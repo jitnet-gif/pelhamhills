@@ -29,3 +29,7 @@ anthropic==0.86.0
 # voice.py 가 `zoneinfo.ZoneInfo("America/Toronto")` 를 쓴다. slim 이미지에는
 # 시간대 데이터베이스가 없어서 이게 없으면 ZoneInfoNotFoundError 로 죽는다.
 tzdata==2024.1
+
+# 예약 확정 문자(MMS)에 붙는 확인 번호 바코드 (`backend/services/barcode_png.py`).
+# 막대 패턴만 쓴다 — PNG 는 직접 쓰므로 Pillow 는 필요 없다.
+python-barcode==0.15.1

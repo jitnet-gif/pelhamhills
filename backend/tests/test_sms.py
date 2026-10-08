@@ -42,8 +42,43 @@ def test_confirm_sends_a_text_with_the_confirmation_code(client):
     sent = [m for m in twilio_sms.sms_messages if m.template == "confirm"]
     assert len(sent) == 1
     assert booking["confirmation_code"] in sent[0].body
-    assert f"Reply C {booking['confirmation_code']}" in sent[0].body
+    assert f"reply C {booking['confirmation_code']}" in sent[0].body
+    assert "call" in sent[0].body  # 취소 방법: 답장 또는 프로 샵 전화
     assert sent[0].status == "skipped"  # 키가 없으니 보내지 않고 기록만
+    assert sent[0].media_url is None  # 로컬은 공개 https 주소가 없어 바코드를 붙이지 않는다
+
+
+def test_confirmation_code_is_six_digits(client):
+    assert book(client)["confirmation_code"].isdigit()
+
+
+def test_confirm_attaches_the_barcode_when_the_api_is_public(client, monkeypatch):
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", "https://example.test/api/v1")
+    booking = book(client)
+
+    [sent] = [m for m in twilio_sms.sms_messages if m.template == "confirm"]
+    assert sent.media_url == f"https://example.test/api/v1/sms/barcode/{booking['confirmation_code']}.png"
+
+
+def test_barcode_is_a_png_for_numeric_codes_only(client):
+    client.app.include_router(sms.router, prefix=API)
+
+    res = client.get(f"{API}/sms/barcode/482915.png")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "image/png"
+    assert res.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+    assert client.get(f"{API}/sms/barcode/4F2K9Q.png").status_code == 404
+
+
+def test_reply_with_the_old_letter_code_still_cancels(client):
+    """숫자로 바뀌기 전에 확인 문자를 받은 손님도 그 코드로 취소할 수 있어야 한다."""
+    booking = book(client)
+
+    reply = sms.cancel_by_reply("+19058921234", voice._legacy_confirmation_code(booking["booking_id"]))
+
+    assert "cancelled" in reply
+    assert status_of(booking["booking_id"]) == ts.BookingStatus.CANCELLED
 
 
 def test_reply_with_code_from_the_booking_phone_cancels(client):

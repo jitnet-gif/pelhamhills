@@ -35,6 +35,7 @@ from backend.api.routes import voice
 from backend.api.routes.retail import TAX_RATE
 from backend.core.config import settings
 from backend.services import supabase_rest
+from backend.services.barcode_png import barcode_url
 from backend.services.twilio_sms import send_sms
 
 logger = logging.getLogger(__name__)
@@ -324,16 +325,19 @@ def book_sim_bay(body: BookSimRequest, background: BackgroundTasks) -> BookSimRe
         # 같은 통화에서 손님이 말을 바꾸면 바로 취소할 수 있게.
         session.revealed.add(_session_key(booked.reservation_id))
 
+    code = booked.confirmation_code
     background.add_task(
         send_sms,
         phone,
         (
             f"{voice.CLUB_NAME}: simulator bay booked, {booked.spoken_date} at {booked.time} for "
-            f"{_hours_word(booked.duration_hours)}. Code {booked.confirmation_code}. "
-            f"Reply C {booked.confirmation_code} to cancel (up to 24 hours before)."
+            f"{_hours_word(booked.duration_hours)}. Confirmation #{code}. "
+            f"To cancel, reply C {code} (up to 24 hours before) or call {settings.PROSHOP_PHONE_NUMBER}. "
+            "Show this barcode at the front desk when you check in."
         ),
         template="confirm",
-        booking_ref=booked.confirmation_code,
+        booking_ref=code,
+        media_url=barcode_url(code),
     )
 
     return BookSimResponse(
@@ -342,8 +346,9 @@ def book_sim_bay(body: BookSimRequest, background: BackgroundTasks) -> BookSimRe
         message=(
             f"Booked. {first} {last}, Bay {booked.bay_number}, {booked.spoken_date} at {booked.time} "
             f"for {_hours_word(booked.duration_hours)}. ${booked.price:.2f} plus HST "
-            f"(${booked.price_with_tax:.2f}), paid at the club. A text with the confirmation code "
-            "is on its way; read the code back one character at a time."
+            f"(${booked.price_with_tax:.2f}), paid at the club. A text with the confirmation number, "
+            "how to cancel, and a barcode for check-in is on its way; read the number back one "
+            "character at a time."
         ),
     )
 

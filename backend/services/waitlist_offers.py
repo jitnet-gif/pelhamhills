@@ -352,9 +352,5 @@ def _accept(entry: dict[str, Any], help_line: str) -> str:
     except supabase_rest.SupabaseUnavailable:
         # 예약은 이미 됐다. 줄은 다음 패스가 `expired` 로 넘긴다 — 손님에게는 상관없다.
         pass
-    players = "player" if summary.party_size == 1 else "players"
-    return (
-        f"Pelham Hills: booked {summary.party_size} {players}, {summary.spoken_date} at "
-        f"{summary.time}. Code {summary.confirmation_code}. "
-        f"Reply C {summary.confirmation_code} to cancel."
-    )
+    # 다른 확정 문자와 같은 문장. 바코드는 이 답장을 돌려주는 `sms.inbound` 가 붙인다.
+    return voice.confirmation_text(summary)

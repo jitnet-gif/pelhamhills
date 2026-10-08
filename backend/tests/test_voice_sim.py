@@ -136,7 +136,7 @@ def test_booking_uses_the_caller_id_and_texts_the_code(client, sim):
                          "customer_name": "Ana Nakamura", "phone": CALLER, "via": "phone"}
     sent = texts("confirm")
     assert len(sent) == 1 and booking["confirmation_code"] in sent[0]
-    assert f"Reply C {booking['confirmation_code']}" in sent[0]
+    assert f"reply C {booking['confirmation_code']}" in sent[0]
     assert "phone" not in booking  # 번호는 비서에게 돌려주지 않는다
 
 

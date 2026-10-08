@@ -43,6 +43,8 @@ from backend.services import (
     tee_waitlist,
     voice_agent,
 )
+from backend.core.config import settings
+from backend.services.barcode_png import barcode_url
 from backend.services.tee_sheet_store import Scope
 from backend.services.twilio_sms import send_sms
 
@@ -557,8 +559,31 @@ class WaitlistResponse(BaseModel):
 # ===== 공용 내부 헬퍼 ==================================================
 
 def _confirmation_code(booking_id: str) -> str:
-    """손님에게 불러 줄 짧은 코드. id 에서 결정론적으로 뽑는다 (따로 저장하지 않는다)."""
+    """손님에게 줄 6자리 숫자 확인 번호. id 에서 결정론적으로 뽑는다 (따로 저장하지 않는다).
+
+    숫자만 쓰는 이유: 문자로 받은 손님이 "C 482915" 를 숫자 자판으로 바로 칠 수 있고,
+    전화로 불러 줄 때 O/0·I/1 을 헷갈리지 않는다. 취소는 발신번호도 맞아야 하므로
+    (`sms.cancel_by_reply`) 다른 손님의 번호와 겹쳐도 남의 예약이 지워지지 않는다.
+    """
+    digest = hashlib.sha256(booking_id.encode()).digest()
+    return f"{int.from_bytes(digest[:8], 'big') % 1_000_000:06d}"
+
+
+def _legacy_confirmation_code(booking_id: str) -> str:
+    """2026-10-08 이전 확인 문자에 실린 영숫자 코드. 그 문자를 받은 손님의 "C <코드>" 취소용."""
     return re.sub(r"[^A-Z0-9]", "", booking_id.upper())[-6:].rjust(6, "0")
+
+
+def confirmation_text(summary: BookingSummary) -> str:
+    """티타임 확정 문자. 전화·문자 예약과 대기자 YES 가 같은 문장을 보낸다."""
+    players_word = "player" if summary.party_size == 1 else "players"
+    code = summary.confirmation_code
+    return (
+        f"{CLUB_NAME}: booked {summary.party_size} {players_word}, {summary.spoken_date} at "
+        f"{summary.time}. Confirmation #{code}. "
+        f"To cancel, reply C {code} (up to {CANCEL_CUTOFF_MINUTES // 60} hours before your tee time) "
+        f"or call {settings.PROSHOP_PHONE_NUMBER}. Show this barcode at the pro shop when you check in."
+    )
 
 
 def _summary(booking: ts.TeeBooking) -> BookingSummary:
@@ -890,18 +915,15 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
         session.revealed.add(summary.booking_id)
 
     players_word = "player" if summary.party_size == 1 else "players"
-    # 확인 문자. 응답이 나간 뒤에 보낸다 — Twilio 가 느려도 에이전트가 기다리지 않게.
+    # 확인 문자 + 바코드(MMS). 응답이 나간 뒤에 보낸다 — Twilio 가 느려도 에이전트가 기다리지 않게.
     # 취소 답장에 코드를 요구하는 이유는 `routes/sms.py` 참고.
     background.add_task(
         send_sms,
         phone,
-        (
-            f"{CLUB_NAME}: booked {summary.party_size} {players_word}, {summary.spoken_date} at "
-            f"{summary.time}. Code {summary.confirmation_code}. "
-            f"Reply C {summary.confirmation_code} to cancel."
-        ),
+        confirmation_text(summary),
         template="confirm",
         booking_ref=summary.confirmation_code,
+        media_url=barcode_url(summary.confirmation_code),
     )
     return ConfirmResponse(
         ok=True,
@@ -909,7 +931,8 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
         message=(
             f"Booked. {first} {last}, {summary.party_size} {players_word} at {summary.time} on "
             f"{summary.spoken_date}. Read back the confirmation code "
-            f"{summary.confirmation_code} one character at a time."
+            f"{summary.confirmation_code} one digit at a time, and tell them the text with the "
+            "confirmation number, how to cancel, and a barcode for check-in is on its way."
         ),
     )
 

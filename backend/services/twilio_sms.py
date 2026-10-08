@@ -58,6 +58,7 @@ class SmsMessage:
     body: str
     template: str | None = None
     booking_ref: str | None = None
+    media_url: str | None = None
     status: str = "queued"  # queued·sent·delivered·failed·skipped·received
     twilio_sid: str | None = None
     error: str | None = None
@@ -77,7 +78,14 @@ def _by_sid(sid: str) -> SmsMessage | None:
     return None
 
 
-async def send_sms(to: str, body: str, template: str | None = None, booking_ref: str | None = None) -> SmsMessage:
+async def send_sms(
+    to: str,
+    body: str,
+    template: str | None = None,
+    booking_ref: str | None = None,
+    media_url: str | None = None,
+) -> SmsMessage:
+    """문자를 보낸다. `media_url` 을 주면 그 그림을 붙인 MMS 가 된다 (예약 확정 바코드)."""
     to_e164 = normalize_phone(to) or to
     msg = SmsMessage(
         direction="out",
@@ -86,6 +94,7 @@ async def send_sms(to: str, body: str, template: str | None = None, booking_ref:
         body=body,
         template=template,
         booking_ref=booking_ref,
+        media_url=media_url,
     )
     sms_messages.insert(0, msg)
     del sms_messages[1000:]
@@ -105,6 +114,8 @@ async def send_sms(to: str, body: str, template: str | None = None, booking_ref:
         "Body": body,
         "StatusCallback": f"{public_api_base()}/sms/status",
     }
+    if media_url:
+        data["MediaUrl"] = media_url
     if settings.TWILIO_MESSAGING_SERVICE_SID:
         data["MessagingServiceSid"] = settings.TWILIO_MESSAGING_SERVICE_SID
     else:

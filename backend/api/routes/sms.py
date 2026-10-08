@@ -4,6 +4,7 @@
                       "book"/"reservation" 첫 문자에는 예약 양식, 그 밖은 문자 예약 비서
   POST /sms/status    Twilio 전달 상태 콜백
   GET  /sms/messages  최근 발송·수신 기록 (Calls & SMS 화면용)
+  GET  /sms/barcode/{code}.png  확정 문자(MMS)에 붙는 확인 번호 바코드
 
 확인 문자는 음성 예약이 확정될 때 `voice.py` 가 보낸다. 여기서는 그 뒤의 일을 한다.
 
@@ -31,6 +32,7 @@ from backend.api.routes import tee_sheet as ts
 from backend.api.routes import voice, voice_sim
 from backend.core.config import settings
 from backend.services import sms_agent, waitlist_offers
+from backend.services.barcode_png import BARCODE_CODE_RE, barcode_url, code128_png
 from backend.services.tee_sheet_store import Scope
 from backend.services.twilio_sms import (
     SmsMessage,
@@ -52,10 +54,14 @@ START_WORDS = {"START", "UNSTOP", "YES", "OPTIN"}
 #: 9am", "End time?" 처럼 평범한 뜻으로 문장을 시작하기 때문이다.
 STOP_FIRST_WORDS = {"STOP", "STOPALL", "UNSUBSCRIBE", "OPTOUT", "REVOKE"}
 
-#: 확인 코드 꼴 (`voice._confirmation_code`). "C u saturday" 같은 문장을 취소로 읽지 않게.
+#: 확인 코드 꼴 (`voice._confirmation_code` 6자리 숫자, 옛 영숫자 코드도). "C u saturday"
+#: 같은 문장을 취소로 읽지 않게.
 CODE_RE = re.compile(r"[A-Z0-9]{6}")
-#: 시뮬레이터 예약 코드 (0003·0016 이 매기는 16진수 10자). 티타임 코드와 길이로 갈린다.
+#: 시뮬레이터 예약 코드 (웹 예약은 16진수 10자, 전화·문자 예약은 0018 부터 숫자 10자리).
+#: 티타임 코드와 길이로 갈린다.
 SIM_CODE_RE = re.compile(r"[0-9A-F]{10}")
+#: 확정 문자 속 확인 번호 (`voice.confirmation_text`). 대기자 YES 답장에 바코드를 붙일 때 쓴다.
+BOOKED_CODE_RE = re.compile(r"Confirmation #(\d{6})\b")
 
 #: 리마인더 두 번. (감사 로그 표시, 보낼 시각을 티타임으로부터 구하는 함수, 문구)
 #: 감사 로그에 남기는 이유: 서버가 재시작돼도 같은 문자를 두 번 보내지 않는다.
@@ -72,8 +78,10 @@ async def _twilio_params(request: Request) -> dict[str, str]:
     return params
 
 
-def _twiml(message: str | None = None) -> Response:
+def _twiml(message: str | None = None, media_url: str | None = None) -> Response:
     inner = f"<Message>{escape(message)}</Message>" if message else ""
+    if message and media_url:
+        inner = f"<Message><Body>{escape(message)}</Body><Media>{escape(media_url)}</Media></Message>"
     return Response(
         content=f'<?xml version="1.0" encoding="UTF-8"?><Response>{inner}</Response>',
         media_type="application/xml",
@@ -93,7 +101,7 @@ def cancel_by_reply(sender: str, code: str) -> str:
     code = code.strip().upper()
     help_line = f"Call {settings.PROSHOP_PHONE_NUMBER} for help."
     if not code:
-        return f"Pelham Hills: reply C and the code from your confirmation text, e.g. C 4F2K9Q. {help_line}"
+        return f"Pelham Hills: reply C and the code from your confirmation text, e.g. C 482915. {help_line}"
 
     today = voice.today_iso()
     now = datetime.now(timezone.utc)
@@ -102,7 +110,8 @@ def cancel_by_reply(sender: str, code: str) -> str:
         for booking in ts.read_bookings(Scope(date_from=today))
         if booking.date >= today
         and _live(booking, now)
-        and voice._confirmation_code(booking.id) == code
+        # 옛 영숫자 코드도 받는다 — 바뀌기 전에 확인 문자를 받은 손님이 아직 있다.
+        and code in (voice._confirmation_code(booking.id), voice._legacy_confirmation_code(booking.id))
         and any(not p.cancelled and voice.normalize_phone(p.phone) == wanted_phone for p in booking.players)
     ]
     if not candidates:
@@ -188,7 +197,9 @@ async def inbound(request: Request, background: BackgroundTasks) -> Response:
         reply = await run_in_threadpool(waitlist_offers.handle_reply, sender, body)
         if reply is not None:
             background.add_task(waitlist_offers.run)  # NO 면 다음 사람에게 바로
-            return _twiml(reply)
+            # YES 로 예약이 됐으면 답장이 곧 확정 문자다 — 다른 확정처럼 바코드를 붙인다.
+            booked = BOOKED_CODE_RE.search(reply)
+            return _twiml(reply, barcode_url(booked.group(1)) if booked else None)
 
     # 수신 거부한 번호에는 비서를 돌리지 않는다. 예약은 되는데 확인 문자도 답장도
     # 못 받는 일이 생긴다.
@@ -203,6 +214,21 @@ async def inbound(request: Request, background: BackgroundTasks) -> Response:
 
     return _twiml(
         f"Pelham Hills: reply C and your code to cancel. For anything else call {settings.PROSHOP_PHONE_NUMBER}."
+    )
+
+
+@router.get("/sms/barcode/{code}.png")
+def barcode_png(code: str) -> Response:
+    """확정 문자(MMS)에 붙는 바코드. Twilio 가 내려받아 손님 휴대폰으로 보낸다.
+
+    공개 경로다 — 그림에는 주소에 이미 있는 숫자 말고 아무 정보도 없다 (`barcode_png`).
+    """
+    if not BARCODE_CODE_RE.fullmatch(code):
+        raise HTTPException(status_code=404, detail="Not Found")
+    return Response(
+        content=code128_png(code),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
     )
 
 

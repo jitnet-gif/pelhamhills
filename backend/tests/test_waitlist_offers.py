@@ -174,7 +174,7 @@ def test_yes_turns_the_hold_into_a_booking(wl, client):
 
     reply = wo.handle_reply(WAITER, "Yes!")
 
-    assert "booked 2 players" in reply and "8:01 AM" in reply and "Reply C" in reply
+    assert "booked 2 players" in reply and "8:01 AM" in reply and "reply C" in reply
     assert wl.row("w1")["status"] == "booked"
     assert holds_on() == []
     [booking] = [b for b in ts.read_bookings(Scope(dates={TOMORROW}))
