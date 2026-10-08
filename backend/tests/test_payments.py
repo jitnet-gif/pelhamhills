@@ -62,6 +62,10 @@ class FakeGateway:
             return self._reply({"messages": {"resultCode": "Error",
                                              "message": [{"code": "E00027", "text": "Gateway said no"}]}})
         ok = {"messages": {"resultCode": "Ok", "message": [{"code": "I00001", "text": "Successful."}]}}
+        if "refId" in payload:
+            ok["refId"] = payload["refId"]     # 진짜처럼 refId 를 돌려준다
+        if kind == "authenticateTestRequest":
+            return self._reply(ok)
         if kind == "getHostedPaymentPageRequest":
             return self._reply({**ok, "token": "TOKEN-123"})
         if kind == "getTransactionDetailsRequest":
@@ -163,6 +167,7 @@ def env(monkeypatch):
     gw, sql = FakeGateway(), FakeSql()
     monkeypatch.setattr(anet, "_transport", httpx.MockTransport(gw))
     monkeypatch.setattr(supabase_rest, "rpc", sql)
+    monkeypatch.setattr(payments, "_credential_check", {"at": None, "result": None, "env": None})
     app = FastAPI()
     app.include_router(payments.router, prefix="/api/v1")
     return TestClient(app), gw, sql
@@ -297,7 +302,11 @@ def test_cancel_before_settlement_voids(env):
     res = client.post(f"{API}/cancel", json=creds())
     assert res.status_code == 200, res.text
     assert res.json()["booking_cancelled"] is True
-    req = gw.of("createTransactionRequest")[-1]["transactionRequest"]
+    top = gw.of("createTransactionRequest")[-1]
+    # Getting Started: 요소 순서는 스키마 순서, refId(20자 이내)는 우리 invoice.
+    assert list(top) == ["merchantAuthentication", "refId", "transactionRequest"]
+    assert top["refId"] == invoice
+    req = top["transactionRequest"]
     assert req == {"transactionType": "voidTransaction", "refTransId": tid}
     fin = sql.called("pelham_online_refund_finish")[-1]["p"]
     assert fin["cancel_booking"] is True and fin["refund_kind"] == "void"
@@ -408,3 +417,28 @@ def test_webhook_db_down_asks_for_retry(env):
     sql.refuse["pelham_online_pay_complete"] = supabase_rest.SupabaseUnavailable("down")
     res = _signed(client, {"eventType": "net.authorize.payment.authcapture.created", "payload": {"id": tid}})
     assert res.status_code == 503
+
+
+# ===== 키 확인 (authenticateTestRequest) ==============================
+
+def test_config_reports_valid_credentials_and_caches(env):
+    client, gw, _ = env
+    body = client.get(f"{API}/config").json()
+    assert body == {"enabled": True, "environment": "sandbox", "credentials": "ok"}
+    client.get(f"{API}/config")
+    assert len(gw.of("authenticateTestRequest")) == 1      # 10분 동안은 다시 묻지 않는다
+
+
+def test_config_reports_rejected_credentials(env):
+    client, gw, _ = env
+    gw.fail.add("authenticateTestRequest")
+    assert client.get(f"{API}/config").json()["credentials"] == "rejected"
+
+
+def test_config_without_keys(monkeypatch):
+    monkeypatch.delenv("AUTHORIZE_NET_API_LOGIN_ID", raising=False)
+    monkeypatch.setattr(payments, "_credential_check", {"at": None, "result": None, "env": None})
+    app = FastAPI()
+    app.include_router(payments.router, prefix="/api/v1")
+    body = TestClient(app).get(f"{API}/config").json()
+    assert body["enabled"] is False and body["credentials"] == "missing"

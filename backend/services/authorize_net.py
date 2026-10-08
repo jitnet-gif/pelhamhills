@@ -269,10 +269,21 @@ def find_unsettled(invoice: str, limit: int = 100) -> list[str]:
     ]
 
 
-def _transact(request: dict[str, Any]) -> str:
-    body = _post({
-        "createTransactionRequest": {"merchantAuthentication": _auth(), "transactionRequest": request}
-    })
+def authenticate_test() -> None:
+    """키가 맞는지만 확인한다(`authenticateTestRequest`, Getting Started). 틀리면 GatewayError(E00007 등)."""
+    _post({"authenticateTestRequest": {"merchantAuthentication": _auth()}})
+
+
+def _transact(request: dict[str, Any], ref_id: str | None = None) -> str:
+    """createTransactionRequest. 성공 = 최상위 resultCode Ok **그리고** transactionResponse.responseCode "1".
+    refId(20자 이내)는 응답에 그대로 돌아온다 — 우리 invoice 를 넣어 로그에서 짝을 맞춘다."""
+    payload: dict[str, Any] = {"merchantAuthentication": _auth()}
+    if ref_id:
+        payload["refId"] = ref_id[:20]
+    payload["transactionRequest"] = request
+    body = _post({"createTransactionRequest": payload})
+    if ref_id and body.get("refId") not in (None, ref_id[:20]):
+        logger.warning("Authorize.net refId 불일치: 보낸 %s, 받은 %s", ref_id[:20], body.get("refId"))
     tr = body.get("transactionResponse") or {}
     if str(tr.get("responseCode")) != "1":
         errors = tr.get("errors") or [{}]
@@ -281,14 +292,15 @@ def _transact(request: dict[str, Any]) -> str:
     return str(tr.get("transId") or "")
 
 
-def reverse(trans_id: str, amount_cents: int) -> tuple[str, str]:
+def reverse(trans_id: str, amount_cents: int, ref_id: str | None = None) -> tuple[str, str]:
     """거래를 카드에 되돌린다. 정산 전이면 void, 정산 뒤면 전액 refund.
-    반환: (kind 'void'|'refund', 새 거래 ID — void 는 원거래 ID 그대로)."""
+    반환: (kind 'void'|'refund', 새 거래 ID — void 는 원거래 ID 그대로). ref_id 는 보통 우리 invoice."""
     t = transaction_details(trans_id)
+    ref_id = ref_id or t.invoice or None
     if t.status in _ALREADY_REVERSED:
         return ("void" if t.status == "voided" else "refund", t.trans_id)
     if t.status in _VOIDABLE:
-        _transact({"transactionType": "voidTransaction", "refTransId": t.trans_id})
+        _transact({"transactionType": "voidTransaction", "refTransId": t.trans_id}, ref_id)
         return "void", t.trans_id
     if t.status in _SETTLED:
         if not t.card_last4:
@@ -298,7 +310,7 @@ def reverse(trans_id: str, amount_cents: int) -> tuple[str, str]:
             "amount": dollars(amount_cents),
             "payment": {"creditCard": {"cardNumber": t.card_last4, "expirationDate": "XXXX"}},
             "refTransId": t.trans_id,
-        })
+        }, ref_id)
         return "refund", new_id
     raise GatewayError(f"This payment cannot be reversed automatically (status {t.status or 'unknown'}).")
 

@@ -85,7 +85,7 @@ def _settle(txn: anet.Transaction, invoice: str | None = None) -> dict[str, Any]
     if result and result.get("needs_reversal"):
         target = str(result.get("reversal_trans_id") or txn.trans_id)
         try:
-            kind, new_id = anet.reverse(target, txn.amount_cents)
+            kind, new_id = anet.reverse(target, txn.amount_cents, result.get("invoice"))
         except anet.GatewayError as exc:
             # 돈은 받았는데 장부에 없다. 사람이 봐야 한다 — 로그에 남기고 손님에게는 전화 안내.
             logger.error("되돌림 실패: invoice=%s trans=%s (%s)", result.get("invoice"), target, exc.message)
@@ -199,7 +199,7 @@ def cancel_and_refund(body: GuestCredentials) -> dict[str, Any]:
     begun = _rpc("pelham_online_refund_begin", {"p_code": body.code, "p_email": body.email})
     invoice, trans_id, amount = begun["invoice"], str(begun["trans_id"]), int(begun["amount_cents"])
     try:
-        kind, new_id = anet.reverse(trans_id, amount)
+        kind, new_id = anet.reverse(trans_id, amount, invoice)
     except anet.GatewayError as exc:
         logger.warning("취소 환불 실패: invoice=%s (%s)", invoice, exc.message)
         try:
@@ -284,8 +284,33 @@ async def authorize_net_webhook(request: Request) -> dict[str, Any]:
     return {"ok": True, "ignored": event_type}
 
 
+# 키 확인 결과(authenticateTestRequest)를 잠깐 기억한다. 화면마다 카드사를 두드리지 않게.
+_CREDENTIAL_TTL = timedelta(minutes=10)
+_credential_check: dict[str, Any] = {"at": None, "result": None, "env": None}
+
+
+def credentials_status() -> str:
+    """"ok" · "rejected"(키가 틀림) · "unreachable"(카드사가 안 닿음) · "missing"(키 없음)."""
+    if not anet.configured():
+        return "missing"
+    now = datetime.now(timezone.utc)
+    cached = _credential_check
+    if cached["at"] and cached["env"] == anet.environment() and now - cached["at"] < _CREDENTIAL_TTL:
+        return cached["result"]
+    try:
+        anet.authenticate_test()
+        result = "ok"
+    except anet.GatewayError as exc:
+        # E00007 = 인증 실패, E00124 = 키가 무효. 그 밖(연결·HTTP 오류)은 안 닿은 것으로 본다.
+        result = "rejected" if exc.code.startswith("E") else "unreachable"
+        logger.warning("Authorize.net 키 확인 실패: %s %s", exc.code, exc.message)
+    cached.update(at=now, result=result, env=anet.environment())
+    return result
+
+
 @router.get("/config")
 def payment_config() -> dict[str, Any]:
-    """화면이 Pay 버튼을 보일지 정한다. 키는 내보내지 않는다."""
-    return {"enabled": anet.configured(), "environment": anet.environment()}
+    """결제가 켜져 있는가(키가 있다), 키가 카드사에서 통하는가. 키 값은 내보내지 않는다.
+    `credentials` 는 배포 확인용이다 — 키를 넣고 이 주소를 열면 바로 맞는지 안다."""
+    return {"enabled": anet.configured(), "environment": anet.environment(), "credentials": credentials_status()}
 

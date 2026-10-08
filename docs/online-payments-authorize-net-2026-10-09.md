@@ -41,7 +41,7 @@ FastAPI (Fly)  ──2. pelham_online_pay_start (금액 결정, invoice PHW…)�
 | 코드 | 역할 |
 |---|---|
 | `supabase/migrations/0020_online_payments.sql` | `pelham_online_payments` 표, service_role 전용 함수 7개, 계산서 보호 트리거 |
-| `backend/services/authorize_net.py` | Authorize.net JSON API: 결제 폼 토큰, 거래 조회, 미정산 목록, void/refund, 웹훅 서명 |
+| `backend/services/authorize_net.py` | Authorize.net JSON API: 키 확인, 결제 폼 토큰, 거래 조회, 미정산 목록, void/refund(refId = invoice), 웹훅 서명 |
 | `backend/api/routes/payments.py` | `/payments/online/{quote,checkout,status,cancel,webhook,config}` |
 | `frontend/components/booking/PayOnline.tsx` | 확정 화면·조회 화면의 결제 칸 |
 | `frontend/app/book/pay/page.tsx` | 결제 뒤 돌아오는 화면(결과 확인·대기) |
@@ -60,6 +60,9 @@ FastAPI (Fly)  ──2. pelham_online_pay_start (금액 결정, invoice PHW…)�
      AUTHORIZE_NET_SIGNATURE_KEY=... AUTHORIZE_NET_ENV=sandbox
    ```
    키가 들어가는 순간 Pay 버튼이 보인다. 빼면 다시 숨는다.
+   확인: `https://pelham-hills-api.fly.dev/api/v1/payments/online/config` 가
+   `{"enabled":true,"environment":"sandbox","credentials":"ok"}` 이면 키가 맞다(`authenticateTestRequest`, 10분 캐시).
+   `rejected` 면 Login ID·Transaction Key 가 틀렸거나 sandbox/production 이 뒤바뀐 것이다.
 4. **웹훅**: Merchant Interface → Account → Webhooks → Add Endpoint
    `https://pelham-hills-api.fly.dev/api/v1/payments/online/webhook`, 이벤트
    `authcapture.created`, `refund.created`, `void.created`, `fraud.approved`. (없어도 결과 화면이 직접 확인하지만,
@@ -70,7 +73,7 @@ FastAPI (Fly)  ──2. pelham_online_pay_start (금액 결정, invoice PHW…)�
 
 ## 시험 방법
 
-- 백엔드: `python -m pytest backend/tests/test_payments.py -q` (20개, 네트워크 없음 — Authorize.net·SQL 가짜).
+- 백엔드: `python -m pytest backend/tests/test_payments.py -q` (23개, 네트워크 없음 — Authorize.net·SQL 가짜).
 - SQL: 0001–0020 을 로컬 Postgres 에 올리고 시나리오 41개(승인·거절·중복·금액 불일치·가격 변경·취소 환불·
   마감 후 취소·POS 환불 차단·실내 골프·직원 환불 웹훅). 0019 가 있든 없든 통과.
 - 샌드박스 카드: Visa `4111 1111 1111 1111`, 유효기간 미래 아무 날, CVV `123`. 거절을 보려면 금액을 바꿀 수 없으니
@@ -78,6 +81,16 @@ FastAPI (Fly)  ──2. pelham_online_pay_start (금액 결정, invoice PHW…)�
 - 확인할 것: Pay → Authorize.net 폼 → Pay → Continue → `/book/pay` 에 "Payment received" → 티 시트에
   플레이어 paid, Reports 에 station online 영수증 → `/book/lookup` 에서 Cancel and refund → 예약 cancelled,
   계산서 refunded, Authorize.net 에 Void.
+
+## API 규칙 (Getting Started 대조)
+
+- POST, `Content-Type: application/json`, 샌드박스 `apitest.authorize.net` / 운영 `api.authorize.net` `/xml/v1/request.api`.
+- JSON 은 XML 로 바뀌므로 **요소 순서가 스키마 순서**여야 한다(테스트가 순서를 검사한다). 응답 앞의 BOM 은 벗긴다.
+- 성공 판정: 최상위 `messages.resultCode == "Ok"`, 거래는 추가로 `transactionResponse.responseCode == "1"`.
+  실패 문구는 `transactionResponse.errors[0].errorText` 를 먼저 쓴다.
+- `refId`(20자 이내): 결제 폼·void·refund 에 우리 invoice 를 넣고, 응답의 refId 가 다르면 로그를 남긴다.
+- 길이: invoiceNumber 20(우리는 15), description 255, billTo 이름 50.
+- `solution` ID 는 리셀러 파트너용이라 쓰지 않는다. `transHashSha2` 는 쓰지 않는다 — 결과는 늘 거래 ID 로 다시 조회한다.
 
 ## 아직 모르는 것
 
