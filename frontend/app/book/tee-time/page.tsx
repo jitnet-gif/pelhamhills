@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import BookingShell from "@/components/booking/BookingShell";
+import PayOnline from "@/components/booking/PayOnline";
 import VoiceBooking from "@/components/booking/VoiceBooking";
 import {
   DAY_PART_LABEL,
@@ -654,7 +655,8 @@ function BookingForm({
       </button>
 
       <p className="mt-3 text-xs text-[#5c6459]">
-        Green fees are paid at the pro shop. Please arrive 15 minutes before your tee time.
+        Pay green fees online right after booking, or at the pro shop. Please arrive 15 minutes before
+        your tee time.
       </p>
     </div>
   );
@@ -692,6 +694,8 @@ function Confirmation({
 }) {
   const players = booking.players.length;
   const code = booking.confirmationCode ?? booking.id;
+  // 온라인 결제의 본인 확인도 조회 화면과 같다: 코드 + 예약한 사람의 이메일.
+  const email = booking.players.find((p) => p.email)?.email ?? "";
   return (
     <div className="min-w-0">
       <div className="rounded-sm border border-[#d8d1c3] bg-white p-6 text-center">
@@ -729,6 +733,8 @@ function Confirmation({
           up to 24 hours before — or call the pro shop at {CLUB.phone}.
         </p>
       </div>
+
+      {booking.confirmationCode && email ? <PayOnline creds={{ code, email }} /> : null}
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Link

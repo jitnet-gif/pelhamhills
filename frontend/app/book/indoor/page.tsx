@@ -22,6 +22,7 @@
 import { useState, useEffect } from "react";
 
 import BookingShell from "@/components/booking/BookingShell";
+import PayOnline from "@/components/booking/PayOnline";
 import { formatLongDate, todayIso } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
@@ -617,9 +618,9 @@ export default function IndoorGolfBooking() {
           {/* Booking Policies */}
           <div className="mb-6 text-sm text-[#5c6459]">
             <ul className="list-disc space-y-2 pl-5">
-              {/* 온라인에서는 돈을 받지 않는다. 와서 프런트에서 계산서로 낸다(0008). */}
+              {/* 결제는 선택이다: 확정 화면의 Pay now(Authorize.net, 0020) 또는 와서 프런트에서 계산서로(0008). */}
               <li className="font-semibold text-[#214d2f]">
-                No payment now — you pay at the front desk when you arrive.
+                Pay online after you book, or at the front desk when you arrive.
               </li>
               {/* 시스템이 실제로 지키는 규칙만 적는다: 온라인·전화·문자 변경·취소는 시작 24시간
                   전까지(0012·0016). 수수료 규칙은 시스템에 없으므로 적지 않는다. */}
@@ -688,7 +689,7 @@ export default function IndoorGolfBooking() {
                 <p className="font-semibold text-[#214d2f]">
                   ${reservation.total_price.toFixed(2)}
                 </p>
-                <p className="text-xs text-[#5c6459]">+ HST · pay on arrival</p>
+                <p className="text-xs text-[#5c6459]">+ HST · pay online or on arrival</p>
                 <p className="text-[#5c6459]">
                   {reservation.player_count} player
                   {reservation.player_count > 1 ? "s" : ""}
@@ -717,9 +718,11 @@ export default function IndoorGolfBooking() {
             any questions.
           </p>
 
+          <PayOnline creds={{ code: reservation.confirmation_code, email: customerEmail }} />
+
           {/* 확인 코드로 다시 찾아볼 수 있는 자리를 준다. */}
           <a
-            className="tap-target flex items-center justify-center rounded-sm bg-[#214d2f] px-6 text-base font-bold text-white transition hover:bg-[#163820]"
+            className="tap-target mt-5 flex items-center justify-center rounded-sm bg-[#214d2f] px-6 text-base font-bold text-white transition hover:bg-[#163820]"
             href={lookupHref(reservation.confirmation_code)}
           >
             View or change this booking

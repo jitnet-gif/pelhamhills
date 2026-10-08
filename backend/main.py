@@ -63,6 +63,9 @@ VOICE_ONLY = PUBLIC_SURFACE == "voice"
 include_route_module("backend.api.routes.voice", f"{settings.API_V1_STR}", ["Voice Booking"])
 include_route_module("backend.api.routes.voice_sim", f"{settings.API_V1_STR}", ["Voice Booking"])
 include_route_module("backend.api.routes.sms", f"{settings.API_V1_STR}", ["SMS (Twilio)"])
+# 손님 온라인 결제(Authorize.net). 예약 사이트는 정적 export 라 카드사 키를 둘 곳이 이 서버뿐이다.
+# 본인 확인(확인 코드 + 이메일)과 금액은 SQL 함수(0020, service_role 전용)가 정한다.
+include_route_module("backend.api.routes.payments", f"{settings.API_V1_STR}", ["Online Payments"])
 
 if VOICE_ONLY:
     logger.warning(

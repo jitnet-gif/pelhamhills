@@ -16,6 +16,11 @@
  * - 바꿀 수 있는지(`editable`)와 못 바꾸는 이유(`reason`)는 서버가 돌려준다. 원래 시작 24시간
  *   전이 마감인데, 손님 기기 시계가 아니라 서버(클럽 현지) 시계로 판정해야 하기 때문이다.
  * - 시간 목록의 "꽉 참" 표시는 안내일 뿐이다. 마지막 판정은 저장할 때 서버가 한다.
+ *
+ * ## 온라인 결제(0020)
+ * - `PayOnline` 이 결제 칸을 그린다(낼 수 있으면 Pay now, 냈으면 영수증 한 줄).
+ * - 온라인으로 낸 예약은 0012 기준으로 "결제됨" 이라 수정·일반 취소가 닫힌다. 대신 마감 전이면
+ *   **취소 + 자동 환불**(FastAPI `/payments/online/cancel`)을 연다. 수정은 프로 샵에서 한다.
  */
 
 // `useSearchParams` 는 아래 `LookupPanel` 에서만 쓴다 — 반드시 Suspense 경계 안쪽이다.
@@ -23,8 +28,10 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 
 import BookingShell from "@/components/booking/BookingShell";
+import PayOnline from "@/components/booking/PayOnline";
 import { formatLongDate, todayIso } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
+import { cancelAndRefund, money, type PaymentQuote } from "@/lib/booking/payments";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
 import { CLUB } from "@/lib/nav";
@@ -144,6 +151,8 @@ function LookupPanel() {
   const [creds, setCreds] = useState<Credentials | null>(null);
   const [mode, setMode] = useState<"view" | "edit" | "cancel">("view");
   const [done, setDone] = useState("");
+  /** 온라인 결제 견적·상태. 결제 서버가 꺼져 있거나 닿지 않으면 null. */
+  const [payQuote, setPayQuote] = useState<PaymentQuote | null>(null);
 
   useEffect(() => {
     setBookingReady(bookingConfigured());
@@ -153,6 +162,7 @@ function LookupPanel() {
     const wanted = { code: code.trim(), email: email.trim() };
     if (!wanted.code || !wanted.email) return;
     setFound(null);
+    setPayQuote(null);
     setError("");
     setDone("");
     setMode("view");
@@ -187,8 +197,25 @@ function LookupPanel() {
     setDone(message);
   }
 
+  /** 환불·취소 뒤 예약 카드를 서버 값으로 다시 그린다. */
+  async function reload(message: string) {
+    if (!creds) return;
+    try {
+      const next = await bookingRpc<Found | null>("pelham_booking_find", {
+        p_code: creds.code,
+        p_email: creds.email,
+      });
+      if (next) applied(next, message);
+      else setDone(message);
+    } catch {
+      setDone(message);
+    }
+  }
+
   const offline = bookingReady === false;
   const trimmed = code.trim();
+  const paidOnline =
+    payQuote?.enabled === true && payQuote.payment?.status === "approved" ? payQuote : null;
 
   return (
     <div className="min-w-0">
@@ -282,7 +309,23 @@ function LookupPanel() {
             <TeeCard booking={found.booking} />
           )}
 
-          {found.editable ? (
+          {/* key: 취소·환불 뒤(done 이 바뀌면) 결제 상태를 다시 묻는다. */}
+          <PayOnline creds={creds} key={`${creds.code}|${done}`} onQuote={setPayQuote} />
+
+          {paidOnline ? (
+            <PaidOnlineActions
+              creds={creds}
+              deadline={found.change_deadline}
+              kind={found.kind}
+              mode={mode}
+              onMode={(next) => {
+                setDone("");
+                setMode(next);
+              }}
+              onRefunded={(message) => void reload(message)}
+              quote={paidOnline}
+            />
+          ) : found.editable ? (
             mode === "edit" ? (
               found.kind === "sim" ? (
                 <SimEditForm
@@ -1012,6 +1055,116 @@ function CancelConfirm({
           Keep my booking
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * 온라인으로 낸 예약: 수정은 프로 샵, 취소는 마감 전이면 여기서 하고 카드에 자동 환불된다.
+ * 환불이 카드사에서 실패하면 예약은 그대로 남는다(서버가 되돌린다) — 손님에게 전화를 안내한다.
+ */
+function PaidOnlineActions({
+  creds,
+  deadline,
+  kind,
+  mode,
+  onMode,
+  onRefunded,
+  quote,
+}: {
+  creds: Credentials;
+  deadline: string;
+  kind: Found["kind"];
+  mode: "view" | "edit" | "cancel";
+  onMode: (next: "view" | "cancel") => void;
+  onRefunded: (message: string) => void;
+  quote: Extract<PaymentQuote, { enabled: true }>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const paid = quote.payment!;
+  const allowed = quote.cancel_refund?.allowed === true;
+  const card = paid.card_last4 ? `${paid.card_brand || "card"} ending ${paid.card_last4}` : "card";
+
+  async function cancel() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await cancelAndRefund(creds);
+      onRefunded(
+        result.booking_cancelled
+          ? `Your booking has been cancelled and ${money(paid.amount)} is going back to your ${card}.`
+          : `${money(paid.amount)} is going back to your ${card}. The pro shop will finish cancelling your booking.`,
+      );
+    } catch (err) {
+      setError(networkMessage(err, "Your booking could not be cancelled."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!allowed) {
+    return (
+      <Notice tone="warn" title="This booking can't be changed online">
+        <p>
+          {quote.cancel_refund?.reason ?? "This booking was paid online."} Please call the pro shop and they
+          will help.
+        </p>
+      </Notice>
+    );
+  }
+
+  if (mode === "cancel") {
+    return (
+      <div className="mt-3 rounded-sm border border-[#e0b3b3] bg-[#fbeeee] p-5 text-[#8a2f2f]">
+        <p className="font-semibold">Cancel and refund {money(paid.amount)}?</p>
+        <p className="mt-1 text-sm">
+          The {kind === "sim" ? "bay" : "tee time"} will be released for other golfers and the full amount goes
+          back to your {card}. This can&apos;t be undone online.
+        </p>
+        {error ? (
+          <p className="mt-3 text-sm font-semibold" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
+          <button
+            className={`tap-target rounded-sm px-5 text-base font-bold text-white transition ${
+              busy ? "cursor-not-allowed bg-[#a9b0a6]" : "bg-[#8a2f2f] hover:bg-[#6e2424]"
+            }`}
+            disabled={busy}
+            onClick={() => void cancel()}
+            type="button"
+          >
+            {busy ? "Refunding…" : "Yes, cancel and refund"}
+          </button>
+          <button
+            className="tap-target rounded-sm border border-[#d8d1c3] bg-white px-5 text-base font-bold text-[#214d2f] transition hover:bg-[#f7f4ed]"
+            disabled={busy}
+            onClick={() => onMode("view")}
+            type="button"
+          >
+            Keep my booking
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-sm border border-[#d8d1c3] bg-white p-4">
+      <p className="text-sm text-[#5c6459]">
+        You paid online, so changes are made by the pro shop. You can cancel here for a full refund until{" "}
+        <span className="font-semibold text-[#182118]">{formatDeadline(deadline)}</span> (24 hours before the
+        start).
+      </p>
+      <button
+        className="tap-target mt-3 w-full rounded-sm border border-[#e0b3b3] bg-white px-5 text-base font-bold text-[#8a2f2f] transition hover:bg-[#fbeeee]"
+        onClick={() => onMode("cancel")}
+        type="button"
+      >
+        Cancel and refund
+      </button>
     </div>
   );
 }
