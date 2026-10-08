@@ -4,10 +4,13 @@
  * 합산 계산서 한 장. 리테일 계산대·스낵바·티 시트가 **같은 컴포넌트**를 쓴다 — 두 벌이면
  * 한쪽에만 결제 규칙이 추가된다.
  *
- * 결제 순서(단말기가 앱과 연동되기 전, "keyed")
+ * 결제 순서
  * 1. 계산서가 다 차면 결제 줄을 하나씩 더한다. 카드·체크카드 줄을 더하는 순간 서버에서 합계를
- *    다시 읽는다 — 직원이 DX8000 에 치는 금액이 곧 그 값이다.
- * 2. 직원이 DX8000 에서 그 금액을 받고, 단말기 전표의 승인번호를 여기 적는다.
+ *    다시 읽는다 — 단말기로 가는 금액이 곧 그 값이다.
+ * 2. 단말기 연동이 켜진 기기(`lib/pos/terminal.ts`, "integrated"): 금액이 DX8000 으로 가고, 손님이 카드를
+ *    대면 승인번호·끝 4자리·팁이 저절로 결제 줄이 된다. 승인은 Charge 전에 이미 서버에 남는다(0019) —
+ *    화면을 닫았다 열어도 결제 줄이 되살아난다. 결제 줄을 지우면 단말기에서 VOID(체크카드는 REFUND)한다.
+ *    연동이 꺼진 기기("keyed"): 직원이 DX8000 에 금액을 치고 전표의 승인번호를 여기 적는다.
  * 3. 남은 금액이 0 이 되면 Charge. 서버는 한 트랜잭션에서 재고·티 시트 paid·영수증 번호를 처리한다.
  *
  * 현금은 받은 돈을 적으면 거스름돈을 보여 주고, 서버에는 **계산서에 들어간 몫**만 보낸다
@@ -21,6 +24,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { newCheckoutId, TERMINAL_METHODS, type Bill, type BillStation, type PaymentInput } from "@/lib/pos/api";
 import { billActions, recentCashiers, rememberCashier, rememberedCashier, useCurrentBill } from "@/lib/pos/currentBill";
+import {
+  certificatePageUrl,
+  describeTerminalResult,
+  normalizeTerminalUrl,
+  terminal,
+  terminalEnabled,
+  TerminalError,
+  useTerminalSettings,
+  writeTerminalSettings,
+  type TerminalMode,
+  type TerminalRecord,
+  type TerminalSettings,
+} from "@/lib/pos/terminal";
 import {
   describeRainCheckError,
   isRainCheckCode,
@@ -70,7 +86,27 @@ function subscribeAutoPrint(listener: () => void): () => void {
 
 // ===== 본체 ============================================================
 
-type PendingPayment = PaymentInput & { key: number; cashReceived?: number };
+type PendingPayment = PaymentInput & { key: number; cashReceived?: number; terminalRecord?: TerminalRecord };
+
+/** 단말기 승인 기록 → 결제 줄. */
+function fromTerminal(key: number, record: TerminalRecord): PendingPayment {
+  return {
+    key,
+    method: record.card_type === "debit" ? "debit" : "card",
+    amount: record.requested_amount,
+    ...(record.tip > 0 ? { tip: record.tip } : {}),
+    ...(record.auth_code ? { auth_code: record.auth_code } : {}),
+    ...(record.card_last4 ? { card_last4: record.card_last4 } : {}),
+    terminal_txn: record.id,
+    terminalRecord: record,
+  };
+}
+
+function terminalErrorText(error: unknown): string {
+  if (error instanceof TerminalError) return error.message;
+  if (error instanceof Error && error.message) return error.message;
+  return "The terminal did not answer. Look at its screen before trying again.";
+}
 
 /** 서버에 보내는 모양. 화면용 key·받은 현금은 뺀다. */
 function toPaymentInput(payment: PendingPayment): PaymentInput {
@@ -81,6 +117,7 @@ function toPaymentInput(payment: PendingPayment): PaymentInput {
     ...(payment.auth_code ? { auth_code: payment.auth_code } : {}),
     ...(payment.card_last4 ? { card_last4: payment.card_last4 } : {}),
     ...(payment.rain_check_code ? { rain_check_code: payment.rain_check_code } : {}),
+    ...(payment.terminal_txn ? { terminal_txn: payment.terminal_txn } : {}),
   };
 }
 
@@ -98,6 +135,8 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
   const current = useCurrentBill();
   const { bill, openBills, busy, error, missing } = current;
   const autoPrint = useSyncExternalStore(subscribeAutoPrint, readAutoPrint, () => false);
+  const terminalSettings = useTerminalSettings();
+  const useTerminal = terminalEnabled(terminalSettings);
 
   const [receipt, setReceipt] = useState<Sale | null>(null);
   const [payments, setPayments] = useState<PendingPayment[]>([]);
@@ -118,6 +157,39 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
     setPaymentsFor(billId);
     setPayments([]);
   }
+
+  // 단말기가 승인했는데 Charge 전에 화면이 닫혔던 결제를 되살린다(서버 기록, 0019). 지난번에 서버에
+  // 못 남긴 결과가 이 브라우저에 있으면 먼저 남긴다.
+  const [terminalNote, setTerminalNote] = useState("");
+  useEffect(() => {
+    if (!billId || !useTerminal || demo) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await terminal.recoverPending(terminalSettings);
+        const approved = await terminal.pending(billId);
+        if (cancelled || approved.length === 0) return;
+        setPayments((current) => {
+          const known = new Set(current.map((payment) => payment.terminal_txn));
+          const restored = approved.filter((record) => !known.has(record.id));
+          return restored.length === 0
+            ? current
+            : [...current, ...restored.map((record) => fromTerminal(-record.id, record))];
+        });
+        setTerminalNote(
+          `${approved.length} card payment${approved.length === 1 ? " was" : "s were"} already approved on the terminal for this bill and ${
+            approved.length === 1 ? "is" : "are"
+          } back on the list.`,
+        );
+      } catch {
+        // 되살리기만 못 했다. 결제는 계속할 수 있고, 다음에 이 계산서를 열 때 다시 본다.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 계산서를 열 때 한 번.
+  }, [billId, useTerminal, demo]);
 
   // 담당자 이름. 담당자별 마감과 팁 나누기가 이 이름으로 묶인다(0010). 계산서에 없으면 이 기기가
   // 마지막으로 쓴 이름을 미리 넣는다 — 서버에는 칸을 떠날 때나 Charge 직전에 보낸다.
@@ -225,10 +297,13 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
           </dl>
 
           <div ref={paymentsRef}>
+            {terminalNote ? <p className="bg-[#eef6f0] px-2 py-2 text-xs text-[#1f6b3a]">{terminalNote}</p> : null}
             <PaymentsEditor
+              billId={bill.id}
               payments={payments}
               remaining={remaining}
               setPayments={setPayments}
+              terminalSettings={terminalSettings}
             />
           </div>
 
@@ -273,6 +348,7 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
             />
             Print receipt after charge
           </label>
+          <TerminalSetup settings={terminalSettings} />
           <Button
             className="min-h-14 text-base"
             disabled={demo || charging || busy || !canCharge}
@@ -422,13 +498,17 @@ function BillLineRow({ line, station }: { line: Bill["lines"][number]; station: 
 // ===== 결제 줄 ==========================================================
 
 function PaymentsEditor({
+  billId,
   payments,
   remaining,
   setPayments,
+  terminalSettings,
 }: {
+  billId: number;
   payments: PendingPayment[];
   remaining: number;
   setPayments: (update: (current: PendingPayment[]) => PendingPayment[]) => void;
+  terminalSettings: TerminalSettings;
 }) {
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [amountInput, setAmountInput] = useState("");
@@ -492,6 +572,12 @@ function PaymentsEditor({
   const rcLeftOver = rcFound && rcUsable ? rcFound.amount - rcApplied : 0;
 
   const needsTerminal = TERMINAL_METHODS.includes(method);
+  // 단말기 연동: 금액을 단말기로 보낸다. 단말기가 꺼졌으면 "Enter manually" 로 예전처럼 친다.
+  const [manual, setManual] = useState(false);
+  const integrated = needsTerminal && terminalEnabled(terminalSettings) && !manual;
+  const [terminalStatus, setTerminalStatus] = useState("");
+  const [running, setRunning] = useState(false);
+  const [removing, setRemoving] = useState<number | null>(null);
   // 팁은 계산서 합계 밖이다(매출이 아니라 직원 몫 — 마감에서 근무시간으로 나눈다).
   // 카드·체크카드는 DX8000 전표의 팁을, 현금은 손님이 "잔돈은 두세요" 한 만큼을 적는다.
   const tip = tipInput.trim() ? parseMoney(tipInput) : 0;
@@ -543,6 +629,30 @@ function PaymentsEditor({
         setFormError(`Only ${formatMoney(freshRemaining)} is left on the bill. Check the amount on the terminal.`);
         return;
       }
+      if (integrated) {
+        if (typed <= 0) {
+          setFormError("Enter an amount above $0.00.");
+          return;
+        }
+        setRunning(true);
+        setTerminalStatus("Sending to the terminal…");
+        try {
+          const record = await terminal.sale(terminalSettings, billId, typed, setTerminalStatus);
+          if (!record.approved) {
+            setFormError(describeTerminalResult(record));
+            return;
+          }
+          const key = keyRef.current++;
+          setPayments((current) => [...current, fromTerminal(key, record)]);
+          setAmountInput("");
+        } catch (error) {
+          setFormError(terminalErrorText(error));
+        } finally {
+          setRunning(false);
+          setTerminalStatus("");
+        }
+        return;
+      }
       if (!authCode.trim()) {
         setFormError("Enter the approval code printed by the Chase terminal.");
         return;
@@ -588,6 +698,51 @@ function PaymentsEditor({
     setTipInput("");
   }
 
+  /**
+   * 결제 줄 지우기. 단말기가 승인한 줄은 돈이 이미 나갔으니 단말기에서 먼저 무른다:
+   * 신용카드는 VOID(카드 필요 없음), 체크카드는 VOID 가 안 돼서 REFUND(손님이 카드를 다시 댄다).
+   */
+  async function removePayment(payment: PendingPayment) {
+    const record = payment.terminalRecord;
+    if (!record) {
+      setPayments((current) => current.filter((item) => item.key !== payment.key));
+      return;
+    }
+    const debit = record.card_type === "debit";
+    const amount = record.requested_amount + record.tip;
+    const ok = window.confirm(
+      debit
+        ? `Refund ${formatMoney(amount)} to the customer's debit card? They will tap the card on the terminal again.`
+        : `Void the ${formatMoney(amount)} card payment on the terminal? The customer is not charged.`,
+    );
+    if (!ok) return;
+    setFormError("");
+    setRemoving(payment.key);
+    setTerminalStatus(debit ? "Refunding on the terminal…" : "Voiding on the terminal…");
+    try {
+      const result = debit
+        ? await terminal.refund(terminalSettings, billId, amount, {
+            onStatus: setTerminalStatus,
+            cancels: record.id,
+            forAuthCode: record.auth_code ?? undefined,
+          })
+        : await terminal.void(terminalSettings, billId, record.auth_code ?? "", {
+            onStatus: setTerminalStatus,
+            cancels: record.id,
+          });
+      if (!result.approved) {
+        setFormError(`${debit ? "Refund" : "Void"} did not go through: ${describeTerminalResult(result)}`);
+        return;
+      }
+      setPayments((current) => current.filter((item) => item.key !== payment.key));
+    } catch (error) {
+      setFormError(terminalErrorText(error));
+    } finally {
+      setRemoving(null);
+      setTerminalStatus("");
+    }
+  }
+
   return (
     <div className="grid gap-2 border-t border-[#d4d4d8] pt-2">
       <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Payments</h3>
@@ -602,8 +757,10 @@ function PaymentsEditor({
                 ) : null}
                 {payment.auth_code ? (
                   <span className="block text-[11px] text-[#6b7280]">
+                    {payment.terminalRecord?.card_brand ? `${payment.terminalRecord.card_brand} · ` : ""}
                     Approval {payment.auth_code}
                     {payment.card_last4 ? ` · ****${payment.card_last4}` : ""}
+                    {payment.terminalRecord ? " · from terminal" : ""}
                   </span>
                 ) : null}
                 {payment.tip ? (
@@ -619,11 +776,12 @@ function PaymentsEditor({
                 {formatMoney(payment.amount)}
                 <button
                   aria-label={`Remove ${PAYMENT_LABELS[payment.method]} payment`}
-                  className="text-[#8a1f1f]"
-                  onClick={() => setPayments((current) => current.filter((item) => item.key !== payment.key))}
+                  className="text-[#8a1f1f] disabled:opacity-40"
+                  disabled={running || removing !== null}
+                  onClick={() => void removePayment(payment)}
                   type="button"
                 >
-                  ×
+                  {removing === payment.key ? "…" : "×"}
                 </button>
               </span>
             </li>
@@ -705,8 +863,35 @@ function PaymentsEditor({
               ) : null}
             </div>
           ) : null}
-          {needsTerminal ? (
+          {integrated ? (
+            <div className="grid gap-1 text-xs">
+              <p className="text-[#5b4708]">
+                {terminalSettings.mode === "practice" ? "Practice mode — no card is charged. " : ""}
+                <b>{formatMoney(typed)}</b> goes to the DX8000. The customer taps, inserts or swipes there; tip and
+                approval come back here.
+              </p>
+              <button className="justify-self-start text-[#4533ff] underline" onClick={() => setManual(true)} type="button">
+                Terminal not working? Enter the approval code by hand
+              </button>
+            </div>
+          ) : null}
+          {running || (removing !== null && terminalStatus) ? (
+            <div className="flex items-center justify-between gap-2 border border-[#4533ff] bg-white p-2 text-sm">
+              <span className="font-bold">{terminalStatus || "Waiting for the terminal…"}</span>
+              {running ? (
+                <Button className="min-h-9 px-2 text-xs" onClick={() => terminal.cancel()} tone="danger">
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          {needsTerminal && !integrated ? (
             <>
+              {manual ? (
+                <button className="justify-self-start text-xs text-[#4533ff] underline" onClick={() => setManual(false)} type="button">
+                  Use the terminal link again
+                </button>
+              ) : null}
               <p className="text-xs text-[#5b4708]">
                 Key <b>{formatMoney(typed)}</b> on the Chase DX8000. When it approves, copy the approval code from the
                 terminal slip.
@@ -733,7 +918,7 @@ function PaymentsEditor({
               </div>
             </>
           ) : null}
-          {isRainCheck ? null : (
+          {isRainCheck || integrated ? null : (
             <Field
               hint={needsTerminal ? "From the DX8000 slip" : isCash ? "Only if they leave it as a tip" : undefined}
               label="Tip (optional)"
@@ -750,16 +935,115 @@ function PaymentsEditor({
             <p className="text-sm font-bold text-[#1f6b3a]">Change due: {formatMoney(change)}</p>
           ) : null}
           {formError ? <ErrorNote>{formError}</ErrorNote> : null}
-          <Button disabled={preparing || (isRainCheck && (rcLooking || !rcUsable))} full onClick={() => void add()}>
+          <Button
+            disabled={preparing || running || removing !== null || (isRainCheck && (rcLooking || !rcUsable))}
+            full
+            onClick={() => void add()}
+            tone={integrated ? "primary" : undefined}
+          >
             {preparing
               ? "Checking total…"
-              : isRainCheck && rcUsable
-                ? `Add rain check ${formatMoney(rcApplied)}`
-                : `Add ${PAYMENT_LABELS[method]} payment`}
+              : running
+                ? "On the terminal…"
+                : isRainCheck && rcUsable
+                  ? `Add rain check ${formatMoney(rcApplied)}`
+                  : integrated
+                    ? `Send ${formatMoney(typed)} to terminal`
+                    : `Add ${PAYMENT_LABELS[method]} payment`}
           </Button>
         </div>
-      ) : null}
+      ) : (
+        <>
+          {terminalStatus ? <p className="text-sm font-bold">{terminalStatus}</p> : null}
+          {formError ? <ErrorNote>{formError}</ErrorNote> : null}
+        </>
+      )}
     </div>
+  );
+}
+
+// ===== 단말기 설정 (이 기기에만) =======================================
+
+const TERMINAL_MODE_LABELS: Record<TerminalMode, string> = {
+  off: "Off — key amounts on the terminal by hand",
+  live: "Linked — send amounts to the DX8000",
+  practice: "Practice — no terminal, nothing charged",
+};
+
+function TerminalSetup({ settings }: { settings: TerminalSettings }) {
+  const [url, setUrl] = useState(settings.url);
+  const [message, setMessage] = useState("");
+  const [testing, setTesting] = useState(false);
+
+  async function test(next: TerminalSettings) {
+    setTesting(true);
+    setMessage("");
+    try {
+      setMessage(await terminal.test(next));
+    } catch (error) {
+      setMessage(terminalErrorText(error));
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  return (
+    <details className="border border-[#e4e4e8] p-2 text-sm">
+      <summary className="cursor-pointer font-bold">
+        Card terminal: {settings.mode === "off" ? "not linked" : settings.mode === "practice" ? "practice" : "linked"}
+      </summary>
+      <div className="mt-2 grid gap-2">
+        <Field hint="Each register computer has its own setting" label="Mode">
+          <Select
+            onChange={(event) => writeTerminalSettings({ ...settings, mode: event.target.value as TerminalMode })}
+            value={settings.mode}
+          >
+            {(Object.keys(TERMINAL_MODE_LABELS) as TerminalMode[]).map((mode) => (
+              <option key={mode} value={mode}>
+                {TERMINAL_MODE_LABELS[mode]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {settings.mode === "live" ? (
+          <>
+            <Field hint="Shown on the terminal's idle screen, e.g. 192.168.1.50" label="Terminal IP address">
+              <TextInput
+                autoComplete="off"
+                onBlur={() => writeTerminalSettings({ ...settings, url })}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="192.168.1.50"
+                value={url}
+              />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="min-h-9 px-2 text-xs"
+                disabled={testing || !url.trim()}
+                onClick={() => {
+                  const next = { ...settings, url: normalizeTerminalUrl(url) };
+                  writeTerminalSettings(next);
+                  void test(next);
+                }}
+              >
+                {testing ? "Testing…" : "Test connection"}
+              </Button>
+              {url.trim() ? (
+                <a
+                  className="self-center text-xs text-[#4533ff] underline"
+                  href={certificatePageUrl(url)}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Trust the terminal certificate
+                </a>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+        {message ? <p className="text-xs">{message}</p> : null}
+      </div>
+    </details>
   );
 }
 

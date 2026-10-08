@@ -46,6 +46,11 @@ export type PaymentInput = {
   card_last4?: string;
   /** 레인체크: 전표 코드(`RC-…`). 서버가 잠그고 상태·만료일·금액을 확인한다(0011). */
   rain_check_code?: string;
+  /**
+   * 단말기 연동(0019): `pelham_terminal_transactions.id`. 있으면 서버가 승인번호·끝 4자리를 단말기
+   * 기록에서 읽고, 금액·팁이 단말기 결과와 같은지 본다(`entry = 'integrated'`).
+   */
+  terminal_txn?: number;
 };
 
 /** 단말기 승인번호가 필요한 결제 수단. */

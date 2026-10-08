@@ -14,11 +14,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  describeTerminalResult,
+  terminal,
+  terminalEnabled,
+  TerminalError,
+  useTerminalSettings,
+  type TerminalRecord,
+} from "@/lib/pos/terminal";
 import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import { printReceipt } from "@/lib/retail/printReceipt";
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
-import { formatMoney, type RetailDailyReport, type Sale } from "@/lib/retail/types";
+import { formatMoney, type RetailDailyReport, type Sale, type SalePayment } from "@/lib/retail/types";
 
 import StaffCloseout from "@/components/reports/StaffCloseout";
 
@@ -427,6 +435,7 @@ function SaleDetail({
                 stock back and marks any green fees on this bill unpaid again.
               </p>
             ) : null}
+            <TerminalRefunds sale={sale} />
             <Field hint="Required — it goes on the day's reconciliation" label="Refund reason">
               <TextArea
                 onChange={(event) => setReason(event.target.value)}
@@ -456,6 +465,124 @@ function SaleDetail({
 
       </div>
     </Modal>
+  );
+}
+
+/**
+ * 단말기 연동으로 받은 카드 결제(0019, `entry = "integrated"`)를 단말기에서 되돌린다. 신용카드는 먼저
+ * VOID(그날 배치가 아직 열려 있으면 카드 없이 통째로 취소)를 해 보고, 배치가 닫혔으면 REFUND(손님이 카드를
+ * 다시 댄다). 체크카드는 VOID 가 안 돼서 바로 REFUND. 손으로 친("keyed") 결제는 예전처럼 단말기에서 직접 한다.
+ */
+function TerminalRefunds({ sale }: { sale: Sale }) {
+  const settings = useTerminalSettings();
+  const linked = (sale.payments ?? []).filter(
+    (payment) => payment.entry === "integrated" && (payment.method === "card" || payment.method === "debit"),
+  );
+  const [records, setRecords] = useState<TerminalRecord[]>([]);
+  const [working, setWorking] = useState<number | null>(null);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+
+  const hasLinked = linked.length > 0;
+  useEffect(() => {
+    if (!hasLinked) return;
+    let cancelled = false;
+    terminal
+      .forBill(sale.id)
+      .then((list) => {
+        if (!cancelled) setRecords(list);
+      })
+      .catch(() => {
+        // 기록을 못 읽었다. 버튼은 그대로 쓸 수 있다.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasLinked, sale.id]);
+
+  if (!hasLinked) return null;
+
+  const done = (payment: SalePayment) =>
+    records.some(
+      (record) =>
+        (record.kind === "void" || record.kind === "refund") &&
+        record.approved &&
+        record.original_auth_code === payment.auth_code,
+    );
+
+  async function reverse(index: number, payment: SalePayment, mode: "void" | "refund") {
+    setWorking(index);
+    setError("");
+    try {
+      const amount = payment.amount + (payment.tip ?? 0);
+      const record =
+        mode === "void"
+          ? await terminal.void(settings, sale.id, payment.auth_code ?? "", { onStatus: setStatus })
+          : await terminal.refund(settings, sale.id, amount, {
+              onStatus: setStatus,
+              forAuthCode: payment.auth_code ?? undefined,
+            });
+      setRecords((current) => [...current, record]);
+      if (!record.approved) {
+        setError(
+          mode === "void"
+            ? `Void did not go through (${describeTerminalResult(record)}). If the batch has closed, use Refund on terminal instead.`
+            : `Refund did not go through: ${describeTerminalResult(record)}`,
+        );
+      }
+    } catch (cause) {
+      setError(cause instanceof TerminalError ? cause.message : "The terminal did not answer. Check its screen.");
+    } finally {
+      setWorking(null);
+      setStatus("");
+    }
+  }
+
+  return (
+    <div className="grid gap-2 border border-[#d4d4d8] p-2 text-sm">
+      <p className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Paid through the linked terminal</p>
+      {!terminalEnabled(settings) ? (
+        <p className="text-xs text-[#5b4708]">
+          This computer is not linked to the card terminal. Do it on the register, or refund on the DX8000 by hand.
+        </p>
+      ) : null}
+      {linked.map((payment, index) => (
+        <div className="grid gap-1" key={index}>
+          <p>
+            {PAYMENT_LABELS[payment.method]} {formatMoney(payment.amount + (payment.tip ?? 0))}
+            <span className="text-[11px] text-[#6b7280]">
+              {" "}
+              · Approval {payment.auth_code}
+              {payment.card_last4 ? ` · ****${payment.card_last4}` : ""}
+            </span>
+          </p>
+          {done(payment) ? (
+            <p className="text-xs font-bold text-[#1f6b3a]">Reversed on the terminal.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {payment.method === "card" ? (
+                <Button
+                  className="min-h-9 px-2 text-xs"
+                  disabled={working !== null || !terminalEnabled(settings)}
+                  onClick={() => void reverse(index, payment, "void")}
+                >
+                  Void on terminal
+                </Button>
+              ) : null}
+              <Button
+                className="min-h-9 px-2 text-xs"
+                disabled={working !== null || !terminalEnabled(settings)}
+                onClick={() => void reverse(index, payment, "refund")}
+              >
+                Refund on terminal (customer taps card)
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+      {status ? <p className="text-xs font-bold">{status}</p> : null}
+      {error ? <ErrorNote>{error}</ErrorNote> : null}
+    </div>
   );
 }
 

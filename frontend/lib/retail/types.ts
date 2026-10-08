@@ -130,7 +130,7 @@ export type Sale = {
 
 /**
  * 결제 한 줄. 카드·체크카드는 Chase 단말기(DX8000)가 찍어 준 승인번호가 있다.
- * `entry: "keyed"` = 직원이 단말기에 금액을 직접 쳤다(아직 앱과 연동 전).
+ * `entry: "keyed"` = 직원이 단말기에 금액을 직접 쳤다. `"integrated"` = 앱이 단말기로 보냈고 승인 결과를 받았다(0019).
  */
 export type SalePayment = {
   method: PaymentMethod;
