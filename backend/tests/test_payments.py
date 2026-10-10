@@ -407,7 +407,7 @@ def test_checkout_sends_sql_amount_and_invoice(env):
 def test_checkout_return_url_ignores_unknown_origin(env):
     client, gw, _ = env
     client.post(f"{API}/checkout", json=creds(), headers={"Origin": "https://evil.example"})
-    assert gw.posts("/checkout/sessions")[0]["success_url"].startswith("https://pelhamhills.vercel.app/book/pay?")
+    assert gw.posts("/checkout/sessions")[0]["success_url"].startswith("https://pelhamhills-golf.vercel.app/book/pay?")
 
 
 def test_checkout_refused_by_sql_passes_message(env):

@@ -73,12 +73,14 @@ class Settings(BaseSettings):
         "http://localhost:3000,http://127.0.0.1:3000,"
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:4173,http://127.0.0.1:4173,"
-        # 배포된 두 사이트. Vercel 프로젝트 golf-gps-pelhamhills(GPS 앱)와
-        # frontend(pelhamhills.vercel.app). 둘 다 이 백엔드의 /tee-sheet/* 를
+        # 배포된 사이트. Vercel 프로젝트 golf-gps-pelhamhills(GPS 앱)와
+        # pelhamhills(팀 pelhamhills, 운영 주소 pelhamhills-golf.vercel.app). pelhamhills.vercel.app 은
+        # 다른 계정의 옛 배포가 붙들고 있다(2026-10-10) — 지우지 않고 남겨 둔다. 모두 이 백엔드의 /tee-sheet/* 를
         # 브라우저에서 직접 부른다. 프리뷰 배포는 매번 주소가 달라 여기 못 넣는다 —
         # 프리뷰에서 예약을 시험하려면 그 주소를 ALLOWED_ORIGINS 에 임시로 넣는다.
         "https://golf-gps-pelhamhills.vercel.app,"
         "https://golf-gps-pelhamhills-seven.vercel.app,"
+        "https://pelhamhills-golf.vercel.app,"
         "https://pelhamhills.vercel.app,"
         "https://bepu.app"
     )

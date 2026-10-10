@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payments/online", tags=["Online Payments"])
 
-DEFAULT_SITE = "https://pelhamhills.vercel.app"
+DEFAULT_SITE = "https://pelhamhills-golf.vercel.app"
 UNAVAILABLE = "Online payment is not available right now. You can pay at the pro shop when you arrive."
 # 결과 화면이 pending 일 때 Stripe 에 다시 묻는 기간. 그보다 오래된 시도는 버려진 것이다(세션은 31분이면 끝난다).
 RECONCILE_WINDOW = timedelta(hours=3)
