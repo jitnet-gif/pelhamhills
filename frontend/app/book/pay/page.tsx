@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Authorize.net 결제 폼에서 돌아오는 자리: `/book/pay?invoice=PHW…` (취소하고 오면 `&cancelled=1`).
+ * Stripe Checkout 에서 돌아오는 자리: `/book/pay?invoice=PHW…` (취소하고 오면 `&cancelled=1`).
  *
- * 돌아온 주소에는 결과가 없다(Authorize.net 은 거래 내용을 붙이지 않는다). 그래서 서버에 invoice 로
- * 묻는다 — 서버는 웹훅이 이미 기록했으면 그 값을, 아직이면 Authorize.net 에 직접 물어 기록한 값을 준다
+ * 돌아온 주소의 값은 믿지 않는다. 그래서 서버에 invoice 로 묻는다 — 서버는 웹훅이 이미 기록했으면
+ * 그 값을, 아직이면 그 invoice 의 Checkout 세션을 Stripe 에 직접 물어 기록한 값을 준다
  * (`backend/api/routes/payments.py` 의 `/status`). 확인 중이면 잠깐씩 다시 묻는다.
  *
  * `useSearchParams` 때문에 내용은 Suspense 안쪽(`PayResult`)에 둔다(`/book/lookup` 과 같은 이유).
@@ -129,7 +129,7 @@ function PayResult() {
     return tries >= POLL_TRIES ? (
       <Panel title="Still confirming your payment" tone="warn">
         <p>
-          Authorize.net has not told us the result yet. If you finished paying, it will show on your booking within a
+          Stripe has not told us the result yet. If you finished paying, it will show on your booking within a
           few minutes — please don&apos;t pay twice. Your booking is reserved either way.
         </p>
         <Actions code={code} />

@@ -134,7 +134,7 @@ export const retailApi = {
   getSale: (id: number) => call<Sale>("pelham_staff_bill", { p_id: id }),
 
   /**
-   * 카드·체크카드 환불은 **Chase 단말기에서 먼저** 한다. 이 호출은 그 뒤에 장부를 맞춘다:
+   * 카드·체크카드 환불은 **단말기(Stripe)에서 먼저** 한다. 이 호출은 그 뒤에 장부를 맞춘다:
    * 계산서를 refunded 로, 재고를 되돌리고, 그린피를 미결제로.
    */
   refundSale: (id: number, body: RefundRequest) =>

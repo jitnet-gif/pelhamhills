@@ -41,7 +41,7 @@ export type PaymentInput = {
   method: PaymentMethod;
   amount: Cents;
   tip?: Cents;
-  /** 카드·체크카드: Chase 단말기가 찍어 준 승인번호. 없으면 서버가 거절한다. */
+  /** 카드·체크카드: 단말기 전표의 승인번호(손으로 칠 때). 없으면 서버가 거절한다. */
   auth_code?: string;
   card_last4?: string;
   /** 레인체크: 전표 코드(`RC-…`). 서버가 잠그고 상태·만료일·금액을 확인한다(0011). */

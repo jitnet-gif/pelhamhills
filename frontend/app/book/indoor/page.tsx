@@ -618,7 +618,7 @@ export default function IndoorGolfBooking() {
           {/* Booking Policies */}
           <div className="mb-6 text-sm text-[#5c6459]">
             <ul className="list-disc space-y-2 pl-5">
-              {/* 결제는 선택이다: 확정 화면의 Pay now(Authorize.net, 0020) 또는 와서 프런트에서 계산서로(0008). */}
+              {/* 결제는 선택이다: 확정 화면의 Pay now(Stripe, 0020·0021) 또는 와서 프런트에서 계산서로(0008). */}
               <li className="font-semibold text-[#214d2f]">
                 Pay online after you book, or at the front desk when you arrive.
               </li>

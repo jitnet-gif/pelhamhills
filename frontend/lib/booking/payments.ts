@@ -1,10 +1,10 @@
 /**
- * 손님 온라인 결제(Authorize.net)의 통로. 예약 자체는 `rpc.ts`(Supabase 함수)로 하지만, 결제는 카드사
+ * 손님 온라인 결제(Stripe Checkout)의 통로. 예약 자체는 `rpc.ts`(Supabase 함수)로 하지만, 결제는 카드사
  * 키가 필요해서 **FastAPI(Fly)** 의 `/payments/online/*` 로 간다(`backend/api/routes/payments.py`).
  *
  * - 금액은 서버(SQL 0020)가 정한다. 화면은 받은 금액을 보여 주기만 한다.
- * - 카드 입력은 Authorize.net 이 호스팅하는 결제 폼에서 한다. 이 사이트는 카드 번호를 보지 않는다.
- *   `checkout()` 이 받은 토큰을 숨은 폼으로 Authorize.net 에 POST 하면 그 페이지로 넘어간다.
+ * - 카드 입력은 Stripe 가 호스팅하는 Checkout 페이지에서 한다. 이 사이트는 카드 번호를 보지 않는다.
+ *   `startCheckout()` 이 서버에서 받은 Checkout 주소로 이 탭을 옮긴다.
  * - 결제 뒤 손님은 `/book/pay?invoice=…` 로 돌아온다. 결과는 그 화면이 서버에 물어서 보여 준다.
  *
  * API 주소: `NEXT_PUBLIC_PAYMENTS_API_URL` 이 있으면 그것. 없으면 로컬에서 연 페이지는 `lib/apiHost.ts`
@@ -18,7 +18,8 @@ import { ApiError } from "@/lib/teeSheet/api";
 
 const PRODUCTION_API = "https://pelham-hills-api.fly.dev/api/v1";
 
-function base(): string {
+/** 결제 API 의 뿌리(`…/api/v1`). 계산대 단말기(`lib/pos/terminal.ts`)도 같은 서버를 쓴다. */
+export function paymentsApiBase(): string {
   const explicit = (process.env.NEXT_PUBLIC_PAYMENTS_API_URL ?? "").trim().replace(/\/+$/, "");
   if (explicit) return explicit;
   const local =
@@ -73,7 +74,7 @@ export type Credentials = { code: string; email: string };
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${base()}/payments/online${path}`, {
+    response = await fetch(`${paymentsApiBase()}/payments/online${path}`, {
       ...init,
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     });
@@ -108,23 +109,14 @@ export function cancelAndRefund(
 }
 
 /**
- * 결제 폼을 연다. 서버가 금액을 정하고 Authorize.net 토큰을 받아 오면, 숨은 폼으로 그 결제 페이지에
- * POST 한다(이 탭이 Authorize.net 으로 넘어간다). 토큰은 15분 유효하다.
+ * 결제 페이지를 연다. 서버가 금액을 정하고 Stripe Checkout 세션을 만들어 주소를 주면, 이 탭이 그리로
+ * 넘어간다. 세션은 31분 뒤 끝난다(그 뒤에는 다시 Pay 를 누르면 새 세션이 열린다).
  */
 export async function startCheckout(creds: Credentials): Promise<void> {
-  const { form_url, token } = await call<{ form_url: string; token: string; invoice: string }>("/checkout", {
+  const { url } = await call<{ url: string; invoice: string }>("/checkout", {
     method: "POST",
     body: JSON.stringify(creds),
   });
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = form_url;
-  form.style.display = "none";
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = "token";
-  input.value = token;
-  form.appendChild(input);
-  document.body.appendChild(form);
-  form.submit();
+  if (!/^https:\/\/checkout\.stripe\.com\//.test(url)) throw new ApiError(502, "Online payment is not available right now.");
+  window.location.assign(url);
 }

@@ -119,7 +119,7 @@ export type ReceiptDoc = {
 export type ReceiptPayment = {
   label: string;
   amount: Cents;
-  /** "Approval 083412 · ****4242 · keyed on Chase DX8000" 같은 한 줄. 없으면 null. */
+  /** "Approval 083412 · ****4242 · keyed on Card terminal" 같은 한 줄. 없으면 null. */
   detail: string | null;
 };
 
@@ -128,7 +128,7 @@ function paymentDetail(payment: NonNullable<Sale["payments"]>[number]): string |
   if (!payment.auth_code) return null;
   const parts = [`Approval ${payment.auth_code}`];
   if (payment.card_last4) parts.push(`****${payment.card_last4}`);
-  if (payment.entry === "keyed") parts.push(`keyed on ${payment.terminal ?? "Chase terminal"}`);
+  if (payment.entry === "keyed") parts.push(`keyed on ${payment.terminal ?? "card terminal"}`);
   return parts.join(" · ");
 }
 

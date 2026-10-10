@@ -12,14 +12,17 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
+import httpx
+
 # 같은 패키지 안에서 설정과 클라이언트를 한 벌로 쓰기 위한 의도적인 비공개 이름 사용.
-from backend.services.tee_sheet_supabase import _client, configured
+from backend.services.tee_sheet_supabase import _client, _config, configured
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["configured", "select", "insert", "update", "rpc", "SupabaseUnavailable", "RpcRefused"]
+__all__ = ["configured", "select", "insert", "update", "rpc", "rpc_as", "SupabaseUnavailable", "RpcRefused"]
 
 
 class SupabaseUnavailable(RuntimeError):
@@ -105,3 +108,45 @@ def rpc(function: str, args: dict[str, Any]) -> Any:
     # 본문에는 손님 정보가 있을 수 있다. 상태와 코드만 남긴다.
     logger.warning("rpc %s 실패: HTTP %s (code %s)", function, res.status_code, code)
     raise SupabaseUnavailable(f"rpc {function} failed: HTTP {res.status_code}")
+
+
+# 공개(publishable) 키. 브라우저 코드에도 박혀 있는 값이라 비밀이 아니다(`frontend/lib/teeSheet/session.ts`).
+_DEFAULT_PUBLISHABLE_KEY = "sb_publishable_oMJG_-xpWr6AI5o3KnrU_A_kJENaKSY"
+
+
+def rpc_as(token: str, function: str, args: dict[str, Any]) -> Any:
+    """`pelham_staff_*` 함수를 **로그인한 직원의 토큰으로** 부른다. 직원 확인은 SQL(`pelham_require_staff`)이
+    한다 — 이 서버가 토큰을 따로 해석하지 않는다. 브라우저의 `staffRpc` 와 같은 요청이다.
+
+    토큰이 없거나 만료됐으면 RpcRefused(401). 그 밖은 `rpc` 와 같다.
+    """
+    if not token:
+        raise RpcRefused(401, "Sign in with a pro shop account.")
+    url, _ = _config()
+    key = (os.getenv("SUPABASE_PUBLISHABLE_KEY") or "").strip() or _DEFAULT_PUBLISHABLE_KEY
+    if not url:
+        raise SupabaseUnavailable("Supabase is not configured")
+    try:
+        with httpx.Client(timeout=10.0, transport=_user_transport) as client:
+            res = client.post(f"{url}/rest/v1/rpc/{function}", json=args,
+                              headers={"apikey": key, "Authorization": f"Bearer {token}"})
+    except Exception as exc:
+        logger.warning("rpc_as %s 실패: %s", function, type(exc).__name__)
+        raise SupabaseUnavailable(f"rpc {function} failed") from exc
+    if res.is_success:
+        return res.json() if res.content else None
+    try:
+        body = res.json()
+    except Exception:
+        body = {}
+    code = body.get("code") if isinstance(body, dict) else None
+    if isinstance(code, str) and code.startswith("PT") and code[2:].isdigit():
+        raise RpcRefused(int(code[2:]), str(body.get("message") or ""))
+    if res.status_code in (401, 403) or (isinstance(code, str) and code.startswith("PGRST3")):
+        raise RpcRefused(401, "Your sign-in expired. Sign in again.")
+    logger.warning("rpc_as %s 실패: HTTP %s (code %s)", function, res.status_code, code)
+    raise SupabaseUnavailable(f"rpc {function} failed: HTTP {res.status_code}")
+
+
+# 테스트가 바꿔 끼운다. None 이면 진짜 네트워크.
+_user_transport: httpx.BaseTransport | None = None

@@ -499,7 +499,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 
   /**
    * 합산 계산서(0005)가 켜져 있으면 Payment 는 **계산서에 담기**다. 돈은 계산서 결제(카드면
-   * Chase 단말기 승인번호)에서만 받는다 — 여기서 paid 를 직접 켜지 않는다(2026-09-10 결정).
+   * 카드 단말기 승인번호)에서만 받는다 — 여기서 paid 를 직접 켜지 않는다(2026-09-10 결정).
    * 0005 가 아직 안 돌았으면(`missing`) 예전 영수증 결제 흐름으로 남는다. 그래야 마이그레이션
    * 전에 배포돼도 그린피를 받을 길이 끊기지 않는다.
    */
@@ -852,7 +852,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     <Link
                       className="ml-auto whitespace-nowrap px-1 text-[10px] font-bold text-[#8a3f26] underline decoration-dotted"
                       href={`/admin/reports?date=${localBusinessDate(player.paidAt ? new Date(player.paidAt) : new Date())}`}
-                      title="Refund the bill this player was paid on — Reports → Daily close. Refund card or debit on the DX8000 first."
+                      title="Refund the bill this player was paid on — Reports → Daily close. Card and debit payments are refunded from that screen."
                     >
                       Refund
                     </Link>

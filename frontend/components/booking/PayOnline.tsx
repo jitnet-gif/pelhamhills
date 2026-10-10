@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 예약 확정 화면과 `/book/lookup` 에 붙는 "지금 결제" 칸(Authorize.net, 선택 결제).
+ * 예약 확정 화면과 `/book/lookup` 에 붙는 "지금 결제" 칸(Stripe Checkout, 선택 결제).
  *
  * - 서버가 결제를 켜 두지 않았으면(`enabled: false`) 아무것도 그리지 않는다. 예약 흐름은 그대로다.
  * - 금액·낼 수 있는지는 서버(SQL 0020)가 정한다. 이 칸은 받은 값을 보여 주기만 한다.
@@ -90,7 +90,7 @@ export default function PayOnline({ creds, onQuote }: Props) {
     setError("");
     try {
       await startCheckout(creds);
-      // 이 탭은 이제 Authorize.net 으로 넘어간다. busy 를 풀지 않는다(두 번 누르지 않게).
+      // 이 탭은 이제 Stripe 로 넘어간다. busy 를 풀지 않는다(두 번 누르지 않게).
     } catch (err) {
       setBusy(false);
       setError(
@@ -140,7 +140,7 @@ export default function PayOnline({ creds, onQuote }: Props) {
         {busy ? "Opening secure payment…" : `Pay ${money(quote.total)} now`}
       </button>
       <p className="mt-2 text-xs text-[#5c6459]">
-        You enter your card on Authorize.net&apos;s secure page; we never see your card number. Cancel online up to
+        You enter your card on Stripe&apos;s secure page; we never see your card number. Cancel online up to
         24 hours before your start time for a full refund.
       </p>
     </div>

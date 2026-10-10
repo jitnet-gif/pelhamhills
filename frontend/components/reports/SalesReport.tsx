@@ -469,9 +469,9 @@ function SaleDetail({
 }
 
 /**
- * 단말기 연동으로 받은 카드 결제(0019, `entry = "integrated"`)를 단말기에서 되돌린다. 신용카드는 먼저
- * VOID(그날 배치가 아직 열려 있으면 카드 없이 통째로 취소)를 해 보고, 배치가 닫혔으면 REFUND(손님이 카드를
- * 다시 댄다). 체크카드는 VOID 가 안 돼서 바로 REFUND. 손으로 친("keyed") 결제는 예전처럼 단말기에서 직접 한다.
+ * 단말기 연동으로 받은 카드 결제(`entry = "integrated"`, Stripe Terminal)를 돌려준다. 신용카드는 Stripe
+ * 환불(카드 필요 없음), Interac 은 리더에서 손님이 카드를 다시 댄다. 돌려준 뒤 아래 *Confirm refund* 로
+ * 장부를 맞춘다. 손으로 친("keyed") 결제는 예전처럼 단말기에서 직접 한다.
  */
 function TerminalRefunds({ sale }: { sale: Sale }) {
   const settings = useTerminalSettings();
@@ -502,36 +502,35 @@ function TerminalRefunds({ sale }: { sale: Sale }) {
 
   if (!hasLinked) return null;
 
-  const done = (payment: SalePayment) =>
-    records.some(
-      (record) =>
-        (record.kind === "void" || record.kind === "refund") &&
-        record.approved &&
-        record.original_auth_code === payment.auth_code,
+  /** 이 결제 줄의 판매 기록(Charge 때 묶인 것). */
+  const saleFor = (payment: SalePayment) =>
+    records.find(
+      (record) => record.kind === "sale" && record.approved && record.used && record.auth_code === payment.auth_code,
     );
+  const done = (payment: SalePayment) => {
+    const original = saleFor(payment);
+    return records.some(
+      (record) =>
+        record.kind === "refund" &&
+        record.approved &&
+        (original ? record.refund_of === original.id : record.original_auth_code === payment.auth_code),
+    );
+  };
 
-  async function reverse(index: number, payment: SalePayment, mode: "void" | "refund") {
+  async function reverse(index: number, payment: SalePayment) {
+    const original = saleFor(payment);
+    if (!original) {
+      setError("Could not find the reader approval for this payment. Refund it in the Stripe Dashboard.");
+      return;
+    }
     setWorking(index);
     setError("");
     try {
-      const amount = payment.amount + (payment.tip ?? 0);
-      const record =
-        mode === "void"
-          ? await terminal.void(settings, sale.id, payment.auth_code ?? "", { onStatus: setStatus })
-          : await terminal.refund(settings, sale.id, amount, {
-              onStatus: setStatus,
-              forAuthCode: payment.auth_code ?? undefined,
-            });
+      const record = await terminal.refund(settings, sale.id, original, { onStatus: setStatus });
       setRecords((current) => [...current, record]);
-      if (!record.approved) {
-        setError(
-          mode === "void"
-            ? `Void did not go through (${describeTerminalResult(record)}). If the batch has closed, use Refund on terminal instead.`
-            : `Refund did not go through: ${describeTerminalResult(record)}`,
-        );
-      }
+      if (!record.approved) setError(`Refund did not go through: ${describeTerminalResult(record)}`);
     } catch (cause) {
-      setError(cause instanceof TerminalError ? cause.message : "The terminal did not answer. Check its screen.");
+      setError(cause instanceof TerminalError || cause instanceof Error ? cause.message : "The reader did not answer.");
     } finally {
       setWorking(null);
       setStatus("");
@@ -540,10 +539,10 @@ function TerminalRefunds({ sale }: { sale: Sale }) {
 
   return (
     <div className="grid gap-2 border border-[#d4d4d8] p-2 text-sm">
-      <p className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Paid through the linked terminal</p>
-      {!terminalEnabled(settings) ? (
+      <p className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Paid through the card reader</p>
+      {linked.some((payment) => payment.method === "debit") && !terminalEnabled(settings) ? (
         <p className="text-xs text-[#5b4708]">
-          This computer is not linked to the card terminal. Do it on the register, or refund on the DX8000 by hand.
+          Interac refunds need the card reader. Do it on a register that is linked to the reader.
         </p>
       ) : null}
       {linked.map((payment, index) => (
@@ -557,26 +556,15 @@ function TerminalRefunds({ sale }: { sale: Sale }) {
             </span>
           </p>
           {done(payment) ? (
-            <p className="text-xs font-bold text-[#1f6b3a]">Reversed on the terminal.</p>
+            <p className="text-xs font-bold text-[#1f6b3a]">Refunded to the card.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {payment.method === "card" ? (
-                <Button
-                  className="min-h-9 px-2 text-xs"
-                  disabled={working !== null || !terminalEnabled(settings)}
-                  onClick={() => void reverse(index, payment, "void")}
-                >
-                  Void on terminal
-                </Button>
-              ) : null}
-              <Button
-                className="min-h-9 px-2 text-xs"
-                disabled={working !== null || !terminalEnabled(settings)}
-                onClick={() => void reverse(index, payment, "refund")}
-              >
-                Refund on terminal (customer taps card)
-              </Button>
-            </div>
+            <Button
+              className="min-h-9 justify-self-start px-2 text-xs"
+              disabled={working !== null || (payment.method === "debit" && !terminalEnabled(settings))}
+              onClick={() => void reverse(index, payment)}
+            >
+              {payment.method === "debit" ? "Refund on reader (customer taps card)" : "Refund to card"}
+            </Button>
           )}
         </div>
       ))}
