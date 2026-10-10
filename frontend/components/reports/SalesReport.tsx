@@ -28,6 +28,7 @@ import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
 import { formatMoney, type RetailDailyReport, type Sale, type SalePayment } from "@/lib/retail/types";
 
+import SalesDrilldown, { type Drill } from "@/components/reports/SalesDrilldown";
 import StaffCloseout from "@/components/reports/StaffCloseout";
 
 import {
@@ -55,6 +56,8 @@ export default function SalesReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Sale | null>(null);
+  // 숫자를 눌러 연 상세. 영수증을 열면 잠시 가렸다가, 영수증을 닫으면 그 목록으로 돌아온다.
+  const [drill, setDrill] = useState<Drill | null>(null);
   // 환불하면 담당자별 마감 숫자도 바뀐다. 마감 패널에 다시 읽으라고 알린다.
   const [closeoutKey, setCloseoutKey] = useState(0);
 
@@ -100,7 +103,10 @@ export default function SalesReport() {
       <div className="grid gap-2 sm:max-w-xs">
         <Field label="Business date">
           <TextInput
-            onChange={(event) => setDate(event.target.value)}
+            onChange={(event) => {
+              setDate(event.target.value);
+              setDrill(null);
+            }}
             type="date"
             value={date}
           />
@@ -125,27 +131,32 @@ export default function SalesReport() {
             <StatCard
               hint="refunds excluded"
               label="Sales"
+              onClick={() => setDrill({ kind: "sales" })}
               value={String(report.sale_count)}
             />
             <StatCard
               hint="before order discounts & tax"
               label="Gross"
+              onClick={() => setDrill({ kind: "gross" })}
               value={formatMoney(report.gross)}
             />
             <StatCard
               hint="order-level only"
               label="Discounts"
+              onClick={() => setDrill({ kind: "discount" })}
               value={formatMoney(report.discount)}
             />
-            <StatCard label="Tax (HST)" value={formatMoney(report.tax)} />
+            <StatCard label="Tax (HST)" onClick={() => setDrill({ kind: "tax" })} value={formatMoney(report.tax)} />
             <StatCard
               hint="gross − discounts + tax"
               label="Net"
+              onClick={() => setDrill({ kind: "net" })}
               value={formatMoney(report.net)}
             />
             <StatCard
               hint={`${report.refunded_count} sale(s) · tax incl.`}
               label="Refunded"
+              onClick={() => setDrill({ kind: "refunded" })}
               value={formatMoney(report.refunded_total)}
             />
           </div>
@@ -155,24 +166,36 @@ export default function SalesReport() {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {divisions.map((division) => (
               <section className="min-w-0 border border-[#d4d4d8] bg-white p-3" key={division.key}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="text-sm font-bold">{division.label}</h2>
-                  <span className="text-xs text-[#6b7280]">
-                    {report.gross > 0 ? `${Math.round((division.total / report.gross) * 100)}%` : "—"}
+                <button
+                  className="block w-full text-left hover:text-[#4533ff]"
+                  onClick={() => setDrill({ kind: "division", division: division.key })}
+                  type="button"
+                >
+                  <span className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-sm font-bold">{division.label}</h2>
+                    <span className="text-xs text-[#6b7280]">
+                      {report.gross > 0 ? `${Math.round((division.total / report.gross) * 100)}%` : "—"}
+                    </span>
                   </span>
-                </div>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(division.total)}</p>
-                <p className="text-[11px] text-[#6b7280]">before order discounts &amp; tax</p>
+                  <span className="mt-1 block text-2xl font-semibold tabular-nums">{formatMoney(division.total)}</span>
+                  <span className="block text-[11px] text-[#6b7280]">before order discounts &amp; tax</span>
+                </button>
                 {division.categories.length === 0 ? (
                   <p className="mt-2 text-xs text-[#6b7280]">No sales.</p>
                 ) : (
                   <ul className="mt-2 grid gap-0.5 border-t border-[#ececf0] pt-2 text-xs">
                     {division.categories.map((row) => (
-                      <li className="flex items-baseline justify-between gap-2" key={row.category}>
-                        <span className="min-w-0 truncate">
-                          {row.category} <span className="text-[#6b7280]">×{row.quantity}</span>
-                        </span>
-                        <span className="shrink-0 tabular-nums">{formatMoney(row.total)}</span>
+                      <li key={row.category}>
+                        <button
+                          className={DRILL_ROW}
+                          onClick={() => setDrill({ kind: "division", division: division.key, category: row.category })}
+                          type="button"
+                        >
+                          <span className="min-w-0 truncate">
+                            {row.category} <span className="text-[#6b7280]">×{row.quantity}</span>
+                          </span>
+                          <span className="shrink-0 tabular-nums">{formatMoney(row.total)}</span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -190,12 +213,18 @@ export default function SalesReport() {
               ) : (
                 <ul className="grid gap-1 text-sm">
                   {report.by_station.map((row) => (
-                    <li className="flex items-baseline justify-between gap-2" key={row.station}>
+                    <li key={row.station}>
+                      <button
+                        className={DRILL_ROW}
+                        onClick={() => setDrill({ kind: "station", station: row.station ?? "" })}
+                        type="button"
+                      >
                       <span className="min-w-0 truncate">
                         {stationLabel(row.station)}{" "}
                         <span className="text-xs text-[#6b7280]">×{row.count}</span>
                       </span>
                       <span className="shrink-0 tabular-nums">{formatMoney(row.total)}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -208,12 +237,18 @@ export default function SalesReport() {
               ) : (
                 <ul className="grid gap-1 text-sm">
                   {report.by_payment.map((row) => (
-                    <li className="flex items-baseline justify-between gap-2" key={row.method}>
+                    <li key={row.method}>
+                      <button
+                        className={DRILL_ROW}
+                        onClick={() => setDrill({ kind: "payment", method: row.method })}
+                        type="button"
+                      >
                       <span className="min-w-0 truncate">
                         {PAYMENT_LABELS[row.method]}{" "}
                         <span className="text-xs text-[#6b7280]">×{row.count}</span>
                       </span>
                       <span className="shrink-0 tabular-nums">{formatMoney(row.total)}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -226,11 +261,17 @@ export default function SalesReport() {
               ) : (
                 <ul className="grid gap-1 text-sm">
                   {report.top_products.map((row) => (
-                    <li className="flex items-baseline justify-between gap-2" key={row.product_id}>
+                    <li key={row.product_id}>
+                      <button
+                        className={DRILL_ROW}
+                        onClick={() => setDrill({ kind: "product", productId: row.product_id, name: row.name })}
+                        type="button"
+                      >
                       <span className="min-w-0 truncate">
                         {row.name} <span className="text-xs text-[#6b7280]">×{row.quantity}</span>
                       </span>
                       <span className="shrink-0 tabular-nums">{formatMoney(row.total)}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -291,6 +332,16 @@ export default function SalesReport() {
         )}
       </Panel>
 
+      {drill && !selected ? (
+        <SalesDrilldown
+          drill={drill}
+          onChange={setDrill}
+          onClose={() => setDrill(null)}
+          onOpenSale={setSelected}
+          sales={sales}
+        />
+      ) : null}
+
       {selected ? (
         <SaleDetail
           onClose={() => setSelected(null)}
@@ -301,6 +352,10 @@ export default function SalesReport() {
     </div>
   );
 }
+
+/** 리포트 칸 안의 한 줄 — 누르면 그 줄을 이루는 계산서가 열린다. */
+const DRILL_ROW =
+  "flex w-full items-baseline justify-between gap-2 py-0.5 text-left hover:text-[#4533ff] hover:underline";
 
 // ===== 영수증 상세 + 환불 ===============================================
 

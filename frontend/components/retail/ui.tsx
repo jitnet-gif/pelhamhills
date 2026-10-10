@@ -137,20 +137,35 @@ export function StatCard({
   label,
   value,
   hint,
+  onClick,
 }: {
   label: string;
   value: string;
   hint?: string;
+  /** 주면 카드 전체가 버튼이 된다(리포트의 상세 보기). */
+  onClick?: () => void;
 }) {
-  return (
-    <div className="min-w-0 border border-[#d4d4d8] bg-white px-3 py-2.5">
+  const body = (
+    <>
       <p className="truncate text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">
         {label}
       </p>
       <p className="mt-0.5 text-lg font-bold tabular-nums">{value}</p>
       {hint ? <p className="mt-0.5 truncate text-xs text-[#6b7280]">{hint}</p> : null}
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        className="min-w-0 border border-[#d4d4d8] bg-white px-3 py-2.5 text-left hover:border-[#4533ff]"
+        onClick={onClick}
+        type="button"
+      >
+        {body}
+      </button>
+    );
+  }
+  return <div className="min-w-0 border border-[#d4d4d8] bg-white px-3 py-2.5">{body}</div>;
 }
 
 export function EmptyNote({ children }: { children: ReactNode }) {

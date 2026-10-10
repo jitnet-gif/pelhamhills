@@ -88,6 +88,8 @@ export type SaleLine = {
   tee_time?: string | null;
   sku: string;
   name: string;
+  /** 판매 당시 분류(0005 줄에 복사). 그린피 'Green Fees', 베이 'Simulator'. 리포트 `by_category` 와 같은 값. */
+  category?: string | null;
   quantity: number;
   /** 판매 당시 단가(센트). */
   unit_price: Cents;
