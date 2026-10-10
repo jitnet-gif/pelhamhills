@@ -129,6 +129,8 @@ function paymentDetail(payment: NonNullable<Sale["payments"]>[number]): string |
   const parts = [`Approval ${payment.auth_code}`];
   if (payment.card_last4) parts.push(`****${payment.card_last4}`);
   if (payment.entry === "keyed") parts.push(`keyed on ${payment.terminal ?? "card terminal"}`);
+  // 어디서 승인됐는지("Stripe Terminal", 온라인이면 "Stripe · visa"). 서버가 적은 그대로다.
+  else if (payment.terminal) parts.push(payment.terminal);
   return parts.join(" · ");
 }
 

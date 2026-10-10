@@ -34,7 +34,7 @@ registerHooks({
 
 const { receiptBlocks, receiptDocBlocks, receiptHtml } = await import("../lib/retail/receipt.ts");
 const { CODE128_PATTERNS, code128Svg, code128Values } = await import("../lib/retail/barcode.ts");
-const { teeReceipt, teeReceiptFor } = await import("../lib/teeSheet/receipt.ts");
+const { paidBillFor, teeReceipt, teeReceiptFor } = await import("../lib/teeSheet/receipt.ts");
 
 const HEADER = {
   name: "Pelham Hills Golf Club",
@@ -411,4 +411,31 @@ test("the Code 128 table has 107 distinct, well-formed patterns", () => {
 
 test("Code 128 B refuses characters it cannot carry", () => {
   assert.throws(() => code128Values("Café"), /cannot encode/);
+});
+
+test("a card paid on the reader shows its approval, last four and where it was taken", () => {
+  const sale = greenFeeSale({
+    payments: [
+      { method: "card", amount: 6600, tip: 0, entry: "integrated", auth_code: "A1B2C3", card_last4: "4242", terminal: "Stripe Terminal" },
+    ],
+    total: 6600,
+  });
+  const blocks = receiptBlocks(sale, { header: HEADER });
+  assert.ok(blocks.some((b) => b.kind === "text" && b.text === "Approval A1B2C3 · ****4242 · Stripe Terminal"));
+});
+
+test("a tee reprint finds the bill that took the green fee, and only one bill", () => {
+  const line = (bill, player) => ({ kind: "tee_player", booking_id: "b-1", player_id: player });
+  const bills = [
+    { id: 1, status: "void", lines: [line(1, "p1")] },
+    { id: 2, status: "paid", lines: [line(2, "p1"), line(2, "p2")] },
+    { id: 3, status: "paid", lines: [line(3, "p3")] },
+  ];
+  const p = (id) => teePlayer({ id });
+  assert.equal(paidBillFor(bills, "b-1", [p("p1")])?.id, 2);
+  assert.equal(paidBillFor(bills, "b-1", [p("p1"), p("p2")])?.id, 2);
+  // 따로 낸 두 사람은 한 장으로 섞지 않는다. 계산서 없이 결제로 표시한 사람은 null.
+  assert.equal(paidBillFor(bills, "b-1", [p("p1"), p("p3")]), null);
+  assert.equal(paidBillFor(bills, "b-1", [p("p9")]), null);
+  assert.equal(paidBillFor(bills, "b-2", [p("p1")]), null);
 });

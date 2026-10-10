@@ -10,10 +10,13 @@
  * (서버와 같은 은행가 반올림)를 쓰므로 계산대 영수증과 1센트도 다르지 않다.
  * 결제 금액을 따로 저장하지는 않는다. 결제 뒤에 그린피를 고치면 재인쇄 영수증도 새 금액을 따른다.
  *
- * 결제 수단은 적지 않는다. Chase 단말 연동 전에는 직원이 결제로 표시할 뿐이라 현금인지
- * 카드인지 모른다 — 지어낸 "Card" 대신 `Payment` 라고 찍는다.
+ * 결제 수단은 적지 않는다. 이 영수증은 계산서 없이 결제로 표시만 한 경우(0005 이전 흐름)라
+ * 현금인지 카드인지 모른다 — 지어낸 "Card" 대신 `Payment` 라고 찍는다.
+ * 계산서(POS·온라인)로 낸 사람은 그 계산서에 카드 끝자리·승인번호가 있으므로 재인쇄는
+ * `paidBillFor` 로 찾은 계산서 영수증을 찍는다.
  */
 
+import type { Bill } from "../pos/api";
 import { CLUB_TIME_ZONE, type ReceiptDoc, type ReceiptLine } from "../retail/receipt";
 import { computeTax } from "../retail/types";
 import type { Player, TeeBooking } from "./types";
@@ -109,6 +112,27 @@ export function teeReceiptFor(
   };
 }
 
+/**
+ * 이 사람들의 그린피를 받은 계산서. 결제 기록(카드 끝자리·승인번호·결제 시각)은 계산서에만 있다.
+ * 모두가 **같은 한 장**에 있어야 그 장을 돌려준다 — 따로 낸 사람들을 한 장으로 섞지 않는다.
+ * 무효(void) 계산서는 결제가 아니다. 못 찾으면 null(계산서 없이 결제로 표시한 경우).
+ */
+export function paidBillFor(bills: readonly Bill[], bookingId: string, players: readonly Player[]): Bill | null {
+  const found = new Set<Bill>();
+  for (const player of players) {
+    const bill = bills.find(
+      (item) =>
+        item.status !== "void" &&
+        item.lines.some(
+          (line) => line.kind === "tee_player" && line.booking_id === bookingId && line.player_id === player.id,
+        ),
+    );
+    if (!bill) return null;
+    found.add(bill);
+  }
+  return found.size === 1 ? [...found][0] : null;
+}
+
 /** 달러 → 센트. 47.79 × 100 = 4778.999… 이므로 반드시 반올림한다. */
 function toCents(dollars: number): number {
   return Math.round(dollars * 100);
@@ -127,7 +151,7 @@ const CLUB_DATE = new Intl.DateTimeFormat("en-CA", {
 });
 
 /** ISO 시각의 클럽 현지 날짜 `YYYY-MM-DD`. 토론토 밤 9시 결제는 UTC 로는 다음 날이다. */
-function clubDate(iso: string): string | null {
+export function clubDate(iso: string): string | null {
   const value = new Date(iso);
   if (Number.isNaN(value.getTime())) return null;
   const parts = CLUB_DATE.formatToParts(value);

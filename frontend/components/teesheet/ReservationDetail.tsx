@@ -19,12 +19,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 
+import { type Bill, posApi, type TeeBill } from "@/lib/pos/api";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
 import { localBusinessDate } from "@/lib/retail/api";
 import { printReceiptDoc, receiptSheetHtml } from "@/lib/retail/printReceipt";
+import { CLUB_TIME_ZONE, saleReceipt } from "@/lib/retail/receipt";
 import { computeTax, formatMoney } from "@/lib/retail/types";
 import { longDate, money } from "@/lib/teeSheet/dates";
-import { confirmationCode, teeReceiptFor } from "@/lib/teeSheet/receipt";
+import { clubDate, confirmationCode, paidBillFor, teeReceiptFor } from "@/lib/teeSheet/receipt";
 import { reservationTitle } from "@/lib/teeSheet/tone";
 import type {
   AuditEntry,
@@ -207,6 +209,14 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   // 결제 전에 보여 주는 영수증 창. 한 사람일 수도(카드의 Payment), 일행 전체일 수도(Pay all) 있다.
   // `at` 은 아직 결제 시각이 없는 사람의 미리보기용 시각이다.
   const [preview, setPreview] = useState<{ playerIds: string[]; reprint: boolean; at: string } | null>(null);
+  // 재인쇄할 때 찾은 결제 계산서. 카드 끝자리·승인번호·결제 시각은 여기에만 있다.
+  // `at` 이 지금 열린 창(`preview.at`)과 같을 때만 그 창의 것이다. null = 찾아봤지만 없다.
+  const [reprintBill, setReprintBill] = useState<{ at: string; bill: Bill | null } | null>(null);
+  // 이 예약에 실렸던 결제·환불 계산서(0022). 환불하면 플레이어의 paid 가 지워지므로, 취소된 예약의
+  // 받은 돈·영수증·환불 내역은 여기서만 보인다. `id` 가 지금 예약과 다르면 아직 안 읽은 것이다.
+  const [teeBills, setTeeBills] = useState<{ id: string; bills: TeeBill[] } | null>(null);
+  // 결제 기록 줄에서 연 계산서 영수증(환불된 것이면 *** REFUNDED *** 가 찍힌다).
+  const [billPreview, setBillPreview] = useState<Bill | null>(null);
 
   // 최신 값을 debounce 타이머 콜백에서 읽기 위한 미러 ref 들.
   const bookingRef = useRef<TeeBooking | null>(booking);
@@ -228,6 +238,63 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     bookingDraftRef.current = bookingDraft;
   }, [bookingDraft]);
 
+  /**
+   * 재인쇄 창이 열리면 그 사람들의 결제 계산서를 찾는다. 계산서의 영업일은 결제한 날(클럽 현지)이고
+   * `paidAt` 도 같은 트랜잭션에서 찍히므로 그 날의 결제 목록만 보면 된다.
+   * 못 찾으면(계산서 없이 결제로 표시했거나 조회 실패) 예전 티 시트 영수증으로 남는다.
+   */
+  useEffect(() => {
+    if (!preview?.reprint) return;
+    const at = preview.at;
+    const current = bookingRef.current;
+    const people = preview.playerIds
+      .map((id) => current?.players.find((item) => item.id === id))
+      .filter((item): item is Player => Boolean(item));
+    const dates = [...new Set(people.map((person) => (person.paidAt ? clubDate(person.paidAt) : null)))].filter(
+      (date): date is string => Boolean(date),
+    );
+    let live = true;
+    const lookup =
+      current && dates.length > 0
+        ? Promise.all(dates.map((date) => posApi.listPaid(date))).then((lists) =>
+            paidBillFor(lists.flat(), current.id, people),
+          )
+        : Promise.resolve(null);
+    lookup
+      .catch(() => null)
+      .then((bill) => {
+        if (live) setReprintBill({ at, bill });
+      });
+    return () => {
+      live = false;
+    };
+  }, [preview]);
+
+  /**
+   * 결제 기록은 결제·환불·취소 때 바뀐다. 그때마다 감사 기록이 한 줄 늘거나 플레이어의 paid 가 바뀌므로
+   * 그것을 열쇠로 삼는다 — 5초 새로고침마다 다시 묻지 않게. 0022 가 아직 없으면 조용히 비운다.
+   */
+  const teeBillsKey = booking
+    ? `${booking.id}|${booking.status}|${booking.audit?.length ?? 0}|${booking.players
+        .map((player) => `${player.id}:${player.paid ? 1 : 0}`)
+        .join(",")}`
+    : "";
+  useEffect(() => {
+    if (!bookingId) return;
+    let live = true;
+    posApi
+      .teeBills(bookingId)
+      .catch(() => [] as TeeBill[])
+      .then((bills) => {
+        if (live) setTeeBills({ id: bookingId, bills: Array.isArray(bills) ? bills : [] });
+      });
+    return () => {
+      live = false;
+    };
+    // teeBillsKey 에 bookingId 가 들어 있다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teeBillsKey]);
+
   const clearTimers = useCallback(() => {
     for (const timer of timersRef.current.values()) clearTimeout(timer);
     timersRef.current.clear();
@@ -246,6 +313,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setFeeDrafts({});
     setReceiptNote(null);
     setPreview(null);
+    setBillPreview(null);
     setRainCheckFor(null);
     setSaveState({ kind: "idle", nonce: 0 });
   }, [bookingId, clearTimers]);
@@ -527,10 +595,26 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const paidPlayers = players.filter((player) => player.paid && !player.cancelled);
   const withoutRainCheck = paidPlayers.filter((player) => !activeRainCheck(rainChecks.checks, player.id));
 
-  /** 재인쇄: 서버 상태는 건드리지 않는다. */
+  const reprintLookup = preview?.reprint && reprintBill?.at === preview.at ? reprintBill : null;
+  const reprintLoading = Boolean(preview?.reprint) && !reprintLookup;
+
+  // 결제 기록(0022). 다른 예약의 것이 남아 있으면 버린다.
+  const bookingBills = teeBills?.id === booking.id ? teeBills.bills : [];
+  /** 이 사람의 그린피를 받았다가 돌려준 계산서. 환불하면 paid 가 지워지므로 이것으로만 안다. */
+  const refundedBillOf = (playerId: string) =>
+    bookingBills.find(
+      (bill) =>
+        bill.status === "refunded" &&
+        bill.lines.some(
+          (line) => line.kind === "tee_player" && line.booking_id === booking.id && line.player_id === playerId,
+        ),
+    );
+
+  /** 재인쇄: 서버 상태는 건드리지 않는다. 결제 계산서가 있으면 그 영수증(결제 수단·카드 정보 포함)이다. */
   const reprintReceipt = (people: Player[]) => {
     setPreview(null);
-    printReceiptDoc(teeReceiptFor(booking, people), { reprint: true });
+    const bill = reprintLookup?.bill;
+    printReceiptDoc(bill ? saleReceipt(bill) : teeReceiptFor(booking, people), { reprint: true });
   };
 
   /**
@@ -591,7 +675,9 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     : [];
   const previewDoc =
     preview && previewPlayers.length > 0
-      ? teeReceiptFor(booking, previewPlayers, preview.reprint ? {} : { at: preview.at })
+      ? reprintLookup?.bill
+        ? saleReceipt(reprintLookup.bill)
+        : teeReceiptFor(booking, previewPlayers, preview.reprint ? {} : { at: preview.at })
       : null;
 
   return (
@@ -732,6 +818,45 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
           Save
         </button>
       </div>
+
+      {/* ===== 결제 기록 (0022) =====
+          계산서 한 장에 한 줄: 영수증 번호 · 금액 · 결제 수단 · 결제 시각, 환불됐으면 환불 시각과 사유.
+          환불하면 플레이어 카드의 paid 가 지워지므로, 취소된 예약의 돈 흐름은 여기서만 보인다. */}
+      {bookingBills.length > 0 ? (
+        <ul className="border-b border-[#c7c7cc] bg-[#f7f7f9]">
+          {bookingBills.map((bill) => {
+            const refunded = bill.status === "refunded";
+            const voided = refunded && bill.online?.refund_kind === "void";
+            return (
+              <li
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#ececf0] px-3 py-1.5 last:border-b-0"
+                key={bill.id}
+              >
+                <span className="font-bold tabular-nums">Receipt {bill.receipt_no}</span>
+                <span className="tabular-nums">{formatMoney(bill.total)}</span>
+                <span className="text-[#4e5560]">{billPaymentLabel(bill)}</span>
+                <span className="text-[#4e5560]">Paid {clubDateTime(bill.paid_at)}</span>
+                {refunded ? (
+                  <span className="border border-[#c47a63] bg-[#fbeae5] px-1.5 py-0.5 font-bold text-[#8a3f26]">
+                    {voided ? "Voided" : "Refunded"} {formatMoney(bill.total)} · {clubDateTime(bill.refunded_at)}
+                    {bill.refund_reason ? ` — ${bill.refund_reason}` : ""}
+                  </span>
+                ) : (
+                  <span className="border border-[#9fd2ae] bg-[#e8f6ec] px-1.5 py-0.5 font-bold text-[#168a3c]">Paid</span>
+                )}
+                <button
+                  className="ml-auto border border-[#c7c7cc] bg-white px-2 py-1 font-bold hover:bg-[#f0eeff]"
+                  onClick={() => setBillPreview(bill)}
+                  title={refunded ? "Show the receipt marked REFUNDED" : "Show the receipt"}
+                  type="button"
+                >
+                  Receipt
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
 
       {/* ===== inline cancel form (window.prompt 대체) ===== */}
       {mode === "cancel" ? (
@@ -1079,6 +1204,20 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     <span>−{money(booking.rate + cartPart(player))}</span>
                   </div>
                 ) : null}
+                {(() => {
+                  const refunded = refundedBillOf(player.id);
+                  return refunded ? (
+                    <button
+                      className="mt-1 flex justify-between border border-[#c47a63] bg-[#fbeae5] px-1 py-0.5 text-left text-[#8a3f26] hover:bg-[#f7dcd4]"
+                      onClick={() => setBillPreview(refunded)}
+                      title={`Refunded on receipt ${refunded.receipt_no} — show the receipt`}
+                      type="button"
+                    >
+                      <span className="font-bold">Refunded</span>
+                      <span className="tabular-nums">{refunded.receipt_no}</span>
+                    </button>
+                  ) : null;
+                })()}
 
                 <div className="mt-1.5 flex justify-between border-t border-[#ececf0] pt-1.5 font-bold">
                   <span>Subtotal Due</span>
@@ -1257,13 +1396,78 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
               </span>
               <button
                 className="ml-auto bg-[#4533ff] px-5 py-2 font-bold text-white disabled:cursor-not-allowed disabled:bg-[#b1a8ff]"
-                disabled={busy}
+                disabled={busy || reprintLoading}
                 onClick={() =>
                   void (preview.reprint ? reprintReceipt(previewPlayers) : payAndPrint(previewPlayers))
                 }
                 type="button"
               >
-                {preview.reprint ? "Print again" : `Pay ${formatMoney(previewDoc.total)} & print`}
+                {reprintLoading
+                  ? "Finding payment…"
+                  : preview.reprint
+                    ? "Print again"
+                    : `Pay ${formatMoney(previewDoc.total)} & print`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ===== 계산서 영수증 창 (결제 기록 줄에서) =====
+          이미 기록된 계산서를 보여 주고 다시 찍기만 한다. 환불된 계산서는 *** REFUNDED *** 와 사유가 찍힌다. */}
+      {billPreview ? (
+        <div
+          aria-label="Receipt"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setBillPreview(null);
+          }}
+          role="dialog"
+        >
+          <div className="flex max-h-full w-full max-w-sm flex-col border border-[#c7c7cc] bg-[#f2f2f4]">
+            <div className="flex items-center gap-2 border-b border-[#c7c7cc] bg-white px-3 py-2">
+              <span className="font-bold">Receipt {billPreview.receipt_no}</span>
+              <span className="min-w-0 truncate text-[#5c6270]">
+                {billPreview.status === "refunded" ? "Refunded" : "Paid"}
+              </span>
+              <button
+                className="ml-auto px-1 text-[15px] text-[#4e5560]"
+                onClick={() => setBillPreview(null)}
+                title="Close"
+                type="button"
+              >
+                <span aria-hidden>&times;</span>
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div
+                className="rc-sheet mx-auto bg-white p-3 shadow"
+                // 우리 포맷터가 만든 HTML 이다 — 사람이 입력한 글자는 전부 이스케이프돼 있다.
+                dangerouslySetInnerHTML={{ __html: receiptSheetHtml(saleReceipt(billPreview), { reprint: true }) }}
+                style={{ width: "72mm" }}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-[#c7c7cc] bg-white px-3 py-2">
+              <button
+                className="border border-[#c7c7cc] bg-white px-4 py-2 font-bold"
+                onClick={() => setBillPreview(null)}
+                type="button"
+              >
+                Close
+              </button>
+              <button
+                className="ml-auto bg-[#4533ff] px-5 py-2 font-bold text-white"
+                onClick={() => {
+                  const bill = billPreview;
+                  setBillPreview(null);
+                  printReceiptDoc(saleReceipt(bill), { reprint: true });
+                }}
+                type="button"
+              >
+                Print again
               </button>
             </div>
           </div>

@@ -131,12 +131,13 @@ export type Sale = {
 /**
  * 결제 한 줄. 카드·체크카드는 단말기(Stripe Terminal, 또는 손으로 친 전표)의 승인번호가 있다.
  * `entry: "keyed"` = 직원이 단말기에 금액을 직접 쳤다. `"integrated"` = 앱이 단말기로 보냈고 승인 결과를 받았다(0019).
+ * `"online"` = 손님이 온라인(Stripe Checkout)으로 냈다(0020·0021).
  */
 export type SalePayment = {
   method: PaymentMethod;
   amount: Cents;
   tip: Cents;
-  entry: "keyed" | "integrated" | "none";
+  entry: "keyed" | "integrated" | "online" | "none";
   auth_code: string | null;
   card_last4: string | null;
   terminal: string | null;
