@@ -1147,7 +1147,7 @@ function TerminalSetup({ settings }: { settings: TerminalSettings }) {
             </Field>
           </>
         ) : null}
-        {message ? <p className="text-xs">{message}</p> : null}
+        {message ? <p className="text-xs wrap-anywhere">{message}</p> : null}
       </div>
     </details>
   );

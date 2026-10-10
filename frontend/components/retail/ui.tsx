@@ -70,7 +70,8 @@ export function OfflineBanner({ detail, demo }: { detail?: string; demo: boolean
 export function ErrorNote({ children }: { children: ReactNode }) {
   return (
     <p
-      className="border border-[#f0b4b4] bg-[#fdf0f0] px-3 py-2 text-sm text-[#8a1f1f]"
+      // wrap-anywhere: 서버가 준 문장에 긴 URL(Stripe 거절 안내 등)이 있으면 그 폭만큼 칸을 밀어 낸다.
+      className="border border-[#f0b4b4] bg-[#fdf0f0] px-3 py-2 text-sm wrap-anywhere text-[#8a1f1f]"
       role="alert"
     >
       {children}
