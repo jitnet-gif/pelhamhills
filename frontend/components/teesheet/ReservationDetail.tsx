@@ -23,7 +23,7 @@ import { type Bill, posApi, type TeeBill } from "@/lib/pos/api";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
 import { localBusinessDate } from "@/lib/retail/api";
 import { printReceiptDoc, receiptSheetHtml } from "@/lib/retail/printReceipt";
-import { CLUB_TIME_ZONE, saleReceipt } from "@/lib/retail/receipt";
+import { CLUB_TIME_ZONE, PAYMENT_LABELS, saleReceipt } from "@/lib/retail/receipt";
 import { computeTax, formatMoney } from "@/lib/retail/types";
 import { longDate, money } from "@/lib/teeSheet/dates";
 import { clubDate, confirmationCode, paidBillFor, teeReceiptFor } from "@/lib/teeSheet/receipt";
@@ -138,6 +138,35 @@ function relativeTime(ts: string): string {
   if (months < 12) return months === 1 ? "1 month ago" : `${months} months ago`;
   const years = Math.floor(months / 12);
   return years === 1 ? "1 year ago" : `${years} years ago`;
+}
+
+const CLUB_DATE_TIME = new Intl.DateTimeFormat("en-CA", {
+  timeZone: CLUB_TIME_ZONE,
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** 결제·환불 시각을 클럽 현지 시각으로("Oct 10, 3:12 p.m."). 없으면 "—". */
+function clubDateTime(iso: string | null | undefined): string {
+  const value = iso ? new Date(iso) : null;
+  return value && !Number.isNaN(value.getTime()) ? CLUB_DATE_TIME.format(value) : "—";
+}
+
+/** 계산서의 결제 수단 한 줄("Online · visa ****4242", "Cash + Card ****1111"). */
+function billPaymentLabel(bill: TeeBill): string {
+  const payments = bill.payments ?? [];
+  if (payments.length === 0) return bill.payment_method ? (PAYMENT_LABELS[bill.payment_method] ?? bill.payment_method) : "No charge";
+  return payments
+    .map((payment) => {
+      const name =
+        payment.entry === "online" || bill.online
+          ? `Online · ${bill.online?.card_brand || PAYMENT_LABELS[payment.method] || payment.method}`
+          : (PAYMENT_LABELS[payment.method] ?? payment.method);
+      return payment.card_last4 ? `${name} ****${payment.card_last4}` : name;
+    })
+    .join(" + ");
 }
 
 const CHIP =

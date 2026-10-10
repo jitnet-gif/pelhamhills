@@ -53,6 +53,16 @@ export type PaymentInput = {
   terminal_txn?: number;
 };
 
+/** 티 시트 예약 하나에 실렸던 결제·환불 계산서(0022). 온라인으로 낸 것이면 `online` 이 붙는다. */
+export type TeeBill = Bill & {
+  online: {
+    invoice: string;
+    status: string;
+    refund_kind: "void" | "refund" | null;
+    card_brand: string | null;
+  } | null;
+};
+
 /** 단말기 승인번호가 필요한 결제 수단. */
 export const TERMINAL_METHODS: readonly PaymentMethod[] = ["card", "debit"];
 
@@ -84,6 +94,8 @@ export const posApi = {
     staffRpc<Bill>("pelham_staff_bill_refund", { p_bill: bill, p_reason: reason }),
   listPaid: (businessDate: string) => staffRpc<Bill[]>("pelham_staff_bills", { p_date: businessDate }),
   byReceipt: (receipt: string) => staffRpc<Bill>("pelham_staff_bill_by_receipt", { p_receipt: receipt }),
+  /** 이 티 시트 예약의 결제·환불 계산서, 최신순(0022). 환불 뒤에도 남는다. */
+  teeBills: (booking: string) => staffRpc<TeeBill[]>("pelham_staff_tee_bills", { p_booking: booking }),
 };
 
 /**
