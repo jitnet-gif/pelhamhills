@@ -104,6 +104,8 @@ class FakeStripe:
         form = dict(parse_qsl(request.content.decode())) if request.content else {}
         self.requests.append((request.method, path, form, query))
         assert request.headers["authorization"] == "Bearer sk_test_123"
+        # 계정 기본 버전(endive~)은 payment_method_types 를 거절한다. 늘 고정 버전으로 보낸다.
+        assert request.headers["stripe-version"] == sg.API_VERSION
         for key, (status, code, message) in self.fail.items():
             if path.startswith(key):
                 return httpx.Response(status, json={"error": {"code": code, "message": message}})

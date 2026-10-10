@@ -36,6 +36,10 @@ import httpx
 logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.stripe.com/v1"
+# API 버전을 고정한다. 계정 기본값(2026-09-30.endive 부터)은 `payment_method_types` 를 받지 않아 Checkout 의
+# card 전용 결제와 Terminal 의 card_present·interac_present 를 만들 수 없다(2026-10-10 확인). 응답 모양
+# (latest_charge, amount_details.tip)도 이 버전 기준으로 읽는다. 올릴 때는 테스트 키로 두 요청을 먼저 시험한다.
+API_VERSION = "2025-09-30.clover"
 CURRENCY = "cad"
 # 웹훅 서명 시각 허용 오차(초). Stripe 라이브러리 기본값과 같다.
 WEBHOOK_TOLERANCE = 300
@@ -108,7 +112,7 @@ def _request(method: str, path: str, params: dict[str, Any] | None = None,
     key = _env("STRIPE_SECRET_KEY")
     if not key:
         raise StripeError("Stripe is not configured")
-    headers = {"Authorization": f"Bearer {key}"}
+    headers = {"Authorization": f"Bearer {key}", "Stripe-Version": API_VERSION}
     if idempotency_key:
         headers["Idempotency-Key"] = idempotency_key
     pairs = _flatten(params or {})
