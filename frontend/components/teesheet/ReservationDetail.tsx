@@ -190,6 +190,9 @@ const GLYPH_PATH: Record<string, string> = {
   trash: "M2.8 4.4h10.4M6.2 4.4V2.6h3.6v1.8M4.2 4.4l.7 9h6.2l.7-9M6.6 6.6v4.6M9.4 6.6v4.6",
   card: "M1.8 4.2h12.4v7.6H1.8zM1.8 6.8h12.4M4 9.6h2.4",
   golf: "M8 2.2a5.8 5.8 0 1 1 0 11.6A5.8 5.8 0 0 1 8 2.2zM6.2 5.6h.01M8.6 5h.01M10.2 6.8h.01M7.4 7.6h.01M9.6 9.2h.01M5.8 9h.01",
+  umbrella: "M1.8 8a6.2 5.4 0 0 1 12.4 0zM8 2.6V1.8M8 8v4.6a1.3 1.3 0 0 1-2.6 0",
+  refund: "M3 5.4a5.6 5.6 0 1 1-.6 4.4M3 2.4v3h3M8 4.8v6.4M9.6 6.2c-.3-.6-.9-.9-1.6-.9-.9 0-1.6.5-1.6 1.2 0 1.6 3.2.9 3.2 2.6 0 .7-.7 1.2-1.6 1.2-.8 0-1.4-.3-1.7-1",
+  dots: "M8 3.2h.01M8 8h.01M8 12.8h.01",
   cart: "M1.6 4.2h8.6v5.2H1.6zM3 4.2 4 2.2h4.4l1 2M10.2 6.6h3.2l1 2.8v1.4h-4.2M1.6 10.8h12.8M3.2 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0M10.6 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0",
 };
 
@@ -221,6 +224,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const rainChecks = useRainChecks(bookingId);
   // 레인체크 창에 띄울 사람들. 열 때 한 번 찍어 둔다(5초 새로고침마다 창이 다시 묻지 않게).
   const [rainCheckFor, setRainCheckFor] = useState<Player[] | null>(null);
+  // 카드의 ⋮ 메뉴(Raincheck · Refund · Mark unpaid · Delete)가 열린 선수.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const [bookingDraft, setBookingDraft] = useState<BookingDraft | null>(null);
   const [playerDrafts, setPlayerDrafts] = useState<Record<string, PlayerDraft>>({});
@@ -346,10 +351,28 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setPreview(null);
     setBillPreview(null);
     setRainCheckFor(null);
+    setMenuFor(null);
     setSaveState({ kind: "idle", nonce: 0 });
   }, [bookingId, clearTimers]);
 
   useEffect(() => clearTimers, [clearTimers]);
+
+  // ⋮ 메뉴는 바깥을 누르거나 Esc 로 닫는다. 메뉴 안의 클릭은 data-player-menu 로 걸러 낸다.
+  useEffect(() => {
+    if (!menuFor) return;
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target as Element | null)?.closest?.("[data-player-menu]")) setMenuFor(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuFor(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuFor]);
 
   useEffect(() => {
     if (saveState.kind !== "saved") return;
@@ -1002,37 +1025,6 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     {player.type === "Guest" ? "G" : "●"}
                   </span>
                   <span className="truncate font-bold">{player.type}</span>
-                  {player.paid ? (
-                    // 계산서로 결제된 선수는 Mark unpaid 가 서버에서 막힌다(0005) — 환불은 계산서
-                    // 단위로 Reports 에서 한다. 결제한 날(영업일) 목록을 바로 연다.
-                    <Link
-                      className="ml-auto whitespace-nowrap px-1 text-[10px] font-bold text-[#8a3f26] underline decoration-dotted"
-                      href={`/admin/reports?date=${localBusinessDate(player.paidAt ? new Date(player.paidAt) : new Date())}`}
-                      title="Refund the bill this player was paid on — Reports → Daily close. Card and debit payments are refunded from that screen."
-                    >
-                      Refund
-                    </Link>
-                  ) : null}
-                  {player.paid ? (
-                    <button
-                      className="whitespace-nowrap px-1 text-[10px] text-[#4e5560] underline decoration-dotted hover:text-[#8a3f26] disabled:opacity-30"
-                      disabled={busy}
-                      onClick={() => void controller.patchPlayer(booking.id, player.id, { paid: false })}
-                      title="Clear the payment on this card — only to fix a mistake"
-                      type="button"
-                    >
-                      Mark unpaid
-                    </button>
-                  ) : null}
-                  <button
-                    className={`${player.paid ? "" : "ml-auto "}px-1 text-[#8a3f26] disabled:opacity-30`}
-                    disabled={busy}
-                    onClick={() => void controller.removePlayer(booking.id, player.id)}
-                    title="Remove this player from the reservation"
-                    type="button"
-                  >
-                    ×
-                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-1">
@@ -1127,7 +1119,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   </select>
                 </label>
 
-                <div className="mt-1.5 grid grid-cols-2 gap-1">
+                <div className="mt-1.5 grid grid-cols-[1fr_1fr_auto] gap-1">
                   <button
                     className={`border px-1 py-1 font-bold disabled:opacity-40 ${
                       player.arrived ? "border-[#168a3c] bg-[#ecfff1] text-[#168a3c]" : "border-[#d7d7dc]"
@@ -1148,6 +1140,85 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   >
                     No show
                   </button>
+                  {/* 레퍼런스의 ⋮ — 선수 한 명에게 하는 드문 일(레인체크·환불·삭제)을 한곳에 모은다.
+                      환불은 계산서 단위라 Reports → Daily close 의 그 영업일로 보낸다(0005). */}
+                  <div className="relative" data-player-menu>
+                    <button
+                      aria-expanded={menuFor === player.id}
+                      aria-haspopup="menu"
+                      aria-label="More actions for this player"
+                      className={`flex h-full items-center border px-1.5 disabled:opacity-40 ${
+                        menuFor === player.id ? "border-[#4533ff] bg-[#f3f2ff]" : "border-[#d7d7dc]"
+                      }`}
+                      disabled={busy}
+                      onClick={() => setMenuFor(menuFor === player.id ? null : player.id)}
+                      type="button"
+                    >
+                      <Glyph className="h-3.5 w-3.5" name="dots" />
+                    </button>
+                    {menuFor === player.id ? (
+                      <div
+                        className="absolute right-0 top-full z-20 mt-1 min-w-[150px] border border-[#c7c7cc] bg-white py-1 text-[12px] shadow-lg"
+                        role="menu"
+                      >
+                        {useRainCheck && player.paid && !player.cancelled ? (
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
+                            onClick={() => {
+                              setMenuFor(null);
+                              setRainCheckFor([player]);
+                            }}
+                            role="menuitem"
+                            title="Give this player a rain check slip (barcode + expiry date), or reprint / void one"
+                            type="button"
+                          >
+                            <Glyph className="h-4 w-4" name="umbrella" />
+                            Raincheck
+                          </button>
+                        ) : null}
+                        {player.paid ? (
+                          <Link
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
+                            href={`/admin/reports?date=${localBusinessDate(player.paidAt ? new Date(player.paidAt) : new Date())}`}
+                            onClick={() => setMenuFor(null)}
+                            role="menuitem"
+                            title="Refund the bill this player was paid on — Reports → Daily close. Card and debit payments are refunded from that screen."
+                          >
+                            <Glyph className="h-4 w-4" name="refund" />
+                            Refund
+                          </Link>
+                        ) : null}
+                        {player.paid ? (
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#4e5560] hover:bg-[#f2f2f5]"
+                            onClick={() => {
+                              setMenuFor(null);
+                              void controller.patchPlayer(booking.id, player.id, { paid: false });
+                            }}
+                            role="menuitem"
+                            title="Clear the payment on this card — only to fix a mistake"
+                            type="button"
+                          >
+                            <Glyph className="h-4 w-4" name="card" />
+                            Mark unpaid
+                          </button>
+                        ) : null}
+                        <button
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#c0262d] hover:bg-[#fff1ee]"
+                          onClick={() => {
+                            setMenuFor(null);
+                            void controller.removePlayer(booking.id, player.id);
+                          }}
+                          role="menuitem"
+                          title="Remove this player from the reservation"
+                          type="button"
+                        >
+                          <Glyph className="h-4 w-4" name="trash" />
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 {/* 그린피 한 줄. 금액은 예약 단위 `rate` 라서 한 카드에서 고치면 모든
@@ -1303,27 +1374,19 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 {useRainCheck && player.paid && !player.cancelled
                   ? (() => {
                       const check = activeRainCheck(rainChecks.checks, player.id);
+                      // 새로 내주는 것은 ⋮ → Raincheck. 여기는 이미 내준 레인체크의 상태만 보여 준다.
+                      if (!check) return null;
                       return (
                         <button
-                          className={`mt-1 border px-1 py-1 font-bold disabled:opacity-40 ${
-                            check
-                              ? "border-[#2f6f8f] bg-[#eef6fa] text-[#2f6f8f]"
-                              : "border-dashed border-[#2f6f8f] text-[#2f6f8f]"
-                          }`}
+                          className="mt-1 border border-[#2f6f8f] bg-[#eef6fa] px-1 py-1 font-bold text-[#2f6f8f] disabled:opacity-40"
                           disabled={busy}
                           onClick={() => setRainCheckFor([player])}
-                          title={
-                            check
-                              ? `Rain check ${check.code} — reprint or void`
-                              : "Give this player a rain check slip (barcode + expiry date)"
-                          }
+                          title={`Rain check ${check.code} — reprint or void`}
                           type="button"
                         >
-                          {check
-                            ? `Rain check ${formatMoney(check.amount)}${
-                                check.status === "redeemed" ? " · used" : check.expired ? " · expired" : ""
-                              }`
-                            : "Rain check"}
+                          {`Rain check ${formatMoney(check.amount)}${
+                            check.status === "redeemed" ? " · used" : check.expired ? " · expired" : ""
+                          }`}
                         </button>
                       );
                     })()
