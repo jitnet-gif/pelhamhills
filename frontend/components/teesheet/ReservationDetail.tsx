@@ -189,6 +189,8 @@ const GLYPH_PATH: Record<string, string> = {
   copy: "M5.4 5.4h8.2v8.2H5.4zM10.6 5.4V2.4H2.4v8.2h3",
   trash: "M2.8 4.4h10.4M6.2 4.4V2.6h3.6v1.8M4.2 4.4l.7 9h6.2l.7-9M6.6 6.6v4.6M9.4 6.6v4.6",
   card: "M1.8 4.2h12.4v7.6H1.8zM1.8 6.8h12.4M4 9.6h2.4",
+  golf: "M8 2.2a5.8 5.8 0 1 1 0 11.6A5.8 5.8 0 0 1 8 2.2zM6.2 5.6h.01M8.6 5h.01M10.2 6.8h.01M7.4 7.6h.01M9.6 9.2h.01M5.8 9h.01",
+  cart: "M1.6 4.2h8.6v5.2H1.6zM3 4.2 4 2.2h4.4l1 2M10.2 6.6h3.2l1 2.8v1.4h-4.2M1.6 10.8h12.8M3.2 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0M10.6 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0",
 };
 
 function Glyph({ name, className = "h-3.5 w-3.5" }: { name: keyof typeof GLYPH_PATH; className?: string }) {
@@ -989,7 +991,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 
             return (
               <article
-                className="flex w-[212px] shrink-0 flex-col border border-[#c7c7cc] bg-white p-1.5"
+                className="flex w-[244px] shrink-0 flex-col border border-[#c7c7cc] bg-white p-1.5"
                 key={player.id}
               >
                 <div className="mb-1.5 flex items-center gap-1.5">
@@ -1152,6 +1154,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     카드가 같이 바뀐다 — title 로 그 사실을 말해 둔다. 레퍼런스처럼
                     글자로 보이지만 실제로는 입력칸이다 (요금 편집을 잃지 않으려고). */}
                 <div className="mt-1.5 flex items-center gap-1 border border-[#d7d7dc] px-1.5 py-1">
+                  <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="golf" />
                   <span className="truncate">{booking.holes} Hole Green Fee</span>
                   <span aria-hidden className="ml-auto text-[#9aa0a6]">
                     $
@@ -1182,8 +1185,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     cartOn ? "border-[#d7d7dc]" : "border-dashed border-[#d7d7dc] text-[#9aa0a6]"
                   }`}
                 >
-                  {/* 글자는 "Half Cart" 만. 212px 카드에 "(18 Holes)" 까지 넣으면 잘린다 — 홀 수는
-                      바로 위 그린피 줄과 영수증 품목 이름에 있다. */}
+                  {/* 레퍼런스처럼 "Half Cart (18 Holes)" 전체를 쓴다 — 카드 폭(244px)이 그 길이에 맞춰져 있다. */}
                   <label
                     className="flex min-w-0 items-center gap-1"
                     title={
@@ -1201,7 +1203,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                       }
                       type="checkbox"
                     />
-                    <span className="truncate">Half Cart</span>
+                    <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="cart" />
+                    <span className="truncate">Half Cart ({booking.holes} Holes)</span>
                   </label>
                   <span aria-hidden className="ml-auto text-[#9aa0a6]">
                     $
