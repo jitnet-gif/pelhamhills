@@ -162,13 +162,26 @@ function PayResult() {
     );
   }
 
-  // orphaned / voided / refunded: 받았지만 예약에 붙일 수 없어 되돌렸거나, 이미 환불됐다.
+  // orphaned / voided / refunded. 장부에는 손님 취소 환불과 자동 되돌림이 똑같이 refunded 로 남는다.
+  // "예약에 붙일 수 없었다" 는 되돌림이 확실할 때만(orphaned, 또는 방금 settle 이 reversed 를 돌려줌) 말한다.
+  if (payment.reversal_failed) {
+    return (
+      <Panel title="Please call the pro shop" tone="warn">
+        <p>
+          We received {money(payment.amount)} but could not apply it to your booking. The pro shop will refund it —
+          please call {CLUB.phone}.
+        </p>
+        <Actions code={code} />
+      </Panel>
+    );
+  }
+  const reversed = payment.status === "orphaned" || Boolean(payment.reversed);
   return (
-    <Panel title={payment.reversal_failed ? "Please call the pro shop" : "Payment returned"} tone="warn">
+    <Panel title={reversed ? "Payment returned" : "Payment refunded"} tone="warn">
       <p>
-        {payment.reversal_failed
-          ? `We received ${money(payment.amount)} but could not apply it to your booking. The pro shop will refund it — please call ${CLUB.phone}.`
-          : `This payment of ${money(payment.amount)} could not be applied to your booking (it may have changed, or was already paid), so it was returned to your card${card ? ` (${card})` : ""}.`}
+        {reversed
+          ? `This payment of ${money(payment.amount)} could not be applied to your booking (it may have changed, or was already paid), so it ${payment.status === "orphaned" ? "is being" : "was"} returned to your card${card ? ` (${card})` : ""}.`
+          : `This payment of ${money(payment.amount)} was refunded to your card${card ? ` (${card})` : ""}. It usually shows on your statement within 5–10 business days.`}
       </p>
       <Actions code={code} />
     </Panel>
