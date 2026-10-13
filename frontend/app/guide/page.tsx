@@ -13,7 +13,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { ADMIN_HOME, ADMIN_RETAIL, ADMIN_SCAN, REGISTER_GUIDE } from "@/lib/nav";
+import { ADMIN_HOME, ADMIN_RETAIL, ADMIN_SCAN, REGISTER_CLOSE_GUIDE, REGISTER_GUIDE } from "@/lib/nav";
 
 export const metadata: Metadata = {
   title: "Staff Guides",
@@ -38,6 +38,14 @@ const sections: { heading: string; guides: Guide[] }[] = [
         title: "Register 첫 화면",
         summary:
           "Continue Sale · Refund · New Sale · Close Register 와 최근 판매 목록을 장면별 나레이션(한국어/English)으로 따라가며 익힌다.",
+        screen: { label: "Pro Shop 계산대", href: ADMIN_RETAIL },
+        tag: "나레이션",
+      },
+      {
+        href: REGISTER_CLOSE_GUIDE,
+        title: "Close Register (계산대 마감)",
+        summary:
+          "Lightspeed 와 같은 Closing Totals 표 — 칸의 뜻, 현금 권종별 세기, 카드 합계, Submit Counts, 다시 세기, 담당자별 마감을 장면별 나레이션(한국어/English)으로.",
         screen: { label: "Pro Shop 계산대", href: ADMIN_RETAIL },
         tag: "나레이션",
       },

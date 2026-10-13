@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head><body>
+<title>Close Register 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko">한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en">English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Vercel · Supabase RPC · Stripe</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 프로샵 계산대 · 나레이터 프레젠테이션",
+  h1:"Lightspeed처럼 세는 <b>Close Register</b>",
+  lede:"계산대를 닫을 때 여는 Closing Totals 표를 아홉 장면으로 따라가요. 칸의 뜻, 현금 권종별 세기, 카드 합계, 제출, 다시 세기, 담당자별 마감까지예요. 왼쪽은 계산대 화면, 가운데는 뒤에서 오가는 요청, 오른쪽은 마감 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 9장면",laneScreen:"계산대 화면",laneLog:"뒤에서 일어나는 일",laneLedger:"마감 상태",
+  ledgerSub:"서버 숫자 · 센 돈 · 저장",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 요청이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"금액·이름·시각은 예시예요. 함수 이름과 동작은 커밋 19f8f79(2026-10-12)의 RegisterClose.tsx · 0023_register_close.sql 기준이에요. 처음 쓰기 전에 Supabase SQL Editor에서 0023_register_close.sql을 한 번 실행해야 해요. 실제 데이터로 마감해 보는 확인은 아직 남아 있어요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Pro shop register · narrated walkthrough",
+  h1:"<b>Close Register</b>, counted like Lightspeed",
+  lede:"Nine scenes walk through the Closing Totals table you open to close a register: what each column means, counting cash by denomination, card totals, submitting, recounting and the staff close-out. Left: the register screen. Middle: the requests behind it. Right: the close-out state.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 9 scenes",laneScreen:"Register screen",laneLog:"Behind the scenes",laneLedger:"Close-out state",
+  ledgerSub:"Server figures · counts · saved",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Requests appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Amounts, names and times are examples. Function names and behavior follow commit 19f8f79 (2026-10-12): RegisterClose.tsx and 0023_register_close.sql. Run 0023_register_close.sql once in the Supabase SQL Editor before first use. Closing with real data has not been tried yet."}
+};
+
+/* ---------- POS screen pieces ---------- */
+const IC={
+ cont:'<svg viewBox="0 0 24 24"><path d="M14 4l7 6.5-7 6.5v-4C8.5 13 5.5 15 3 20c.5-6.5 4-11 11-12V4z"/></svg>',
+ refund:'<svg viewBox="0 0 24 24"><path d="M15.5 2.5l6 6-1.6 1.6a1.8 1.8 0 00-2.5 2.5l-6.9 6.9-6-6 6.9-6.9a1.8 1.8 0 002.5-2.5l1.6-1.6zm-1.4 4.2l-7.4 7.4 3.2 3.2 7.4-7.4-3.2-3.2z"/></svg>',
+ plus:'<svg viewBox="0 0 24 24"><path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7V3z"/></svg>',
+ sw:'<svg viewBox="0 0 24 24"><path d="M16 3l5 4.5L16 12V9H4V6h12V3zM8 12v3h12v3H8v3l-5-4.5L8 12z"/></svg>',
+ pw:'<svg viewBox="0 0 24 24" style="fill:none;stroke:#2b2f36;stroke-width:2.6;stroke-linecap:round"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1011.4 0"/></svg>'
+};
+function tile(ic,label,o){o=o||{};return '<div class="tile'+(o.cls?" "+o.cls:"")+'">'+(o.k?'<span class="k">'+o.k+'</span>':"")+ic+'<b>'+label+'</b>'+(o.hint?'<em>'+o.hint+'</em>':"")+'</div>'}
+function shell(body){return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app/pos/pro-shop</span></div><div class="posbar"><span><small>PELHAM HILLS POS</small><b>Pro Shop</b></span><span class="st">Snack Bar <i>Pro Shop</i></span></div><div class="postabs"><span class="on">Register</span><span>Products</span></div><div class="posbody">'+body+'</div></div>'}
+function home(o){o=o||{};
+ let b='<div class="sh">Current sale</div><div class="tiles">'+
+  tile(IC.cont,"Continue Sale",{k:"Alt+S",hint:"No open sale",cls:"off"})+
+  tile(IC.refund,"Refund",{k:"Alt+R"})+
+  tile(IC.plus,"New Sale",{k:"Alt+N",cls:"primary"})+'</div>'+
+  '<div class="sh">Current register is Pro Shop</div><p class="snote">The register is where you do sales and refunds. You are using Pro Shop at Pelham Hills Golf Club.</p><div class="tiles">'+
+  tile(IC.sw,"Switch Registers")+tile(IC.pw,"Close Register",{cls:o.hot?"hot":""})+'</div>';
+ return shell(b)}
+
+/* 오늘 Pro Shop 숫자(예시). 센트. */
+const ROWS=[
+ {m:"cash",l:"Cash",start:20000,pay:15363,cnt:true},
+ {m:"card",l:"Credit Card",start:0,pay:41288,cnt:true},
+ {m:"debit",l:"Debit Card",start:0,pay:8620,cnt:true},
+ {m:"member_account",l:"Credit Account",start:0,pay:4500},
+ {m:"gift_card",l:"Gift card",start:0,pay:0},
+ {m:"rain_check",l:"Rain check",start:0,pay:2937}
+];
+const DEN=[10000,5000,2000,1000,500,200,100,25,10,5,1];
+const FULL={10000:1,5000:2,2000:5,1000:3,500:4,200:1,100:1,25:2,10:1,5:0,1:3};
+const money=c=>(c<0?"-":"")+"$"+(Math.abs(c)/100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");
+const plain=c=>(c/100).toFixed(2);
+const denL=c=>c>=100?"$"+c/100:c+"¢";
+/* 현금 칸을 위에서부터 n개 채운 개수 */
+function partial(n){const o={};DEN.forEach((d,i)=>{o[d]=i<n?FULL[d]:0});return o}
+function cashSum(c){return DEN.reduce((s,d)=>s+d*(c[d]||0),0)}
+function diffTag(counted,expected){const d=counted-expected;return '<span class="df '+(d===0?"ok":"bad")+'">'+(d===0?"Balances":(d>0?"Over ":"Short ")+money(Math.abs(d)))+'</span>'}
+
+function closeWin(o){o=o||{};
+ const counts=o.counts||partial(0);const ct=cashSum(counts);
+ const counted={cash:ct,card:o.card||0,debit:o.debit||0};
+ const hot=o.hot||"";
+ let t='<table class="ct"><thead><tr><th class="l">Type</th><th'+(hot==="cols"?' class="hc"':"")+'>Start+Adds</th><th'+(hot==="cols"?' class="hc"':"")+'>Payments</th><th'+(hot==="cols"?' class="hc"':"")+'>Withdraws</th><th'+(hot==="cols"||hot==="remain"?' class="hc"':"")+'>Total Remaining</th><th class="c">Closing Count</th></tr></thead><tbody>';
+ const rowsNow=ROWS.map(r=>Object.assign({},r,{pay:r.pay+(o.stale&&r.m==="cash"?2937:0)}));
+ for(const r of rowsNow){
+  const rem=r.start+r.pay;
+  const rh=(hot===r.m||(hot==="nocount"&&!r.cnt))?" hr":"";
+  let cell;
+  if(r.m==="cash"){
+   cell='<div class="den">'+DEN.map(d=>'<span>'+denL(d)+' ×</span><i class="'+(o.typing===d?"on":"")+'">'+(counts[d]||0)+'</i>').join("")+'<span>Extra</span><i class="w">$ 0.00</i><span>Total</span><i class="w tot">$ '+plain(ct)+'</i></div>';
+  }else if(r.cnt){
+   cell='<i class="mi'+(o.typing===r.m?" on":"")+'">$ '+plain(counted[r.m])+'</i>';
+  }else cell='<span class="ro">'+money(rem)+'</span>';
+  if(r.cnt&&o.showDiff)cell+=diffTag(counted[r.m],rem);
+  t+='<tr class="'+rh+'"><td class="l b">'+r.l+'</td><td>'+money(r.start)+'</td><td>'+money(r.pay)+'</td><td>$0.00</td><td>'+money(rem)+'</td><td class="cc">'+cell+'</td></tr>';
+ }
+ const ts=rowsNow.reduce((s,r)=>s+r.start,0),tp=rowsNow.reduce((s,r)=>s+r.pay,0);
+ t+='<tr class="tt"><td class="l">Totals</td><td>'+money(ts)+'</td><td>'+money(tp)+'</td><td>$0.00</td><td>'+money(ts+tp)+'</td><td></td></tr></tbody></table>';
+ let b='<div class="win"><header><span>Close register · 2026-10-12</span><span>×</span></header><div class="wb">';
+ b+='<h4 class="wt">Register - "Pro Shop" Closing Totals</h4>';
+ if(o.openBills)b+='<div class="warnbox">1 sale(s) on this register are still open. Charge or void them before closing.</div>';
+ if(o.saved)b+='<div class="sv '+(o.stale?"bad":"warn")+'"><b>'+(o.just?"Counts submitted":"Counted")+' 2026-10-12, 6:12 p.m.</b>'+(o.stale?'<span>Debit Card: short $0.20</span><span>Sales on this register changed after the count. Count again.</span>':'<span>Debit Card: short $0.20</span>')+'</div>';
+ b+='<div class="ctw">'+t+'</div>';
+ b+='<div class="nr"><b>Note</b><span class="ta'+(o.noteOn?" on":"")+'">'+(o.note||"")+'</span></div>';
+ b+='<div class="btns"><span class="sbtn pri'+(hot==="submit"?" hot":"")+'">'+(o.saved?"Submit Counts Again":"Submit Counts")+'</span><span class="sbtn">Cancel</span><span class="sbtn r'+(hot==="staff"?" hot":"")+'">Staff hours &amp; tip split →</span></div>';
+ b+='</div></div>';
+ return shell(b)}
+function staffWin(){
+ const b='<div class="win"><header><span>Staff close-out · 2026-10-12</span><span>×</span></header><div class="wb">'+
+  '<table class="ctable"><thead><tr><th>Staff</th><th class="r">Cash</th><th class="r">Card</th><th class="r">Tips</th><th></th></tr></thead><tbody>'+
+  '<tr><td>sunjae</td><td class="r">$103.63</td><td class="r">$320.08</td><td class="r">$18.00</td><td><span class="okpill">Closed</span></td></tr>'+
+  '<tr><td>alex</td><td class="r">$50.00</td><td class="r">$179.00</td><td class="r">$6.00</td><td><span class="waitpill">Open</span></td></tr></tbody></table>'+
+  '<span class="mlbl">Tip split — by hours worked</span><div class="sum"><div><span>Tip pool</span><span>$24.00</span></div><div><span>sunjae · 6.0 h</span><span>$14.40</span></div><div><span>alex · 4.0 h</span><span>$9.60</span></div></div>'+
+  '<span class="mlbl">Not built yet · no buttons</span><div class="ghostlist"><span>Open Drawer</span><span>Payout / Drop</span></div></div></div>';
+ return shell(b)}
+
+const L=(ko,en)=>({ko,en});
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"look",ko:"전체 구성",en:"Overview",
+ screen:()=>closeWin({counts:FULL,card:41288,debit:8600,showDiff:true}),
+ log:[
+  {at:.2,tag:"ui",name:"RegisterClose.tsx",ep:"new · Close Register window",why:L("Lightspeed R-Series의 Register Closing Totals 표와 같은 칸·같은 순서예요.","Same columns and order as the Lightspeed R-Series Register Closing Totals table.")},
+  {at:.45,tag:"rpc",name:"0023_register_close.sql",ep:"new table + 2 staff functions",why:L("계산대 하나·하루 하나 = 마감 한 줄(pelham_register_closes).","One register, one day = one close row (pelham_register_closes).")},
+  {at:.7,tag:"ui",name:"per register, not per person",ep:"station = pro_shop",why:L("사람별 마감(팁 나누기)은 그대로 있고, 이건 서랍 하나를 맞추는 마감이에요.","The per-person close-out (tip split) stays; this one balances a single drawer.")}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"all",sv:"none",st:"none"}]},
+
+{a:"open",ph:"look",ko:"마감 창 열기",en:"Open the window",
+ screen:(lang,p)=>p<.35?home({hot:true}):closeWin({}),
+ log:[
+  {at:.2,tag:"key",name:"Close Register",ep:"tile on the register home"},
+  {at:.4,tag:"rpc",name:"pelham_staff_register_close_report",ep:"staff token",body:{p_date:"2026-10-12",p_station:"pro_shop"},why:L("서버가 오늘 이 계산대에서 결제된 계산서를 결제수단별로 세요. 환불된 계산서는 빼요.","The server totals today's paid bills on this register by payment type. Refunded bills are left out.")},
+  {at:.65,tag:"rpc",name:"pelham_register_expected",ep:"amount + tip per method",body:{cash:15363,card:41288,debit:8620,member_account:4500,gift_card:0,rain_check:2937}},
+  {at:.85,tag:"ui",name:"no sums on screen",ep:"server numbers only",why:L("화면은 센 돈만 더해요. 그래서 Reports와 숫자가 어긋나지 않아요.","The screen only adds up what you count, so the figures can't drift from Reports.")}
+ ],
+ ledger:[{at:0,fig:"none",cnt:"none",sv:"none",st:"none"},{at:.45,fig:"read",flash:["fig"]}]},
+
+{a:"cols",ph:"look",ko:"칸의 뜻",en:"The columns",
+ screen:(lang,p)=>closeWin({hot:p<.75?"cols":"remain"}),
+ log:[
+  {at:.15,tag:"rpc",name:"Start+Adds",ep:"pelham_register_float() = 20000",why:L("시작 잔돈. '계산대 열기'가 아직 없어 계산대마다 $200으로 고정. 현금 줄에만 붙어요.","Opening float. No 'open register' step yet, so it's fixed at $200 per register, cash row only.")},
+  {at:.35,tag:"rpc",name:"Payments",ep:"amount + tip",why:L("오늘 받은 돈, 팁 포함. 거스름돈은 서버로 오지 않아서 빼고 셀 필요가 없어요.","Money taken today, tips included. Change given back never reaches the server.")},
+  {at:.55,tag:"rpc",name:"Withdraws",ep:"always 0 for now",why:L("Payout/Drop 기능이 아직 없어요.","There's no Payout/Drop yet.")},
+  {at:.75,tag:"rpc",name:"Total Remaining",ep:"start + payments − withdraws",body:{cash:"200.00 + 153.63 = 353.63"},why:L("서랍(또는 단말기 전표)에 있어야 하는 돈이에요.","What should be in the drawer, or on the terminal slip.")}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"none",sv:"none",st:"none"}]},
+
+{a:"cash",ph:"count",ko:"현금 권종별",en:"Cash by denomination",
+ screen:(lang,p)=>{const n=Math.min(11,Math.floor(p*14));return closeWin({hot:"cash",counts:partial(n),typing:n<11?DEN[n]:0,showDiff:true})},
+ log:[
+  {at:.15,tag:"key",name:"$100 × 1 · $50 × 2 · $20 × 5 …",ep:"count per bill and coin"},
+  {at:.4,tag:"ui",name:"Total = Σ denomination × count + Extra",ep:"adds up as you type",why:L("$2·$1·25¢는 캐나다 동전(투니·루니·쿼터)이에요. 권종에 없는 돈은 Extra에.","$2, $1 and 25¢ are toonies, loonies and quarters. Anything else goes in Extra.")},
+  {at:.6,tag:"ui",name:"Short $3.63 → Balances",ep:"live, per row",why:L("세는 도중엔 빨간 Short, 서랍과 맞으면 초록 Balances.","Red Short while counting, green Balances when it matches the drawer.")},
+  {at:.85,tag:"ui",name:"cash_counts",ep:"kept with the close",body:{"10000":1,"5000":2,"2000":5,"1000":3,"500":4,"200":1,"100":1,"25":2,"10":1,"5":0,"1":3,extra:0}}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"none",sv:"none",st:"none"},{at:.3,cnt:"cash1",flash:["cnt"]},{at:.8,cnt:"cash",flash:["cnt"]}]},
+
+{a:"card",ph:"count",ko:"카드 · 체크카드",en:"Card · debit",
+ screen:(lang,p)=>closeWin({hot:p<.5?"card":"debit",counts:FULL,card:p<.25?0:41288,debit:p<.6?0:8600,typing:p<.5?"card":"debit",showDiff:true}),
+ log:[
+  {at:.15,tag:"stripe",name:"terminal daily total",ep:"card reader report",why:L("카드·체크카드는 단말기 하루 합계를 보고 금액을 적어요.","For credit and debit, type the totals from the card terminal's daily report.")},
+  {at:.35,tag:"key",name:"Credit Card $412.88",ep:"Balances"},
+  {at:.65,tag:"key",name:"Debit Card $86.00",ep:"Short $0.20",why:L("제출 전에 바로 보여서 전표를 다시 확인할 수 있어요.","It shows before submitting, so the slip can be checked again.")},
+  {at:.85,tag:"ui",name:"one card row",ep:"no Visa / Mastercard / AMEX split",why:L("우리 결제수단은 카드 하나라 한 줄로 세요.","Our payments have one card type, so it's one row.")}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"cash",sv:"none",st:"none"},{at:.4,cnt:"card",flash:["cnt"]},{at:.7,cnt:"all",flash:["cnt"]}]},
+
+{a:"nocount",ph:"count",ko:"세지 않는 줄",en:"Rows not counted",
+ screen:(lang,p)=>closeWin({hot:p<.7?"nocount":"",counts:FULL,card:41288,debit:8600,showDiff:true}),
+ log:[
+  {at:.2,tag:"rpc",name:"countable = cash · card · debit",ep:"row.countable",why:L("회원 계정·기프트카드·레인체크는 셀 실물이 없어 입력칸 없이 금액만 보여요.","Member account, gift card and rain check have nothing to count, so they show the amount without a box.")},
+  {at:.5,tag:"ui",name:"Credit Account",ep:"= member_account",why:L("Lightspeed와 같은 이름으로 보여요.","Shown with the same name as in Lightspeed.")},
+  {at:.75,tag:"ui",name:"Totals row",ep:"200.00 · 727.08 · 0.00 · 927.08"}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"all",sv:"none",st:"none"}]},
+
+{a:"submit",ph:"save",ko:"Submit Counts",en:"Submit Counts",
+ screen:(lang,p)=>p<.6?closeWin({hot:p<.35?"":"submit",counts:FULL,card:41288,debit:8600,showDiff:true,noteOn:true,note:p<.2?"":"Debit slip off by 20¢ — checked"}):closeWin({counts:FULL,card:41288,debit:8600,showDiff:true,note:"Debit slip off by 20¢ — checked",saved:true,just:true}),
+ log:[
+  {at:.25,tag:"key",name:"Note",ep:"why it's over/short"},
+  {at:.55,tag:"rpc",name:"pelham_staff_register_close_save",ep:"staff token",body:{p_station:"pro_shop",cash:35363,card:41288,debit:8600,note:"Debit slip off by 20¢ — checked"}},
+  {at:.7,tag:"rpc",name:"pelham_register_closes",ep:"upsert (business_date, station)",why:L("그 순간의 Total Remaining(expected)과 센 돈(counted)을 같이 적어요. 다시 내면 덮어써요.","Stores the Total Remaining at that moment (expected) with the counts. Submitting again replaces it.")},
+  {at:.85,tag:"ui",name:"result banner",ep:"over / short per row"}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"all",sv:"none",st:"none"},{at:.65,sv:"saved",flash:["sv"]}]},
+
+{a:"stale",ph:"save",ko:"다시 세기",en:"Count again",
+ screen:(lang,p)=>closeWin({counts:FULL,card:41288,debit:8600,showDiff:true,note:"Debit slip off by 20¢ — checked",saved:true,stale:p>=.25,openBills:p>=.6,hot:p>=.8?"submit":""}),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_staff_bill_pay",ep:"a $29.37 sale after the count"},
+  {at:.3,tag:"rpc",name:"stale = expected ≠ now",ep:"report recomputes",why:L("저장된 expected와 지금 숫자가 다르면 빨간 경고가 떠요.","If the saved expected differs from now, a red warning shows.")},
+  {at:.6,tag:"rpc",name:"open_bills = 1",ep:"today only",why:L("아직 결제 안 된 계산서가 있으면 노란 안내. 먼저 결제하거나 Void해요.","Unpaid bills on this register get a yellow note. Charge or void them first.")},
+  {at:.82,tag:"key",name:"Submit Counts Again",ep:"recount, replaces"}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"all",sv:"saved",st:"none"},{at:.3,fig:"read2",sv:"stale",flash:["fig","sv"]}]},
+
+{a:"staff",ph:"save",ko:"담당자별 마감",en:"Staff close-out",
+ screen:(lang,p)=>p<.35?closeWin({counts:FULL,card:41288,debit:8600,showDiff:true,saved:true,note:"Debit slip off by 20¢ — checked",hot:"staff"}):staffWin(),
+ log:[
+  {at:.2,tag:"ui",name:"Staff hours & tip split →",ep:"same window, next step"},
+  {at:.4,tag:"rpc",name:"pelham_staff_closeout_report",ep:"0010 · unchanged",why:L("근무시간과 팁 나누기는 예전 담당자별 마감 그대로예요.","Hours and the tip split are the same staff close-out as before.")},
+  {at:.65,tag:"ui",name:"Open Drawer",ep:"not shown",why:L("앱이 아직 서랍을 열 수 없어서, 눌러도 안 되는 버튼은 두지 않았어요.","The app can't open the drawer yet, so the button isn't shown.")},
+  {at:.85,tag:"rpc",name:"run 0023 once",ep:"Supabase SQL Editor",why:L("실행 전에는 '0023을 실행해 주세요' 안내만 나와요.","Until then the window only says to run 0023.")}
+ ],
+ ledger:[{at:0,fig:"read",cnt:"all",sv:"saved",st:"none"},{at:.4,st:"open",flash:["st"]}]}
+];
+
+const PH={look:{ko:"보기",en:"Read"},count:{ko:"세기",en:"Count"},save:{ko:"저장",en:"Save"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"DEVICE",stripe:"TERMINAL",key:"INPUT"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const rows=a=>'<div class="lrows">'+a.map(r=>'<div class="'+(r[2]||"")+'"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>').join("")+'</div>';
+  // 1) 서버가 센 숫자
+  const after=st.fig==="read2";
+  let h=card("fig",k==="ko"?"있어야 하는 돈":"Should be there","pelham_register_expected · Pro Shop",
+    st.fig==="none"?pill("none",k==="ko"?"아직 안 읽음":"Not read"):pill(after?"bad":"vi",after?(k==="ko"?"센 뒤 +$29.37":"+$29.37 since count"):(k==="ko"?"서버가 셈":"From the server")),
+    st.fig==="none"?'<p class="lnote">'+(k==="ko"?"Close Register를 누르면 읽어요.":"Read when Close Register opens.")+'</p>':
+    rows([["Cash",after?"$383.00":"$353.63",after?"cur":""],["Credit Card","$412.88"],["Debit Card","$86.20"],["Credit Account","$45.00"],["Rain check","$29.37"]]));
+  // 2) 센 돈
+  const c=st.cnt;
+  const cnt={none:["none",k==="ko"?"아직 안 셈":"Not counted"],cash1:["wait",k==="ko"?"현금 세는 중":"Counting cash"],cash:["ok",k==="ko"?"현금 맞음":"Cash balances"],card:["ok",k==="ko"?"카드 맞음":"Card balances"],all:["bad",k==="ko"?"체크카드 20¢ 모자람":"Debit short 20¢"]}[c];
+  h+=card("cnt",k==="ko"?"센 돈":"Counted","RegisterClose.tsx · on screen",pill(cnt[0],cnt[1]),
+    rows([["Cash",c==="none"?"—":c==="cash1"?"$350.00…":"$353.63"],["Credit Card",c==="all"||c==="card"?"$412.88":"—"],["Debit Card",c==="all"?"$86.00":"—",c==="all"?"cur":""]]));
+  // 3) 저장
+  const sv={none:["none",k==="ko"?"아직 없음":"None yet"],saved:["ok",k==="ko"?"저장됨 6:12 p.m.":"Saved 6:12 p.m."],stale:["bad",k==="ko"?"다시 세야 함":"Count again"]}[st.sv];
+  h+=card("sv",k==="ko"?"저장된 마감":"Saved close","pelham_register_closes",pill(sv[0],sv[1]),
+    st.sv==="none"?'<p class="lnote">'+(k==="ko"?"Submit Counts를 누르면 한 줄이 생겨요.":"Submit Counts writes one row.")+'</p>':
+    rows([["business_date · station","2026-10-12 · pro_shop"],["expected.cash","35363"],["counted.cash","35363"],["counted.debit","8600 (−20)"],["stale",st.sv==="stale"?"true":"false",st.sv==="stale"?"cur":""]]));
+  // 4) 담당자별
+  h+=card("st",k==="ko"?"담당자별 마감":"Staff close-out","pelham_staff_closeouts · 0010",
+    st.st==="open"?pill("wait",k==="ko"?"1명 남음":"1 still open"):pill("none",k==="ko"?"따로 함":"Separate"),
+    rows([["sunjae",st.st==="open"?(k==="ko"?"마감됨":"closed"):"—"],["alex",st.st==="open"?(k==="ko"?"열림":"open"):"—"],[k==="ko"?"팁 풀":"Tip pool","$24.00"]]));
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"ov": {"ko": 15.2, "en": 13.1}, "open": {"ko": 15.1, "en": 14.2}, "cols": {"ko": 19.4, "en": 16.1}, "cash": {"ko": 15.8, "en": 15.2}, "card": {"ko": 12.7, "en": 11.2}, "nocount": {"ko": 12.3, "en": 12.0}, "submit": {"ko": 14.6, "en": 11.7}, "stale": {"ko": 12.1, "en": 11.7}, "staff": {"ko": 16.0, "en": 13.7}};
+const NARR={"ko": {"ov": "이번엔 계산대 마감, Close Register 화면을 보여드릴게요. Lightspeed에서 쓰던 Closing Totals 표를 그대로 옮겼어요. 결제수단마다 한 줄이고, 서랍에 있어야 할 돈과 직접 센 돈을 나란히 놓고 맞춰 봐요. 계산대 하나씩 따로 마감해요.", "open": "계산대 첫 화면에서 Close Register 타일을 누르면 마감 창이 넓게 열려요. 이때 서버가 오늘 이 계산대에서 결제된 계산서를 직접 세서 표를 채워요. 화면에서 더하지 않으니까 Reports와 숫자가 어긋나지 않아요.", "cols": "칸 이름도 Lightspeed와 같아요. Start 플러스 Adds는 시작 잔돈인데, 지금은 계산대마다 이백 달러로 정해 두었어요. Payments는 오늘 받은 돈, 팁 포함이에요. Withdraws는 아직 서랍에서 빼는 기능이 없어서 영이에요. 그리고 Total Remaining이 서랍에 있어야 하는 돈이에요.", "cash": "현금은 권종별로 개수를 적어요. 백 달러 몇 장, 이십 달러 몇 장, 동전까지요. 적는 대로 아래 Total이 바로 더해지고, 서랍과 맞으면 초록색 Balances, 아니면 빨간 Short나 Over가 나와요. 권종에 없는 돈은 Extra에 적어요.", "card": "카드와 체크카드는 단말기 하루 합계를 보고 금액을 적어요. 여기서는 체크카드가 이십 센트 모자라게 나왔어요. 칸 바로 아래 Short 이십 센트가 보이니까, 제출하기 전에 전표를 다시 확인할 수 있어요.", "nocount": "Credit Account, 기프트카드, 레인체크는 셀 실물이 없어요. 그래서 Lightspeed의 Credit Account 줄처럼 입력칸 없이 금액만 보여 줘요. 맨 아래 Totals 줄은 칸마다 전체 합이에요.", "submit": "다 셌으면 Note에 이유를 적고 Submit Counts를 눌러요. 서버가 그 순간 있어야 할 돈과 센 돈을 같이 저장하고, 위에 결과가 떠요. 같은 날 다시 세서 제출하면 그 계산대 기록을 덮어써요.", "stale": "센 뒤에 이 계산대에서 결제나 환불이 또 생기면, 마감 창에 빨간 경고가 나와요. 그럼 다시 세서 Submit Counts Again을 누르면 돼요. 아직 결제 안 된 계산서가 남아 있으면 노란 안내도 떠요.", "staff": "근무시간과 팁 나누기는 오른쪽 아래 Staff hours and tip split 버튼으로 가요. 예전 담당자별 마감 그대로예요. Open Drawer 버튼은 앱이 아직 서랍을 열 수 없어서 넣지 않았어요. 이제 마감할 때 이 표로 세면 돼요!"}, "en": {"ov": "Now let's look at closing the register. Close Register opens the same Closing Totals table you used in Lightspeed. Each payment type gets one row, and what should be in the drawer sits right next to what you count. Each register is closed on its own.", "open": "Tap the Close Register tile on the register home, and the closing window opens wide. The server counts today's paid bills on this register and fills in the table. Nothing is added up on the screen, so the numbers can't drift from Reports.", "cols": "The columns match Lightspeed too. Start plus Adds is the opening float, set at two hundred dollars per register for now. Payments is what came in today, tips included. Withdraws stays at zero, because there's no payout yet. And Total Remaining is what should be in the drawer.", "cash": "For cash, enter how many of each bill and coin you have, from hundreds down to pennies. The Total adds up as you type. When it matches, you see a green Balances; if not, a red Short or Over. Anything that doesn't fit a denomination goes in Extra.", "card": "For credit and debit cards, type the totals from the card terminal's daily report. Here, debit comes out twenty cents short. It shows right under the box, so you can check the slip again before submitting.", "nocount": "Credit Account, gift cards and rain checks have nothing physical to count. Like the Credit Account row in Lightspeed, they show the amount without an input box. The Totals row at the bottom adds up each column.", "submit": "When you're done, add a note and press Submit Counts. The server saves what should be there at that moment, together with your counts, and the result shows at the top. Submitting again the same day replaces that register's count.", "stale": "If a sale or refund happens on this register after the count, the closing window shows a red warning. Just count again and press Submit Counts Again. If unpaid bills are still open, a yellow note shows up too.", "staff": "For hours and the tip split, use the Staff hours and tip split button at the bottom right. It's the same staff close-out as before. There's no Open Drawer button, because the app can't open the drawer yet. From now on, close out with this table!"}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phrc-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phrc-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"/guides/register-close/audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phrc-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phrc-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

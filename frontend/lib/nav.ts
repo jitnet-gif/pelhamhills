@@ -140,6 +140,9 @@ export const ADMIN_RETAIL = "/admin/retail";
 /** 계산대 첫 화면 사용법 — 나레이션 프레젠테이션(`public/guides/register-home/`). 로그인 없이 열린다. */
 export const REGISTER_GUIDE = "/guides/register-home/index.html";
 
+/** 계산대 마감(Close Register) 사용법 — 나레이션 프레젠테이션(`public/guides/register-close/`). */
+export const REGISTER_CLOSE_GUIDE = "/guides/register-close/index.html";
+
 /**
  * 직원용 사용 안내 모음. 각 안내는 `public/guides/<slug>/` 에 통째로 둔 정적 HTML 이고,
  * 이 주소는 그 목록 한 장이다(`app/guide/page.tsx`). 로그인 없이 열린다.

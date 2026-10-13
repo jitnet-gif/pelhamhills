@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { REGISTER_CLOSE_GUIDE } from "@/lib/nav";
 import retailApi, { toRetailError } from "@/lib/retail/api";
 import { PAYMENT_LABELS } from "@/lib/retail/receipt";
 import {
@@ -256,6 +257,16 @@ function CloseForm({
           Staff hours &amp; tip split →
         </Button>
       </div>
+
+      {/* 이 화면 사용법(나레이션 프레젠테이션). 새 탭으로 열어 마감 창은 그대로 둔다. */}
+      <a
+        className="justify-self-start text-sm font-bold text-[#4533ff] underline"
+        href={REGISTER_CLOSE_GUIDE}
+        rel="noopener"
+        target="_blank"
+      >
+        ▶ How closing works (Korean / English)
+      </a>
     </div>
   );
 }
