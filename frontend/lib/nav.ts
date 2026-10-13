@@ -116,6 +116,7 @@ export const adminNav: NavItem[] = [
   { label: "Course Map", href: GOLF_GPS_MAP_EDITOR, glyph: "⌖" },
   { label: "Integrations", href: "/admin/integrations", glyph: "⊞" },
   { label: "Settings", href: "/admin/settings", glyph: "⚙" },
+  { label: "Staff Guides", href: "/guide", glyph: "▶" },
 ];
 
 /**
@@ -138,6 +139,12 @@ export const ADMIN_RETAIL = "/admin/retail";
 
 /** 계산대 첫 화면 사용법 — 나레이션 프레젠테이션(`public/guides/register-home/`). 로그인 없이 열린다. */
 export const REGISTER_GUIDE = "/guides/register-home/index.html";
+
+/**
+ * 직원용 사용 안내 모음. 각 안내는 `public/guides/<slug>/` 에 통째로 둔 정적 HTML 이고,
+ * 이 주소는 그 목록 한 장이다(`app/guide/page.tsx`). 로그인 없이 열린다.
+ */
+export const GUIDE_HOME = "/guide";
 
 /** 스낵바 계산대. 프로 샵 계산대와 Switch Registers 로 오간다. */
 export const ADMIN_SNACK_BAR = "/admin/snack-bar";
@@ -181,6 +188,7 @@ export const adminDivisions: AdminDivision[] = [
       { label: "Pro Shop Retail", href: ADMIN_RETAIL, glyph: "🛒" },
       { label: "Camera Scan", href: ADMIN_SCAN, glyph: "📷" },
       { label: "Register Guide", href: REGISTER_GUIDE, glyph: "▶" },
+      { label: "Staff Guides", href: GUIDE_HOME, glyph: "▶" },
       pick("Reports"),
       pick("Integrations"),
     ],
