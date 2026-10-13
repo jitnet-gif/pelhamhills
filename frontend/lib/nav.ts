@@ -100,6 +100,8 @@ export const GOLF_GPS_MAP_EDITOR = "https://golf-gps-pelhamhills-seven.vercel.ap
  */
 export const adminNav: NavItem[] = [
   { label: "Tee Sheet", href: "/admin", glyph: "▦" },
+  // 프로 샵 계산대. 티 시트에서 담은 그린피를 여기서 받으므로 골프 메뉴에도 둔다(2026-10-12).
+  { label: "Pro Shop", href: "/admin/retail", glyph: "🛒" },
   { label: "Tee Times & Pricing", href: "/admin/pricing", glyph: "◉" },
   { label: "Dynamic Pricing", href: "/admin/dynamic-pricing", glyph: "↗" },
   { label: "Events", href: "/admin/events", glyph: "▤" },
@@ -129,9 +131,8 @@ export const adminQuickNav: NavItem[] = adminNav.filter((item) =>
 );
 
 /**
- * `/admin/retail` 은 골프 메뉴(`adminNav`)에는 없다 — 맞춰 온 pelhamhills 사이드바의
- * Golf 목록에 Retail 항목이 없기 때문이다. 대신 "Snack Bar & Retail" 사업부 메뉴에 있다
- * (아래 `adminDivisions`).
+ * 프로 샵 계산대. 골프 메뉴(`adminNav` 의 Pro Shop)와 "Snack Bar & Retail" 사업부 메뉴
+ * (아래 `adminDivisions`) 양쪽에 있다.
  */
 export const ADMIN_RETAIL = "/admin/retail";
 
