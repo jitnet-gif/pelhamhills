@@ -238,6 +238,53 @@ export type CloseoutSave = {
   note?: string | null;
 };
 
+// ===== 계산대 마감 (0023) ================================================
+
+/** 현금 권종(센트). Lightspeed 마감 화면과 같은 순서. `extra` 는 권종 밖의 돈(센트). */
+export const CASH_DENOMINATIONS = [10000, 5000, 2000, 1000, 500, 200, 100, 25, 10, 5, 1] as const;
+
+export type CashCounts = Record<string, number>;
+
+export type RegisterCloseRow = {
+  method: PaymentMethod;
+  /** 셀 실물이 있는가(현금·카드·체크카드). 아니면 숫자만 보인다. */
+  countable: boolean;
+  /** Start+Adds — 시작 잔돈. 현금 줄만. */
+  start: Cents;
+  payments: Cents;
+  payment_count: number;
+  withdraws: Cents;
+  /** Total Remaining = start + payments − withdraws. */
+  remaining: Cents;
+  /** 마지막으로 센 값. 아직 안 셌으면 null. */
+  counted: Cents | null;
+};
+
+export type RegisterCloseReport = {
+  business_date: string;
+  station: string;
+  /** 이 계산대에 아직 결제 안 된 계산서 수(오늘만). */
+  open_bills: number;
+  rows: RegisterCloseRow[];
+  close: {
+    opening_float: Cents;
+    /** 센 순간의 Total Remaining. */
+    expected: Partial<Record<PaymentMethod, Cents>>;
+    counted: Partial<Record<PaymentMethod, Cents>>;
+    cash_counts: CashCounts;
+    note: string | null;
+    closed_at: string;
+    /** 센 뒤에 이 계산대에서 결제·환불이 있었다 — 다시 세야 한다. */
+    stale: boolean;
+  } | null;
+};
+
+export type RegisterCloseSave = {
+  counted: { cash: Cents; card: Cents; debit: Cents };
+  cash_counts: CashCounts;
+  note?: string | null;
+};
+
 /** "7.5", "7:30", "7h30", "7h" → 분. 읽을 수 없으면 null. */
 export function parseHours(input: string): number | null {
   const text = input.trim().toLowerCase();

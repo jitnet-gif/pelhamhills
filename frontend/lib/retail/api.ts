@@ -28,6 +28,8 @@ import {
   type Product,
   type ProductCreate,
   type ProductUpdate,
+  type RegisterCloseReport,
+  type RegisterCloseSave,
   type RefundRequest,
   type RetailDailyReport,
   type Sale,
@@ -95,6 +97,18 @@ async function closeoutCall<T>(fn: string, args: Record<string, unknown>): Promi
   }
 }
 
+export const REGISTER_CLOSE_MISSING_MESSAGE =
+  "계산대 마감이 아직 켜지지 않았습니다. Supabase SQL Editor 에서 0023_register_close.sql 을 실행해 주세요.";
+
+async function registerCloseCall<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  try {
+    return await staffRpc<T>(fn, args);
+  } catch (cause) {
+    if (isMissingMigration(cause)) throw new RetailApiError("http", 404, REGISTER_CLOSE_MISSING_MESSAGE);
+    throw toRetailError(cause);
+  }
+}
+
 /** 매장 현지 날짜 `YYYY-MM-DD`. `toISOString()` 은 UTC 라 저녁에 하루가 밀린다. */
 export function localBusinessDate(date: Date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -156,6 +170,21 @@ export const retailApi = {
 
   reopenCloseout: (businessDate: string, staffKey: string) =>
     closeoutCall<CloseoutReport>("pelham_staff_closeout_reopen", { p_date: businessDate, p_staff_key: staffKey }),
+
+  // ===== 계산대 마감 (0023) =====
+  getRegisterClose: (businessDate: string, station: string) =>
+    registerCloseCall<RegisterCloseReport>("pelham_staff_register_close_report", {
+      p_date: businessDate,
+      p_station: station,
+    }),
+
+  /** 센 돈을 적는다(다시 세면 덮어쓴다). 표 전체를 돌려준다. */
+  saveRegisterClose: (businessDate: string, station: string, body: RegisterCloseSave) =>
+    registerCloseCall<RegisterCloseReport>("pelham_staff_register_close_save", {
+      p_date: businessDate,
+      p_station: station,
+      p: body,
+    }),
 };
 
 export default retailApi;

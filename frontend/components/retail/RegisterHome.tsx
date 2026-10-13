@@ -31,6 +31,7 @@ import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import { CLUB_TIME_ZONE, stationLabel } from "@/lib/retail/receipt";
 import { formatMoney, type Sale } from "@/lib/retail/types";
 
+import RegisterClose from "./RegisterClose";
 import { EmptyNote, ErrorNote, Modal, SkeletonRows, TextInput } from "./ui";
 
 type Props = {
@@ -51,6 +52,7 @@ type Dialog =
   | { kind: "refund"; code: string }
   | { kind: "continue" }
   | { kind: "close" }
+  | { kind: "staff" }
   | { kind: "sale"; sale: Sale };
 
 const RECENT_COUNT = 10;
@@ -276,6 +278,22 @@ export default function RegisterHome({
         <Modal
           onClose={() => setDialog(null)}
           title={`Close register · ${today}`}
+          wide
+        >
+          <RegisterClose
+            date={today}
+            onCancel={() => setDialog(null)}
+            onStaffCloseout={() => setDialog({ kind: "staff" })}
+            registerName={registerName}
+            station={station}
+          />
+        </Modal>
+      ) : null}
+
+      {dialog?.kind === "staff" ? (
+        <Modal
+          onClose={() => setDialog(null)}
+          title={`Staff close-out · ${today}`}
           wide
         >
           <StaffCloseout date={today} refreshKey={reloadKey} />
