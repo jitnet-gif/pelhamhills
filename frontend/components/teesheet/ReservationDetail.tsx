@@ -38,6 +38,7 @@ import type {
 } from "@/lib/teeSheet/types";
 
 import BillPanel from "../pos/BillPanel";
+import { SEATS_PER_TEE_TIME } from "./BookingDialog";
 import RainCheckDialog, { activeRainCheck, useRainChecks } from "./RainCheckDialog";
 
 export type ReservationDetailProps = { controller: TeeSheetController };
@@ -72,6 +73,9 @@ const RATE_PLANS = [
   "Full Member - Single with 7 Day Cart",
   "GolfNow",
 ];
+
+/** Clone 드롭다운에 내놓는 최대 개수 (레퍼런스는 끝없이 늘어나지만 하루 단체가 이 이상인 일은 없다). */
+const MAX_CLONES = 20;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -258,6 +262,10 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const [historyOpen, setHistoryOpen] = useState(false);
   // 레일의 $ — 왼쪽의 Take Payment 패널(지금 계산서). 카드의 Select 를 누르면 저절로 열린다.
   const [payOpen, setPayOpen] = useState(false);
+  // 레일의 복사 아이콘 — Clone Reservation 패널. 열리면 카드 자리를 차지한다(레퍼런스와 같다).
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneCount, setCloneCount] = useState(1);
+  const [cloning, setCloning] = useState(false);
   // 카트 요금 입력 중인 글자. 이름·전화 draft 와 따로 둔다 — 그 draft 는 필드 전체를 한 번에
   // 찍어 두므로, 카트를 켜서 서버가 요금을 채운 직후에 이름 draft 가 커밋되면 옛 요금(0)을 되돌려 보낸다.
   const [feeDrafts, setFeeDrafts] = useState<Record<string, string>>({});
@@ -367,6 +375,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setCancelReason("");
     setDateDraft(null);
     setHistoryOpen(false);
+    setCloneOpen(false);
+    setCloneCount(1);
     setFeeDrafts({});
     setReceiptNote(null);
     setPreview(null);
@@ -670,6 +680,77 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const useRainCheck = !rainChecks.missing;
   const paidPlayers = players.filter((player) => player.paid && !player.cancelled);
   const withoutRainCheck = paidPlayers.filter((player) => !activeRainCheck(rainChecks.checks, player.id));
+
+  /**
+   * Clone 대상: 같은 날 **이 예약 뒤의** 티 타임 가운데 이 일행이 통째로 들어가는 곳, 이른 순.
+   * 좌석 계산은 서버의 require_capacity 와 같다(취소된 예약은 자리를 잡지 않는다).
+   * 슬롯 목록은 controller.slots(= focusedDate 의 것)뿐이라, 다른 날을 보고 있으면 비워 둔다.
+   */
+  const groupSize = Math.max(1, players.filter((player) => !player.cancelled).length);
+  const cloneTargets = (() => {
+    if (controller.focusedDate !== booking.date) return [];
+    const sorted = [...controller.slots].sort((a, b) => a.minutes - b.minutes);
+    const start = sorted.find((slot) => slot.time === booking.time)?.minutes;
+    if (start === undefined) return [];
+    const taken = new Map<string, number>();
+    for (const item of controller.bookings) {
+      if (item.date !== booking.date || item.status === "cancelled") continue;
+      taken.set(item.time, (taken.get(item.time) ?? 0) + item.players.length);
+    }
+    return sorted
+      .filter((slot) => slot.minutes > start && (taken.get(slot.time) ?? 0) + groupSize <= SEATS_PER_TEE_TIME)
+      .slice(0, MAX_CLONES)
+      .map((slot) => slot.time);
+  })();
+  const cloneN = Math.min(cloneCount, cloneTargets.length);
+
+  /**
+   * 복제는 이름·연락처·요금제·카트와 예약의 홀 수·요금·메모만 옮긴다. 도착·결제·노쇼는 새 라운드의
+   * 일이라 옮기지 않는다. 한 건씩 **차례로** 만든다 — 하나가 정원에 걸려 실패해도(다른 화면이 먼저
+   * 채운 경우) 앞의 것은 남고, 몇 건이 됐는지 정확히 알린다.
+   */
+  const cloneReservation = async () => {
+    if (cloning || cloneN === 0) return;
+    setCloning(true);
+    let made = 0;
+    try {
+      if (dirty) await saveAll();
+      const source = bookingRef.current ?? booking;
+      for (const time of cloneTargets.slice(0, cloneN)) {
+        const created = await controller.createBooking({
+          date: source.date,
+          time,
+          title: source.title,
+          holes: source.holes,
+          rate: source.rate,
+          cartCount: source.cartCount,
+          color: source.color,
+          notes: source.notes ?? "",
+          players: source.players
+            .filter((player) => !player.cancelled)
+            .map((player) => ({
+              firstName: player.firstName ?? "",
+              lastName: player.lastName ?? "",
+              email: player.email ?? "",
+              phone: player.phone ?? "",
+              type: player.type,
+              ratePlan: player.ratePlan,
+              cart: player.cart === true,
+              cartFee: player.cart ? (player.cartFee ?? 0) : 0,
+            })),
+        });
+        if (!created) break;
+        made += 1;
+      }
+    } finally {
+      setCloning(false);
+    }
+    if (made > 0) {
+      controller.pushToast("success", `Cloned into ${made} tee time${made === 1 ? "" : "s"}.`);
+      setCloneOpen(false);
+      setCloneCount(1);
+    }
+  };
 
   const reprintLookup = preview?.reprint && reprintBill?.at === preview.at ? reprintBill : null;
   const reprintLoading = Boolean(preview?.reprint) && !reprintLookup;
@@ -1019,6 +1100,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
       <div className="flex items-stretch">
         <IconRail
           canPay={useBills}
+          cloneOpen={cloneOpen}
+          onToggleClone={() => setCloneOpen((open) => !open)}
           historyOpen={historyOpen}
           onTogglePay={() => setPayOpen((open) => !open)}
           payOpen={payOpen && useBills}
@@ -1047,6 +1130,18 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
           </div>
         ) : null}
 
+        {cloneOpen ? (
+          <ClonePanel
+            busy={cloning}
+            count={cloneN}
+            groupSize={groupSize}
+            onCancel={() => setCloneOpen(false)}
+            onChangeCount={setCloneCount}
+            onClone={() => void cloneReservation()}
+            otherDay={controller.focusedDate !== booking.date}
+            targets={cloneTargets}
+          />
+        ) : (
         <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-x-auto p-2">
           {players.map((player) => {
             const pd = playerDrafts[player.id] ?? playerDraftOf(player);
@@ -1479,6 +1574,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             </button>
           ) : null}
         </div>
+        )}
       </div>
 
       {/* ===== history (레일의 🕐) ===== */}
@@ -1661,7 +1757,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 /**
  * 상세 패널 왼쪽의 세로 아이콘 레일.
  *
- * 실제로 무언가 하는 것은 셋뿐이다 — 히스토리 · 삭제 · 닫기. 나머지 글리프는
+ * 실제로 무언가 하는 것은 결제 · 히스토리 · 복제 · 삭제 · 닫기뿐이다. 나머지 글리프는
  * 레퍼런스의 자리를 지키는 **표시**이고 버튼이 아니다(`<span>`). 눌러도 아무 일이
  * 없는 과녁을 일곱 개 만들어 두면 사용자는 앱이 고장 났다고 생각한다 — 사이드바의
  * Golf 드롭다운, 상단바 글리프와 같은 판단이다.
@@ -1673,6 +1769,8 @@ function IconRail({
   canPay,
   payOpen,
   onTogglePay,
+  cloneOpen,
+  onToggleClone,
   onDelete,
   onClose,
 }: {
@@ -1682,6 +1780,8 @@ function IconRail({
   canPay: boolean;
   payOpen: boolean;
   onTogglePay: () => void;
+  cloneOpen: boolean;
+  onToggleClone: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
@@ -1717,9 +1817,15 @@ function IconRail({
       <span aria-hidden className={`${cell} text-[13px] text-[#9297a1]`}>
         ?
       </span>
-      <span className={`${cell} text-[#9297a1]`}>
+      <button
+        aria-pressed={cloneOpen}
+        className={`${cell} ${cloneOpen ? "bg-white text-[#4533ff]" : "text-[#4e5560] hover:bg-white/60"}`}
+        onClick={onToggleClone}
+        title="Clone Reservation"
+        type="button"
+      >
         <Glyph name="copy" />
-      </span>
+      </button>
       <button
         className={`${cell} text-[15px] text-[#4e5560] hover:bg-white/60`}
         onClick={onClose}
@@ -1736,6 +1842,84 @@ function IconRail({
       >
         <Glyph name="trash" />
       </button>
+    </div>
+  );
+}
+
+/**
+ * Clone Reservation — 레퍼런스(Lightspeed)의 복제 화면. 이 예약을 같은 날 **다음 빈 티 타임 N개**에
+ * 그대로 복사한다. 단체를 한 번에 잡을 때 쓴다. 대상 시각은 부모가 계산해서 넘긴다.
+ */
+function ClonePanel({
+  targets,
+  count,
+  groupSize,
+  otherDay,
+  busy,
+  onChangeCount,
+  onClone,
+  onCancel,
+}: {
+  targets: string[];
+  count: number;
+  groupSize: number;
+  otherDay: boolean;
+  busy: boolean;
+  onChangeCount: (count: number) => void;
+  onClone: () => void;
+  onCancel: () => void;
+}) {
+  const none = targets.length === 0;
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-10 gap-y-4 bg-white px-8 py-6">
+      <div className="min-w-[260px] max-w-[420px]">
+        <Glyph className="h-12 w-12 text-[#1f2328]" name="copy" />
+        <h3 className="mt-3 text-2xl font-bold text-[#1f2328]">Clone Reservation</h3>
+        <p className="mt-2 text-sm text-[#4e5560]">
+          Copy this reservation across the next available tee times. This is useful for quickly reserving for a
+          group.
+        </p>
+        <div className="mt-5 flex gap-2">
+          <button className="border border-[#c7c7cc] bg-white px-5 py-2 font-bold" onClick={onCancel} type="button">
+            Cancel
+          </button>
+          <button
+            className="bg-[#4533ff] px-6 py-2 font-bold text-white disabled:opacity-40"
+            disabled={busy || none}
+            onClick={onClone}
+            type="button"
+          >
+            {busy ? "Cloning…" : `Clone Reservation (${count})`}
+          </button>
+        </div>
+      </div>
+      <div className="min-w-[240px] flex-1">
+        <p className="text-sm text-[#1f2328]">Clone this reservation over the next</p>
+        {none ? (
+          <p className="mt-2 text-[#8a3f26]">
+            {otherDay
+              ? "Open this reservation's day on the tee sheet to see its tee times."
+              : `No later tee time today has room for ${groupSize} player${groupSize === 1 ? "" : "s"}.`}
+          </p>
+        ) : (
+          <>
+            <select
+              aria-label="Number of tee times to clone into"
+              className="mt-2 w-full border border-[#c7c7cc] bg-white px-2 py-2 text-sm"
+              disabled={busy}
+              onChange={(event) => onChangeCount(Number(event.target.value))}
+              value={count}
+            >
+              {targets.map((_, index) => (
+                <option key={index + 1} value={index + 1}>
+                  {index === 0 ? "available tee time" : `${index + 1} available tee times`}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-[#4e5560]">{targets.slice(0, count).join(" · ")}</p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
