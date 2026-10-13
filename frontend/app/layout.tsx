@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+import ManagerApprovalHost from "@/components/pos/ManagerApprovalHost";
+
 export const metadata: Metadata = {
   title: {
     default: "Pelham Hills Golf Club - Golf, Pub, and Indoor Simulators",
@@ -56,6 +58,8 @@ export default function RootLayout({
         className="min-h-screen w-full bg-bepu-bg text-bepu-text antialiased selection:bg-bepu-mint/30 selection:text-bepu-text"
       >
         {children}
+        {/* 환불·레인체크·선수 삭제의 매니저 PIN 창(0024). 직원 화면 어디서든 뜬다. */}
+        <ManagerApprovalHost />
       </body>
     </html>
   );

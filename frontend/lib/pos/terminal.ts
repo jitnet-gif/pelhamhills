@@ -23,6 +23,7 @@ import { useSyncExternalStore } from "react";
 import { paymentsApiBase } from "@/lib/booking/payments";
 import { ApiError } from "@/lib/teeSheet/api";
 import { accessToken } from "@/lib/teeSheet/session";
+import { withManagerApproval } from "@/lib/teeSheet/managerApproval";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 import type { Cents } from "@/lib/retail/types";
 
@@ -152,7 +153,12 @@ export type Reader = {
 
 // ===== 서버 호출 =======================================================
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+// 결제 뒤 카드 환불은 매니저 승인이 필요하다(0024). 서버(Fly)가 SQL 의 PT428 을 그대로 428 로 넘긴다.
+function call<T>(path: string, init?: RequestInit): Promise<T> {
+  return withManagerApproval(() => rawCall<T>(path, init));
+}
+
+async function rawCall<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await accessToken();
   if (!token) throw new ApiError(401, "Sign in with a pro shop account.");
   let response: Response;

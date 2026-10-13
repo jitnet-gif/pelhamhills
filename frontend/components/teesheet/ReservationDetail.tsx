@@ -1103,6 +1103,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                           >
                             <Glyph className="h-4 w-4" name="umbrella" />
                             Raincheck
+                            <span className="ml-auto pl-2 text-[10px] text-[#9aa0a6]">Manager</span>
                           </button>
                         ) : null}
                         {player.paid ? (
@@ -1130,6 +1131,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                           >
                             <Glyph className="h-4 w-4" name="card" />
                             Mark unpaid
+                            <span className="ml-auto pl-2 text-[10px] text-[#9aa0a6]">Manager</span>
                           </button>
                         ) : null}
                         <button
@@ -1144,6 +1146,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                         >
                           <Glyph className="h-4 w-4" name="trash" />
                           Delete
+                          <span className="ml-auto pl-2 text-[10px] text-[#9aa0a6]">Manager</span>
                         </button>
                       </div>
                     ) : null}
