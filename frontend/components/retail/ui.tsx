@@ -294,10 +294,13 @@ export function Modal({
   title,
   onClose,
   children,
+  wide = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** 표가 들어가는 창(마감 등). 데스크톱에서 넓게 연다. */
+  wide?: boolean;
 }) {
   useOverlayDismiss(onClose);
   return (
@@ -310,7 +313,7 @@ export function Modal({
       />
       {/* max-h + overflow-y: 키보드가 올라온 모바일에서 폼 아래쪽 버튼이
           화면 밖으로 밀려 눌리지 않는 것을 막는다. */}
-      <div className="relative flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl sm:max-h-[88dvh]">
+      <div className={`relative flex max-h-[92dvh] w-full ${wide ? "max-w-3xl" : "max-w-md"} flex-col overflow-hidden bg-white shadow-2xl sm:max-h-[88dvh]`}>
         <header className="flex items-center justify-between border-b border-[#d4d4d8] px-3 py-2.5">
           <h2 className="text-sm font-bold">{title}</h2>
           <button

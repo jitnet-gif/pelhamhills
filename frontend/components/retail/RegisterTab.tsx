@@ -44,10 +44,12 @@ type Props = {
   lockedCategory?: RetailCategory;
   /** 카메라 스캔을 켠 채로 연다. 바로가기 주소(`/admin/scan`)용. */
   startWithCamera?: boolean;
+  /** 스캔을 먼저 보여 준다. true 를 돌려주면 받은 쪽이 처리한 것이다(첫 화면에서 쏜 영수증). */
+  onScanned?: (code: string) => boolean;
 };
 
 /** 리테일 영수증 번호(`PH-20260915-0001`). 상품이 아니라 영수증을 쏜 경우를 알아본다. */
-const RECEIPT_NO = /^PH-\d{8}-\d+$/i;
+export const RECEIPT_NO = /^PH-\d{8}-\d+$/i;
 
 export default function RegisterTab({
   products,
@@ -58,6 +60,7 @@ export default function RegisterTab({
   scanEnabled = true,
   lockedCategory,
   startWithCamera = false,
+  onScanned,
 }: Props) {
   const [search, setSearch] = useState("");
   const [pickedCategory, setCategory] = useState<RetailCategory | "All">("All");
@@ -126,6 +129,7 @@ export default function RegisterTab({
   function handleScan(code: string) {
     // 검색칸에서 쏜 스캔이면 칸에 글자(IME 가 한글이면 자모)가 남아 있다. 비운다.
     setSearch("");
+    if (onScanned?.(code)) return;
     // 레인체크 전표: 계산서 결제 칸으로 넘긴다(그쪽이 찾고 금액을 잡는다).
     if (isRainCheckCode(code)) {
       if (!bill || bill.lines.length === 0) {

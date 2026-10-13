@@ -135,6 +135,9 @@ export const adminQuickNav: NavItem[] = adminNav.filter((item) =>
  */
 export const ADMIN_RETAIL = "/admin/retail";
 
+/** 스낵바 계산대. 프로 샵 계산대와 Switch Registers 로 오간다. */
+export const ADMIN_SNACK_BAR = "/admin/snack-bar";
+
 /** 카메라 스캔 바로가기 — 켜자마자 카메라가 켜진 계산대. 홈 화면에 붙여 두는 주소. */
 export const ADMIN_SCAN = "/admin/scan";
 
@@ -168,9 +171,9 @@ export const adminDivisions: AdminDivision[] = [
   {
     key: "snack-retail",
     label: "Snack Bar & Retail",
-    home: "/admin/snack-bar",
+    home: ADMIN_SNACK_BAR,
     links: [
-      { label: "Snack Bar / Bev Cart", href: "/admin/snack-bar", glyph: "☕" },
+      { label: "Snack Bar / Bev Cart", href: ADMIN_SNACK_BAR, glyph: "☕" },
       { label: "Pro Shop Retail", href: ADMIN_RETAIL, glyph: "🛒" },
       { label: "Camera Scan", href: ADMIN_SCAN, glyph: "📷" },
       pick("Reports"),

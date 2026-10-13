@@ -34,7 +34,9 @@ export default function PosHome() {
     } catch {
       last = null;
     }
-    const station = STATIONS.find((item) => item.id === last);
+    // 계산대 첫 화면의 Switch Registers 는 `?pick=1` 로 온다 — 지난 계산대로 되돌려 보내지 않는다.
+    const picking = new URLSearchParams(window.location.search).has("pick");
+    const station = picking ? undefined : STATIONS.find((item) => item.id === last);
     if (station) {
       router.replace(station.href);
       return;

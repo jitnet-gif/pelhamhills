@@ -25,10 +25,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
 import ProductsTab from "@/components/retail/ProductsTab";
-import RegisterTab from "@/components/retail/RegisterTab";
+import RegisterHome from "@/components/retail/RegisterHome";
+import RegisterTab, { RECEIPT_NO } from "@/components/retail/RegisterTab";
 import { demoLowStock, demoProducts } from "@/components/retail/demoData";
 import { Chip, ErrorNote, OfflineBanner } from "@/components/retail/ui";
-import { ADMIN_REPORTS } from "@/lib/nav";
+import { ADMIN_REPORTS, ADMIN_RETAIL, ADMIN_SNACK_BAR } from "@/lib/nav";
 import retailApi, { toRetailError } from "@/lib/retail/api";
 import type { LowStockItem, Product, RetailCategory } from "@/lib/retail/types";
 
@@ -51,6 +52,12 @@ type Props = {
 
 export default function RetailWorkspace({ title, category, startWithCamera, posApp = false }: Props) {
   const [tab, setTab] = useState<TabId>("register");
+  /**
+   * Register 탭 안의 두 화면: Lightspeed 식 첫 화면(home)과 판매 화면(sale). 카메라 바로가기는
+   * 곧장 판매로 연다. 판매 화면은 홈에서도 마운트된 채라 스캔·장바구니가 그대로다.
+   */
+  const [view, setView] = useState<"home" | "sale">(startWithCamera ? "sale" : "home");
+  const [refundRequest, setRefundRequest] = useState<{ code: string; at: number } | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,6 +129,22 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
   // 저장된 줄 알았는데 아무 데도 안 남는 것이 빈 화면보다 나쁘다.
   const demo = offline;
 
+  const registerName = category ? "Snack Bar / Bev Cart" : "Pro Shop";
+  const station = category === "Food & Beverage" ? "snack_bar" : "pro_shop";
+  // 설치형 앱은 `/pos` 의 계산대 고르기로(`pick` 이 있으면 지난 계산대로 바로 가지 않는다).
+  const switchHref = posApp ? "/pos?pick=1" : category ? ADMIN_RETAIL : ADMIN_SNACK_BAR;
+
+  /** 첫 화면에서 쏜 스캔: 영수증이면 환불 창, 상품이면 판매 화면으로 넘기고 계산대가 담는다. */
+  function onScanned(code: string): boolean {
+    if (view !== "home") return false;
+    if (RECEIPT_NO.test(code.trim())) {
+      setRefundRequest({ code: code.trim(), at: Date.now() });
+      return true;
+    }
+    setView("sale");
+    return false;
+  }
+
   const shownProducts = useMemo(
     () => (category ? products.filter((item) => item.category === category) : products),
     [category, products],
@@ -138,7 +161,15 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
         // 그래서 여기에는 id/htmlFor 를 쓰지 않는다 — 중복 id 는 label 연결을 깬다.
         <div className="flex flex-wrap gap-1.5">
           {TABS.map((item) => (
-            <Chip active={tab === item.id} key={item.id} onClick={() => setTab(item.id)}>
+            <Chip
+              active={tab === item.id}
+              key={item.id}
+              onClick={() => {
+                // 이미 Register 에 있는데 또 누르면 첫 화면으로(Lightspeed 의 Sales 메뉴와 같다).
+                if (item.id === "register" && tab === "register") setView("home");
+                setTab(item.id);
+              }}
+            >
               {item.label}
             </Chip>
           ))}
@@ -164,11 +195,34 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
 
         {/* 세 탭 모두 마운트한 채로 두고 보이기만 끈다. 조건부 렌더로 바꾸면
             상품을 담아 둔 채 재고를 확인하러 갔다 온 순간 장바구니가 비어 있다. */}
-        <div className={tab === "register" ? "min-w-0" : "hidden"}>
+        {tab === "register" && view === "home" ? (
+          <RegisterHome
+            active
+            demo={demo}
+            onOpenSale={() => setView("sale")}
+            refundRequest={refundRequest}
+            registerName={registerName}
+            station={station}
+            switchHref={switchHref}
+          />
+        ) : null}
+
+        <div className={tab === "register" && view === "sale" ? "grid min-w-0 gap-3" : "hidden"}>
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-[#d4d4d8] bg-white px-3 text-sm font-bold text-[#3f434a] hover:bg-[#f2f2f4]"
+              onClick={() => setView("home")}
+              type="button"
+            >
+              <span aria-hidden>←</span> Register
+            </button>
+            <span className="truncate text-xs font-bold tracking-wide text-[#6b7280] uppercase">{registerName}</span>
+          </div>
           <RegisterTab
             demo={demo}
             loading={loading}
             lockedCategory={category}
+            onScanned={onScanned}
             onSold={refresh}
             products={shownProducts}
             scanEnabled={tab === "register"}
