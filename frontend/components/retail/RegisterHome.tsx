@@ -24,6 +24,7 @@ import {
 
 import SaleDetail from "@/components/reports/SaleDetail";
 import StaffCloseout from "@/components/reports/StaffCloseout";
+import { REGISTER_GUIDE } from "@/lib/nav";
 import { posApi, type Bill, type BillStation } from "@/lib/pos/api";
 import { billActions, useCurrentBill } from "@/lib/pos/currentBill";
 import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
@@ -222,6 +223,16 @@ export default function RegisterHome({
           </ul>
         )}
       </section>
+
+      {/* 이 화면 사용법(나레이션 프레젠테이션). 새 탭으로 열어 계산대는 그대로 둔다. */}
+      <a
+        className="justify-self-start text-sm font-bold text-[#4533ff] underline"
+        href={REGISTER_GUIDE}
+        rel="noopener"
+        target="_blank"
+      >
+        ▶ How this screen works (Korean / English)
+      </a>
 
       {dialog?.kind === "refund" ? (
         <RefundLookup

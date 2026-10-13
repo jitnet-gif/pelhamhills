@@ -135,6 +135,9 @@ export const adminQuickNav: NavItem[] = adminNav.filter((item) =>
  */
 export const ADMIN_RETAIL = "/admin/retail";
 
+/** 계산대 첫 화면 사용법 — 나레이션 프레젠테이션(`public/guides/register-home/`). 로그인 없이 열린다. */
+export const REGISTER_GUIDE = "/guides/register-home/index.html";
+
 /** 스낵바 계산대. 프로 샵 계산대와 Switch Registers 로 오간다. */
 export const ADMIN_SNACK_BAR = "/admin/snack-bar";
 
@@ -176,6 +179,7 @@ export const adminDivisions: AdminDivision[] = [
       { label: "Snack Bar / Bev Cart", href: ADMIN_SNACK_BAR, glyph: "☕" },
       { label: "Pro Shop Retail", href: ADMIN_RETAIL, glyph: "🛒" },
       { label: "Camera Scan", href: ADMIN_SCAN, glyph: "📷" },
+      { label: "Register Guide", href: REGISTER_GUIDE, glyph: "▶" },
       pick("Reports"),
       pick("Integrations"),
     ],

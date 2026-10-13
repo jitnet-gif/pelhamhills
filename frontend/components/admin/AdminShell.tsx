@@ -432,6 +432,23 @@ function NavLink({
   onClick?: () => void;
 }) {
   const current = isActive(pathname, item.href);
+  const body = (
+    <>
+      <span aria-hidden className="w-3.5 shrink-0 text-center opacity-80">
+        {item.glyph}
+      </span>
+      <span className="truncate">{item.label}</span>
+    </>
+  );
+  // `public/` 의 정적 페이지(사용법 프레젠테이션)는 앱 라우트가 아니다. Link 로 두면
+  // 클라이언트 이동을 시도하다 실패하므로 평범한 링크로 연다.
+  if (item.href.endsWith(".html")) {
+    return (
+      <a className="flex items-center gap-2 px-3 py-2 font-semibold hover:bg-white/10" href={item.href} onClick={onClick}>
+        {body}
+      </a>
+    );
+  }
   return (
     <Link
       aria-current={current ? "page" : undefined}
@@ -441,10 +458,7 @@ function NavLink({
       href={item.href}
       onClick={onClick}
     >
-      <span aria-hidden className="w-3.5 shrink-0 text-center opacity-80">
-        {item.glyph}
-      </span>
-      <span className="truncate">{item.label}</span>
+      {body}
     </Link>
   );
 }
