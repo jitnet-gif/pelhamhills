@@ -37,6 +37,7 @@ import type {
   TeeSheetController,
 } from "@/lib/teeSheet/types";
 
+import BillPanel from "../pos/BillPanel";
 import RainCheckDialog, { activeRainCheck, useRainChecks } from "./RainCheckDialog";
 
 export type ReservationDetailProps = { controller: TeeSheetController };
@@ -193,6 +194,9 @@ const GLYPH_PATH: Record<string, string> = {
   umbrella: "M1.8 8a6.2 5.4 0 0 1 12.4 0zM8 2.6V1.8M8 8v4.6a1.3 1.3 0 0 1-2.6 0",
   refund: "M3 5.4a5.6 5.6 0 1 1-.6 4.4M3 2.4v3h3M8 4.8v6.4M9.6 6.2c-.3-.6-.9-.9-1.6-.9-.9 0-1.6.5-1.6 1.2 0 1.6 3.2.9 3.2 2.6 0 .7-.7 1.2-1.6 1.2-.8 0-1.4-.3-1.7-1",
   dots: "M8 3.2h.01M8 8h.01M8 12.8h.01",
+  dollar: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM8 4.4v7.2M9.8 6c-.3-.6-1-1-1.8-1-1 0-1.8.5-1.8 1.3 0 1.8 3.6 1 3.6 2.9 0 .8-.8 1.3-1.8 1.3-.9 0-1.6-.4-1.9-1.1",
+  check: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM5.2 8.2l2 2 3.6-4",
+  ban: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM3.6 3.6l8.8 8.8",
   cart: "M1.6 4.2h8.6v5.2H1.6zM3 4.2 4 2.2h4.4l1 2M10.2 6.6h3.2l1 2.8v1.4h-4.2M1.6 10.8h12.8M3.2 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0M10.6 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0",
 };
 
@@ -210,6 +214,21 @@ function Glyph({ name, className = "h-3.5 w-3.5" }: { name: keyof typeof GLYPH_P
     >
       <path d={GLYPH_PATH[name]} />
     </svg>
+  );
+}
+
+// 줄 끝의 $ 동전 — 결제됐으면 초록으로 채우고, 아니면 회색 테두리만.
+function PaidCoin({ paid }: { paid: boolean }) {
+  return (
+    <span
+      aria-label={paid ? "Paid" : "Not paid"}
+      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold leading-none ${
+        paid ? "bg-[#168a3c] text-white" : "border border-[#c7c7cc] text-[#b6b6c0]"
+      }`}
+      role="img"
+    >
+      $
+    </span>
   );
 }
 
@@ -237,6 +256,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   // 부르면 예약이 중간 날짜들을 하나씩 밟고 지나간다. blur 에서 한 번만 커밋한다.
   const [dateDraft, setDateDraft] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // 레일의 $ — 왼쪽의 Take Payment 패널(지금 계산서). 카드의 Select 를 누르면 저절로 열린다.
+  const [payOpen, setPayOpen] = useState(false);
   // 카트 요금 입력 중인 글자. 이름·전화 draft 와 따로 둔다 — 그 draft 는 필드 전체를 한 번에
   // 찍어 두므로, 카트를 켜서 서버가 요금을 채운 직후에 이름 draft 가 커밋되면 옛 요금(0)을 되돌려 보낸다.
   const [feeDrafts, setFeeDrafts] = useState<Record<string, string>>({});
@@ -637,7 +658,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     if (dirty) await saveAll();
     const added = await billActions.addTee(booking.id, people?.map((person) => person.id));
     if (added) {
-      controller.pushToast("success", `Added to bill #${added.id} — ${formatMoney(added.total)} so far. Charge it from the Bill button.`);
+      setPayOpen(true);
+      controller.pushToast("success", `Added to bill #${added.id} — ${formatMoney(added.total)} so far.`);
     } else {
       controller.pushToast("error", getBillState().error || "Could not add to the bill.");
     }
@@ -996,12 +1018,34 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
       {/* ===== 아이콘 레일 + 플레이어 카드 ===== */}
       <div className="flex items-stretch">
         <IconRail
+          canPay={useBills}
           historyOpen={historyOpen}
+          onTogglePay={() => setPayOpen((open) => !open)}
+          payOpen={payOpen && useBills}
           onClose={() => controller.select(null)}
           onDelete={() => setMode(mode === "delete" ? "none" : "delete")}
           onToggleHistory={() => setHistoryOpen((open) => !open)}
           playerCount={players.length}
         />
+
+        {/* ===== Take Payment (레일의 $) =====
+            레퍼런스처럼 카드 왼쪽에 지금 계산서를 펼친다. 카드의 Select 로 라운드를 담고 여기서 받는다 —
+            계산대·스낵바에서 담은 상품도 같은 계산서에 있다. 비어 있으면 안내만. */}
+        {payOpen && useBills ? (
+          <div className="w-[340px] shrink-0 overflow-y-auto border-r border-[#c7c7cc] bg-white">
+            {billState.bill && billState.bill.lines.length > 0 ? (
+              <BillPanel onPaid={() => void controller.refresh()} station="tee_sheet" />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center px-6 py-8 text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1f2328] text-white">
+                  <Glyph className="h-9 w-9" name="dollar" />
+                </span>
+                <p className="mt-4 text-sm font-bold">Please select rounds</p>
+                <p className="mt-2 text-[#4e5560]">This allows you to combine multiple rounds into one invoice.</p>
+              </div>
+            )}
+          </div>
+        ) : null}
 
         <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-x-auto p-2">
           {players.map((player) => {
@@ -1025,6 +1069,85 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     {player.type === "Guest" ? "G" : "●"}
                   </span>
                   <span className="truncate font-bold">{player.type}</span>
+                  {/* 레퍼런스의 머리 ⋮ — 선수 한 명에게 하는 드문 일(레인체크·환불·삭제)을 한곳에 모은다.
+                      환불은 계산서 단위라 Reports → Daily close 의 그 영업일로 보낸다(0005). */}
+                  <div className="relative ml-auto" data-player-menu>
+                    <button
+                      aria-expanded={menuFor === `${player.id}:card`}
+                      aria-haspopup="menu"
+                      aria-label="More actions for this player"
+                      className={`flex items-center p-1 disabled:opacity-40 ${
+                        menuFor === `${player.id}:card` ? "bg-[#f3f2ff] text-[#4533ff]" : "hover:bg-[#f2f2f5]"
+                      }`}
+                      disabled={busy}
+                      onClick={() => setMenuFor(menuFor === `${player.id}:card` ? null : `${player.id}:card`)}
+                      type="button"
+                    >
+                      <Glyph className="h-3.5 w-3.5" name="dots" />
+                    </button>
+                    {menuFor === `${player.id}:card` ? (
+                      <div
+                        className="absolute right-0 top-full z-20 mt-1 min-w-[150px] border border-[#c7c7cc] bg-white py-1 text-[12px] shadow-lg"
+                        role="menu"
+                      >
+                        {useRainCheck && player.paid && !player.cancelled ? (
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
+                            onClick={() => {
+                              setMenuFor(null);
+                              setRainCheckFor([player]);
+                            }}
+                            role="menuitem"
+                            title="Give this player a rain check slip (barcode + expiry date), or reprint / void one"
+                            type="button"
+                          >
+                            <Glyph className="h-4 w-4" name="umbrella" />
+                            Raincheck
+                          </button>
+                        ) : null}
+                        {player.paid ? (
+                          <Link
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
+                            href={`/admin/reports?date=${localBusinessDate(player.paidAt ? new Date(player.paidAt) : new Date())}`}
+                            onClick={() => setMenuFor(null)}
+                            role="menuitem"
+                            title="Refund the bill this player was paid on — Reports → Daily close. Card and debit payments are refunded from that screen."
+                          >
+                            <Glyph className="h-4 w-4" name="refund" />
+                            Refund
+                          </Link>
+                        ) : null}
+                        {player.paid ? (
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#4e5560] hover:bg-[#f2f2f5]"
+                            onClick={() => {
+                              setMenuFor(null);
+                              void controller.patchPlayer(booking.id, player.id, { paid: false });
+                            }}
+                            role="menuitem"
+                            title="Clear the payment on this card — only to fix a mistake"
+                            type="button"
+                          >
+                            <Glyph className="h-4 w-4" name="card" />
+                            Mark unpaid
+                          </button>
+                        ) : null}
+                        <button
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#c0262d] hover:bg-[#fff1ee]"
+                          onClick={() => {
+                            setMenuFor(null);
+                            void controller.removePlayer(booking.id, player.id);
+                          }}
+                          role="menuitem"
+                          title="Remove this player from the reservation"
+                          type="button"
+                        >
+                          <Glyph className="h-4 w-4" name="trash" />
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-1">
@@ -1119,102 +1242,63 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   </select>
                 </label>
 
-                <div className="mt-1.5 grid grid-cols-[1fr_1fr_auto] gap-1">
+                {/* 레퍼런스처럼 넓은 상태 버튼 하나 + ⋮. 누르면 Arrived 를 켜고 끈다(No show 였다면
+                    그걸 지운다). No show 는 드물어서 ⋮ 안에 둔다. */}
+                <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-1">
                   <button
-                    className={`border px-1 py-1 font-bold disabled:opacity-40 ${
-                      player.arrived ? "border-[#168a3c] bg-[#ecfff1] text-[#168a3c]" : "border-[#d7d7dc]"
+                    className={`flex items-center justify-center gap-1.5 border px-1 py-1 font-bold disabled:opacity-40 ${
+                      player.no_show
+                        ? "border-[#c0262d] bg-[#fff1ee] text-[#c0262d]"
+                        : player.arrived
+                          ? "border-[#168a3c] text-[#168a3c]"
+                          : "border-[#d7d7dc] text-[#4e5560]"
                     }`}
                     disabled={busy}
-                    onClick={() => void controller.patchPlayer(booking.id, player.id, { arrived: !player.arrived })}
+                    onClick={() =>
+                      void controller.patchPlayer(
+                        booking.id,
+                        player.id,
+                        player.no_show ? { no_show: false } : { arrived: !player.arrived },
+                      )
+                    }
+                    title={player.no_show ? "Clear the no show" : player.arrived ? "Undo arrived" : "Check this player in"}
                     type="button"
                   >
-                    Arrived
+                    <Glyph className="h-4 w-4" name={player.no_show ? "ban" : "check"} />
+                    {player.no_show ? "No show" : "Arrived"}
                   </button>
-                  <button
-                    className={`border px-1 py-1 font-bold disabled:opacity-40 ${
-                      player.no_show ? "border-[#8a3f26] bg-[#fff1ee] text-[#8a3f26]" : "border-[#d7d7dc]"
-                    }`}
-                    disabled={busy}
-                    onClick={() => void controller.patchPlayer(booking.id, player.id, { no_show: !player.no_show })}
-                    type="button"
-                  >
-                    No show
-                  </button>
-                  {/* 레퍼런스의 ⋮ — 선수 한 명에게 하는 드문 일(레인체크·환불·삭제)을 한곳에 모은다.
-                      환불은 계산서 단위라 Reports → Daily close 의 그 영업일로 보낸다(0005). */}
                   <div className="relative" data-player-menu>
                     <button
-                      aria-expanded={menuFor === player.id}
+                      aria-expanded={menuFor === `${player.id}:status`}
                       aria-haspopup="menu"
-                      aria-label="More actions for this player"
+                      aria-label="More check-in actions"
                       className={`flex h-full items-center border px-1.5 disabled:opacity-40 ${
-                        menuFor === player.id ? "border-[#4533ff] bg-[#f3f2ff]" : "border-[#d7d7dc]"
+                        menuFor === `${player.id}:status` ? "border-[#4533ff] bg-[#f3f2ff]" : "border-[#d7d7dc]"
                       }`}
                       disabled={busy}
-                      onClick={() => setMenuFor(menuFor === player.id ? null : player.id)}
+                      onClick={() =>
+                        setMenuFor(menuFor === `${player.id}:status` ? null : `${player.id}:status`)
+                      }
                       type="button"
                     >
                       <Glyph className="h-3.5 w-3.5" name="dots" />
                     </button>
-                    {menuFor === player.id ? (
+                    {menuFor === `${player.id}:status` ? (
                       <div
                         className="absolute right-0 top-full z-20 mt-1 min-w-[150px] border border-[#c7c7cc] bg-white py-1 text-[12px] shadow-lg"
                         role="menu"
                       >
-                        {useRainCheck && player.paid && !player.cancelled ? (
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
-                            onClick={() => {
-                              setMenuFor(null);
-                              setRainCheckFor([player]);
-                            }}
-                            role="menuitem"
-                            title="Give this player a rain check slip (barcode + expiry date), or reprint / void one"
-                            type="button"
-                          >
-                            <Glyph className="h-4 w-4" name="umbrella" />
-                            Raincheck
-                          </button>
-                        ) : null}
-                        {player.paid ? (
-                          <Link
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
-                            href={`/admin/reports?date=${localBusinessDate(player.paidAt ? new Date(player.paidAt) : new Date())}`}
-                            onClick={() => setMenuFor(null)}
-                            role="menuitem"
-                            title="Refund the bill this player was paid on — Reports → Daily close. Card and debit payments are refunded from that screen."
-                          >
-                            <Glyph className="h-4 w-4" name="refund" />
-                            Refund
-                          </Link>
-                        ) : null}
-                        {player.paid ? (
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#4e5560] hover:bg-[#f2f2f5]"
-                            onClick={() => {
-                              setMenuFor(null);
-                              void controller.patchPlayer(booking.id, player.id, { paid: false });
-                            }}
-                            role="menuitem"
-                            title="Clear the payment on this card — only to fix a mistake"
-                            type="button"
-                          >
-                            <Glyph className="h-4 w-4" name="card" />
-                            Mark unpaid
-                          </button>
-                        ) : null}
                         <button
                           className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#c0262d] hover:bg-[#fff1ee]"
                           onClick={() => {
                             setMenuFor(null);
-                            void controller.removePlayer(booking.id, player.id);
+                            void controller.patchPlayer(booking.id, player.id, { no_show: !player.no_show });
                           }}
                           role="menuitem"
-                          title="Remove this player from the reservation"
                           type="button"
                         >
-                          <Glyph className="h-4 w-4" name="trash" />
-                          Delete
+                          <Glyph className="h-4 w-4" name="ban" />
+                          {player.no_show ? "Clear no show" : "No show"}
                         </button>
                       </div>
                     ) : null}
@@ -1238,12 +1322,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     title="Green fee — one rate for the whole reservation"
                     value={draft.rate}
                   />
-                  <span
-                    aria-hidden
-                    className={`h-2 w-2 shrink-0 rounded-full border ${
-                      player.paid ? "border-[#168a3c] bg-[#168a3c]" : "border-[#c7c7cc]"
-                    }`}
-                  />
+                  <PaidCoin paid={player.paid} />
                 </div>
                 {draft.rate.trim() !== "" && !Number.isFinite(Number(draft.rate)) ? (
                   <span className="mt-1 block text-[10px] text-[#8a3f26]">Not a number — will not be saved</span>
@@ -1293,12 +1372,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     title="Cart fee for this player only — filled in from the rate plan and holes"
                     value={feeDrafts[player.id] ?? cartPart(player).toFixed(2)}
                   />
-                  <span
-                    aria-hidden
-                    className={`h-2 w-2 shrink-0 rounded-full border ${
-                      !cartOn ? "border-transparent" : player.paid ? "border-[#168a3c] bg-[#168a3c]" : "border-[#c7c7cc]"
-                    }`}
-                  />
+                  {cartOn ? <PaidCoin paid={player.paid} /> : <span aria-hidden className="w-4 shrink-0" />}
                 </div>
 
                 {player.cancelled ? (
@@ -1327,50 +1401,40 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   <span className="tabular-nums">{money(dueFor(player))}</span>
                 </div>
 
-                <div className="mt-1.5 grid grid-cols-2 gap-1">
-                  {/* 할인 API 가 아직 없다. 생김새만 맞추고 눌리지 않게 잠근다 —
-                      눌러도 아무 일이 없는 버튼보다 잠긴 버튼이 정직하다. */}
-                  <button
-                    className="cursor-not-allowed border border-[#ececf0] px-1 py-1 font-bold text-[#b6b6c0]"
-                    disabled
-                    title="No discount API yet"
-                    type="button"
-                  >
-                    Discount
-                  </button>
-                  <button
-                    className={`flex items-center justify-center gap-1 px-1 py-1 font-bold text-white disabled:opacity-40 ${
-                      player.paid ? "bg-[#4533ff]" : "bg-[#b1a8ff]"
-                    }`}
-                    disabled={
-                      busy ||
-                      player.cancelled ||
-                      (useBills && !player.paid && (billState.busy || Boolean(billOf(player.id))))
-                    }
-                    onClick={() =>
-                      player.paid || !useBills ? openReceipt([player], player.paid) : void addToBill([player])
-                    }
-                    title={
-                      player.paid
-                        ? "Paid — show the receipt to print again"
-                        : useBills
-                          ? billOf(player.id)
-                            ? `Already on bill #${billOf(player.id)?.id}`
-                            : "Put this player's green fee on the current bill"
-                          : "Show the receipt, then take payment"
-                    }
-                    type="button"
-                  >
-                    {player.paid
-                      ? "Payment"
+                {/* 레퍼런스의 보라색 Select — 이 선수의 라운드를 지금 계산서에 담는다. 할인 버튼은
+                    API 가 없어 잠겨만 있었으므로 뺐다. 결제된 선수는 영수증을 다시 연다. */}
+                <button
+                  className={`mt-1.5 flex items-center justify-center gap-1.5 px-1 py-1.5 font-bold text-white disabled:opacity-40 ${
+                    !player.paid && useBills && billOf(player.id) ? "bg-[#168a3c]" : "bg-[#4533ff]"
+                  }`}
+                  disabled={
+                    busy ||
+                    player.cancelled ||
+                    (useBills && !player.paid && (billState.busy || Boolean(billOf(player.id))))
+                  }
+                  onClick={() =>
+                    player.paid || !useBills ? openReceipt([player], player.paid) : void addToBill([player])
+                  }
+                  title={
+                    player.paid
+                      ? "Paid — show the receipt to print again"
                       : useBills
                         ? billOf(player.id)
-                          ? `On bill #${billOf(player.id)?.id}`
-                          : "Add to bill"
-                        : "Payment"}
-                    <Glyph className="h-3 w-3" name="card" />
-                  </button>
-                </div>
+                          ? `Already on bill #${billOf(player.id)?.id}`
+                          : "Put this player's round on the current bill"
+                        : "Show the receipt, then take payment"
+                  }
+                  type="button"
+                >
+                  <Glyph className="h-4 w-4" name={player.paid ? "card" : "check"} />
+                  {player.paid
+                    ? "Receipt"
+                    : useBills
+                      ? billOf(player.id)
+                        ? `Selected · #${billOf(player.id)?.id}`
+                        : "Select"
+                      : "Payment"}
+                </button>
                 {useRainCheck && player.paid && !player.cancelled
                   ? (() => {
                       const check = activeRainCheck(rainChecks.checks, player.id);
@@ -1603,12 +1667,18 @@ function IconRail({
   playerCount,
   historyOpen,
   onToggleHistory,
+  canPay,
+  payOpen,
+  onTogglePay,
   onDelete,
   onClose,
 }: {
   playerCount: number;
   historyOpen: boolean;
   onToggleHistory: () => void;
+  canPay: boolean;
+  payOpen: boolean;
+  onTogglePay: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
@@ -1618,6 +1688,17 @@ function IconRail({
       <span className={`${cell} text-[#4e5560]`} title={`${playerCount} player(s)`}>
         <Glyph name="people" />
       </span>
+      {canPay ? (
+        <button
+          aria-pressed={payOpen}
+          className={`${cell} ${payOpen ? "bg-white text-[#1f2328]" : "text-[#4e5560] hover:bg-white/60"}`}
+          onClick={onTogglePay}
+          title="Take Payment"
+          type="button"
+        >
+          <Glyph className="h-4 w-4" name="dollar" />
+        </button>
+      ) : null}
       <button
         aria-pressed={historyOpen}
         className={`${cell} ${historyOpen ? "bg-white text-[#4533ff]" : "text-[#4e5560] hover:bg-white/60"}`}
