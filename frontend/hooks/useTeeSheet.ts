@@ -1189,6 +1189,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
     let arrived = 0;
     let paid = 0;
     let carts = 0;
+    let cartsOut = 0;
     let revenue = 0;
     let outstanding = 0;
 
@@ -1197,6 +1198,10 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       arrived += booking.players.filter((player) => player.arrived).length;
       paid += booking.players.filter((player) => player.paid).length;
       carts += booking.cartCount;
+      // 체크인한 사람이 하나라도 있는 예약의 카트는 이미 코스에 나간 것으로 센다.
+      if (booking.status !== "cancelled" && booking.players.some((player) => player.arrived && !player.cancelled)) {
+        cartsOut += booking.cartCount;
+      }
 
       if (booking.status === "cancelled") continue; // 취소 예약은 매출에서 제외
       for (const player of booking.players) {
@@ -1214,6 +1219,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       arrived,
       paid,
       carts,
+      cartsOut,
       revenue: round2(revenue),
       outstanding: round2(outstanding),
     };

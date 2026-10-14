@@ -249,6 +249,8 @@ export type TeeSheetController = {
     arrived: number;
     paid: number;
     carts: number;
+    /** 체크인된 예약에 붙은 카트 수 — 지금 코스에 나가 있는 카트. */
+    cartsOut: number;
     revenue: number;
     outstanding: number;
   };

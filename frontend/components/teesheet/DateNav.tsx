@@ -444,9 +444,13 @@ export default function DateNav({ controller }: DateNavProps) {
             <PeopleIcon />
             {stats.players}
           </span>
-          <span className="flex shrink-0 items-center gap-1.5 font-semibold text-[#111315]" title="Carts booked">
+          <span
+            className="flex shrink-0 items-center gap-1.5 font-semibold text-[#111315]"
+            title={`Carts booked · ${stats.cartsOut} out on the course (checked in)`}
+          >
             <CartIcon />
             {stats.carts}
+            {stats.cartsOut > 0 ? <span className="text-[#c62828]">({stats.cartsOut})</span> : null}
           </span>
 
           {/* 오프라인 복구 버튼은 레퍼런스에 없지만 남긴다 — 스크린샷은 정상 상태이고
