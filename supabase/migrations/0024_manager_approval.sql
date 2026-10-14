@@ -1,4 +1,4 @@
--- 매니저 승인(Manager override) — 환불·레인체크·선수 삭제·결제 취소는 매니저 PIN 이 있어야 된다.
+-- 매니저 승인(Manager override) — 환불·레인체크·선수 삭제·결제 취소·가격 변경은 매니저 PIN 이 있어야 된다.
 --
 -- 왜(2026-10-13): 프로 샵 계정 하나로 누구나 돈을 되돌릴 수 있었다. Lightspeed 처럼 그 순간 매니저가
 -- 와서 PIN 을 치게 한다. 화면이 아니라 **서버**가 막는다 — 화면을 우회해 함수를 직접 불러도 막힌다.
@@ -15,6 +15,10 @@
 --   rain_check    · 예약 id    — 레인체크 발행·무효.
 --   remove_player · 예약 id    — 예약에서 선수 빼기.
 --   mark_unpaid   · 예약 id    — 선수의 결제 표시 지우기(paid=false).
+--   price         · 예약 id    — 그린피(pelham_staff_booking_patch 의 rate)·카트 요금(player_patch 의 cartFee) 바꾸기.
+--                                카트를 켜서 서버가 요금을 채우는 것과 새 예약의 요금은 막지 않는다.
+--
+-- 2026-10-14: `price` 를 더했다. 이미 0024 를 돌렸어도 이 파일 전체를 다시 실행하면 된다.
 --
 -- 매니저 PIN 은 SQL editor 에서 넣는다(화면이 없다). 4~8자리 숫자, 매니저마다 달라야 한다:
 --   select public.pelham_manager_pin_set('Francis', '2468');        -- 넣기·바꾸기
@@ -147,7 +151,7 @@ declare
   v_at timestamptz := now();
 begin
   perform public.pelham_require_staff();
-  if p_action is null or p_action not in ('refund', 'rain_check', 'remove_player', 'mark_unpaid') then
+  if p_action is null or p_action not in ('refund', 'rain_check', 'remove_player', 'mark_unpaid', 'price') then
     perform public.pelham_fail('422', 'Unknown approval.');
   end if;
   if coalesce(btrim(p_ref), '') = '' then
@@ -197,7 +201,8 @@ begin
       ('pelham_staff_rain_check_issue', 'jsonb'),
       ('pelham_staff_rain_check_void', 'text, text'),
       ('pelham_staff_player_remove', 'text, text'),
-      ('pelham_staff_player_patch', 'text, text, jsonb')
+      ('pelham_staff_player_patch', 'text, text, jsonb'),
+      ('pelham_staff_booking_patch', 'text, jsonb')
     ) as t(fn, args)
   loop
     -- 주석이 아니라 본문으로 본다. 옛 마이그레이션의 `create or replace` 는 본문만 바꾸고 주석은 남긴다.
@@ -306,7 +311,35 @@ begin
   if p ? 'paid' and jsonb_typeof(p->'paid') = 'boolean' and not (p->>'paid')::boolean then
     perform public.pelham_require_manager('mark_unpaid', coalesce(p_id, ''), 'clearing this payment');
   end if;
+  -- 카트 요금을 손으로 바꿀 때만. 같은 금액을 다시 보내는 것은 통과시킨다.
+  if p ? 'cartFee' and jsonb_typeof(p->'cartFee') = 'number' and exists (
+       select 1 from public.pelham_tee_bookings t,
+                     jsonb_array_elements(coalesce(t.doc->'players', '[]'::jsonb)) as pl(value)
+        where t.id = p_id and pl.value->>'id' = p_player
+          and round(coalesce((pl.value->>'cartFee')::numeric, 0), 2) <> round((p->>'cartFee')::numeric, 2)) then
+    perform public.pelham_require_manager('price', coalesce(p_id, ''), 'changing the cart fee');
+  end if;
   return public.pelham_staff_player_patch_ungated(p_id, p_player, p);
+end;
+$$;
+
+create or replace function public.pelham_staff_booking_patch(p_id text, p jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.pelham_require_staff();
+  -- 그린피(예약 하나에 한 금액)를 바꿀 때만. 날짜·시간·홀·메모 같은 다른 수정은 그대로 둔다.
+  if p ? 'rate' and jsonb_typeof(p->'rate') = 'number' and exists (
+       select 1 from public.pelham_tee_bookings t
+        where t.id = p_id
+          and round(coalesce((t.doc->>'rate')::numeric, 0), 2) <> round((p->>'rate')::numeric, 2)) then
+    perform public.pelham_require_manager('price', coalesce(p_id, ''), 'changing the green fee');
+  end if;
+  return public.pelham_staff_booking_patch_ungated(p_id, p);
 end;
 $$;
 
@@ -316,6 +349,7 @@ comment on function public.pelham_staff_rain_check_issue(jsonb) is 'pelham manag
 comment on function public.pelham_staff_rain_check_void(text, text) is 'pelham manager gate';
 comment on function public.pelham_staff_player_remove(text, text) is 'pelham manager gate';
 comment on function public.pelham_staff_player_patch(text, text, jsonb) is 'pelham manager gate';
+comment on function public.pelham_staff_booking_patch(text, jsonb) is 'pelham manager gate';
 
 -- ===== 권한 ============================================================
 -- 이름을 바꿔도 권한은 따라간다 — _ungated 에서 authenticated 를 꼭 걷어 낸다.
@@ -326,6 +360,7 @@ revoke all on function public.pelham_staff_rain_check_issue_ungated(jsonb) from 
 revoke all on function public.pelham_staff_rain_check_void_ungated(text, text) from public, anon, authenticated;
 revoke all on function public.pelham_staff_player_remove_ungated(text, text) from public, anon, authenticated;
 revoke all on function public.pelham_staff_player_patch_ungated(text, text, jsonb) from public, anon, authenticated;
+revoke all on function public.pelham_staff_booking_patch_ungated(text, jsonb) from public, anon, authenticated;
 
 revoke all on function public.pelham_manager_pin_set(text, text) from public, anon, authenticated;
 revoke all on function public.pelham_require_manager(text, text, text) from public, anon, authenticated;
@@ -336,6 +371,7 @@ revoke all on function public.pelham_staff_rain_check_issue(jsonb) from public, 
 revoke all on function public.pelham_staff_rain_check_void(text, text) from public, anon, authenticated;
 revoke all on function public.pelham_staff_player_remove(text, text) from public, anon, authenticated;
 revoke all on function public.pelham_staff_player_patch(text, text, jsonb) from public, anon, authenticated;
+revoke all on function public.pelham_staff_booking_patch(text, jsonb) from public, anon, authenticated;
 
 grant execute on function public.pelham_staff_manager_approve(text, text, text) to authenticated;
 grant execute on function public.pelham_staff_bill_refund(bigint, text) to authenticated;
@@ -344,3 +380,4 @@ grant execute on function public.pelham_staff_rain_check_issue(jsonb) to authent
 grant execute on function public.pelham_staff_rain_check_void(text, text) to authenticated;
 grant execute on function public.pelham_staff_player_remove(text, text) to authenticated;
 grant execute on function public.pelham_staff_player_patch(text, text, jsonb) to authenticated;
+grant execute on function public.pelham_staff_booking_patch(text, jsonb) to authenticated;

@@ -530,6 +530,32 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     [schedulePlayerCommit],
   );
 
+  /** 그린피 칸을 커밋한다 (blur·Enter). 예전에는 맨 아래 Save 를 눌러야만 저장돼서, 칸만 고치고 나가면
+   *  값이 그대로 남아 "가격이 안 바뀐다" 고 보였다. 매니저 승인(0024 `price`)이 필요하면 PIN 창이 뜬다.
+   *  숫자가 아니거나 그대로면 보내지 않고, 실패(승인 취소 포함)하면 칸을 서버 값으로 되돌린다. */
+  const commitRate = useCallback(
+    async (text: string) => {
+      const current = bookingRef.current;
+      if (!current) return;
+      const rate = Number(text);
+      const resetRate = () =>
+        setBookingDraft((prev) => (prev ? { ...prev, rate: String(bookingRef.current?.rate ?? current.rate) } : prev));
+      if (text.trim() === "" || !Number.isFinite(rate) || rate < 0) {
+        resetRate();
+        return;
+      }
+      const cents = Math.round(rate * 100);
+      if (cents === Math.round(current.rate * 100)) {
+        resetRate();
+        return;
+      }
+      const updated = await controller.patchBooking(current.id, { rate: cents / 100 });
+      if (updated) setBookingDraft((prev) => (prev ? { ...prev, rate: String(updated.rate) } : prev));
+      else resetRate();
+    },
+    [controller],
+  );
+
   /** 카트 요금 칸을 커밋한다 (blur·Enter). 숫자가 아니거나 그대로면 보내지 않고 칸을 되돌린다. */
   const commitFee = useCallback(
     (playerId: string, text: string) => {
@@ -1416,8 +1442,12 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     aria-label="Green fee for every player on this reservation"
                     className="w-12 bg-transparent text-right tabular-nums outline-none focus:text-[#4533ff]"
                     inputMode="decimal"
+                    onBlur={(event) => void commitRate(event.currentTarget.value)}
                     onChange={(event) => setBookingDraft({ ...draft, rate: event.target.value })}
-                    title="Green fee — one rate for the whole reservation"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                    }}
+                    title="Green fee — one rate for the whole reservation. Changing it needs a manager PIN."
                     value={draft.rate}
                   />
                   <PaidCoin paid={player.paid} />
@@ -1467,7 +1497,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     onKeyDown={(event) => {
                       if (event.key === "Enter") event.currentTarget.blur();
                     }}
-                    title="Cart fee for this player only — filled in from the rate plan and holes"
+                    title="Cart fee for this player only — filled in from the rate plan and holes. Changing it needs a manager PIN."
                     value={feeDrafts[player.id] ?? cartPart(player).toFixed(2)}
                   />
                   {cartOn ? <PaidCoin paid={player.paid} /> : <span aria-hidden className="w-4 shrink-0" />}
