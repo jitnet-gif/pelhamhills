@@ -88,6 +88,20 @@ def _same_money(a: float, b: float) -> bool:
 # 지금은 비어 있다. 날짜를 넣으면 주말/평일 판정보다 우선한다.
 RATE_OVERRIDES: dict[str, float] = {}
 
+# 공휴일 — supabase/migrations/0025_tee_holiday_rates.sql 의 `pelham_tee_holidays` 시드와 같다.
+# 프로덕션은 그 표가 기준이고, 이 사본은 로컬/레거시 API 가 같은 금액을 내게 하려는 것이다.
+HOLIDAY_RATE = WEEKEND_RATE
+HOLIDAYS: dict[str, str] = {
+    "2026-01-01": "New Year's Day", "2026-02-16": "Family Day", "2026-04-03": "Good Friday",
+    "2026-05-18": "Victoria Day", "2026-07-01": "Canada Day", "2026-08-03": "Civic Holiday",
+    "2026-09-07": "Labour Day", "2026-10-12": "Thanksgiving", "2026-12-25": "Christmas Day",
+    "2026-12-26": "Boxing Day",
+    "2027-01-01": "New Year's Day", "2027-02-15": "Family Day", "2027-03-26": "Good Friday",
+    "2027-05-24": "Victoria Day", "2027-07-01": "Canada Day", "2027-08-02": "Civic Holiday",
+    "2027-09-06": "Labour Day", "2027-10-11": "Thanksgiving", "2027-12-25": "Christmas Day",
+    "2027-12-26": "Boxing Day",
+}
+
 ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SLOT_TIME_RE = re.compile(r"^\d{1,2}:\d{2} (AM|PM)$")
 MAX_TASKS = 50
@@ -219,6 +233,8 @@ class TeeSlot(BaseModel):
     minutes: int
     rate: float
     cartsTotal: int
+    dayType: Literal["weekday", "weekend", "holiday"] = "weekday"
+    holiday: str | None = None
 
 
 class SlotsResponse(BaseModel):
@@ -392,17 +408,27 @@ def parse_iso_date(value: str, field: str = "date") -> date_cls:
         raise HTTPException(status_code=422, detail=f"'{field}' is not a real calendar date: {value}")
 
 
+def day_type_for(iso_date: str) -> str:
+    """'holiday' > 'weekend' > 'weekday'."""
+    if iso_date in HOLIDAYS:
+        return "holiday"
+    return "weekend" if parse_iso_date(iso_date).weekday() >= 5 else "weekday"
+
+
 def slot_rate_for(iso_date: str) -> float:
-    """날짜별 요금: 오버라이드 > 주말 > 평일."""
+    """날짜별 요금: 오버라이드 > 공휴일 > 주말 > 평일."""
     override = RATE_OVERRIDES.get(iso_date)
     if override is not None:
         return override
-    day = parse_iso_date(iso_date)
-    return WEEKEND_RATE if day.weekday() >= 5 else WEEKDAY_RATE
+    kind = day_type_for(iso_date)
+    if kind == "holiday":
+        return HOLIDAY_RATE
+    return WEEKEND_RATE if kind == "weekend" else WEEKDAY_RATE
 
 
 def generate_slots(iso_date: str) -> list[TeeSlot]:
     rate = slot_rate_for(iso_date)
+    kind = day_type_for(iso_date)
     slots: list[TeeSlot] = []
     minutes = FIRST_TEE_MINUTES
     while minutes <= LAST_TEE_MINUTES:
@@ -412,6 +438,8 @@ def generate_slots(iso_date: str) -> list[TeeSlot]:
                 minutes=minutes,
                 rate=rate,
                 cartsTotal=CARTS_PER_SLOT,
+                dayType=kind,
+                holiday=HOLIDAYS.get(iso_date),
             )
         )
         minutes += SLOT_INTERVAL_MINUTES

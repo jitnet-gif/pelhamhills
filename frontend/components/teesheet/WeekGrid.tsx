@@ -34,6 +34,7 @@ import {
   toDate,
   todayIso,
 } from "@/lib/teeSheet/dates";
+import { dayTypeLabel, useRateDays } from "@/hooks/useRateDays";
 import { GUEST_NAME, TONE_CLASS, isDeadPlayer, playerLabel, playerTone } from "@/lib/teeSheet/tone";
 import type {
   BookingColor,
@@ -227,6 +228,15 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
     }
     return [...derived.values()].sort((a, b) => a.minutes - b.minutes);
   }, [slots, visibleBookings]);
+
+  // 주간 뷰: 열마다 그 날 요금(주중·주말·공휴일). 한 주에 요금이 섞이면 Rate 열은 비우고
+  // 열 머리의 금액을 보게 한다 — 행 하나에 고른 날의 요금만 찍으면 다른 날 칸이 틀린 값을 단다.
+  const rateDays = useRateDays(columns);
+  const weekRate = useMemo<number | null>(() => {
+    const values = columns.map((iso) => rateDays.get(iso)?.rate);
+    if (values.some((value) => value === undefined)) return rows[0]?.rate ?? null;
+    return values.every((value) => value === values[0]) ? (values[0] as number) : null;
+  }, [columns, rateDays, rows]);
 
   const rowIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -523,7 +533,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
               className="sticky top-0 z-40 border-b border-[#d6d6dc] bg-[#d7d5da] px-2 py-1 text-center font-bold"
               style={{ gridColumn: 2, gridRow: 1, left: timeColWidth }}
             >
-              Rate
+              {weekRate === null ? "Rate ↗" : "Rate"}
             </div>
 
             {columns.map((iso, index) => {
@@ -548,6 +558,17 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                   style={{ gridColumn: dayColStart + index, gridRow: 1 }}
                 >
                   {columnLabel(iso)}
+                  {rateDays.get(iso) && (
+                    <span
+                      className={`block text-[10px] leading-tight font-semibold tabular-nums ${
+                        isToday ? "text-white/85" : rateDays.get(iso)!.dayType === "holiday" ? "text-[#b4530a]" : "text-[#4e5560]"
+                      }`}
+                      title={dayTypeLabel(rateDays.get(iso)!)}
+                    >
+                      {rateDays.get(iso)!.dayType === "holiday" ? "★ " : ""}
+                      {money(rateDays.get(iso)!.rate)}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -613,7 +634,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                     }`}
                     style={{ gridColumn: 2, gridRow: index + 2, left: timeColWidth }}
                   >
-                    {money(slot.rate)}
+                    {weekRate === null ? "" : money(weekRate)}
                   </div>
                   <div
                     className={`relative flex ${cellAlign} justify-center gap-1 text-[#3f4650]`}
@@ -754,10 +775,10 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                         {slot.time}
                       </div>
                       <div
-                        className={`sticky z-20 flex items-center justify-center bg-white text-[#9aa0a6] ${rule}`}
+                        className={`sticky z-20 flex items-center justify-center bg-white px-1 ${rule}`}
                         style={{ gridColumn: 2, gridRow, left: DAY_TIME_COL_PX }}
                       >
-                        {money(slot.rate)}
+                        <RateTag slot={slot} open={pack.free.length > 0} />
                       </div>
 
                       {/* 세그먼트 = 예약 하나. 좌→우 순서는 dayPacks 가 확정해 둔다. */}
@@ -1143,5 +1164,26 @@ function OffGridStrip({ title, hint, bookings, selectedId, onSelect, dayTone }: 
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * 일간 시트의 그린피 꼬리표(레퍼런스의 회색 가격표). 팔 자리가 남은 티타임은 진한 글자,
+ * 꽉 찼거나 막힌 티타임은 흐리게 — 프로 샵이 "지금 팔 수 있는 시각" 을 금액 열만 보고 고른다.
+ * 공휴일은 주황 테두리. 금액은 서버가 날짜로 정한 값(주중·주말·공휴일, 0025)이다.
+ */
+function RateTag({ slot, open }: { slot: TeeSlot; open: boolean }) {
+  const holiday = slot.dayType === "holiday";
+  const kind = slot.dayType ? dayTypeLabel({ dayType: slot.dayType, holiday: slot.holiday ?? null }) : "";
+  return (
+    <span
+      title={`${kind ? `${kind} rate` : "Rate"} ${money(slot.rate)}${open ? "" : " · no open spots"}`}
+      className={`flex h-[26px] w-full items-center justify-center bg-[#f2f2f4] pr-1.5 text-[12px] font-semibold tabular-nums ${
+        open ? "text-[#1f2328]" : "text-[#c2c5cb]"
+      } ${holiday ? "shadow-[inset_0_0_0_1px_#e0a46a]" : ""}`}
+      style={{ clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%)" }}
+    >
+      {money(slot.rate)}
+    </span>
   );
 }

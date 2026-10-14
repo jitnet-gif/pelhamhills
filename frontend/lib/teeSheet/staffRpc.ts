@@ -29,6 +29,7 @@ import type {
   DailyReport,
   PatchBookingInput,
   PatchPlayerInput,
+  RateDay,
   SlotsResponse,
   TeeBooking,
   WeekReport,
@@ -164,3 +165,7 @@ export const staffReportDaily = (date: string) =>
 
 export const staffReportWeek = (from: string, to: string) =>
   staffRpc<WeekReport>("pelham_staff_report_week", { p_from: from, p_to: to });
+
+// 0025: 날짜별 요금(주중·주말·공휴일). 요일 탭과 주간 격자 머리에 쓴다.
+export const staffRateDays = (from: string, to: string) =>
+  staffRpc<RateDay[]>("pelham_staff_rate_days", { p_from: from, p_to: to });

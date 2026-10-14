@@ -82,6 +82,20 @@ export type TeeSlot = {
   minutes: number;
   rate: number;
   cartsTotal: number;
+  /** 요금 구분 (0025). 옛 서버·오프라인 시드에는 없다. */
+  dayType?: DayType;
+  /** 공휴일 이름, 예: "Thanksgiving". 공휴일이 아니면 null. */
+  holiday?: string | null;
+};
+
+export type DayType = "weekday" | "weekend" | "holiday";
+
+/** `pelham_staff_rate_days` 한 줄 — 날짜 하나의 그린피와 구분. */
+export type RateDay = {
+  date: string;
+  rate: number;
+  dayType: DayType;
+  holiday: string | null;
 };
 
 export type SlotsResponse = {

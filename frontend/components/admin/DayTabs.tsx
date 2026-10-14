@@ -15,7 +15,8 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { addDays, columnLabel, longDate, toDate, todayIso } from "@/lib/teeSheet/dates";
+import { dayTypeLabel, useRateDays } from "@/hooks/useRateDays";
+import { addDays, columnLabel, longDate, money, toDate, todayIso } from "@/lib/teeSheet/dates";
 
 /** 탭에 보이는 날짜 수. */
 export const STRIP_DAYS = 7;
@@ -63,6 +64,8 @@ export type DayTabsProps = {
 
 export default function DayTabs({ value, onChange }: DayTabsProps) {
   const { dates, mounted } = useDayStrip(value);
+  // 칸마다 그 날 그린피. 공휴일은 주황 글자 — 평일인데 요금이 다른 날을 놓치지 않게.
+  const rates = useRateDays(dates);
 
   return (
     // `grid-cols-7` 이라 칸 폭이 내용이 아니라 화면 폭으로 정해진다: 좁은 화면에서도
@@ -73,6 +76,8 @@ export default function DayTabs({ value, onChange }: DayTabsProps) {
         // columnLabel()은 내부에서 todayIso()를 부른다 → 마운트 전에는 쓸 수 없다.
         const label = mounted ? columnLabel(iso) : weekdayLabel(iso);
         const active = iso === value;
+        const day = rates.get(iso);
+        const holiday = day?.dayType === "holiday";
         return (
           <button
             aria-pressed={active}
@@ -81,10 +86,19 @@ export default function DayTabs({ value, onChange }: DayTabsProps) {
             }`}
             key={iso}
             onClick={() => onChange(iso)}
-            title={longDate(iso)}
+            title={day ? `${longDate(iso)} — ${dayTypeLabel(day)} ${money(day.rate)}` : longDate(iso)}
             type="button"
           >
             {label}
+            {day && (
+              <span
+                className={`block truncate text-[10px] leading-tight font-semibold tabular-nums ${
+                  active ? "text-white/85" : holiday ? "text-[#b4530a]" : "text-[#3f4650]"
+                }`}
+              >
+                {holiday ? `★ ${money(day.rate)}` : money(day.rate)}
+              </span>
+            )}
           </button>
         );
       })}
