@@ -39,6 +39,7 @@ import type {
   PatchPlayerInput,
   Player,
   TeeBooking,
+  TeeExtra,
   TeeSheetController,
   TeeSlot,
   Toast,
@@ -1121,6 +1122,37 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
     [pushToast, runBookingMutation],
   );
 
+  const setPlayerExtras = useCallback(
+    (bookingId: string, playerId: string, extras: TeeExtra[]): Promise<TeeBooking | null> => {
+      const booking = bookingsRef.current.find((item) => item.id === bookingId);
+      const player = booking?.players.find((item) => item.id === playerId);
+      if (!booking || !player) {
+        pushToast("error", "플레이어를 찾을 수 없습니다 — that player no longer exists.");
+        setMessage("Player not found — the reservation may have changed.");
+        return Promise.resolve(null);
+      }
+
+      return runBookingMutation({
+        bookingId,
+        apply: (current) => ({
+          ...current,
+          players: current.players.map((item) => (item.id === playerId ? { ...item, extras } : item)),
+        }),
+        call: () =>
+          teeSheetApi.setPlayerExtras(
+            bookingId,
+            playerId,
+            extras.map((extra) => extra.code),
+          ),
+        statusText: `${player.name || "Player"} extras updated.`,
+        failText: "추가 품목 수정 실패 — could not update the extras",
+      });
+    },
+    [pushToast, runBookingMutation],
+  );
+
+  const loadExtras = useCallback(() => teeSheetApi.listExtras(), []);
+
   // --- misc actions ---
   const refresh = useCallback(async (): Promise<void> => {
     beginBusy();
@@ -1207,7 +1239,10 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       for (const player of booking.players) {
         if (player.cancelled) continue;
         // 한 사람이 내는 돈 = 그린피 + (카트를 쓰면) 카트 요금. 서버 일일 리포트와 같은 식이다.
-        const due = booking.rate + (player.cart ? (player.cartFee ?? 0) : 0);
+        const due =
+          booking.rate +
+          (player.cart ? (player.cartFee ?? 0) : 0) +
+          (player.extras ?? []).reduce((sum, extra) => sum + extra.price, 0);
         revenue += due;
         if (!player.paid) outstanding += due;
       }
@@ -1272,6 +1307,8 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       addPlayer,
       patchPlayer,
       removePlayer,
+      setPlayerExtras,
+      loadExtras,
 
       // misc
       refresh,
@@ -1288,6 +1325,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       goToNextWeek,
       goToPreviousWeek,
       goToToday,
+      loadExtras,
       message,
       moveBooking,
       patchBooking,
@@ -1299,6 +1337,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       selected,
       selectedId,
       setFocusedDate,
+      setPlayerExtras,
       setStatus,
       setView,
       slots,

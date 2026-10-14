@@ -81,6 +81,9 @@ export function teeReceiptFor(
         amount: toCents(player.cartFee ?? 0),
       });
     }
+    for (const extra of player.extras ?? []) {
+      lines.push({ name: extra.name, detail, quantity: 1, amount: toCents(extra.price) });
+    }
   }
 
   const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);

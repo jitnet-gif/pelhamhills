@@ -34,6 +34,7 @@ import type {
   PatchPlayerInput,
   Player,
   TeeBooking,
+  TeeExtraItem,
   TeeSheetController,
 } from "@/lib/teeSheet/types";
 
@@ -201,6 +202,7 @@ const GLYPH_PATH: Record<string, string> = {
   dollar: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM8 4.4v7.2M9.8 6c-.3-.6-1-1-1.8-1-1 0-1.8.5-1.8 1.3 0 1.8 3.6 1 3.6 2.9 0 .8-.8 1.3-1.8 1.3-.9 0-1.6-.4-1.9-1.1",
   check: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM5.2 8.2l2 2 3.6-4",
   ban: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM3.6 3.6l8.8 8.8",
+  basket: "M1.8 6.2h12.4l-1.4 7H3.2zM5 6.2l2-4M11 6.2l-2-4M5.6 8.6v2.6M8 8.6v2.6M10.4 8.6v2.6",
   cart: "M1.6 4.2h8.6v5.2H1.6zM3 4.2 4 2.2h4.4l1 2M10.2 6.6h3.2l1 2.8v1.4h-4.2M1.6 10.8h12.8M3.2 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0M10.6 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0",
 };
 
@@ -236,6 +238,11 @@ function PaidCoin({ paid }: { paid: boolean }) {
   );
 }
 
+/** 이 사람에게 붙은 추가 품목의 합(세전 달러). */
+function extrasTotal(player: Player): number {
+  return (player.extras ?? []).reduce((sum, extra) => sum + extra.price, 0);
+}
+
 // ===== component =====
 
 export default function ReservationDetail({ controller }: ReservationDetailProps) {
@@ -264,6 +271,11 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const [payOpen, setPayOpen] = useState(false);
   // 레일의 복사 아이콘 — Clone Reservation 패널. 열리면 카드 자리를 차지한다(레퍼런스와 같다).
   const [cloneOpen, setCloneOpen] = useState(false);
+  // 레일의 바구니 · 카드의 + — Add Products 패널. `productsFor` 는 품목을 붙일 선수.
+  const [productsOpen, setProductsOpen] = useState(false);
+  const [productsFor, setProductsFor] = useState<string | null>(null);
+  // 추가 품목 카탈로그(0026). 패널을 처음 열 때 읽는다. null = 아직, "error" = 못 읽음(0026 이 없을 수도).
+  const [catalog, setCatalog] = useState<TeeExtraItem[] | "error" | null>(null);
   const [cloneCount, setCloneCount] = useState(1);
   const [cloning, setCloning] = useState(false);
   // 카트 요금 입력 중인 글자. 이름·전화 draft 와 따로 둔다 — 그 draft 는 필드 전체를 한 번에
@@ -377,6 +389,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setHistoryOpen(false);
     setCloneOpen(false);
     setCloneCount(1);
+    setProductsOpen(false);
+    setProductsFor(null);
     setFeeDrafts({});
     setReceiptNote(null);
     setPreview(null);
@@ -387,6 +401,25 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   }, [bookingId, clearTimers]);
 
   useEffect(() => clearTimers, [clearTimers]);
+
+  // 카탈로그는 패널을 열 때 읽는다. 못 읽었으면 다음에 열 때 다시 묻는다.
+  const { loadExtras } = controller;
+  useEffect(() => {
+    if (!productsOpen || Array.isArray(catalog)) return;
+    let live = true;
+    loadExtras()
+      .then((list) => {
+        if (live) setCatalog(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (live) setCatalog("error");
+      });
+    return () => {
+      live = false;
+    };
+    // catalog 는 결과를 담을 뿐 — 다시 읽는 계기는 패널을 여는 것이다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productsOpen, loadExtras]);
 
   // ⋮ 메뉴는 바깥을 누르거나 Esc 로 닫는다. 메뉴 안의 클릭은 data-player-menu 로 걸러 낸다.
   useEffect(() => {
@@ -655,13 +688,19 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 
   /** 카트를 쓰는 사람의 카트 요금, 아니면 0. */
   const cartPart = (player: Player) => (player.cart ? (player.cartFee ?? 0) : 0);
-  const dueFor = (player: Player) => (player.paid || player.cancelled ? 0 : booking.rate + cartPart(player));
+  /** 그린피를 뺀 이 사람 몫(카트 + 추가 품목). */
+  const addOnsOf = (player: Player) => cartPart(player) + extrasTotal(player);
+  const dueFor = (player: Player) => (player.paid || player.cancelled ? 0 : booking.rate + addOnsOf(player));
 
   // 전체 결제 대상과 그 청구액. 센트는 영수증과 **같은 방식**으로 만든다(사람마다 그린피·카트를
   // 따로 반올림한 뒤 더하고, 세금은 합계에 한 번). 그래야 버튼 금액과 종이의 Total 이 같다.
   const unpaidPlayers = players.filter((player) => !player.paid && !player.cancelled);
   const unpaidSubtotal = unpaidPlayers.reduce(
-    (sum, player) => sum + Math.round(booking.rate * 100) + Math.round(cartPart(player) * 100),
+    (sum, player) =>
+      sum +
+      Math.round(booking.rate * 100) +
+      Math.round(cartPart(player) * 100) +
+      (player.extras ?? []).reduce((cents, extra) => cents + Math.round(extra.price * 100), 0),
     0,
   );
   const unpaidTotal = unpaidSubtotal + computeTax(unpaidSubtotal);
@@ -777,6 +816,27 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
       setCloneCount(1);
     }
   };
+
+  /** Add Products 의 대상 선수. 고른 사람이 없거나 사라졌으면 아직 안 낸 첫 사람, 그도 없으면 첫 사람. */
+  const productTarget =
+    players.find((player) => player.id === productsFor) ?? unpaidPlayers[0] ?? players[0] ?? null;
+  const openProducts = (playerId: string | null) => {
+    setCloneOpen(false);
+    setProductsFor(playerId);
+    setProductsOpen(true);
+  };
+  /** 품목을 붙이거나 뗀다. 붙어 있던 줄은 붙일 때의 값을 그대로 보낸다(서버도 그 값을 지킨다). */
+  const addExtra = (player: Player, item: TeeExtraItem) =>
+    void controller.setPlayerExtras(booking.id, player.id, [
+      ...(player.extras ?? []),
+      { code: item.code, name: item.name, price: Number(item.price) },
+    ]);
+  const removeExtra = (player: Player, index: number) =>
+    void controller.setPlayerExtras(
+      booking.id,
+      player.id,
+      (player.extras ?? []).filter((_, at) => at !== index),
+    );
 
   const reprintLookup = preview?.reprint && reprintBill?.at === preview.at ? reprintBill : null;
   const reprintLoading = Boolean(preview?.reprint) && !reprintLookup;
@@ -1127,7 +1187,12 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
         <IconRail
           canPay={useBills}
           cloneOpen={cloneOpen}
-          onToggleClone={() => setCloneOpen((open) => !open)}
+          onToggleClone={() => {
+            setProductsOpen(false);
+            setCloneOpen((open) => !open);
+          }}
+          productsOpen={productsOpen}
+          onToggleProducts={() => (productsOpen ? setProductsOpen(false) : openProducts(productsFor))}
           historyOpen={historyOpen}
           onTogglePay={() => setPayOpen((open) => !open)}
           payOpen={payOpen && useBills}
@@ -1154,6 +1219,20 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
               </div>
             )}
           </div>
+        ) : null}
+
+        {productsOpen && productTarget ? (
+          <ProductsPanel
+            busy={busy}
+            catalog={catalog}
+            holes={booking.holes}
+            onAddExtra={(item) => addExtra(productTarget, item)}
+            onClose={() => setProductsOpen(false)}
+            onToggleCart={() =>
+              void controller.patchPlayer(booking.id, productTarget.id, { cart: productTarget.cart !== true })
+            }
+            player={productTarget}
+          />
         ) : null}
 
         {cloneOpen ? (
@@ -1503,10 +1582,54 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   {cartOn ? <PaidCoin paid={player.paid} /> : <span aria-hidden className="w-4 shrink-0" />}
                 </div>
 
+                {/* 추가 품목 줄(0026). 결제 전에는 × 로 뗀다. */}
+                {(player.extras ?? []).map((extra, index) => (
+                  <div
+                    className="mt-1 flex items-center gap-1 border border-[#d7d7dc] px-1.5 py-1"
+                    key={`${extra.code}-${index}`}
+                  >
+                    <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="basket" />
+                    <span className="min-w-0 truncate">{extra.name}</span>
+                    <span className="ml-auto tabular-nums">{money(extra.price)}</span>
+                    {player.paid || player.cancelled ? null : (
+                      <button
+                        aria-label={`Remove ${extra.name}`}
+                        className="px-0.5 text-[14px] leading-none text-[#9aa0a6] hover:text-[#c0262d] disabled:opacity-40"
+                        disabled={busy}
+                        onClick={() => removeExtra(player, index)}
+                        title={`Remove ${extra.name}`}
+                        type="button"
+                      >
+                        <span aria-hidden>&times;</span>
+                      </button>
+                    )}
+                    <PaidCoin paid={player.paid} />
+                  </div>
+                ))}
+
+                {/* 레퍼런스의 줄 아래 + — 이 선수를 대상으로 Add Products 를 연다. */}
+                <button
+                  className={`mt-1 border py-1 text-[15px] leading-none disabled:opacity-40 ${
+                    productsOpen && productTarget?.id === player.id
+                      ? "border-[#4533ff] bg-[#f3f2ff] text-[#4533ff]"
+                      : "border-[#d7d7dc] bg-[#f2f2f4] text-[#4e5560] hover:bg-[#e8e8ec]"
+                  }`}
+                  disabled={busy || player.cancelled || player.paid}
+                  onClick={() => openProducts(player.id)}
+                  title={
+                    player.paid
+                      ? "Paid — mark unpaid to add more"
+                      : "Add a cart or extras (pull cart, range basket) for this player"
+                  }
+                  type="button"
+                >
+                  +
+                </button>
+
                 {player.cancelled ? (
                   <div className="mt-1 flex justify-between text-[#8a3f26]">
                     <span>Cancelled</span>
-                    <span>−{money(booking.rate + cartPart(player))}</span>
+                    <span>−{money(booking.rate + addOnsOf(player))}</span>
                   </div>
                 ) : null}
                 {(() => {
@@ -1801,6 +1924,8 @@ function IconRail({
   onTogglePay,
   cloneOpen,
   onToggleClone,
+  productsOpen,
+  onToggleProducts,
   onDelete,
   onClose,
 }: {
@@ -1812,6 +1937,8 @@ function IconRail({
   onTogglePay: () => void;
   cloneOpen: boolean;
   onToggleClone: () => void;
+  productsOpen: boolean;
+  onToggleProducts: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
@@ -1844,6 +1971,15 @@ function IconRail({
       <span className={`${cell} text-[#9297a1]`}>
         <Glyph name="tag" />
       </span>
+      <button
+        aria-pressed={productsOpen}
+        className={`${cell} ${productsOpen ? "bg-white text-[#1f2328]" : "text-[#4e5560] hover:bg-white/60"}`}
+        onClick={onToggleProducts}
+        title="Add Products"
+        type="button"
+      >
+        <Glyph className="h-4 w-4" name="basket" />
+      </button>
       <span aria-hidden className={`${cell} text-[13px] text-[#9297a1]`}>
         ?
       </span>
@@ -1950,6 +2086,89 @@ function ClonePanel({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Add Products — 레퍼런스(Lightspeed)의 바구니 패널. 카드 왼쪽에 펼친다.
+ *   Carts  : 대상 선수의 Half Cart 를 켜고 끈다(카드의 카트 줄과 같은 값 — 요금은 서버가 채운다).
+ *   Extras : 0026 카탈로그. 누를 때마다 그 선수 몫에 한 줄 붙는다(같은 것을 두 번 붙일 수 있다).
+ */
+function ProductsPanel({
+  player,
+  holes,
+  catalog,
+  busy,
+  onToggleCart,
+  onAddExtra,
+  onClose,
+}: {
+  player: Player;
+  holes: number;
+  catalog: TeeExtraItem[] | "error" | null;
+  busy: boolean;
+  onToggleCart: () => void;
+  onAddExtra: (item: TeeExtraItem) => void;
+  onClose: () => void;
+}) {
+  const tile =
+    "flex min-h-[64px] flex-col justify-between border border-[#c7c7cc] bg-[#f7f7f9] px-2 py-1.5 text-left hover:border-[#4533ff] disabled:cursor-not-allowed disabled:opacity-40";
+  const cartOn = player.cart === true;
+  const locked = player.paid || player.cancelled;
+  return (
+    <div className="w-[300px] shrink-0 overflow-y-auto border-r border-[#c7c7cc] bg-white p-3">
+      <div className="flex items-center gap-2">
+        <Glyph className="h-5 w-5" name="basket" />
+        <h3 className="text-sm font-bold">Add Products</h3>
+        <button className="ml-auto px-1 text-[17px] leading-none" onClick={onClose} title="Close" type="button">
+          <span aria-hidden>&times;</span>
+        </button>
+      </div>
+      <p className="mt-1 truncate text-[#4e5560]">
+        For {player.name || player.type}
+        {locked ? (player.paid ? " — paid, mark unpaid to change" : " — cancelled") : ""}
+      </p>
+
+      <p className="mt-3 text-[13px] text-[#4e5560]">Carts</p>
+      <div className="mt-1 grid grid-cols-2 gap-1.5">
+        <button
+          aria-pressed={cartOn}
+          className={`${tile} ${cartOn ? "border-[#4533ff] bg-[#f3f2ff]" : ""}`}
+          disabled={busy || locked}
+          onClick={onToggleCart}
+          title={cartOn ? "Take the half cart off this player" : "Add a half cart — the fee comes from the rate plan"}
+          type="button"
+        >
+          <span className="line-clamp-2 font-bold">Half Cart ({holes} Holes)</span>
+          <span className="text-[#4e5560]">{cartOn ? `Added · ${money(player.cartFee ?? 0)}` : `${holes} holes`}</span>
+        </button>
+      </div>
+
+      <p className="mt-4 text-[13px] text-[#4e5560]">Extras</p>
+      {catalog === null ? (
+        <p className="mt-1 text-[#9aa0a6]">Loading…</p>
+      ) : catalog === "error" ? (
+        <p className="mt-1 text-[#8a3f26]">Could not load extras. Close and open again to retry.</p>
+      ) : catalog.length === 0 ? (
+        <p className="mt-1 text-[#9aa0a6]">No extras are turned on.</p>
+      ) : (
+        <div className="mt-1 grid grid-cols-2 gap-1.5">
+          {catalog.map((item) => (
+            <button
+              className={tile}
+              disabled={busy || locked}
+              key={item.code}
+              onClick={() => onAddExtra(item)}
+              title={`Add ${item.name} for this player`}
+              type="button"
+            >
+              <span className="line-clamp-2 font-bold">{item.name}</span>
+              <span className="self-end tabular-nums">{money(Number(item.price))}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

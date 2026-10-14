@@ -41,7 +41,15 @@ export type Player = {
   cartFee: number;
   /** 결제로 표시된 시각(ISO). 서버만 찍는다. 이 필드가 생기기 전의 결제에는 없다. */
   paidAt: string | null;
+  /** 이 사람 몫에 붙은 추가 품목(풀카트·레인지 바스켓, 0026). 붙일 때의 값이 복사돼 있다. 없으면 키가 없다. */
+  extras?: TeeExtra[];
 };
+
+/** 선수에게 붙은 추가 품목 한 줄. price 는 세전 달러(`rate`·`cartFee` 와 같다). */
+export type TeeExtra = { code: string; name: string; price: number };
+
+/** 추가 품목 카탈로그 한 항목(0026 `pelham_staff_tee_extras`). */
+export type TeeExtraItem = TeeExtra & { category: string };
 
 export type AuditEntry = {
   id: string;
@@ -129,7 +137,7 @@ export type PatchBookingInput = Partial<{
 }>;
 
 export type AddPlayerInput = Partial<Omit<Player, "id" | "paidAt">>;
-export type PatchPlayerInput = Partial<Omit<Player, "id" | "paidAt">>;
+export type PatchPlayerInput = Partial<Omit<Player, "id" | "paidAt" | "extras">>;
 
 // ===== Reports =====
 
@@ -274,6 +282,10 @@ export type TeeSheetController = {
   addPlayer: (bookingId: string, input?: AddPlayerInput) => Promise<TeeBooking | null>;
   patchPlayer: (bookingId: string, playerId: string, patch: PatchPlayerInput) => Promise<TeeBooking | null>;
   removePlayer: (bookingId: string, playerId: string) => Promise<TeeBooking | null>;
+  /** 선수의 추가 품목을 통째로 바꾼다(0026). 순서대로, 같은 품목을 두 번 넣을 수 있다. */
+  setPlayerExtras: (bookingId: string, playerId: string, extras: TeeExtra[]) => Promise<TeeBooking | null>;
+  /** 추가 품목 카탈로그(켜진 것만). 0026 이 없으면 실패한다. */
+  loadExtras: () => Promise<TeeExtraItem[]>;
 
   // misc
   refresh: () => Promise<void>;

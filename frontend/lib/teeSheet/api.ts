@@ -19,6 +19,7 @@ import type {
   SlotsResponse,
   TaskAck,
   TeeBooking,
+  TeeExtraItem,
   WeekReport,
 } from "./types";
 
@@ -33,11 +34,13 @@ import {
   staffBookingPatch,
   staffBookings,
   staffPlayerAdd,
+  staffPlayerExtras,
   staffPlayerPatch,
   staffPlayerRemove,
   staffReportDaily,
   staffReportWeek,
   staffSlots,
+  staffTeeExtras,
 } from "./staffRpc";
 
 export { apiBaseUrl };
@@ -105,6 +108,12 @@ export const teeSheetApi = {
 
   removePlayer: (bookingId: string, playerId: string): Promise<TeeBooking> =>
     staffPlayerRemove(bookingId, playerId),
+
+  // ===== Extras (0026) =====
+  listExtras: (): Promise<TeeExtraItem[]> => staffTeeExtras(),
+
+  setPlayerExtras: (bookingId: string, playerId: string, codes: string[]): Promise<TeeBooking> =>
+    staffPlayerExtras(bookingId, playerId, codes),
 
   // ===== Reports =====
   getDailyReport: (date: string): Promise<DailyReport> => staffReportDaily(date),
