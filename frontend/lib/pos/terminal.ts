@@ -239,6 +239,8 @@ export type RunOptions = {
   onStatus?: (text: string) => void;
   /** 서버가 pending 줄을 만들었을 때(취소·시험 버튼이 그 id 를 쓴다). */
   onStarted?: (record: TerminalRecord) => void;
+  /** 승인 문자를 받을 번호(판매만). 비우면 서버가 계산서에 담긴 예약의 번호로 보낸다. */
+  receiptPhone?: string;
 };
 
 export const terminal = {
@@ -246,7 +248,12 @@ export const terminal = {
   async sale(settings: TerminalSettings, bill: number, amount: Cents, options: RunOptions = {}): Promise<TerminalRecord> {
     if (!terminalEnabled(settings)) throw new TerminalError("Pick a card reader for this register first.");
     options.onStatus?.("Sending to the reader…");
-    const started = await post<TerminalRecord>("/terminal/sale", { bill_id: bill, amount, reader_id: settings.readerId });
+    const started = await post<TerminalRecord>("/terminal/sale", {
+      bill_id: bill,
+      amount,
+      reader_id: settings.readerId,
+      receipt_phone: options.receiptPhone?.trim() || null,
+    });
     options.onStarted?.(started);
     return waitFor(started, options.onStatus);
   },

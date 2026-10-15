@@ -29,8 +29,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.api.routes import payments as online
+from backend.services import payment_texts
 from backend.services import stripe_gateway as sg
 from backend.services import supabase_rest
+from backend.services.twilio_sms import normalize_phone
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +90,13 @@ def _age_seconds(row: dict[str, Any]) -> float:
 
 def _final(row: dict[str, Any], *, approved: bool, result: str, message: str = "", code: str = "",
            **fields: Any) -> dict[str, Any]:
-    return _service("pelham_terminal_settle", {"p": {
+    done = _service("pelham_terminal_settle", {"p": {
         "id": row["id"], "final": True, "approved": approved, "result": result,
         "host_message": message[:200] or None, "response_code": code[:10] or None, **fields,
     }})
+    if approved and row.get("kind") == "sale":
+        payment_texts.kick()  # 손님에게 승인 문자(0028). 한 번만 가는 것은 SQL 이 지킨다.
+    return done
 
 
 def _final_from_payment(row: dict[str, Any], p: sg.Payment) -> dict[str, Any]:
@@ -234,6 +239,8 @@ class SaleBody(BaseModel):
     bill_id: int
     amount: int = Field(gt=0)
     reader_id: str = Field(min_length=4, max_length=64)
+    # 승인 문자를 받을 번호. 비우면 계산서에 담긴 예약의 번호로 간다(0028).
+    receipt_phone: Optional[str] = Field(default=None, max_length=40)
 
 
 class RefundBody(BaseModel):
@@ -297,8 +304,19 @@ def register(body: RegisterBody, request: Request) -> dict[str, Any]:
 def sale(body: SaleBody, request: Request) -> dict[str, Any]:
     """판매: 리더에 금액을 띄운다. 돌려주는 줄은 pending — 화면이 `/terminal/txn/{id}` 로 결과를 묻는다."""
     _require_stripe()
+    receipt_phone = None
+    if (body.receipt_phone or "").strip():
+        receipt_phone = normalize_phone(body.receipt_phone)
+        if not receipt_phone:
+            raise HTTPException(status_code=422, detail="Enter a 10-digit phone number for the receipt text.")
     row = _as_staff(request, "pelham_staff_terminal_begin", {"p": {
         "kind": "sale", "bill_id": body.bill_id, "amount": body.amount, "reader_id": body.reader_id}})
+    if receipt_phone:
+        try:
+            supabase_rest.rpc("pelham_payment_text_phone", {"p_txn": row["id"], "p_phone": receipt_phone})
+        except Exception as exc:
+            # 문자 번호 때문에 결제를 막지 않는다. 그러면 예약 번호로 가거나 안 간다.
+            logger.warning("승인 문자 번호를 적지 못함: txn=%s (%s)", row.get("id"), type(exc).__name__)
     pi_id = ""
     try:
         pi = sg.create_terminal_intent(amount_cents=body.amount, txn_id=int(row["id"]),

@@ -513,6 +513,8 @@ function PaymentsEditor({
   const [amountInput, setAmountInput] = useState("");
   const [authCode, setAuthCode] = useState("");
   const [last4, setLast4] = useState("");
+  // 단말기 승인 문자를 받을 번호. 비우면 서버가 계산서에 담긴 예약의 번호로 보낸다(0028).
+  const [receiptPhone, setReceiptPhone] = useState("");
   const [tipInput, setTipInput] = useState("");
   const [formError, setFormError] = useState("");
   const [preparing, setPreparing] = useState(false);
@@ -652,6 +654,7 @@ function PaymentsEditor({
           const record = await terminal.sale(terminalSettings, billId, typed, {
             onStatus: setTerminalStatus,
             onStarted: (started) => setInFlight(started.id),
+            receiptPhone,
           });
           if (!record.approved) {
             setFormError(describeTerminalResult(record));
@@ -660,6 +663,7 @@ function PaymentsEditor({
           const key = keyRef.current++;
           setPayments((current) => [...current, fromTerminal(key, record)]);
           setAmountInput("");
+          setReceiptPhone("");
         } catch (error) {
           setFormError(terminalErrorText(error));
         } finally {
@@ -913,6 +917,15 @@ function PaymentsEditor({
                 <b>{formatMoney(typed)}</b> goes to {terminalSettings.readerLabel || "the card reader"}. The customer
                 taps, inserts or swipes there; tip and approval come back here.
               </p>
+              <Field hint="Leave blank to use the phone on the booking" label="Text the approval to (optional)">
+                <TextInput
+                  autoComplete="off"
+                  inputMode="tel"
+                  onChange={(event) => setReceiptPhone(event.target.value)}
+                  placeholder="905-555-0101"
+                  value={receiptPhone}
+                />
+              </Field>
               <button className="justify-self-start text-[#4533ff] underline" onClick={() => setManual(true)} type="button">
                 Terminal not working? Enter the approval code by hand
               </button>

@@ -33,6 +33,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.core.config import settings
+from backend.services import payment_texts
 from backend.services import stripe_gateway as sg
 from backend.services import supabase_rest
 
@@ -89,6 +90,8 @@ def settle(payment: sg.Payment, invoice: str | None = None) -> dict[str, Any]:
             "reason": "Reversed automatically: the payment could not be applied to the booking.",
         }}) if target == result.get("trans_id") else None
         return {**(finished or result), "reversed": kind}
+    if result and result.get("status") == "approved":
+        payment_texts.kick()  # 손님에게 승인 문자(0028). 한 번만 가는 것은 SQL 이 지킨다.
     return result
 
 
