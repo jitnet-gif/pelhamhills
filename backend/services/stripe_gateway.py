@@ -291,6 +291,35 @@ def refunds_for(pi_id: str) -> list[dict[str, Any]]:
     return list(res.get("data") or [])
 
 
+# ===== 목록 (대사) =====================================================
+
+def list_all(path: str, params: dict[str, Any], max_pages: int = 20) -> tuple[list[dict[str, Any]], bool]:
+    """목록 API 를 끝까지(최대 max_pages × 100 건). (항목들, 다 못 읽었으면 True)."""
+    items: list[dict[str, Any]] = []
+    after: str | None = None
+    for _ in range(max_pages):
+        page = _request("GET", path, {**params, "limit": 100, "starting_after": after})
+        data = list(page.get("data") or [])
+        items.extend(data)
+        if not page.get("has_more") or not data:
+            return items, False
+        after = str(data[-1].get("id") or "")
+    return items, True
+
+
+def payment_intents_created(start: int, end: int) -> tuple[list[dict[str, Any]], bool]:
+    """[start, end) 에 만든 PaymentIntent (latest_charge 를 펼쳐서)."""
+    return list_all("/payment_intents", {"created": {"gte": start, "lt": end}, "expand": ["data.latest_charge"]})
+
+
+def refunds_created(start: int, end: int) -> tuple[list[dict[str, Any]], bool]:
+    return list_all("/refunds", {"created": {"gte": start, "lt": end}})
+
+
+def payment_intent_raw(pi_id: str) -> dict[str, Any]:
+    return _request("GET", f"/payment_intents/{pi_id}", {"expand": ["latest_charge"]})
+
+
 # ===== 계산대 (Terminal) ===============================================
 
 def create_terminal_intent(*, amount_cents: int, txn_id: int, reference: str, bill_id: int | None,

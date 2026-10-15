@@ -69,6 +69,8 @@ include_route_module("backend.api.routes.payments", f"{settings.API_V1_STR}", ["
 # 계산대 카드 단말기(Stripe Terminal)와 Stripe 웹훅. 직원 확인은 요청의 Supabase 토큰으로 SQL 이 한다
 # (`pelham_staff_terminal_*`, 0021) — 그래서 공개 배포에서도 연다.
 include_route_module("backend.api.routes.terminal", f"{settings.API_V1_STR}", ["Card Terminal"])
+# Stripe 대사 리포트(Reports → Stripe check). 직원 확인은 단말기와 같다(0027).
+include_route_module("backend.api.routes.reconcile", f"{settings.API_V1_STR}", ["Card Terminal"])
 
 if VOICE_ONLY:
     logger.warning(
