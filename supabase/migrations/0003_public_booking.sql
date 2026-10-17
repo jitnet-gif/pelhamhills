@@ -104,28 +104,7 @@ alter table public.pelham_retail_products enable row level security;
 alter table public.pelham_retail_sales enable row level security;
 revoke all on public.pelham_retail_products, public.pelham_retail_sales from anon, authenticated;
 
--- 시드: `backend/data/retail.json` (2026-09-08 사본).
-insert into public.pelham_retail_products
-  (id, sku, name, category, price, cost, stock, reorder_point, is_active, created_at, updated_at)
-select * from (values
-  (1, 'PV1-DZ', 'Titleist Pro V1 (Dozen)', 'Balls', 8499, 5900, 48, 12, true, '2026-09-08T07:05:02.744080+00:00'::timestamptz, '2026-09-08T07:05:02.744080+00:00'::timestamptz),
-  (2, 'CHRM-DZ', 'Callaway Chrome Soft (Dozen)', 'Balls', 7999, 5500, 36, 12, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (3, 'TM-QI10-D', 'TaylorMade Qi10 Driver', 'Equipment', 69999, 52000, 4, 2, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (4, 'VKY-SM10-56', 'Titleist Vokey SM10 Wedge 56', 'Equipment', 24999, 17500, 6, 2, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (5, 'SC-NP2-34', 'Scotty Cameron Newport 2 Putter (34")', 'Equipment', 64999, 48000, 2, 1, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (6, 'FJ-POLO-M', 'FootJoy ProDry Polo (M)', 'Apparel', 8999, 4800, 14, 6, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (7, 'PH-CAP-ADJ', 'Pelham Hills Adjustable Cap', 'Apparel', 3499, 1400, 30, 10, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (8, 'SM-RAIN-L', 'Sun Mountain Rain Jacket (L)', 'Apparel', 19999, 12000, 5, 3, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (9, 'FJ-GLV-ML', 'FootJoy WeatherSof Glove (ML)', 'Accessories', 2299, 1150, 40, 12, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (10, 'TEE-BMB-50', 'Bamboo Tees 2.75" (50 pack)', 'Accessories', 999, 380, 60, 20, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (11, 'PH-TWL-TRI', 'Pelham Hills Tri-Fold Towel', 'Accessories', 2999, 1300, 18, 6, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (12, 'DVT-MRK-SET', 'Divot Tool & Ball Marker Set', 'Accessories', 1499, 620, 25, 10, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (13, 'GTR-591', 'Gatorade 591 mL', 'Food & Beverage', 399, 145, 72, 24, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (14, 'CLIF-BAR', 'Clif Bar', 'Food & Beverage', 349, 160, 45, 15, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (15, 'CART-18', 'Power Cart Rental (18 holes)', 'Rentals', 2500, 0, null, 0, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00'),
-  (16, 'CLUBS-18', 'Rental Clubs (18 holes)', 'Rentals', 4500, 0, null, 0, true, '2026-09-08T07:05:02.744080+00:00', '2026-09-08T07:05:02.744080+00:00')
-) as seed (id, sku, name, category, price, cost, stock, reorder_point, is_active, created_at, updated_at)
-where not exists (select 1 from public.pelham_retail_products);
+-- 견본 16개 시드는 뺐다(2026-10-17). 진짜 상품은 매장 POS 에서 내보낸 목록으로 넣는다 — 0029 참고.
 
 -- ===== 공용 헬퍼 =======================================================
 
