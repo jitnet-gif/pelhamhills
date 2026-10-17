@@ -12,41 +12,39 @@
 --
 -- 전제: 0005. 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
 
-create temp table if not exists _pelham_sample_skus (sku text primary key);
-truncate _pelham_sample_skus;
-insert into _pelham_sample_skus (sku) values
-  ('pv1-dz'), ('chrm-dz'), ('tm-qi10-d'), ('vky-sm10-56'), ('sc-np2-34'), ('fj-polo-m'),
-  ('ph-cap-adj'), ('sm-rain-l'), ('fj-glv-ml'), ('tee-bmb-50'), ('ph-twl-tri'), ('dvt-mrk-set'),
-  ('gtr-591'), ('clif-bar'), ('cart-18'), ('clubs-18');
-
-begin;
+-- 견본 SKU 목록은 문장마다 그대로 적는다. 임시 테이블·임시 함수는 SQL editor 에서 문장 사이에
+-- 사라질 수 있다(2026-10-17, "_pelham_sample_skus does not exist").
 
 -- 계산서에 한 번도 안 담긴 견본: 원장 → 상품 순으로 지운다.
 delete from public.pelham_retail_stock_moves m
  using public.pelham_retail_products p
  where m.product_id = p.id
-   and lower(p.sku) in (select sku from _pelham_sample_skus)
+   and lower(p.sku) = any (array['pv1-dz', 'chrm-dz', 'tm-qi10-d', 'vky-sm10-56', 'sc-np2-34', 'fj-polo-m',
+                             'ph-cap-adj', 'sm-rain-l', 'fj-glv-ml', 'tee-bmb-50', 'ph-twl-tri', 'dvt-mrk-set',
+                             'gtr-591', 'clif-bar', 'cart-18', 'clubs-18'])
    and not exists (select 1 from public.pelham_bill_lines l where l.product_id = p.id);
 
 delete from public.pelham_retail_products p
- where lower(p.sku) in (select sku from _pelham_sample_skus)
+ where lower(p.sku) = any (array['pv1-dz', 'chrm-dz', 'tm-qi10-d', 'vky-sm10-56', 'sc-np2-34', 'fj-polo-m',
+                             'ph-cap-adj', 'sm-rain-l', 'fj-glv-ml', 'tee-bmb-50', 'ph-twl-tri', 'dvt-mrk-set',
+                             'gtr-591', 'clif-bar', 'cart-18', 'clubs-18'])
    and not exists (select 1 from public.pelham_bill_lines l where l.product_id = p.id);
 
 -- 계산서에 담긴 적 있는 견본: 숨긴다.
 update public.pelham_retail_products p
    set is_active = false, updated_at = now()
- where lower(p.sku) in (select sku from _pelham_sample_skus)
+ where lower(p.sku) = any (array['pv1-dz', 'chrm-dz', 'tm-qi10-d', 'vky-sm10-56', 'sc-np2-34', 'fj-polo-m',
+                             'ph-cap-adj', 'sm-rain-l', 'fj-glv-ml', 'tee-bmb-50', 'ph-twl-tri', 'dvt-mrk-set',
+                             'gtr-591', 'clif-bar', 'cart-18', 'clubs-18'])
    and p.is_active;
-
-commit;
 
 -- 결과: 남은 견본(계산서에 담겨 숨기기만 한 것)과 남은 상품 수.
 select 'sample kept hidden (on a bill)' as what, p.sku, p.name,
        (select count(*) from public.pelham_bill_lines l where l.product_id = p.id) as bill_lines
   from public.pelham_retail_products p
- where lower(p.sku) in (select sku from _pelham_sample_skus)
+ where lower(p.sku) = any (array['pv1-dz', 'chrm-dz', 'tm-qi10-d', 'vky-sm10-56', 'sc-np2-34', 'fj-polo-m',
+                             'ph-cap-adj', 'sm-rain-l', 'fj-glv-ml', 'tee-bmb-50', 'ph-twl-tri', 'dvt-mrk-set',
+                             'gtr-591', 'clif-bar', 'cart-18', 'clubs-18'])
 union all
 select 'products left (active)', null, null, count(*)
   from public.pelham_retail_products where is_active;
-
-drop table _pelham_sample_skus;
