@@ -1546,7 +1546,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 {draft.rate.trim() !== "" && !Number.isFinite(Number(draft.rate)) ? (
                   <span className="mt-1 block text-[10px] text-[#8a3f26]">Not a number — will not be saved</span>
                 ) : null}
-                {/* 카트 한 줄. 켜면 서버가 금액을 채운다(`cart_fee_for`) — 세전 $19.00 한 가지이고,
+                {/* 카트 한 줄. 켜면 서버가 금액을 채운다(`cart_fee_for`) — 세전 18홀 $19.47 · 9홀 $19.00 이고,
                     카트가 포함된 회원 요금제만 $0 이다. 그린피와 달리 이 사람 것만 바뀐다.
                     결제한 뒤에는 잠근다: 받은 돈과 재인쇄 영수증이 달라지면 안 된다. */}
                 <div

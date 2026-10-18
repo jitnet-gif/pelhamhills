@@ -57,14 +57,17 @@ HOLD_TTL_SECONDS = 180
 WEEKDAY_RATE = 47.79
 WEEKEND_RATE = 58.41
 
-# 1인 카트 요금(세전, 달러). **2026-09-15 클럽 확인: 홀 수·요금제와 무관하게 $19.00 한 가지다**
-# (HST 13% 를 더하면 $21.47).
+# 1인 카트 요금(세전, 달러). **2026-10-18 클럽 확인: 18홀 $19.47.** 9홀은 아직 따로 정해진 게
+# 없어 예전 단일 요금 $19.00 을 그대로 쓴다(2026-09-15 확인값).
 #
 # 참고로 Chronogolf export(2026-04~09, 좌석 25,108행)에 남아 있는 과거 금액은 여러 가지였다:
 # 19.47(6,607행, 18홀 일반), 17.70(2,607행, Public Senior), 9.74(1,760행, 9홀), 11.50(1,369행, 미상).
-# 지금 요금표는 한 금액으로 통일됐으므로 상수 하나만 둔다. 옛 예약의 금액은 그대로 보존된다 —
-# 이 값은 카트를 **새로 켤 때** 채우는 기본값이고, 이미 적힌 금액을 건드리지 않는다.
-CART_FEE = 19.00
+# 옛 예약의 금액은 그대로 보존된다 — 이 값은 카트를 **새로 켤 때** 채우는 기본값이고,
+# 이미 적힌 금액을 건드리지 않는다.
+#
+# 같은 값이 DB 의 `pelham_tee_cart_fee`(0035)에도 있다. 바꾸면 둘을 같이 고쳐라.
+CART_FEE = 19.47
+NINE_HOLE_CART_FEE = 19.00
 
 
 def cart_fee_for(rate_plan: str, holes: int) -> float:
@@ -72,13 +75,10 @@ def cart_fee_for(rate_plan: str, holes: int) -> float:
 
     이름에 "Cart" 가 든 회원 요금제("... with Weekday Cart", "... with 7 Day Cart")는
     회원권에 카트가 들어 있다고 보고 0 이다 — export 로 확인한 것이 아니라 요금제 이름을 읽은 것이다.
-
-    `holes` 는 지금 금액에 영향을 주지 않지만 인자로 남겨 둔다. 홀 수별 요금이 다시 생기면
-    호출부(카드·예약 수정·리포트)를 건드리지 않고 이 함수만 고치면 된다.
     """
     if "cart" in (rate_plan or "").lower():
         return 0.0
-    return CART_FEE
+    return NINE_HOLE_CART_FEE if holes == 9 else CART_FEE
 
 
 def _same_money(a: float, b: float) -> bool:
