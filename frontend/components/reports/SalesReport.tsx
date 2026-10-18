@@ -105,8 +105,8 @@ export default function SalesReport() {
       {error ? <ErrorNote>{error}</ErrorNote> : null}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-6">
-          {Array.from({ length: 6 }, (_, index) => (
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }, (_, index) => (
             <SkeletonBar className="h-16 min-w-0" key={index} />
           ))}
         </div>
@@ -116,7 +116,47 @@ export default function SalesReport() {
               여기서 다시 더하거나 빼지 않는다 — 특히 환불 건은 `gross`/`net` 에서
               서버가 **이미 빼 두었다.** 화면에서 또 빼면 이중 차감이 되고,
               그러면 마감 숫자가 서랍 속 현금과 영영 맞지 않는다. */}
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-6">
+          {/* 위에서 아래로 읽히게: 세전 매출 → 할인 → 세전 순매출 → 세금 → 받은 돈.
+              굵은 두 칸이 "얼마 팔았나"(Net Sales)와 "손님에게 얼마 받았나"(Total Collected).
+              서버의 `net` 은 세금 포함이라 화면에서는 Total Collected 로 부르고,
+              Net Sales 는 `gross − discount` 로 여기서 만든다. */}
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+            <StatCard
+              hint="before discounts · tax excl."
+              label="Gross Sales"
+              onClick={() => setDrill({ kind: "gross" })}
+              value={formatMoney(report.gross)}
+            />
+            <StatCard
+              hint="order discounts applied"
+              label="Discounts"
+              onClick={() => setDrill({ kind: "discount" })}
+              value={`−${formatMoney(report.discount)}`}
+            />
+            <StatCard
+              hint="after discounts · tax excl."
+              label="Net Sales"
+              onClick={() => setDrill({ kind: "net_sales" })}
+              strong
+              value={formatMoney(report.gross - report.discount)}
+            />
+            <StatCard
+              hint="collected from customers"
+              label="Tax · HST"
+              onClick={() => setDrill({ kind: "tax" })}
+              value={`+${formatMoney(report.tax)}`}
+            />
+            <StatCard
+              hint="tax incl. · tips excl."
+              label="Total Collected"
+              onClick={() => setDrill({ kind: "net" })}
+              strong
+              value={formatMoney(report.net)}
+            />
+          </div>
+
+          {/* 위 흐름 밖의 숫자. 환불은 위에서 이미 빠졌고, 팁은 매출이 아니다. */}
+          <div className="grid grid-cols-3 gap-2 lg:grid-cols-5">
             <StatCard
               hint="refunds excluded"
               label="Sales"
@@ -124,34 +164,21 @@ export default function SalesReport() {
               value={String(report.sale_count)}
             />
             <StatCard
-              hint="before order discounts & tax"
-              label="Gross"
-              onClick={() => setDrill({ kind: "gross" })}
-              value={formatMoney(report.gross)}
-            />
-            <StatCard
-              hint="order-level only"
-              label="Discounts"
-              onClick={() => setDrill({ kind: "discount" })}
-              value={formatMoney(report.discount)}
-            />
-            <StatCard label="Tax (HST)" onClick={() => setDrill({ kind: "tax" })} value={formatMoney(report.tax)} />
-            <StatCard
-              hint="gross − discounts + tax"
-              label="Net"
-              onClick={() => setDrill({ kind: "net" })}
-              value={formatMoney(report.net)}
-            />
-            <StatCard
-              hint={`${report.refunded_count} sale(s) · tax incl.`}
-              label="Refunded"
+              hint={`${report.refunded_count} sale(s) · already excluded above`}
+              label="Refunds"
               onClick={() => setDrill({ kind: "refunded" })}
               value={formatMoney(report.refunded_total)}
+            />
+            <StatCard
+              hint="counted apart from sales"
+              label="Tips"
+              onClick={() => setDrill({ kind: "tips" })}
+              value={formatMoney(report.tips ?? 0)}
             />
           </div>
 
           {/* 사업부 네 칸. 팔린 것(분류)으로 나눈다 — 나누는 규칙과 이유는 `lib/retail/divisions.ts`.
-              합이 위 Gross 와 같다. 할인·세금은 계산서 단위라 여기 들어가지 않는다. */}
+              합이 위 Gross Sales 와 같다. 할인·세금은 계산서 단위라 여기 들어가지 않는다. */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {divisions.map((division) => (
               <section className="min-w-0 border border-[#d4d4d8] bg-white p-3" key={division.key}>
@@ -167,7 +194,7 @@ export default function SalesReport() {
                     </span>
                   </span>
                   <span className="mt-1 block text-2xl font-semibold tabular-nums">{formatMoney(division.total)}</span>
-                  <span className="block text-[11px] text-[#6b7280]">before order discounts &amp; tax</span>
+                  <span className="block text-[11px] text-[#6b7280]">before order discounts · tax excl.</span>
                 </button>
                 {division.categories.length === 0 ? (
                   <p className="mt-2 text-xs text-[#6b7280]">No sales.</p>
@@ -195,7 +222,7 @@ export default function SalesReport() {
 
           <div className="grid min-w-0 gap-3 lg:grid-cols-3">
             {/* 계산서를 연 계산대별. 서랍·단말기 대사용이지 사업부 매출이 아니다 —
-                티 시트 계산대에서 모자를 팔 수 있다. 합이 위 Net 과 같다. */}
+                티 시트 계산대에서 모자를 팔 수 있다. 합이 위 Total Collected 와 같다. */}
             <Panel title="By register (tax incl.)">
               {!report.by_station || report.by_station.length === 0 ? (
                 <EmptyNote>Nothing rung in yet.</EmptyNote>

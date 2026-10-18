@@ -138,26 +138,31 @@ export function StatCard({
   value,
   hint,
   onClick,
+  strong,
 }: {
   label: string;
   value: string;
   hint?: string;
   /** 주면 카드 전체가 버튼이 된다(리포트의 상세 보기). */
   onClick?: () => void;
+  /** 한 줄에서 먼저 읽어야 할 숫자. 값을 크게, 테두리를 진하게. */
+  strong?: boolean;
 }) {
   const body = (
     <>
       <p className="truncate text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">
         {label}
       </p>
-      <p className="mt-0.5 text-lg font-bold tabular-nums">{value}</p>
+      <p className={`mt-0.5 font-bold tabular-nums ${strong ? "text-2xl" : "text-lg"}`}>{value}</p>
       {hint ? <p className="mt-0.5 truncate text-xs text-[#6b7280]">{hint}</p> : null}
     </>
   );
   if (onClick) {
     return (
       <button
-        className="min-w-0 border border-[#d4d4d8] bg-white px-3 py-2.5 text-left hover:border-[#4533ff]"
+        className={`min-w-0 border bg-white px-3 py-2.5 text-left hover:border-[#4533ff] ${
+          strong ? "border-[#18181b]" : "border-[#d4d4d8]"
+        }`}
         onClick={onClick}
         type="button"
       >
@@ -165,7 +170,11 @@ export function StatCard({
       </button>
     );
   }
-  return <div className="min-w-0 border border-[#d4d4d8] bg-white px-3 py-2.5">{body}</div>;
+  return (
+    <div className={`min-w-0 border bg-white px-3 py-2.5 ${strong ? "border-[#18181b]" : "border-[#d4d4d8]"}`}>
+      {body}
+    </div>
+  );
 }
 
 export function EmptyNote({ children }: { children: ReactNode }) {

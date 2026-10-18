@@ -19,7 +19,7 @@ import { formatMoney, type Cents, type PaymentMethod, type Sale, type SaleLine }
 import { EmptyNote, Modal } from "@/components/retail/ui";
 
 export type Drill =
-  | { kind: "sales" | "gross" | "discount" | "tax" | "net" | "refunded" }
+  | { kind: "sales" | "gross" | "discount" | "net_sales" | "tax" | "net" | "refunded" | "tips" }
   | { kind: "division"; division: DivisionKey; category?: string }
   | { kind: "station"; station: string }
   | { kind: "payment"; method: PaymentMethod }
@@ -50,15 +50,19 @@ function title(drill: Drill) {
     case "sales":
       return "Sales";
     case "gross":
-      return "Gross — before order discounts & tax";
+      return "Gross Sales — before discounts, tax excl.";
     case "discount":
       return "Order discounts";
+    case "net_sales":
+      return "Net Sales — after discounts, tax excl.";
     case "tax":
-      return "Tax (HST)";
+      return "Tax · HST";
     case "net":
-      return "Net";
+      return "Total Collected — tax incl., tips excl.";
     case "refunded":
-      return "Refunded";
+      return "Refunds";
+    case "tips":
+      return "Tips";
     case "division": {
       const label = DIVISIONS.find((d) => d.key === drill.division)?.label ?? drill.division;
       return drill.category ? `${label} — ${drill.category}` : label;
@@ -98,6 +102,10 @@ export default function SalesDrilldown({
         return paid.map((sale) => ({ sale, amount: sale.total }));
       case "gross":
         return paid.map((sale) => ({ sale, amount: sale.subtotal }));
+      case "net_sales":
+        return paid.map((sale) => ({ sale, amount: sale.subtotal - sale.discount }));
+      case "tips":
+        return paid.filter((sale) => (sale.tip ?? 0) > 0).map((sale) => ({ sale, amount: sale.tip ?? 0 }));
       case "discount":
         return paid.filter((sale) => sale.discount > 0).map((sale) => ({ sale, amount: sale.discount }));
       case "tax":
