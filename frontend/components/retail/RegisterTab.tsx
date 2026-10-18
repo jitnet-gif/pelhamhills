@@ -21,13 +21,14 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import BillPanel from "@/components/pos/BillPanel";
 import CameraScanner, { type ScanOutcome } from "@/components/pos/CameraScanner";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import type { BillStation } from "@/lib/pos/api";
+import type { BillStation, OpenItemInput } from "@/lib/pos/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
 import { billActions, useCurrentBill } from "@/lib/pos/currentBill";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
 import { groupProducts, type MenuGroup } from "@/lib/retail/menuGroups";
 import { LOW_STOCK_RED_BELOW, RETAIL_CATEGORIES, formatMoney, type Product, type RetailCategory } from "@/lib/retail/types";
 
+import OpenItemDialog from "./OpenItemDialog";
 import { Chip, EmptyNote, ErrorNote, SkeletonCards, TextInput, useOverlayDismiss } from "./ui";
 
 type Props = {
@@ -78,6 +79,7 @@ export default function RegisterTab({
   // 스캔으로 담으면 결제 칸을 바로 띄운다. 값이 바뀔 때마다 BillPanel 이 결제 칸으로 스크롤한다.
   const [revealPayments, setRevealPayments] = useState(0);
   const [cameraOpen, setCameraOpen] = useState(startWithCamera);
+  const [openItemOpen, setOpenItemOpen] = useState(false);
 
   // 판매 화면에는 **활성 상품만** 올린다. 비활성 상품이 격자에 섞이면 이미
   // 안 파는 물건을 눌러 찍게 된다.
@@ -167,7 +169,21 @@ export default function RegisterTab({
     );
   }
 
-  useBarcodeScanner(handleScan, { enabled: scanEnabled && !loading && !cameraOpen });
+  useBarcodeScanner(handleScan, { enabled: scanEnabled && !loading && !cameraOpen && !openItemOpen });
+
+  /** 오픈 아이템(0038)을 담고 결제 칸을 띄운다 — 스캔으로 담을 때와 같다. */
+  async function addOpenItem(item: OpenItemInput): Promise<boolean> {
+    if (demo) {
+      setScanNote("예시 데이터입니다. 서버에 연결되기 전까지는 계산서에 담을 수 없습니다.");
+      return true;
+    }
+    setScanNote("");
+    const added = await billActions.addOpenItem(item, station);
+    if (!added) return false;
+    if (!window.matchMedia("(min-width: 1024px)").matches) setSheetOpen(true);
+    setRevealPayments((n) => n + 1);
+    return true;
+  }
 
   /**
    * 카메라 스캔 = 마트 계산대. 읽을 때마다 **담기만** 하고 결제 칸은 열지 않는다 —
@@ -248,6 +264,15 @@ export default function RegisterTab({
               >
                 <span aria-hidden>📷</span>
                 <span className="hidden sm:inline">Camera</span>
+              </button>
+              <button
+                aria-label="Add an open item"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-[#d4d4d8] bg-white px-3 text-sm font-bold text-[#3f434a] hover:bg-[#f2f2f4]"
+                onClick={() => setOpenItemOpen(true)}
+                type="button"
+              >
+                <span aria-hidden>＋</span>
+                <span className="hidden sm:inline">Open Item</span>
               </button>
             </div>
             {scanNote ? <ErrorNote>{scanNote}</ErrorNote> : null}
@@ -344,6 +369,14 @@ export default function RegisterTab({
               <span className="block text-lg font-bold tabular-nums">{formatMoney(bill?.total ?? 0)}</span>
             </>
           }
+        />
+      ) : null}
+
+      {openItemOpen ? (
+        <OpenItemDialog
+          defaultCategory={lockedCategory ?? "Other"}
+          onAdd={addOpenItem}
+          onClose={() => setOpenItemOpen(false)}
         />
       ) : null}
 

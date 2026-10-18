@@ -83,8 +83,8 @@ export type ProductUpdate = Partial<ProductCreate>;
 export type SaleLine = {
   /** 계산서 줄 id. Supabase 계산서(0005)에서만 온다. */
   id?: number;
-  /** product = 상품, tee_player = 티 시트 플레이어의 그린피, sim_booking = 실내 골프 베이. 없으면 product. */
-  kind?: "product" | "tee_player" | "sim_booking";
+  /** product = 상품, tee_player = 티 시트 플레이어의 그린피, sim_booking = 실내 골프 베이, open_item = 직접 친 이름·가격(0038). 없으면 product. */
+  kind?: "product" | "tee_player" | "sim_booking" | "open_item";
   /** 그린피 줄은 null. */
   product_id: number | null;
   /** 그린피 줄만: 티 타임 날짜(YYYY-MM-DD)와 시각 라벨. */
