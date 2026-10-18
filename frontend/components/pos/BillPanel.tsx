@@ -382,7 +382,8 @@ function BillHeader({
   busy: boolean;
   demo: boolean;
 }) {
-  const others = openBills.filter((item) => item.id !== bill?.id);
+  // 빈 영수증(줄 0개)은 고를 이유가 없어 목록에서 뺀다.
+  const others = openBills.filter((item) => item.id !== bill?.id && item.lines.length > 0);
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-2">
