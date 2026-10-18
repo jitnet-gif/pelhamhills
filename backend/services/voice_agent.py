@@ -164,3 +164,45 @@ async def signed_url(target_agent_id: str) -> str:
     if not url:
         raise VoiceAgentError(f"No signed_url in the response: {payload}")
     return str(url)
+
+
+# ===== 통화 기록 (Calls & SMS 화면) ====================================
+# 키에 `convai_read` 권한이 있어야 한다. 없으면 ElevenLabs 가 401 을 돌려주고
+# 그 본문이 VoiceAgentError 에 그대로 실린다.
+
+async def list_conversations(cursor: str | None = None, page_size: int = 30) -> dict[str, Any]:
+    """이 에이전트의 통화 목록(최근 것부터). 요약과 쓴 도구 이름까지 받는다."""
+    params: dict[str, Any] = {"page_size": page_size, "summary_mode": "include"}
+    if agent_id():
+        params["agent_id"] = agent_id()
+    if cursor:
+        params["cursor"] = cursor
+    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+        response = await client.get(
+            f"{API_ROOT}/convai/conversations", params=params,
+            headers={"xi-api-key": require_api_key()},
+        )
+    _raise_for_status(response, "list conversations")
+    return response.json()
+
+
+async def get_conversation(conversation_id: str) -> dict[str, Any]:
+    """통화 한 건 — 녹취(도구 호출·결과 포함), 메타데이터, 분석."""
+    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+        response = await client.get(
+            f"{API_ROOT}/convai/conversations/{conversation_id}",
+            headers={"xi-api-key": require_api_key()},
+        )
+    _raise_for_status(response, "get conversation")
+    return response.json()
+
+
+async def conversation_audio(conversation_id: str) -> tuple[bytes, str]:
+    """통화 녹음 `(본문, content-type)`. 몇 분짜리 mp3 라 통째로 받아 넘긴다."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.get(
+            f"{API_ROOT}/convai/conversations/{conversation_id}/audio",
+            headers={"xi-api-key": require_api_key()},
+        )
+    _raise_for_status(response, "get conversation audio")
+    return response.content, response.headers.get("content-type", "audio/mpeg")

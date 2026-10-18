@@ -71,6 +71,8 @@ include_route_module("backend.api.routes.payments", f"{settings.API_V1_STR}", ["
 include_route_module("backend.api.routes.terminal", f"{settings.API_V1_STR}", ["Card Terminal"])
 # Stripe 대사 리포트(Reports → Stripe check). 직원 확인은 단말기와 같다(0027).
 include_route_module("backend.api.routes.reconcile", f"{settings.API_V1_STR}", ["Card Terminal"])
+# 통화 기록(Calls & SMS). ElevenLabs 에서 읽는다. 직원 확인은 단말기와 같다.
+include_route_module("backend.api.routes.calls", f"{settings.API_V1_STR}", ["Calls"])
 
 if VOICE_ONLY:
     logger.warning(

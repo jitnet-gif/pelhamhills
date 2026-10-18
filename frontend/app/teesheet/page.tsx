@@ -6,7 +6,7 @@
 // 이 화면의 사이드바는 `hidden lg:block` 이라 휴대폰에서는 메뉴가 통째로 사라졌고,
 // 티 시트를 열면 다른 어드민 화면으로 갈 방법이 뒤로 가기밖에 없었다.
 // 이 페이지는 `fill` 모드를 쓴다 — 페이지 자체는 스크롤하지 않고 격자/상세만 스크롤한다.
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AdminShell from "../../components/admin/AdminShell";
 import BillDrawer from "../../components/pos/BillDrawer";
@@ -34,6 +34,15 @@ export default function TeeSheetPage() {
   // 새로 만들어진다. 아래 콜백이 통째로 그 객체에 의존하면 격자(셀 버튼 수백 개)가
   // 그때마다 다시 그려지므로, 쓰는 것만 꺼내 쓴다 — 이 넷은 useCallback 으로 고정이다.
   const { bookings, createBooking, focusedDate, pushToast, select, setFocusedDate, slots } = controller;
+  // `/teesheet?date=YYYY-MM-DD&booking=<id>` — 다른 화면(Calls & SMS 의 예약 통화)에서 그 예약을 연 채로 온다.
+  // 처음 한 번만 읽는다. 예약이 아직 안 읽혔어도 선택은 id 로 걸어 두면 읽히는 대로 상세가 열린다.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const date = params.get("date");
+    const booking = params.get("booking");
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) setFocusedDate(date);
+    if (booking) select(booking);
+  }, [select, setFocusedDate]);
   // 다이얼로그는 이제 **막다른 길을 막는 용도**로만 남는다 (아래 addReservation 참고).
   const [dialogOpen, setDialogOpen] = useState(false);
   // 합산 계산서 서랍. 그린피를 담고 여기서 바로 결제하거나, 리테일 화면으로 넘어가 상품을 더 담는다.
