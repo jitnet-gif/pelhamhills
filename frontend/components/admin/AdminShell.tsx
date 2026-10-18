@@ -901,7 +901,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
         </form>
 
         <p className="mt-3 text-[11px] leading-5 text-[#6b7280]">
-          계정이 없거나 비밀번호를 잊으셨으면 프로 샵(416-822-7609)으로 연락해 주세요.
+          계정이 없거나 비밀번호를 잊으셨으면 프로 샵(249-805-0556)으로 연락해 주세요.
         </p>
       </div>
     </main>
@@ -919,7 +919,7 @@ function NotStaffScreen({ email, onSignOut }: { email: string; onSignOut: () => 
         <h1 className="text-base font-bold">직원 계정이 아닙니다</h1>
         <p className="mt-2 text-xs leading-5 text-[#6b7280]">
           {email ? `${email} 계정에는 ` : "이 계정에는 "}
-          프로 샵 권한이 없습니다. 다른 계정으로 로그인하거나, 프로 샵(416-822-7609)에
+          프로 샵 권한이 없습니다. 다른 계정으로 로그인하거나, 프로 샵(249-805-0556)에
           권한을 요청해 주세요.
         </p>
         <button
