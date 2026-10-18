@@ -836,7 +836,7 @@ function TeeEditForm({
   // 남은 자리 수에는 이 예약 자신의 인원도 빠져 있다. 원래 티타임이면 그만큼 돌려받는다.
   const options = (times ?? []).map((t) => {
     const own = date === booking.date && t.time === booking.time ? booking.players : 0;
-    // 9홀은 평일 10시·주말/공휴일 3시부터(0034). 옛 서버는 nineHoles 를 주지 않는다 — 서버가 다시 확인한다.
+    // 9홀은 평일 10시부터, 주말·공휴일은 없다(0034·0037). 옛 서버는 nineHoles 를 주지 않는다 — 서버가 다시 확인한다.
     return { time: t.time, free: t.remaining + own, full: t.remaining + own < players, nine: t.nineHoles !== false };
   });
   const timeStillValid = options.some((o) => o.time === time);
@@ -853,7 +853,7 @@ function TeeEditForm({
       return;
     }
     if (nineBlocked) {
-      setError("Nine holes start at 10:00 AM on weekdays and 3:00 PM on weekends and holidays. Pick a later tee time or 18 holes.");
+      setError("Nine holes are available from 10:00 AM on weekdays only — not on weekends or holidays. Pick 18 holes or a later weekday tee time.");
       return;
     }
     setSaving(true);

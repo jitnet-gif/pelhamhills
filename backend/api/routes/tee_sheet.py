@@ -425,11 +425,12 @@ def slot_rate_for(iso_date: str) -> float:
     return WEEKEND_RATE if kind == "weekend" else WEEKDAY_RATE
 
 
-# 9홀 요금(세전)과 9홀을 칠 수 있는 첫 시각. **2026-10-18 클럽 요금표**: 평일 $28.31 오전 10시부터,
-# 주말·공휴일 $38.94 오후 3시부터(마감까지). 공휴일 개별 18홀 요금과 무관하게 주말 값이다.
-# DB `pelham_tee_rate_for`·`pelham_tee_nine_from`(0034), `frontend/lib/greenFee.ts` 와 같아야 한다.
+# 9홀 요금(세전)과 9홀을 칠 수 있는 첫 시각. **2026-10-18 클럽 요금표**: 평일 $28.31 오전 10시부터
+# 마감까지. 주말·공휴일은 손님이 9홀을 잡을 수 없다(2026-10-18 클럽 결정) — 시작 시각을 하루 끝(24:00)
+# 으로 두어 어느 티타임도 닿지 않게 한다. 주말 요금 $38.94 는 직원 시트가 9홀로 잡을 때의 자동값으로만 남는다.
+# DB `pelham_tee_rate_for`·`pelham_tee_nine_from`(0034·0037), `frontend/lib/greenFee.ts` 와 같아야 한다.
 NINE_HOLE_RATES = {"weekday": 28.31, "weekend": 38.94}
-NINE_HOLE_FROM_MINUTES = {"weekday": 10 * 60, "weekend": 15 * 60}
+NINE_HOLE_FROM_MINUTES = {"weekday": 10 * 60, "weekend": 24 * 60}
 
 
 def _nine_kind(iso_date: str) -> str:
@@ -452,7 +453,14 @@ def nine_holes_rule(iso_date: str) -> str:
     """손님·에이전트에게 읽어 줄 규칙 한 줄."""
     if _nine_kind(iso_date) == "weekday":
         return "Nine holes can be booked from 10:00 AM on weekdays"
-    return "Nine holes can be booked from 3:00 PM on weekends and holidays"
+    return "Nine holes cannot be booked on weekends or holidays"
+
+
+def nine_holes_alternative(iso_date: str) -> str:
+    """9홀이 막혔을 때 손님에게 권할 대안 — 평일은 더 늦은 티타임, 주말·공휴일은 평일."""
+    if _nine_kind(iso_date) == "weekday":
+        return "a later tee time for nine"
+    return "a weekday tee time for nine"
 
 
 def generate_slots(iso_date: str) -> list[TeeSlot]:

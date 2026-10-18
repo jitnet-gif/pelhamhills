@@ -893,7 +893,7 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
                 detail=(
                     f"{ts.nine_holes_rule(hold.date)}, so {hold.time} can only be booked for "
                     "eighteen holes. Ask the caller whether they want eighteen holes at this time "
-                    "or a later tee time for nine."
+                    f"or {ts.nine_holes_alternative(hold.date)}."
                 ),
             )
         hold.title = f"{last}, {first}".strip(", ")
@@ -1243,8 +1243,8 @@ def get_rates(body: RatesRequest) -> RatesResponse:
     숫자는 전부 `tee_sheet` 의 요금 함수에서 온다 — `slot_rate_for`(주말/평일과
     `RATE_OVERRIDES`)와 `cart_fee_for`. 세율은 리테일의 `TAX_RATE` 한 벌을 쓴다.
 
-    9홀은 평일·주말 고정 요금이고 시간 제한이 있다(2026-10-18 클럽 요금표, `green_fee_for`·DB 0034).
-    날짜만 받으므로 금액과 함께 그 날 9홀이 몇 시부터인지 알려 준다.
+    9홀은 평일 고정 요금이고 오전 10시부터다(2026-10-18 클럽 요금표, `green_fee_for`·DB 0034).
+    날짜만 받으므로 금액과 함께 그 날 9홀이 몇 시부터인지 알려 준다. 주말·공휴일은 9홀을 잡을 수 없다고 말한다.
     """
     _touch_session(body.conversation_id)
     iso_date = resolve_date(body.date)
@@ -1260,6 +1260,19 @@ def get_rates(body: RatesRequest) -> RatesResponse:
     if body.riders:
         riders_word = "rider" if body.riders == 1 else "riders"
         cart_part = f" plus ${cart:.2f} per {riders_word} for a cart,"
+    if body.holes == 9 and ts.nine_holes_from(iso_date) >= 24 * 60:
+        # 주말·공휴일은 9홀을 잡을 수 없다(2026-10-18). 금액을 읽어 주면 잡을 수 있는 줄 안다.
+        message = (
+            f"{ts.nine_holes_rule(iso_date)}, and {spoken_date(iso_date)} is one, so only eighteen holes "
+            "can be booked that day. Offer eighteen holes that day or a weekday tee time for nine."
+        )
+    else:
+        message = (
+            f"On {spoken_date(iso_date)} it is ${green:.2f} per player for {body.holes} holes "
+            f"before tax,{cart_part} so ${total:.2f} in total for {body.players} "
+            f"{players_word} with tax. Read the total, not the breakdown, unless they ask."
+            + (f" {ts.nine_holes_rule(iso_date)} — mention that if they have not picked a time." if body.holes == 9 else "")
+        )
     return RatesResponse(
         ok=True,
         date=iso_date,
@@ -1271,12 +1284,7 @@ def get_rates(body: RatesRequest) -> RatesResponse:
         subtotal=subtotal,
         tax=tax,
         total=total,
-        message=(
-            f"On {spoken_date(iso_date)} it is ${green:.2f} per player for {body.holes} holes "
-            f"before tax,{cart_part} so ${total:.2f} in total for {body.players} "
-            f"{players_word} with tax. Read the total, not the breakdown, unless they ask."
-            + (f" {ts.nine_holes_rule(iso_date)} — mention that if they have not picked a time." if body.holes == 9 else "")
-        ),
+        message=message,
     )
 
 
@@ -1381,7 +1389,7 @@ def modify_booking(body: ModifyRequest) -> ModifyResponse:
                     status_code=409,
                     detail=(
                         f"{ts.nine_holes_rule(booking.date)}, so the {booking.time} tee time stays at "
-                        "eighteen holes. Offer to cancel and book a later tee time for nine."
+                        f"eighteen holes. Offer to cancel and book {ts.nine_holes_alternative(booking.date)}."
                     ),
                 )
             changes.append(f"holes {booking.holes} to {body.holes}")

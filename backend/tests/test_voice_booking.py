@@ -548,8 +548,10 @@ def test_nine_hole_rates_follow_the_club_rate_card():
     assert ts.green_fee_for("2026-10-12", 9) == 38.94  # 추수감사절(월) — 주말과 같다
     assert ts.green_fee_for("2026-10-20", 18) == ts.slot_rate_for("2026-10-20")
     assert ts.nine_holes_from("2026-10-20") == 10 * 60
-    assert ts.nine_holes_from("2026-10-24") == 15 * 60
-    assert ts.nine_holes_from("2026-10-12") == 15 * 60
+    # 주말·공휴일은 9홀을 잡을 수 없다 — 어느 티타임도 닿지 않는 24:00.
+    assert ts.nine_holes_from("2026-10-24") == 24 * 60
+    assert ts.nine_holes_from("2026-10-12") == 24 * 60
+    assert "weekends or holidays" in ts.nine_holes_rule("2026-10-24")
 
 
 def test_confirm_refuses_nine_holes_before_the_nine_hole_start(client):
