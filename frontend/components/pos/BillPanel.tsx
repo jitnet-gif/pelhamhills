@@ -410,6 +410,7 @@ function BillHeader({
       {others.length > 0 && !demo ? (
         <Select
           aria-label="Switch to another open bill"
+          className="min-h-14 text-xl font-semibold"
           onChange={(event) => {
             const id = Number(event.target.value);
             if (id) void billActions.select(id);
