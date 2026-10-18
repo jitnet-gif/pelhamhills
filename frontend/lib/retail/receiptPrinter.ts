@@ -121,7 +121,7 @@ async function closePort(): Promise<void> {
 async function writeBytes(bytes: Uint8Array): Promise<void> {
   if (!openPort) {
     const port = await grantedPort();
-    if (!port) throw new Error("No receipt printer chosen. Open Receipt printer → Choose printer.");
+    if (!port) throw new Error("No receipt printer chosen. On the register home screen, open Receipt Printer → Choose printer.");
     // 블루투스 SPP 는 속도 값을 쓰지 않지만 open() 은 값을 요구한다.
     await port.open({ baudRate: 115200 });
     openPort = port;

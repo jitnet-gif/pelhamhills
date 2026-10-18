@@ -96,7 +96,7 @@
 - **설정 순서**
   1. 프린터 전원을 켜고 컴퓨터의 블루투스 설정에서 페어링한다(맥: 시스템 설정 → Bluetooth,
      윈도: 설정 → Bluetooth 및 장치). PIN 을 물으면 프린터 기본값(보통 `0000`)을 넣는다.
-  2. 계산대(`/admin/retail`) 장바구니 아래 **Receipt printer** 를 펼쳐 `Bluetooth — Epson TM-m30 …` 를 고른다.
+  2. 계산대(`/admin/retail`) 첫 화면의 **Receipt Printer** 타일을 눌러 `Bluetooth — Epson TM-m30 …` 를 고른다.
   3. **Choose printer** → 창에서 프린터(예: `TM-m30III_xxxxxx`, 직렬 포트로 보인다)를 고른다.
      Chrome 이 이 사이트에 대해 기억하므로 한 번만 하면 된다.
   4. **Print test** 로 로고·글자·바코드·절단을 확인한다.

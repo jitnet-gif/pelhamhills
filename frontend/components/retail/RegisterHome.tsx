@@ -3,7 +3,7 @@
 /**
  * 계산대 첫 화면. Lightspeed R-Series 의 Register 화면을 그대로 옮겼다 — 직원들이 그 화면에
  * 손이 익어 있다(2026-10-12). 위 줄은 지금 손님(Continue Sale / Refund / New Sale), 아래 줄은
- * 이 계산대 자체(Switch Registers / Close Register), 맨 아래는 오늘 이 계산대의 영수증.
+ * 이 계산대 자체(Switch Registers / Close Register / Receipt Printer), 맨 아래는 오늘 이 계산대의 영수증.
  *
  * Lightspeed 의 Special Order · Layaway · Payout/Drop · Add Amount 는 아직 없다. 빈 타일을
  * 두면 눌러 보고 "고장" 이라고 판단하므로 그리지 않는다.
@@ -19,9 +19,11 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
+import { ReceiptPrinterSetup } from "@/components/pos/ReceiptPrinterSetup";
 import SaleDetail from "@/components/reports/SaleDetail";
 import StaffCloseout from "@/components/reports/StaffCloseout";
 import { REGISTER_GUIDE } from "@/lib/nav";
@@ -29,6 +31,10 @@ import { posApi, type Bill, type BillStation } from "@/lib/pos/api";
 import { billActions, useCurrentBill } from "@/lib/pos/currentBill";
 import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import { CLUB_TIME_ZONE, stationLabel } from "@/lib/retail/receipt";
+import {
+  readReceiptPrinterMode,
+  subscribeReceiptPrinter,
+} from "@/lib/retail/receiptPrinter";
 import { formatMoney, type Sale } from "@/lib/retail/types";
 
 import RegisterClose from "./RegisterClose";
@@ -53,6 +59,7 @@ type Dialog =
   | { kind: "continue" }
   | { kind: "close" }
   | { kind: "staff" }
+  | { kind: "printer" }
   | { kind: "sale"; sale: Sale };
 
 const RECENT_COUNT = 10;
@@ -67,6 +74,11 @@ export default function RegisterHome({
   refundRequest,
 }: Props) {
   const { bill, openBills } = useCurrentBill();
+  const printerMode = useSyncExternalStore(
+    subscribeReceiptPrinter,
+    readReceiptPrinterMode,
+    () => "browser" as const,
+  );
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [recent, setRecent] = useState<Sale[] | null>(null);
   const [recentError, setRecentError] = useState("");
@@ -195,6 +207,12 @@ export default function RegisterHome({
           label="Close Register"
           onClick={() => setDialog({ kind: "close" })}
         />
+        <Tile
+          hint={printerMode === "bluetooth" ? "Bluetooth" : "Print dialog"}
+          icon={<PrinterIcon />}
+          label="Receipt Printer"
+          onClick={() => setDialog({ kind: "printer" })}
+        />
       </Section>
 
       <section className="grid min-w-0 gap-2">
@@ -297,6 +315,12 @@ export default function RegisterHome({
           wide
         >
           <StaffCloseout date={today} refreshKey={reloadKey} />
+        </Modal>
+      ) : null}
+
+      {dialog?.kind === "printer" ? (
+        <Modal onClose={() => setDialog(null)} title="Receipt printer">
+          <ReceiptPrinterSetup />
         </Modal>
       ) : null}
     </div>
@@ -679,6 +703,14 @@ function SwitchIcon() {
   return (
     <svg {...SVG}>
       <path d="M16 3l5 4.5L16 12V9H4V6h12V3zM8 12v3h12v3H8v3l-5-4.5L8 12z" />
+    </svg>
+  );
+}
+
+function PrinterIcon() {
+  return (
+    <svg {...SVG} fillRule="evenodd">
+      <path d="M6 2h12v5H6V2zM4 8h16a2 2 0 012 2v7h-4v5H6v-5H2v-7a2 2 0 012-2zm4 7v5h8v-5H8zm10-4.5a1 1 0 100 2 1 1 0 000-2z" />
     </svg>
   );
 }
