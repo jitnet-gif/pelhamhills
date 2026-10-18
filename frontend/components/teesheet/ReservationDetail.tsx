@@ -83,8 +83,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // ===== local helpers =====
 
 type PlayerDraft = { firstName: string; lastName: string; phone: string; email: string };
-/** 예약 단위로 남은 편집 대상. Title·Carts 는 레퍼런스 패널에 없어서 빠졌다. */
-type BookingDraft = { holes: 9 | 18; rate: string; notes: string };
+/** 예약 단위로 남은 편집 대상. Title·Carts 는 레퍼런스 패널에 없어서 빠졌다.
+ *  홀 수는 고르는 즉시 저장한다(그린피가 같이 바뀌어야 해서) — 그래서 draft 에 없다. */
+type BookingDraft = { rate: string; notes: string };
 type SaveState = { kind: "idle" | "saving" | "saved"; nonce: number };
 type PanelMode = "none" | "cancel" | "delete";
 
@@ -99,7 +100,6 @@ function playerDraftOf(player: Player): PlayerDraft {
 
 function bookingDraftOf(booking: TeeBooking): BookingDraft {
   return {
-    holes: booking.holes,
     rate: String(booking.rate),
     notes: booking.notes ?? "",
   };
@@ -116,7 +116,6 @@ function playerPatchFrom(player: Player, draft: PlayerDraft): PatchPlayerInput {
 
 function bookingPatchFrom(booking: TeeBooking, draft: BookingDraft): PatchBookingInput {
   const patch: PatchBookingInput = {};
-  if (draft.holes !== booking.holes) patch.holes = draft.holes;
   const rate = Number(draft.rate);
   if (draft.rate.trim() !== "" && Number.isFinite(rate) && rate >= 0 && rate !== booking.rate) {
     patch.rate = rate;
@@ -589,6 +588,17 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     [controller],
   );
 
+  /** 홀 수를 바로 저장한다. 서버(0033)가 자동 그린피를 새 홀 수의 값으로 바꿔 돌려주므로 그린피 칸도 그 값으로 맞춘다. */
+  const commitHoles = useCallback(
+    async (holes: 9 | 18) => {
+      const current = bookingRef.current;
+      if (!current || holes === current.holes) return;
+      const updated = await controller.patchBooking(current.id, { holes });
+      if (updated) setBookingDraft((prev) => (prev ? { ...prev, rate: String(updated.rate) } : prev));
+    },
+    [controller],
+  );
+
   /** 카트 요금 칸을 커밋한다 (blur·Enter). 숫자가 아니거나 그대로면 보내지 않고 칸을 되돌린다. */
   const commitFee = useCallback(
     (playerId: string, text: string) => {
@@ -936,8 +946,10 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
           <span className="sr-only">Holes</span>
           <select
             className="bg-transparent outline-none"
-            onChange={(event) => setBookingDraft({ ...draft, holes: Number(event.target.value) === 9 ? 9 : 18 })}
-            value={String(draft.holes)}
+            disabled={busy}
+            onChange={(event) => void commitHoles(Number(event.target.value) === 9 ? 9 : 18)}
+            title="9 or 18 holes — saved right away. The green fee follows unless it was changed by hand or someone has paid."
+            value={String(booking.holes)}
           >
             <option value="9">9 holes</option>
             <option value="18">18 holes</option>
