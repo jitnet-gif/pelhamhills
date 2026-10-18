@@ -419,6 +419,10 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
   // 자동 스크롤을 해 주는 쪽이 포인터 좌표를 직접 칸으로 환산하는 것보다 훨씬 덜 깨진다.
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
+  // 일간 시트에서 마우스가 올라가 있는 티타임. 행은 셀 여러 개로 흩어져 있어서
+  // CSS :hover 로는 "같은 행" 을 잡을 수 없다 — 셀마다 data-slot-time 을 달고
+  // 격자 한 곳에서 위임으로 읽는다. 그 행의 Time 칸을 파란색으로 뒤집어 보인다.
+  const [hoverTime, setHoverTime] = useState<string | null>(null);
   const { moveBooking, pushToast, select } = controller;
 
   const draggedBooking = useMemo(
@@ -519,6 +523,15 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
           <div
             className={`grid ${isDayView ? "text-[15px] subpixel-antialiased" : "text-xs"}`}
             style={{ gridTemplateColumns, gridTemplateRows }}
+            onMouseOver={
+              isDayView
+                ? (event) => {
+                    const cell = (event.target as HTMLElement).closest<HTMLElement>("[data-slot-time]");
+                    setHoverTime(cell?.dataset.slotTime ?? null);
+                  }
+                : undefined
+            }
+            onMouseLeave={isDayView ? () => setHoverTime(null) : undefined}
           >
             {/* ================= 주간 뷰 본문 (그대로 유지) =================
                 주간 뷰는 컬럼이 **날짜**라서 헤더 행이 있어야 어느 칸이 어느 날인지 알 수 있다.
@@ -772,12 +785,16 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                   return (
                     <Fragment key={line.key}>
                       <div
-                        className={`sticky left-0 z-20 flex items-center bg-white px-2 text-[15px] font-bold text-[#111315] ${rule}`}
+                        data-slot-time={slot.time}
+                        className={`sticky left-0 z-20 flex items-center px-2 text-[15px] font-bold ${
+                          hoverTime === slot.time ? "bg-[#4533ff] text-white" : "bg-white text-[#111315]"
+                        } ${rule}`}
                         style={{ gridColumn: 1, gridRow }}
                       >
                         {slot.time}
                       </div>
                       <div
+                        data-slot-time={slot.time}
                         className={`sticky z-20 flex items-center justify-center bg-white px-1 ${rule}`}
                         style={{ gridColumn: 2, gridRow, left: DAY_TIME_COL_PX }}
                       >
@@ -793,6 +810,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                           selected={booking.id === selectedId}
                           onSelect={controller.select}
                           rule={rule}
+                          slotTime={slot.time}
                           style={{
                             gridColumn: `${DAY_PLAYER_COL + start} / span ${width}`,
                             gridRow,
@@ -805,6 +823,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                         <button
                           key={`day-empty-${slot.time}-${seat}`}
                           type="button"
+                          data-slot-time={slot.time}
                           onClick={() => onCreateAt(focusedDate, slot.time)}
                           {...dropTarget(focusedDate, slot.time)}
                           aria-label={`Create reservation on ${shortDate(focusedDate)} at ${slot.time}`}
@@ -823,6 +842,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
 
                       {/* Cart: 0이면 아예 아무것도 그리지 않는다 (스크린샷과 동일). */}
                       <div
+                        data-slot-time={slot.time}
                         className={`flex items-center justify-center gap-1 text-[14px] text-[#3f4650] ${rule}`}
                         style={{ gridColumn: DAY_CART_COL, gridRow }}
                         title={carts > 0 ? `${carts} cart(s) booked at ${slot.time}` : undefined}
@@ -844,6 +864,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                       </div>
 
                       <div
+                        data-slot-time={slot.time}
                         className={`flex items-center justify-center ${rule}`}
                         style={{ gridColumn: DAY_TIMER_COL, gridRow }}
                       >
@@ -1009,10 +1030,11 @@ function DaySegmentCard({
   onSelect,
   rule,
   style,
+  slotTime,
   dragging,
   onDragStart,
   onDragEnd,
-}: BookingButtonProps & { rule: string; style: CSSProperties }) {
+}: BookingButtonProps & { rule: string; style: CSSProperties; slotTime: string }) {
   const blocked = booking.status === "blocked";
   const cancelled = isDead(booking);
   const hasChrome = booking.holes === 9 || booking.notes.trim().length > 0;
@@ -1020,6 +1042,7 @@ function DaySegmentCard({
   return (
     <button
       type="button"
+      data-slot-time={slotTime}
       draggable={Boolean(onDragStart)}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
