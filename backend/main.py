@@ -109,11 +109,13 @@ async def start_reminder_loop() -> None:
     # Twilio 키가 없으면 돌리지 않는다. 보내지도 못할 문자 때문에 1분마다 티 시트를
     # 읽고 감사 로그에 "보냈다" 고 적으면 나중에 키를 넣었을 때 리마인더가 빠진다.
     if settings.TWILIO_ENABLED:
-        from backend.services import payment_texts
+        from backend.services import booking_texts, payment_texts
 
         app.state.reminder_loop = asyncio.create_task(_reminder_loop())
         # 카드 승인 문자. 승인을 기록한 곳이 깨우면 바로 보낸다(`services/payment_texts.py`).
         app.state.payment_text_loop = asyncio.create_task(payment_texts.loop())
+        # 웹 예약 확인 문자. 웹 예약은 이 서버를 거치지 않아 1분마다 Supabase 에 묻는다.
+        app.state.booking_text_loop = asyncio.create_task(booking_texts.loop())
 
 @app.get("/")
 def read_root():
