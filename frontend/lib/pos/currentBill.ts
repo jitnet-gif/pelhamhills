@@ -199,6 +199,9 @@ export const billActions = {
       }),
     ),
 
+  /** 지금 계산서가 없으면 빈 계산서를 연다. 휴대폰 스캔 QR 에 넣을 번호가 먼저 있어야 해서. */
+  ensure: (station: BillStation) => enqueue(() => guarded(() => ensureBill(station))),
+
   /** 지금 계산서를 놓고 빈 상태로. 계산서는 열린 채 목록에 남는다. */
   park: () => {
     setCurrent(null);

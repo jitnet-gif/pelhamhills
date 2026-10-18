@@ -16,7 +16,7 @@
  * 0005). 티 시트에서 담은 그린피가 여기 같은 계산서에 보이고, 한 번에 결제한다.
  */
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import BillPanel from "@/components/pos/BillPanel";
 import CameraScanner, { type ScanOutcome } from "@/components/pos/CameraScanner";
@@ -29,6 +29,7 @@ import { groupProducts, type MenuGroup } from "@/lib/retail/menuGroups";
 import { LOW_STOCK_RED_BELOW, RETAIL_CATEGORIES, formatMoney, type Product, type RetailCategory } from "@/lib/retail/types";
 
 import OpenItemDialog from "./OpenItemDialog";
+import PhoneScanDialog from "./PhoneScanDialog";
 import { Chip, EmptyNote, ErrorNote, SkeletonCards, TextInput, useOverlayDismiss } from "./ui";
 
 type Props = {
@@ -80,6 +81,19 @@ export default function RegisterTab({
   const [revealPayments, setRevealPayments] = useState(0);
   const [cameraOpen, setCameraOpen] = useState(startWithCamera);
   const [openItemOpen, setOpenItemOpen] = useState(false);
+  const [phoneScanOpen, setPhoneScanOpen] = useState(false);
+
+  // PC 의 "Phone" QR 로 열렸다(`/admin/scan?bill=12`). 그 계산서로 옮겨 타야 휴대폰에서 담은 것이
+  // PC 계산서에 들어간다. 새로고침해도 다시 옮겨 타지 않게 주소에서 지운다.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = Number(params.get("bill"));
+    if (!Number.isInteger(id) || id <= 0) return;
+    void billActions.select(id);
+    params.delete("bill");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, []);
 
   // 판매 화면에는 **활성 상품만** 올린다. 비활성 상품이 격자에 섞이면 이미
   // 안 파는 물건을 눌러 찍게 된다.
@@ -169,7 +183,7 @@ export default function RegisterTab({
     );
   }
 
-  useBarcodeScanner(handleScan, { enabled: scanEnabled && !loading && !cameraOpen && !openItemOpen });
+  useBarcodeScanner(handleScan, { enabled: scanEnabled && !loading && !cameraOpen && !openItemOpen && !phoneScanOpen });
 
   /** 오픈 아이템(0038)을 담고 결제 칸을 띄운다 — 스캔으로 담을 때와 같다. */
   async function addOpenItem(item: OpenItemInput): Promise<boolean> {
@@ -264,6 +278,15 @@ export default function RegisterTab({
               >
                 <span aria-hidden>📷</span>
                 <span className="hidden sm:inline">Camera</span>
+              </button>
+              <button
+                aria-label="Scan with a phone"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 border border-[#d4d4d8] bg-white px-3 text-sm font-bold text-[#3f434a] hover:bg-[#f2f2f4]"
+                onClick={() => setPhoneScanOpen(true)}
+                type="button"
+              >
+                <QrIcon />
+                <span className="hidden sm:inline">Phone</span>
               </button>
               <button
                 aria-label="Add an open item"
@@ -371,6 +394,8 @@ export default function RegisterTab({
           }
         />
       ) : null}
+
+      {phoneScanOpen ? <PhoneScanDialog onClose={() => setPhoneScanOpen(false)} station={station} /> : null}
 
       {openItemOpen ? (
         <OpenItemDialog
@@ -495,5 +520,17 @@ function ProductButton({ product, onAdd }: { product: Product; onAdd: () => void
         </span>
       </span>
     </button>
+  );
+}
+
+/** QR 모양. 이모지에는 QR 이 없어서 직접 그린다. */
+function QrIcon() {
+  return (
+    <svg aria-hidden className="size-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <rect height="7" width="7" x="3" y="3" />
+      <rect height="7" width="7" x="14" y="3" />
+      <rect height="7" width="7" x="3" y="14" />
+      <path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3" />
+    </svg>
   );
 }
