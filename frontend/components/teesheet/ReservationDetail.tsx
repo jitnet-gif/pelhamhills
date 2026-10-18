@@ -630,7 +630,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     [controller],
   );
 
-  /** 홀 수를 바로 저장한다. 서버(0033)가 자동 그린피를 새 홀 수의 값으로 바꿔 돌려주므로 그린피 칸도 그 값으로 맞춘다. */
+  /** 홀 수를 바로 저장한다. 서버(0036)가 그린피를 새 홀 수의 요금표 값으로 바꿔 돌려주므로 그린피 칸도 그 값으로 맞춘다. */
   const commitHoles = useCallback(
     async (holes: 9 | 18) => {
       const current = bookingRef.current;
@@ -991,7 +991,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             className="bg-transparent outline-none"
             disabled={busy}
             onChange={(event) => void commitHoles(Number(event.target.value) === 9 ? 9 : 18)}
-            title="9 or 18 holes — saved right away. The green fee follows unless it was changed by hand or someone has paid."
+            title="9 or 18 holes — saved right away. The green fee is reset to the rate card unless someone has paid."
             value={String(booking.holes)}
           >
             <option value="9">9 holes</option>

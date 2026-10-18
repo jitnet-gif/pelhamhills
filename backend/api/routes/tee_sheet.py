@@ -864,13 +864,14 @@ def patch_booking(booking_id: str, body: PatchBookingRequest) -> TeeBooking:
         if "holes" in fields and fields["holes"] is not None and fields["holes"] != booking.holes:
             old_holes = booking.holes
             booking.holes = fields["holes"]
-            # 그린피도 아직 자동값이고 아무도 결제하지 않았으면 새 홀 수의 값으로(0033 과 같은 규칙).
+            # 아무도 결제하지 않았으면 그린피는 새 홀 수의 요금표 값으로 다시 채운다(0036 과 같은 규칙).
+            # 손으로 고친 금액이라도 덮는다 — 특별 금액은 홀 수를 바꾼 뒤 다시 적는다.
             # 같은 요청에 rate 를 직접 보냈으면 아래에서 그 값이 덮어쓴다.
-            if not any(p.paid for p in booking.players) and _same_money(
-                booking.rate, green_fee_for(booking.date, old_holes)
-            ):
-                booking.rate = green_fee_for(booking.date, booking.holes)
-                _audit(booking, f"Rate set to ${booking.rate:.2f}.")
+            if not any(p.paid for p in booking.players):
+                new_rate = green_fee_for(booking.date, booking.holes)
+                if not _same_money(booking.rate, new_rate):
+                    booking.rate = new_rate
+                    _audit(booking, f"Rate set to ${booking.rate:.2f}.")
             # 카트 요금이 아직 자동값이면 새 홀 수의 값으로 따라간다. 사람이 고친 금액과
             # 이미 결제한 사람의 금액은 그대로 둔다 — 결제한 뒤에 금액이 바뀌면 재인쇄한
             # 영수증이 받은 돈과 달라진다.

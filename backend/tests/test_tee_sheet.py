@@ -552,6 +552,22 @@ def test_cart_fee_is_filled_in_and_stays_editable(client):
     assert client.patch(f"{url}/players/{bob}", json={"cart": True}).json()["players"][1]["cartFee"] == 19.47
 
 
+def test_changing_holes_resets_the_green_fee_until_someone_pays(client):
+    url, (ann, _) = _cart_booking(client)                 # 2026-09-08 화요일 → 18홀 $47.79, 9홀 $28.31
+    assert client.patch(url, json={"holes": 9}).json()["rate"] == 28.31
+
+    # 손으로 고친 금액(0033 때의 절반 요금 $23.90 같은 옛 값 포함)도 홀 수를 바꾸면 요금표 값이 된다.
+    client.patch(url, json={"rate": 23.90})
+    assert client.patch(url, json={"holes": 18}).json()["rate"] == 47.79
+
+    # 같은 요청에 준 금액이 이긴다.
+    assert client.patch(url, json={"holes": 9, "rate": 30.0}).json()["rate"] == 30.0
+
+    # 한 명이라도 결제하면 그대로 둔다.
+    client.patch(f"{url}/players/{ann}", json={"paid": True})
+    assert client.patch(url, json={"holes": 18}).json()["rate"] == 30.0
+
+
 def test_new_players_get_a_cart_fee_unless_one_is_given(client):
     url, _ = _cart_booking(client)
     added = client.post(f"{url}/players", json={"name": "Cy Senior", "ratePlan": "Public Senior", "cart": True})
