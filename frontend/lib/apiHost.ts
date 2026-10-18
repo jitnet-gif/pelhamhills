@@ -60,4 +60,4 @@ export function apiBaseUrl(): string {
  * 방문자에게 localhost 든 내부 호스트든 알려 줄 이유가 없다.
  */
 export const NO_API_MESSAGE =
-  "Online booking is not available on this site yet. Please call the pro shop at 249-805-0556 or email info@pelhamhills.com.";
+  "Online booking is not available on this site yet. Please call the pro shop at 416-822-7609 or email info@pelhamhills.com.";
