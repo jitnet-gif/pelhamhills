@@ -33,6 +33,8 @@ type Props = {
   summary: ReactNode;
   /** 결제 버튼을 누를 수 있는가(담긴 게 있는가). */
   canPay: boolean;
+  /** 아래 버튼 글자. 계산대는 Pay, 상품 등록 창처럼 하나만 읽는 곳은 Cancel. */
+  doneLabel?: string;
 };
 
 /**
@@ -64,7 +66,7 @@ function currentDeviceId(video: HTMLVideoElement): string {
   return stream?.getVideoTracks()[0]?.getSettings().deviceId ?? "";
 }
 
-export default function CameraScanner({ onCode, onDone, onClose, summary, canPay }: Props) {
+export default function CameraScanner({ onCode, onDone, onClose, summary, canPay, doneLabel = "Pay" }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<"starting" | "live" | "error">("starting");
   const [problem, setProblem] = useState("");
@@ -389,7 +391,7 @@ export default function CameraScanner({ onCode, onDone, onClose, summary, canPay
           onClick={onDone}
           type="button"
         >
-          Pay
+          {doneLabel}
         </button>
       </footer>
     </div>

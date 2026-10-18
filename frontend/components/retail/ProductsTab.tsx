@@ -11,6 +11,7 @@
 
 import { useMemo, useState } from "react";
 
+import CameraScanner, { type ScanOutcome } from "@/components/pos/CameraScanner";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 
 import retailApi, { toRetailError } from "@/lib/retail/api";
@@ -426,6 +427,7 @@ function ProductDialog({
   const [form, setForm] = useState<FormState>(() => toForm(product, defaultCategory));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
   const groupOptions = useMemo(
     () => menuGroupSuggestions(allProducts, form.category),
     [allProducts, form.category],
@@ -457,6 +459,14 @@ function ProductDialog({
       }),
     { everywhere: true },
   );
+
+  // 휴대폰·아이패드처럼 USB 스캐너가 없는 기기는 카메라로 읽는다. 상품 하나에 바코드 하나라
+  // 읽자마자 칸에 넣고 닫는다.
+  async function onCameraCode(code: string): Promise<ScanOutcome> {
+    set("barcode", code);
+    setCameraOpen(false);
+    return { ok: true, message: code };
+  }
 
   // `parseMoney` 는 쓰레기 입력을 조용히 0 으로 떨어뜨린다. 그러면 "$0.00 짜리
   // Pro V1" 이 만들어지고 아무도 모른다 — 저장 버튼을 켜기 전에 직접 본다.
@@ -496,134 +506,160 @@ function ProductDialog({
   }
 
   return (
-    <Modal onClose={onClose} title={product ? "Edit product" : "Add product"}>
-      <div className="grid gap-3">
-        <Field hint="Scan the product's barcode — works wherever the cursor is" label="Barcode">
-          <TextInput
-            autoComplete="off"
-            className="font-mono"
-            data-scan-target=""
-            inputMode="numeric"
-            onChange={(event) => set("barcode", event.target.value)}
-            placeholder="Scan now, e.g. 055577420249"
-            value={form.barcode}
-          />
-        </Field>
+    <>
+      {/* 카메라가 떠 있을 때 Esc 는 카메라만 닫는다. 이 창까지 닫히면 적던 것이 날아간다. */}
+      <Modal onClose={cameraOpen ? () => undefined : onClose} title={product ? "Edit product" : "Add product"}>
+        <div className="grid gap-3">
+          <Field hint="Scan the product's barcode — works wherever the cursor is" label="Barcode">
+            <div className="flex min-w-0 gap-2">
+              <button
+                aria-label="Scan barcode with camera"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center border border-[#d4d4d8] bg-white text-lg hover:bg-[#f2f2f4]"
+                onClick={() => setCameraOpen(true)}
+                type="button"
+              >
+                <span aria-hidden>📷</span>
+              </button>
+              <div className="min-w-0 flex-1">
+                <TextInput
+                  autoComplete="off"
+                  className="font-mono"
+                  data-scan-target=""
+                  inputMode="numeric"
+                  onChange={(event) => set("barcode", event.target.value)}
+                  placeholder="Scan now, e.g. 055577420249"
+                  value={form.barcode}
+                />
+              </div>
+            </div>
+          </Field>
 
-        <Field hint="Club code. Leave blank to use the barcode." label="SKU">
-          <TextInput
-            autoComplete="off"
-            onChange={(event) => set("sku", event.target.value)}
-            placeholder="GTR-591"
-            value={form.sku}
-          />
-        </Field>
-
-        <Field label="Name">
-          <TextInput
-            autoComplete="off"
-            onChange={(event) => set("name", event.target.value)}
-            placeholder="Titleist Pro V1 (dozen)"
-            value={form.name}
-          />
-        </Field>
-
-        <Field label="Category">
-          <Select
-            onChange={(event) => set("category", event.target.value as RetailCategory)}
-            value={form.category}
-          >
-            {RETAIL_CATEGORIES.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-
-        <Field hint="Folder on the register, e.g. Hot Food, Beer, Men's Shirts. Blank = no folder." label="Menu group">
-          <TextInput
-            autoComplete="off"
-            list="pelham-menu-groups"
-            maxLength={40}
-            onChange={(event) => set("menuGroup", event.target.value)}
-            placeholder="Hot Food"
-            value={form.menuGroup}
-          />
-          <datalist id="pelham-menu-groups">
-            {groupOptions.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-        </Field>
-
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <Field hint="Shelf price, tax excluded" label="Price">
+          <Field hint="Club code. Leave blank to use the barcode." label="SKU">
             <TextInput
-              inputMode="decimal"
-              onChange={(event) => set("price", event.target.value)}
-              placeholder="19.99"
-              value={form.price}
+              autoComplete="off"
+              onChange={(event) => set("sku", event.target.value)}
+              placeholder="GTR-591"
+              value={form.sku}
             />
           </Field>
-          <Field hint="Margin only — never shown to customers" label="Cost">
+
+          <Field label="Name">
             <TextInput
-              inputMode="decimal"
-              onChange={(event) => set("cost", event.target.value)}
-              placeholder="9.50"
-              value={form.cost}
+              autoComplete="off"
+              onChange={(event) => set("name", event.target.value)}
+              placeholder="Titleist Pro V1 (dozen)"
+              value={form.name}
             />
           </Field>
+
+          <Field label="Category">
+            <Select
+              onChange={(event) => set("category", event.target.value as RetailCategory)}
+              value={form.category}
+            >
+              {RETAIL_CATEGORIES.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field hint="Folder on the register, e.g. Hot Food, Beer, Men's Shirts. Blank = no folder." label="Menu group">
+            <TextInput
+              autoComplete="off"
+              list="pelham-menu-groups"
+              maxLength={40}
+              onChange={(event) => set("menuGroup", event.target.value)}
+              placeholder="Hot Food"
+              value={form.menuGroup}
+            />
+            <datalist id="pelham-menu-groups">
+              {groupOptions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </Field>
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <Field hint="Shelf price, tax excluded" label="Price">
+              <TextInput
+                inputMode="decimal"
+                onChange={(event) => set("price", event.target.value)}
+                placeholder="19.99"
+                value={form.price}
+              />
+            </Field>
+            <Field hint="Margin only — never shown to customers" label="Cost">
+              <TextInput
+                inputMode="decimal"
+                onChange={(event) => set("cost", event.target.value)}
+                placeholder="9.50"
+                value={form.cost}
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <Field hint="Leave blank for rentals (not tracked)" label="Stock">
+              <TextInput
+                inputMode="numeric"
+                onChange={(event) => set("stock", event.target.value)}
+                placeholder="12"
+                value={form.stock}
+              />
+            </Field>
+            <Field label="Reorder point">
+              <TextInput
+                inputMode="numeric"
+                onChange={(event) => set("reorderPoint", event.target.value)}
+                placeholder="4"
+                value={form.reorderPoint}
+              />
+            </Field>
+          </div>
+
+          <label className="flex min-h-11 items-center gap-2 text-sm font-bold">
+            <input
+              checked={form.isActive}
+              className="h-5 w-5"
+              onChange={(event) => set("isActive", event.target.checked)}
+              type="checkbox"
+            />
+            Active (shows on the register)
+          </label>
+
+          {error ? <ErrorNote>{error}</ErrorNote> : null}
+          {!valid ? (
+            <p className="text-xs text-[#6b7280]">A barcode or SKU, a name and a price above $0.00 are required.</p>
+          ) : null}
+
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              disabled={!valid || saving}
+              onClick={save}
+              tone="primary"
+            >
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <Field hint="Leave blank for rentals (not tracked)" label="Stock">
-            <TextInput
-              inputMode="numeric"
-              onChange={(event) => set("stock", event.target.value)}
-              placeholder="12"
-              value={form.stock}
-            />
-          </Field>
-          <Field label="Reorder point">
-            <TextInput
-              inputMode="numeric"
-              onChange={(event) => set("reorderPoint", event.target.value)}
-              placeholder="4"
-              value={form.reorderPoint}
-            />
-          </Field>
-        </div>
-
-        <label className="flex min-h-11 items-center gap-2 text-sm font-bold">
-          <input
-            checked={form.isActive}
-            className="h-5 w-5"
-            onChange={(event) => set("isActive", event.target.checked)}
-            type="checkbox"
-          />
-          Active (shows on the register)
-        </label>
-
-        {error ? <ErrorNote>{error}</ErrorNote> : null}
-        {!valid ? (
-          <p className="text-xs text-[#6b7280]">A barcode or SKU, a name and a price above $0.00 are required.</p>
-        ) : null}
-
-        <div className="flex gap-2">
-          <Button
-            className="flex-1"
-            disabled={!valid || saving}
-            onClick={save}
-            tone="primary"
-          >
-            {saving ? "Saving…" : "Save"}
-          </Button>
-          <Button className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </Modal>
+      </Modal>
+      {/* 이 창(z-[60]) 뒤에 그려서 같은 층에서 위에 뜬다. */}
+      {cameraOpen ? (
+        <CameraScanner
+          canPay
+          doneLabel="Cancel"
+          onClose={() => setCameraOpen(false)}
+          onCode={onCameraCode}
+          onDone={() => setCameraOpen(false)}
+          summary={<span className="text-sm font-bold">Scan the product&apos;s barcode</span>}
+        />
+      ) : null}
+    </>
   );
 }
