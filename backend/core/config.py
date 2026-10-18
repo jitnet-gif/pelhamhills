@@ -82,6 +82,10 @@ class Settings(BaseSettings):
         "https://golf-gps-pelhamhills-seven.vercel.app,"
         "https://pelhamhills-golf.vercel.app,"
         "https://pelhamhills.vercel.app,"
+        # 운영 도메인(2026-10-18). pelhamhills.com 은 www 로 넘긴다. 빠지면 계산대의 카드 리더 목록이
+        # CORS 로 막혀 "Loading readers…" 에서 멈춘다.
+        "https://www.pelhamhills.com,"
+        "https://pelhamhills.com,"
         "https://bepu.app"
     )
 

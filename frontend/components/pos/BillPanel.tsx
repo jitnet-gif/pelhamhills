@@ -1031,6 +1031,8 @@ function TerminalSetup({ settings }: { settings: TerminalSettings }) {
       setReaders(found.readers);
       setEnvironment(found.environment);
     } catch (error) {
+      // 목록을 못 받았어도 "Loading readers…" 에 멈춰 있지 않게 한다. 오류는 아래 줄에 보인다.
+      setReaders((current) => current ?? []);
       setMessage(terminalErrorText(error));
     } finally {
       setWorking(false);
