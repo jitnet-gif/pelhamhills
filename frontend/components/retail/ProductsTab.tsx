@@ -41,6 +41,12 @@ import {
 
 type Props = {
   products: Product[];
+  /**
+   * 분류 필터를 거치지 않은 전체 상품(비활성 포함). SKU·바코드가 겹치는지는 이것으로 본다 —
+   * 2026-10-18: 바코드를 SKU 로 쓴 상품이 다른 분류에 있어서 목록에 안 보였는데, 저장하면
+   * "SKU … already exists" 만 나와 무엇과 겹치는지 알 수 없었다.
+   */
+  catalog?: Product[];
   lowStock: LowStockItem[];
   loading: boolean;
   demo: boolean;
@@ -65,6 +71,7 @@ function hasBarcode(product: Product) {
 
 export default function ProductsTab({
   products,
+  catalog,
   lowStock,
   loading,
   demo,
@@ -306,9 +313,13 @@ export default function ProductsTab({
 
       {editing ? (
         <ProductDialog
+          // 겹치는 상품을 열면 같은 창이 그 상품으로 바뀐다. 폼은 처음 한 번만 채우므로 새로 만든다.
+          key={editing === "new" ? "new" : editing.id}
           allProducts={products}
+          catalog={catalog ?? products}
           defaultCategory={defaultCategory}
           onClose={() => setEditing(null)}
+          onOpenExisting={(existing) => setEditing(existing)}
           onSaved={() => {
             setEditing(null);
             onChanged();
@@ -413,16 +424,22 @@ function toForm(product: Product | null, defaultCategory: RetailCategory): FormS
 function ProductDialog({
   product,
   allProducts,
+  catalog,
   defaultCategory,
   onClose,
   onSaved,
+  onOpenExisting,
 }: {
   product: Product | null;
   /** 그룹 칸의 제안 목록을 만든다. */
   allProducts: Product[];
+  /** 겹치는 SKU·바코드를 찾는다. 다른 분류·비활성 상품까지 들어 있다. */
+  catalog: Product[];
   defaultCategory: RetailCategory;
   onClose: () => void;
   onSaved: () => void;
+  /** 겹치는 상품을 이 창 대신 연다. */
+  onOpenExisting: (existing: Product) => void;
 }) {
   const [form, setForm] = useState<FormState>(() => toForm(product, defaultCategory));
   const [saving, setSaving] = useState(false);
@@ -475,8 +492,21 @@ function ProductDialog({
   const sku = form.sku.trim() || form.barcode.trim();
   const valid = sku.length > 0 && form.name.trim().length > 0 && priceCents > 0;
 
+  // 서버도 같은 규칙(대소문자 무시 정확 일치)으로 막지만, 서버 메시지는 무엇과 겹치는지
+  // 말하지 않는다. 저장 전에 여기서 찾아 그 상품을 보여 주고 바로 열 수 있게 한다.
+  const clash = useMemo(() => {
+    const others = catalog.filter((item) => item.id !== product?.id);
+    const same = (a: string | null | undefined, b: string) => (a ?? "").trim().toLowerCase() === b.toLowerCase();
+    const barcode = form.barcode.trim();
+    const byBarcode = barcode ? others.find((item) => same(item.barcode, barcode)) : undefined;
+    if (byBarcode) return { field: "Barcode", value: barcode, owner: byBarcode };
+    const bySku = sku ? others.find((item) => same(item.sku, sku)) : undefined;
+    if (bySku) return { field: "SKU", value: sku, owner: bySku };
+    return null;
+  }, [catalog, product?.id, form.barcode, sku]);
+
   async function save() {
-    if (!valid) return;
+    if (!valid || clash) return;
     setSaving(true);
     setError("");
 
@@ -629,6 +659,21 @@ function ProductDialog({
             Active (shows on the register)
           </label>
 
+          {clash ? (
+            <ErrorNote>
+              {clash.field} {clash.value} is already used by “{clash.owner.name}” ({clash.owner.category}
+              {clash.owner.is_active ? "" : ", inactive"}
+              {clash.field === "SKU" && !form.sku.trim() ? " — an empty SKU uses the barcode" : ""}).{" "}
+              <button
+                className="font-bold underline"
+                onClick={() => onOpenExisting(clash.owner)}
+                type="button"
+              >
+                Open that product
+              </button>
+              {clash.field === "SKU" ? " or type a different SKU." : "."}
+            </ErrorNote>
+          ) : null}
           {error ? <ErrorNote>{error}</ErrorNote> : null}
           {!valid ? (
             <p className="text-xs text-[#6b7280]">A barcode or SKU, a name and a price above $0.00 are required.</p>
@@ -637,7 +682,7 @@ function ProductDialog({
           <div className="flex gap-2">
             <Button
               className="flex-1"
-              disabled={!valid || saving}
+              disabled={!valid || Boolean(clash) || saving}
               onClick={save}
               tone="primary"
             >

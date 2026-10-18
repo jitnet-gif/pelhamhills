@@ -233,6 +233,7 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
 
         <div className={tab === "products" ? "min-w-0" : "hidden"}>
           <ProductsTab
+            catalog={products}
             defaultCategory={category}
             demo={demo}
             loading={loading}
