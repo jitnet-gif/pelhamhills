@@ -49,6 +49,19 @@ type Props = {
   defaultCategory?: RetailCategory;
 };
 
+// 바코드 칸이 비어 있으면 "바코드 없음" 이다. SKU 는 바코드가 없어도 늘 있으므로 보지 않는다.
+type BarcodeFilter = "all" | "with" | "without";
+
+const BARCODE_FILTERS: { value: BarcodeFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "with", label: "Barcode" },
+  { value: "without", label: "No barcode" },
+];
+
+function hasBarcode(product: Product) {
+  return (product.barcode ?? "").trim() !== "";
+}
+
 export default function ProductsTab({
   products,
   lowStock,
@@ -59,6 +72,7 @@ export default function ProductsTab({
 }: Props) {
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [barcodeFilter, setBarcodeFilter] = useState<BarcodeFilter>("all");
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -68,6 +82,9 @@ export default function ProductsTab({
     return products
       .filter((item) => (showInactive ? true : item.is_active))
       .filter((item) =>
+        barcodeFilter === "all" ? true : hasBarcode(item) === (barcodeFilter === "with"),
+      )
+      .filter((item) =>
         needle
           ? item.name.toLowerCase().includes(needle) ||
             item.sku.toLowerCase().includes(needle) ||
@@ -75,7 +92,14 @@ export default function ProductsTab({
             (item.menu_group ?? "").toLowerCase().includes(needle)
           : true,
       );
-  }, [products, search, showInactive]);
+  }, [products, search, showInactive, barcodeFilter]);
+
+  // 칩 옆 숫자는 검색어와 상관없이, 지금 활성/비활성 보기에서 몇 개인지다.
+  const barcodeCounts = useMemo(() => {
+    const shown = products.filter((item) => (showInactive ? true : item.is_active));
+    const withCode = shown.filter(hasBarcode).length;
+    return { all: shown.length, with: withCode, without: shown.length - withCode };
+  }, [products, showInactive]);
 
   async function deactivate(product: Product) {
     if (demo) return;
@@ -132,6 +156,15 @@ export default function ProductsTab({
           value={search}
         />
         <div className="flex flex-wrap gap-2">
+          {BARCODE_FILTERS.map((option) => (
+            <Chip
+              active={barcodeFilter === option.value}
+              key={option.value}
+              onClick={() => setBarcodeFilter(option.value)}
+            >
+              {option.label} ({barcodeCounts[option.value]})
+            </Chip>
+          ))}
           <Chip active={showInactive} onClick={() => setShowInactive((value) => !value)}>
             {showInactive ? "Showing inactive" : "Hiding inactive"}
           </Chip>
