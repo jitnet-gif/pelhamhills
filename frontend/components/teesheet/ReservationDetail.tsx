@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 
-import { type Bill, posApi, type TeeBill } from "@/lib/pos/api";
+import { type Bill, type BillLine, posApi, type TeeBill } from "@/lib/pos/api";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
 import { localBusinessDate } from "@/lib/retail/api";
 import { printReceiptDoc, receiptSheetHtml } from "@/lib/retail/printReceipt";
@@ -202,6 +202,8 @@ const GLYPH_PATH: Record<string, string> = {
   check: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM5.2 8.2l2 2 3.6-4",
   ban: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM3.6 3.6l8.8 8.8",
   basket: "M1.8 6.2h12.4l-1.4 7H3.2zM5 6.2l2-4M11 6.2l-2-4M5.6 8.6v2.6M8 8.6v2.6M10.4 8.6v2.6",
+  register: "M2 8.6h12v4.8H2zM3.4 8.6l1-3.4h7.2l1 3.4M5.6 5.2V2.4h4.8v2.8M5 11h6",
+  person: "M8 2.6a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM2.8 14c0-2.8 2.3-4.6 5.2-4.6s5.2 1.8 5.2 4.6",
   cart: "M1.6 4.2h8.6v5.2H1.6zM3 4.2 4 2.2h4.4l1 2M10.2 6.6h3.2l1 2.8v1.4h-4.2M1.6 10.8h12.8M3.2 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0M10.6 12.6a1 1 0 1 0 2 0 1 1 0 1 0-2 0",
 };
 
@@ -237,6 +239,25 @@ function PaidCoin({ paid }: { paid: boolean }) {
   );
 }
 
+/**
+ * 품목 줄 끝의 표시. 레퍼런스(Chronogolf)처럼 계산서에 담긴(Select 된) 줄은 보라색으로 채운 동그라미,
+ * 아직이면 보라색 테두리만. 결제가 끝난 줄은 초록 $ 동전이다.
+ */
+function LineMark({ paid, selected }: { paid: boolean; selected: boolean }) {
+  if (paid) return <PaidCoin paid />;
+  return (
+    <span
+      aria-label={selected ? "Selected for payment" : "Not selected"}
+      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-[#4533ff] ${
+        selected ? "bg-[#4533ff]" : "bg-white"
+      }`}
+      role="img"
+    >
+      {selected ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
+    </span>
+  );
+}
+
 /** 이 사람에게 붙은 추가 품목의 합(세전 달러). */
 function extrasTotal(player: Player): number {
   return (player.extras ?? []).reduce((sum, extra) => sum + extra.price, 0);
@@ -268,6 +289,9 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const [historyOpen, setHistoryOpen] = useState(false);
   // 레일의 $ — 왼쪽의 Take Payment 패널(지금 계산서). 카드의 Select 를 누르면 저절로 열린다.
   const [payOpen, setPayOpen] = useState(false);
+  // Take Payment 패널의 두 단계: 요약(Paid By · 수단 · 품목 · 합계) → 실제 결제(BillPanel).
+  const [payStep, setPayStep] = useState<"summary" | "checkout">("summary");
+  const [payMethod, setPayMethod] = useState<"card" | "cash">("card");
   // 레일의 복사 아이콘 — Clone Reservation 패널. 열리면 카드 자리를 차지한다(레퍼런스와 같다).
   const [cloneOpen, setCloneOpen] = useState(false);
   // 레일의 바구니 · 카드의 + — Add Products 패널. `productsFor` 는 품목을 붙일 선수.
@@ -391,6 +415,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setProductsOpen(false);
     setProductsFor(null);
     setFeeDrafts({});
+    setPayStep("summary");
     setReceiptNote(null);
     setPreview(null);
     setBillPreview(null);
@@ -743,6 +768,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     if (dirty) await saveAll();
     const added = await billActions.addTee(booking.id, people?.map((person) => person.id));
     if (added) {
+      setPayStep("summary");
       setPayOpen(true);
       controller.pushToast("success", `Added to bill #${added.id} — ${formatMoney(added.total)} so far.`);
     } else {
@@ -1218,9 +1244,17 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             레퍼런스처럼 카드 왼쪽에 지금 계산서를 펼친다. 카드의 Select 로 라운드를 담고 여기서 받는다 —
             계산대·스낵바에서 담은 상품도 같은 계산서에 있다. 비어 있으면 안내만. */}
         {payOpen && useBills ? (
-          <div className="w-[340px] shrink-0 overflow-y-auto border-r border-[#c7c7cc] bg-white">
+          <div className="w-[260px] shrink-0 overflow-y-auto border-r border-[#c7c7cc] bg-white">
             {billState.bill && billState.bill.lines.length > 0 ? (
-              <BillPanel onPaid={() => void controller.refresh()} station="tee_sheet" />
+              <TakePaymentSummary
+                bill={billState.bill}
+                booking={booking}
+                busy={busy || billState.busy}
+                method={payMethod}
+                onMethod={setPayMethod}
+                onPaidBy={(name) => void billActions.update({ label: name }, "tee_sheet")}
+                onTakePayment={() => setPayStep("checkout")}
+              />
             ) : (
               <div className="flex h-full flex-col items-center justify-center px-6 py-8 text-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1f2328] text-white">
@@ -1230,6 +1264,46 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 <p className="mt-2 text-[#4e5560]">This allows you to combine multiple rounds into one invoice.</p>
               </div>
             )}
+          </div>
+        ) : null}
+
+        {/* ===== Sales 화면 =====
+            Take Payment 를 누르면 Lightspeed 의 Sales 화면처럼 넓게 펼친다 — 품목 표(DESCRIPTION · PRICE · QTY ·
+            TAX · SUBTOTAL)와 오른쪽 합계·결제. 같은 계산서(BillPanel)라 계산대에서 받는 것과 규칙이 같다. */}
+        {payOpen && useBills && payStep === "checkout" ? (
+          <div
+            aria-label="Sales"
+            aria-modal="true"
+            className="fixed inset-0 z-[70] flex flex-col bg-white text-[13px] text-[#1f2328]"
+            role="dialog"
+          >
+            <div className="flex items-center gap-3 border-b border-[#d4d4d8] bg-white px-4 py-2.5">
+              <button
+                className="flex items-center gap-1 border border-[#c7c7cc] px-3 py-1.5 font-bold hover:bg-[#f2f2f5]"
+                onClick={() => setPayStep("summary")}
+                title="Back to the reservation — the bill stays open"
+                type="button"
+              >
+                <span aria-hidden>&larr;</span> Tee sheet
+              </button>
+              <Glyph className="h-5 w-5 text-[#4e5560]" name="register" />
+              <h2 className="text-[17px] font-normal">Sales</h2>
+            </div>
+            <div className="min-h-0 flex-1">
+              <BillPanel
+                customer={billState.bill?.label ?? undefined}
+                describeLine={(line) => describeTeeLine(line, booking)}
+                initialMethod={payMethod}
+                key={payMethod}
+                layout="sales"
+                onDone={() => {
+                  setPayStep("summary");
+                  setPayOpen(false);
+                }}
+                onPaid={() => void controller.refresh()}
+                station="tee_sheet"
+              />
+            </div>
           </div>
         ) : null}
 
@@ -1267,20 +1341,25 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             const plan = player.ratePlan?.trim() || "Public";
             const planOptions = RATE_PLANS.includes(plan) ? RATE_PLANS : [plan, ...RATE_PLANS];
             const cartOn = player.cart === true;
+            // 이 선수의 라운드가 열린 계산서에 담겼나(= 레퍼런스의 Select 된 상태).
+            const onBill = useBills ? billOf(player.id) : null;
+            const selected = !player.paid && Boolean(onBill);
 
             return (
               <article
-                className="flex w-[244px] shrink-0 flex-col border border-[#c7c7cc] bg-white p-1.5"
+                className="flex w-[264px] shrink-0 flex-col border border-[#c7c7cc] bg-white p-1.5"
                 key={player.id}
               >
                 <div className="mb-1.5 flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#ececf0] text-[10px] text-[#6b7280]"
-                  >
-                    {player.type === "Guest" ? "G" : "●"}
-                  </span>
-                  <span className="truncate font-bold">{player.type}</span>
+                  {player.type === "Guest" ? null : (
+                    <span
+                      aria-hidden
+                      className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#c7c7cc] bg-[#f2f2f4] text-[#9aa0a6]"
+                    >
+                      <Glyph className="mt-1.5 h-6 w-6" name="person" />
+                    </span>
+                  )}
+                  <span className="truncate text-[13px]">{player.type}</span>
                   {/* 레퍼런스의 머리 ⋮ — 선수 한 명에게 하는 드문 일(레인체크·환불·삭제)을 한곳에 모은다.
                       환불은 계산서 단위라 Reports → Daily close 의 그 영업일로 보낸다(0005). */}
                   <div className="relative ml-auto" data-player-menu>
@@ -1457,30 +1536,50 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   </select>
                 </label>
 
-                {/* 레퍼런스처럼 넓은 상태 버튼 하나 + ⋮. 누르면 Arrived 를 켜고 끈다(No show 였다면
-                    그걸 지운다). No show 는 드물어서 ⋮ 안에 둔다. */}
-                <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-1">
+                {/* 레퍼런스처럼 Arrived | No show 두 칸 + ⋮. 각 칸은 자기 상태를 켜고 끈다 — 하나를 켜면
+                    다른 하나는 끈다(도착한 사람이 노쇼일 수는 없다). ⋮ 는 둘 다 지우기. */}
+                <div className="mt-1.5 grid grid-cols-[1fr_1fr_auto] gap-1 bg-[#f2f2f4] p-1">
                   <button
+                    aria-pressed={player.arrived && !player.no_show}
                     className={`flex items-center justify-center gap-1.5 border px-1 py-1 font-bold disabled:opacity-40 ${
-                      player.no_show
-                        ? "border-[#c0262d] bg-[#fff1ee] text-[#c0262d]"
-                        : player.arrived
-                          ? "border-[#168a3c] text-[#168a3c]"
-                          : "border-[#d7d7dc] text-[#4e5560]"
+                      player.arrived && !player.no_show
+                        ? "border-[#168a3c] bg-[#e8f6ec] text-[#168a3c]"
+                        : "border-[#d7d7dc] bg-white text-[#4e5560] hover:border-[#9aa0a6]"
                     }`}
                     disabled={busy}
                     onClick={() =>
                       void controller.patchPlayer(
                         booking.id,
                         player.id,
-                        player.no_show ? { no_show: false } : { arrived: !player.arrived },
+                        player.arrived && !player.no_show ? { arrived: false } : { arrived: true, no_show: false },
                       )
                     }
-                    title={player.no_show ? "Clear the no show" : player.arrived ? "Undo arrived" : "Check this player in"}
+                    title={player.arrived && !player.no_show ? "Undo arrived" : "Check this player in"}
                     type="button"
                   >
-                    <Glyph className="h-4 w-4" name={player.no_show ? "ban" : "check"} />
-                    {player.no_show ? "No show" : "Arrived"}
+                    <Glyph className="h-3.5 w-3.5" name="check" />
+                    Arrived
+                  </button>
+                  <button
+                    aria-pressed={player.no_show}
+                    className={`flex items-center justify-center gap-1.5 border px-1 py-1 font-bold disabled:opacity-40 ${
+                      player.no_show
+                        ? "border-[#c0262d] bg-[#fff1ee] text-[#c0262d]"
+                        : "border-[#d7d7dc] bg-white text-[#4e5560] hover:border-[#9aa0a6]"
+                    }`}
+                    disabled={busy}
+                    onClick={() =>
+                      void controller.patchPlayer(
+                        booking.id,
+                        player.id,
+                        player.no_show ? { no_show: false } : { no_show: true, arrived: false },
+                      )
+                    }
+                    title={player.no_show ? "Clear the no show" : "Mark this player as a no show"}
+                    type="button"
+                  >
+                    <Glyph className="h-3.5 w-3.5" name="ban" />
+                    No show
                   </button>
                   <div className="relative" data-player-menu>
                     <button
@@ -1488,7 +1587,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                       aria-haspopup="menu"
                       aria-label="More check-in actions"
                       className={`flex h-full items-center border px-1.5 disabled:opacity-40 ${
-                        menuFor === `${player.id}:status` ? "border-[#4533ff] bg-[#f3f2ff]" : "border-[#d7d7dc]"
+                        menuFor === `${player.id}:status` ? "border-[#4533ff] bg-[#f3f2ff]" : "border-[#d7d7dc] bg-white"
                       }`}
                       disabled={busy}
                       onClick={() =>
@@ -1504,16 +1603,17 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                         role="menu"
                       >
                         <button
-                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#c0262d] hover:bg-[#fff1ee]"
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5] disabled:opacity-40"
+                          disabled={!player.arrived && !player.no_show}
                           onClick={() => {
                             setMenuFor(null);
-                            void controller.patchPlayer(booking.id, player.id, { no_show: !player.no_show });
+                            void controller.patchPlayer(booking.id, player.id, { arrived: false, no_show: false });
                           }}
                           role="menuitem"
                           type="button"
                         >
-                          <Glyph className="h-4 w-4" name="ban" />
-                          {player.no_show ? "Clear no show" : "No show"}
+                          <Glyph className="h-4 w-4" name="refund" />
+                          Clear check-in
                         </button>
                       </div>
                     ) : null}
@@ -1523,7 +1623,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 {/* 그린피 한 줄. 금액은 예약 단위 `rate` 라서 한 카드에서 고치면 모든
                     카드가 같이 바뀐다 — title 로 그 사실을 말해 둔다. 레퍼런스처럼
                     글자로 보이지만 실제로는 입력칸이다 (요금 편집을 잃지 않으려고). */}
-                <div className="mt-1.5 flex items-center gap-1 border border-[#d7d7dc] px-1.5 py-1">
+                <div className="mt-1.5 flex items-center gap-1 border border-[#d7d7dc] px-1.5 py-1.5">
                   <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="golf" />
                   <span className="truncate">{booking.holes} Hole Green Fee</span>
                   <span aria-hidden className="ml-auto text-[#9aa0a6]">
@@ -1541,7 +1641,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     title="Green fee — one rate for the whole reservation. Changing it needs a manager PIN."
                     value={draft.rate}
                   />
-                  <PaidCoin paid={player.paid} />
+                  <LineMark paid={player.paid} selected={selected} />
                 </div>
                 {draft.rate.trim() !== "" && !Number.isFinite(Number(draft.rate)) ? (
                   <span className="mt-1 block text-[10px] text-[#8a3f26]">Not a number — will not be saved</span>
@@ -1549,50 +1649,44 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 {/* 카트 한 줄. 켜면 서버가 금액을 채운다(`cart_fee_for`) — 세전 18홀 $19.47 · 9홀 $11.50 이고,
                     카트가 포함된 회원 요금제만 $0 이다. 그린피와 달리 이 사람 것만 바뀐다.
                     결제한 뒤에는 잠근다: 받은 돈과 재인쇄 영수증이 달라지면 안 된다. */}
-                <div
-                  className={`mt-1 flex items-center gap-1 border px-1.5 py-1 ${
-                    cartOn ? "border-[#d7d7dc]" : "border-dashed border-[#d7d7dc] text-[#9aa0a6]"
-                  }`}
-                >
-                  {/* 레퍼런스처럼 "Half Cart (18 Holes)" 전체를 쓴다 — 카드 폭(244px)이 그 길이에 맞춰져 있다. */}
-                  <label
-                    className="flex min-w-0 items-center gap-1"
-                    title={
-                      player.paid
-                        ? "Paid — mark unpaid to change the cart"
-                        : `Add a half cart (${booking.holes} holes) for this player`
-                    }
-                  >
-                    <input
-                      checked={cartOn}
-                      className="h-3 w-3 shrink-0 accent-[#4533ff]"
-                      disabled={busy || player.paid || player.cancelled}
-                      onChange={(event) =>
-                        void controller.patchPlayer(booking.id, player.id, { cart: event.target.checked })
-                      }
-                      type="checkbox"
-                    />
+                {/* 카트 한 줄 — 레퍼런스처럼 **켜져 있을 때만** 보인다. 켜는 것은 아래 + (Add Products 의 Carts).
+                    서버가 금액을 채운다(`cart_fee_for`) — 세전 18홀 $19.47 · 9홀 $11.50 이고, 카트가 포함된
+                    회원 요금제만 $0 이다. 그린피와 달리 이 사람 것만 바뀐다. 결제한 뒤에는 잠근다. */}
+                {cartOn ? (
+                  <div className="group/row mt-1 flex items-center gap-1 border border-[#d7d7dc] px-1.5 py-1.5">
                     <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="cart" />
-                    <span className="truncate">Half Cart ({booking.holes} Holes)</span>
-                  </label>
-                  <span aria-hidden className="ml-auto text-[#9aa0a6]">
-                    $
-                  </span>
-                  <input
-                    aria-label={`Cart fee for ${player.name}`}
-                    className="w-12 bg-transparent text-right tabular-nums outline-none focus:text-[#4533ff] disabled:text-[#b6b6c0]"
-                    disabled={!cartOn || player.paid}
-                    inputMode="decimal"
-                    onBlur={(event) => commitFee(player.id, event.currentTarget.value)}
-                    onChange={(event) => setFeeDrafts((prev) => ({ ...prev, [player.id]: event.target.value }))}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") event.currentTarget.blur();
-                    }}
-                    title="Cart fee for this player only — filled in from the rate plan and holes. Changing it needs a manager PIN."
-                    value={feeDrafts[player.id] ?? cartPart(player).toFixed(2)}
-                  />
-                  {cartOn ? <PaidCoin paid={player.paid} /> : <span aria-hidden className="w-4 shrink-0" />}
-                </div>
+                    <span className="min-w-0 truncate">Half Cart ({booking.holes} Holes)</span>
+                    <span aria-hidden className="ml-auto text-[#9aa0a6]">
+                      $
+                    </span>
+                    <input
+                      aria-label={`Cart fee for ${player.name}`}
+                      className="w-12 bg-transparent text-right tabular-nums outline-none focus:text-[#4533ff] disabled:text-[#1f2328]"
+                      disabled={player.paid}
+                      inputMode="decimal"
+                      onBlur={(event) => commitFee(player.id, event.currentTarget.value)}
+                      onChange={(event) => setFeeDrafts((prev) => ({ ...prev, [player.id]: event.target.value }))}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                      title="Cart fee for this player only — filled in from the rate plan and holes. Changing it needs a manager PIN."
+                      value={feeDrafts[player.id] ?? cartPart(player).toFixed(2)}
+                    />
+                    {player.paid || player.cancelled ? null : (
+                      <button
+                        aria-label="Remove the cart"
+                        className="hidden px-0.5 group-hover/row:block group-focus-within/row:block text-[14px] leading-none text-[#9aa0a6] hover:text-[#c0262d] disabled:opacity-40"
+                        disabled={busy}
+                        onClick={() => void controller.patchPlayer(booking.id, player.id, { cart: false })}
+                        title="Take the half cart off this player"
+                        type="button"
+                      >
+                        <span aria-hidden>&times;</span>
+                      </button>
+                    )}
+                    <LineMark paid={player.paid} selected={selected} />
+                  </div>
+                ) : null}
 
                 {/* 추가 품목 줄(0026). 결제 전에는 × 로 뗀다. */}
                 {(player.extras ?? []).map((extra, index) => (
@@ -1615,7 +1709,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                         <span aria-hidden>&times;</span>
                       </button>
                     )}
-                    <PaidCoin paid={player.paid} />
+                    <LineMark paid={player.paid} selected={selected} />
                   </div>
                 ))}
 
@@ -1631,7 +1725,9 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   title={
                     player.paid
                       ? "Paid — mark unpaid to add more"
-                      : "Add a cart or extras (pull cart, range basket) for this player"
+                      : cartOn
+                        ? "Add extras (pull cart, range basket) for this player"
+                        : "Add a half cart or extras (pull cart, range basket) for this player"
                   }
                   type="button"
                 >
@@ -1664,20 +1760,24 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   <span className="tabular-nums">{money(dueFor(player))}</span>
                 </div>
 
-                {/* 레퍼런스의 보라색 Select — 이 선수의 라운드를 지금 계산서에 담는다. 할인 버튼은
-                    API 가 없어 잠겨만 있었으므로 뺐다. 결제된 선수는 영수증을 다시 연다. */}
+                {/* 레퍼런스의 Select — 담기 전에는 흰 바탕에 빈 동그라미, 담기면 보라색으로 채운다. 담긴 것을
+                    다시 누르면 그 계산서를 이 계산대의 "지금 계산서" 로 불러와 Take Payment 를 펼친다(다른 탭·
+                    계산대에서 담았거나 계산서를 잠시 놓아 두면 패널이 비어 받을 길이 없었다). 결제된 선수는
+                    영수증을 다시 연다. */}
                 <button
-                  className={`mt-1.5 flex items-center justify-center gap-1.5 px-1 py-1.5 font-bold text-white disabled:opacity-40 ${
-                    !player.paid && useBills && billOf(player.id) ? "bg-[#168a3c]" : "bg-[#4533ff]"
+                  className={`mt-1.5 flex items-center justify-center gap-1.5 border px-1 py-1.5 font-bold disabled:opacity-40 ${
+                    player.paid
+                      ? "border-[#168a3c] bg-white text-[#168a3c] hover:bg-[#e8f6ec]"
+                      : selected || !useBills
+                        ? "border-[#4533ff] bg-[#4533ff] text-white hover:bg-[#3a2ae0]"
+                        : "border-[#c7c7cc] bg-[#f7f7f9] text-[#1f2328] hover:border-[#4533ff]"
                   }`}
                   disabled={busy || player.cancelled || (useBills && !player.paid && billState.busy)}
                   onClick={() => {
                     if (player.paid || !useBills) return openReceipt([player], player.paid);
-                    const onBill = billOf(player.id);
-                    // 이미 담긴 선수: 그 계산서를 이 계산대의 "지금 계산서" 로 불러와 펼친다. 다른 탭·계산대에서
-                    // 담았거나 계산서를 잠시 놓아 두면(park) 패널이 비어 있어 받을 길이 없었다.
                     if (onBill) {
                       if (billState.bill?.id !== onBill.id) void billActions.select(onBill.id);
+                      setPayStep("summary");
                       setPayOpen(true);
                       return;
                     }
@@ -1687,21 +1787,21 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     player.paid
                       ? "Paid — show the receipt to print again"
                       : useBills
-                        ? billOf(player.id)
-                          ? `On bill #${billOf(player.id)?.id} — open it to take payment`
+                        ? onBill
+                          ? `On bill #${onBill.id} — open it to take payment`
                           : "Put this player's round on the current bill"
                         : "Show the receipt, then take payment"
                   }
                   type="button"
                 >
-                  <Glyph className="h-4 w-4" name={player.paid ? "card" : "check"} />
-                  {player.paid
-                    ? "Receipt"
-                    : useBills
-                      ? billOf(player.id)
-                        ? `Selected · #${billOf(player.id)?.id}`
-                        : "Select"
-                      : "Payment"}
+                  {player.paid ? (
+                    <Glyph className="h-4 w-4" name="card" />
+                  ) : selected ? (
+                    <Glyph className="h-4 w-4" name="check" />
+                  ) : (
+                    <span aria-hidden className="h-3.5 w-3.5 rounded-full border-[1.5px] border-current" />
+                  )}
+                  {player.paid ? "Receipt" : useBills ? "Select" : "Payment"}
                 </button>
                 {useRainCheck && player.paid && !player.cancelled
                   ? (() => {
@@ -2188,4 +2288,191 @@ function ProductsPanel({
       )}
     </div>
   );
+}
+
+/**
+ * Take Payment 첫 화면 — 레퍼런스(Chronogolf)의 왼쪽 결제 패널. Paid By · Payment Method · Items ·
+ * Subtotal Due 를 보여 주고, Take Payment 를 누르면 실제 결제(BillPanel)로 넘어간다. 고른 수단이 그쪽의
+ * 첫 결제 수단이 된다(카드 = 단말기, 금전함 = 현금).
+ *
+ * 품목은 계산서 줄에서 온다. 이 예약의 그린피 줄은 "그린피 · 카트 · 추가 품목" 으로 나눠 보여 주는데,
+ * 나눈 합이 그 줄의 금액과 다르면(담은 뒤 카트를 바꾼 경우) 나누지 않고 서버의 줄 그대로 보인다 —
+ * 화면의 숫자가 받을 돈과 어긋나면 안 된다.
+ */
+function TakePaymentSummary({
+  bill,
+  booking,
+  busy,
+  method,
+  onMethod,
+  onPaidBy,
+  onTakePayment,
+}: {
+  bill: Bill;
+  booking: TeeBooking;
+  busy: boolean;
+  method: "card" | "cash";
+  onMethod: (method: "card" | "cash") => void;
+  onPaidBy: (name: string) => void;
+  onTakePayment: () => void;
+}) {
+  const cents = (dollars: number) => Math.round(dollars * 100);
+  const items: { name: string; amount: number }[] = [];
+  const payers: string[] = [];
+  for (const line of bill.lines) {
+    const player =
+      line.kind === "tee_player" && line.booking_id === booking.id
+        ? booking.players.find((item) => item.id === line.player_id)
+        : undefined;
+    if (player) {
+      const name = player.name.trim() || [player.firstName, player.lastName].join(" ").trim();
+      if (name && !payers.includes(name)) payers.push(name);
+      const parts = [
+        { name: `${booking.holes} Hole Green Fee`, amount: cents(booking.rate) },
+        ...(player.cart ? [{ name: `Half Cart (${booking.holes} Holes)`, amount: cents(player.cartFee ?? 0) }] : []),
+        ...(player.extras ?? []).map((extra) => ({ name: extra.name, amount: cents(extra.price) })),
+      ];
+      const sum = parts.reduce((total, part) => total + part.amount, 0);
+      if (line.discount === 0 && sum === line.line_total) {
+        items.push(...parts);
+        continue;
+      }
+    }
+    items.push({ name: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name, amount: line.line_total });
+  }
+  // 같은 품목은 한 줄로(레퍼런스처럼 사람 수만큼 반복하지 않는다).
+  const grouped: { name: string; amount: number; count: number }[] = [];
+  for (const item of items) {
+    const match = grouped.find((row) => row.name === item.name && row.amount === item.amount * row.count);
+    if (match) {
+      match.amount += item.amount;
+      match.count += 1;
+    } else {
+      grouped.push({ ...item, count: 1 });
+    }
+  }
+  const paidBy = bill.label?.trim() || payers[0] || "";
+  const options = paidBy && !payers.includes(paidBy) ? [paidBy, ...payers] : payers;
+  const due = bill.subtotal - bill.discount;
+  const tile = "flex h-14 items-center justify-center border bg-white disabled:opacity-40";
+
+  return (
+    <div className="flex h-full flex-col px-4 py-4 text-[13px]">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#1f2328] text-white">
+        <Glyph className="h-6 w-6" name="dollar" />
+      </span>
+
+      <p className="mt-4 font-bold">Paid By</p>
+      <select
+        aria-label="Paid by"
+        className="mt-1.5 w-full border border-[#c7c7cc] bg-white px-2.5 py-2 font-bold outline-none focus:border-[#4533ff]"
+        disabled={busy || options.length === 0}
+        onChange={(event) => onPaidBy(event.target.value)}
+        value={paidBy}
+      >
+        {options.length === 0 ? <option value="">—</option> : null}
+        {options.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+
+      <p className="mt-4 font-bold">Payment Method</p>
+      <div className="mt-1.5 grid grid-cols-2 gap-2">
+        <button
+          aria-label="Card"
+          aria-pressed={method === "card"}
+          className={`${tile} ${method === "card" ? "border-2 border-[#4533ff]" : "border-[#c7c7cc] hover:border-[#9aa0a6]"}`}
+          disabled={busy}
+          onClick={() => onMethod("card")}
+          title="Card — the amount goes to the card reader"
+          type="button"
+        >
+          <Glyph className="h-6 w-6" name="card" />
+        </button>
+        <button
+          aria-label="Cash"
+          aria-pressed={method === "cash"}
+          className={`${tile} ${method === "cash" ? "border-2 border-[#4533ff]" : "border-[#c7c7cc] hover:border-[#9aa0a6]"}`}
+          disabled={busy}
+          onClick={() => onMethod("cash")}
+          title="Cash — enter what the guest hands over and see the change"
+          type="button"
+        >
+          <Glyph className="h-6 w-6" name="register" />
+        </button>
+      </div>
+
+      <p className="mt-5 font-bold">Items</p>
+      <ul className="mt-1 grid gap-0.5">
+        {grouped.map((row) => (
+          <li className="flex justify-between gap-2" key={`${row.name}-${row.amount}`}>
+            <span className="min-w-0 truncate">
+              {row.name}
+              {row.count > 1 ? ` ×${row.count}` : ""}
+            </span>
+            <span className="tabular-nums">{formatMoney(row.amount)}</span>
+          </li>
+        ))}
+        {bill.discount > 0 ? (
+          <li className="flex justify-between gap-2 text-[#168a3c]">
+            <span>Discount</span>
+            <span className="tabular-nums">−{formatMoney(bill.discount)}</span>
+          </li>
+        ) : null}
+      </ul>
+
+      <div className="mt-auto pt-5">
+        <div className="flex justify-between border-t border-[#ececf0] pt-3 text-[14px] font-bold">
+          <span>Subtotal Due</span>
+          <span className="tabular-nums">{formatMoney(due)}</span>
+        </div>
+        <p className="mt-0.5 text-right text-[11px] text-[#9aa0a6]">+ HST at checkout</p>
+        <button
+          className="mt-3 w-full bg-[#4533ff] py-2.5 font-bold text-white hover:bg-[#3a2ae0] disabled:cursor-not-allowed disabled:bg-[#b1a8ff]"
+          disabled={busy}
+          onClick={onTakePayment}
+          type="button"
+        >
+          Take Payment
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** "10:07 AM" → "10:07", "1:15 PM" → "13:15". Lightspeed 의 줄 설명은 24시간제다. */
+function clock24(label: string): string {
+  const match = /^(\d{1,2}):(\d{2})\s*([AP]M)?$/i.exec(label.trim());
+  if (!match) return label;
+  let hour = Number(match[1]) % 12;
+  if (match[3]?.toUpperCase() === "PM") hour += 12;
+  if (!match[3]) hour = Number(match[1]);
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
+}
+
+/**
+ * Sales 화면의 그린피 줄 설명 — Lightspeed 처럼 두 줄:
+ *   "18 Hole Green Fee - Public"
+ *   "Mackey Michelle (#T1A2B3C4D5) - Tee Time: 2026-10-18 10:07"
+ * 이 예약의 줄만 안다. 다른 예약·상품 줄은 null 이라 BillPanel 의 기본 설명을 쓴다.
+ */
+function describeTeeLine(line: BillLine, booking: TeeBooking): { title: string; detail?: string } | null {
+  if (line.kind !== "tee_player" || line.booking_id !== booking.id) return null;
+  const player = booking.players.find((item) => item.id === line.player_id);
+  if (!player) return null;
+  const plan = player.ratePlan?.trim() || "Public";
+  const parts = [`${booking.holes} Hole Green Fee - ${plan}`];
+  if (player.cart) parts.push(`Half Cart (${booking.holes} Holes)`);
+  for (const extra of player.extras ?? []) parts.push(extra.name);
+  const name =
+    [player.lastName, player.firstName].map((part) => part?.trim()).filter(Boolean).join(" ") ||
+    player.name.trim() ||
+    player.type;
+  const code = booking.confirmationCode ?? confirmationCode(booking.id);
+  return {
+    title: parts.join(" + "),
+    detail: `${name} (#${code}) - Tee Time: ${booking.date} ${clock24(booking.time)}`,
+  };
 }

@@ -22,7 +22,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import { newCheckoutId, TERMINAL_METHODS, type Bill, type BillStation, type PaymentInput } from "@/lib/pos/api";
+import {
+  newCheckoutId,
+  TERMINAL_METHODS,
+  type Bill,
+  type BillLine,
+  type BillStation,
+  type PaymentInput,
+} from "@/lib/pos/api";
 import { billActions, recentCashiers, rememberCashier, rememberedCashier, useCurrentBill } from "@/lib/pos/currentBill";
 import {
   describeTerminalResult,
@@ -47,7 +54,16 @@ import {
 } from "@/lib/pos/rainCheck";
 import { printReceipt } from "@/lib/retail/printReceipt";
 import { PAYMENT_LABELS, usDate } from "@/lib/retail/receipt";
-import { PAYMENT_METHODS, formatMoney, parseMoney, type PaymentMethod, type Sale } from "@/lib/retail/types";
+import retailApi from "@/lib/retail/api";
+import {
+  PAYMENT_METHODS,
+  formatMoney,
+  parseMoney,
+  type PaymentMethod,
+  type Product,
+  type RetailCategory,
+  type Sale,
+} from "@/lib/retail/types";
 
 import { Button, EmptyNote, ErrorNote, Field, Select, TextInput } from "@/components/retail/ui";
 
@@ -129,9 +145,32 @@ type Props = {
   onPaid?: (bill: Bill) => void;
   /** 값이 (0 이 아닌 값으로) 바뀌면 결제 칸으로 스크롤한다. 계산대에서 스캔으로 담았을 때. */
   revealPayments?: number;
+  /** 결제 칸이 처음 고르고 있을 수단. 티 시트의 Take Payment 에서 카드·현금 타일을 고르고 들어올 때. */
+  initialMethod?: PaymentMethod;
+  /**
+   * "panel" = 좁은 옆 칸(계산대·티 시트 기본). "sales" = Lightspeed 의 Sales 화면처럼 넓게 — 왼쪽에 품목 찾기와
+   * DESCRIPTION · PRICE · QTY · TAX · SUBTOTAL 표, 오른쪽에 합계와 결제. 티 시트의 Take Payment 가 쓴다.
+   */
+  layout?: "panel" | "sales";
+  /** sales 화면에서 줄의 두 줄 설명(예: "18 Hole Green Fee - Public" / "Mackey Michelle (#R…) - Tee Time: …"). */
+  describeLine?: (line: BillLine) => { title: string; detail?: string } | null;
+  /** sales 화면의 손님 칸(왼쪽 위). 없으면 계산서 이름. */
+  customer?: string;
+  /** 결제 뒤 영수증 화면에서 Done 을 눌렀을 때. 없으면 빈 계산서로 돌아간다. */
+  onDone?: () => void;
 };
 
-export default function BillPanel({ station, demo = false, onPaid, revealPayments = 0 }: Props) {
+export default function BillPanel({
+  station,
+  demo = false,
+  onPaid,
+  revealPayments = 0,
+  initialMethod,
+  layout = "panel",
+  describeLine,
+  customer,
+  onDone,
+}: Props) {
   const current = useCurrentBill();
   const { bill, openBills, busy, error, missing } = current;
   const autoPrint = useSyncExternalStore(subscribeAutoPrint, readAutoPrint, () => false);
@@ -251,7 +290,97 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
   }
 
   if (receipt) {
-    return <PaidReceipt onDone={() => setReceipt(null)} sale={receipt} />;
+    const done = () => {
+      setReceipt(null);
+      onDone?.();
+    };
+    return layout === "sales" ? (
+      <div className="mx-auto w-full max-w-md py-6">
+        <PaidReceipt onDone={done} sale={receipt} />
+      </div>
+    ) : (
+      <PaidReceipt onDone={done} sale={receipt} />
+    );
+  }
+
+  if (layout === "sales") {
+    return (
+      <SalesLayout
+        bill={bill}
+        busy={busy}
+        cashierField={
+          <>
+            <Field hint="Close-outs and tips go by it" label="Cashier">
+              <TextInput
+                autoComplete="off"
+                list="pelham-cashiers"
+                onBlur={() => void commitCashier()}
+                onChange={(event) => {
+                  setCashier(event.target.value);
+                  setCashierError("");
+                }}
+                placeholder="Who is ringing this in"
+                value={cashier}
+              />
+            </Field>
+            <datalist id="pelham-cashiers">
+              {recentCashiers().map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+            {cashierError ? <ErrorNote>{cashierError}</ErrorNote> : null}
+          </>
+        }
+        chargeButton={
+          <>
+            <label className="flex min-h-9 items-center gap-2 text-xs">
+              <input
+                checked={autoPrint}
+                className="h-4 w-4 accent-[#4533ff]"
+                onChange={(event) => writeAutoPrint(event.target.checked)}
+                type="checkbox"
+              />
+              Print receipt after charge
+            </label>
+            <TerminalSetup settings={terminalSettings} />
+            <button
+              className="min-h-14 w-full bg-[#5cb85c] text-base font-bold text-white hover:bg-[#4cae4c] disabled:cursor-not-allowed disabled:bg-[#a8d8a8]"
+              disabled={demo || charging || busy || !canCharge}
+              onClick={() => void charge()}
+              type="button"
+            >
+              {charging
+                ? "Charging…"
+                : noCharge
+                  ? "Close bill — no charge"
+                  : canCharge
+                    ? `Charge ${formatMoney(total)}`
+                    : `Add payments — ${formatMoney(remaining)} left`}
+            </button>
+          </>
+        }
+        customer={customer}
+        demo={demo}
+        describeLine={describeLine}
+        error={error}
+        paymentsEditor={
+          bill ? (
+            <div ref={paymentsRef}>
+              {terminalNote ? <p className="bg-[#eef6f0] px-2 py-2 text-xs text-[#1f6b3a]">{terminalNote}</p> : null}
+              <PaymentsEditor
+                billId={bill.id}
+                initialMethod={initialMethod}
+                payments={payments}
+                remaining={remaining}
+                setPayments={setPayments}
+                terminalSettings={terminalSettings}
+              />
+            </div>
+          ) : null
+        }
+        station={station}
+      />
+    );
   }
 
   return (
@@ -299,6 +428,7 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
             {terminalNote ? <p className="bg-[#eef6f0] px-2 py-2 text-xs text-[#1f6b3a]">{terminalNote}</p> : null}
             <PaymentsEditor
               billId={bill.id}
+              initialMethod={initialMethod}
               payments={payments}
               remaining={remaining}
               setPayments={setPayments}
@@ -364,6 +494,375 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
                   : `Add payments — ${formatMoney(remaining)} left`}
           </Button>
         </>
+      ) : null}
+    </div>
+  );
+}
+
+// ===== Sales 화면 (Lightspeed 모양) =====================================
+
+/** 품목 찾기 옆의 색 버튼 — Lightspeed 계산대처럼 분류마다 한 색. 누르면 그 분류의 상품이 아래에 펼쳐진다. */
+const QUICK_CATEGORIES: { category: RetailCategory; label: string; color: string }[] = [
+  { category: "Rentals", label: "Carts", color: "bg-[#3c9a4a] hover:bg-[#33873f]" },
+  { category: "Equipment", label: "Range", color: "bg-[#c0392b] hover:bg-[#a93226]" },
+  { category: "Balls", label: "Balls", color: "bg-[#e67e22] hover:bg-[#cf711f]" },
+  { category: "Accessories", label: "Accessories", color: "bg-[#8fb3d9] hover:bg-[#7aa3cf]" },
+  { category: "Apparel", label: "Apparel", color: "bg-[#2b2b2b] hover:bg-[#111111]" },
+  { category: "Food & Beverage", label: "Food & Beverage", color: "bg-[#0b4f8a] hover:bg-[#09406f]" },
+];
+
+function SalesLayout({
+  bill,
+  busy,
+  cashierField,
+  chargeButton,
+  customer,
+  demo,
+  describeLine,
+  error,
+  paymentsEditor,
+  station,
+}: {
+  bill: Bill | null;
+  busy: boolean;
+  cashierField: React.ReactNode;
+  chargeButton: React.ReactNode;
+  customer?: string;
+  demo: boolean;
+  describeLine?: (line: BillLine) => { title: string; detail?: string } | null;
+  error: string;
+  paymentsEditor: React.ReactNode;
+  station: BillStation;
+}) {
+  const lines = bill?.lines ?? [];
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const who = (customer ?? bill?.label ?? "").trim();
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-white text-[13px] text-[#1f2328] md:flex-row">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* 손님 · 계산서 일 */}
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-[#d4d4d8] bg-[#e9edf2] px-3 py-2">
+          <span className="border border-[#c7c7cc] bg-white px-3 py-1.5 text-[11px] font-bold tracking-wide uppercase">
+            {who || "No customer"}
+          </span>
+          {bill ? (
+            <>
+              <button
+                className="border border-[#c7c7cc] bg-white px-3 py-1.5 hover:bg-[#f2f2f5]"
+                onClick={() => billActions.park()}
+                title="Keep this bill open and start another"
+                type="button"
+              >
+                Hold
+              </button>
+              <button
+                className="border border-[#c7c7cc] bg-white px-3 py-1.5 text-[#8a1f1f] hover:bg-[#fff1ee]"
+                onClick={() => {
+                  if (window.confirm(`Void bill #${bill.id}? Nothing was charged.`)) void billActions.voidBill(bill.id);
+                }}
+                title="Throw this bill away. Nothing was charged."
+                type="button"
+              >
+                Void
+              </button>
+              <span className="ml-auto text-[#6b7280]">
+                Bill #{bill.id}
+                {busy ? " · saving…" : ""}
+              </span>
+            </>
+          ) : null}
+        </div>
+
+        <ItemFinder disabled={demo || !bill} station={station} />
+
+        {/* 줄 표 */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[#d4d4d8] text-[11px] tracking-wide text-[#4e5560] uppercase">
+                <th className="w-12" />
+                <th className="py-1.5 text-left font-normal">Description</th>
+                <th className="w-20 py-1.5 text-right font-normal">Price</th>
+                <th className="w-20 py-1.5 pl-3 text-left font-normal">Qty.</th>
+                <th className="w-14 py-1.5 text-center font-normal">Tax</th>
+                <th className="w-24 py-1.5 pr-3 text-right font-normal">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-6 text-center text-[#6b7280]" colSpan={6}>
+                    {bill ? "Search for an item or tap a category to add it." : "No open bill."}
+                  </td>
+                </tr>
+              ) : (
+                lines.map((line) => (
+                  <SalesLineRow
+                    describe={describeLine?.(line) ?? null}
+                    key={line.id}
+                    line={line}
+                    station={station}
+                  />
+                ))
+              )}
+            </tbody>
+          </table>
+
+          {bill && lines.length > 0 ? (
+            <div className="flex flex-wrap items-start justify-end gap-1.5 border-t border-[#d4d4d8] px-3 py-2">
+              {discountOpen ? (
+                <div className="w-48">
+                  <MoneyField
+                    compact
+                    initial={bill.discount}
+                    key={`discount-${bill.id}-${bill.discount}`}
+                    label="Bill discount"
+                    onCommit={(cents) => billActions.update({ discount: cents }, station)}
+                  />
+                </div>
+              ) : null}
+              <button
+                aria-pressed={discountOpen}
+                className="border border-[#c7c7cc] bg-white px-3 py-1.5 hover:bg-[#f2f2f5]"
+                onClick={() => setDiscountOpen((open) => !open)}
+                type="button"
+              >
+                Apply Discount
+              </button>
+            </div>
+          ) : null}
+          {error ? (
+            <div className="px-3 pb-3">
+              <ErrorNote>{error}</ErrorNote>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {/* 합계 · 결제 */}
+      <aside className="grid w-full shrink-0 content-start gap-3 overflow-y-auto border-t border-[#d4d4d8] bg-white p-3 md:w-[320px] md:border-t-0 md:border-l">
+        <dl className="grid gap-1.5 text-[12px]">
+          <Row label="Subtotal" value={formatMoney(bill?.subtotal ?? 0)} />
+          <Row label="Discounts" value={formatMoney(bill?.discount ?? 0)} />
+          <Row label="HST" value={formatMoney(bill?.tax ?? 0)} />
+          <div className="mt-1 flex items-baseline justify-between gap-2 border-t border-[#d4d4d8] pt-2">
+            <dt className="text-base font-bold">Total</dt>
+            <dd className="text-xl font-bold tabular-nums">{formatMoney(bill?.total ?? 0)}</dd>
+          </div>
+        </dl>
+        {bill && lines.length > 0 ? (
+          <>
+            {paymentsEditor}
+            {cashierField}
+            {chargeButton}
+          </>
+        ) : null}
+        {demo ? (
+          <p className="bg-[#fff8e1] px-2 py-2 text-xs text-[#5b4708]">
+            예시 데이터입니다. 서버에 연결되기 전까지는 계산서를 만들 수 없습니다.
+          </p>
+        ) : null}
+      </aside>
+    </div>
+  );
+}
+
+function SalesLineRow({
+  line,
+  station,
+  describe,
+}: {
+  line: BillLine;
+  station: BillStation;
+  describe: { title: string; detail?: string } | null;
+}) {
+  // 그린피·베이 줄은 예약 하나 = 한 줄. 수량을 바꿀 수 없다.
+  const fixed = line.kind === "tee_player" || line.kind === "sim_booking";
+  const [qty, setQty] = useState(String(line.quantity));
+  const [qtyFor, setQtyFor] = useState(line.quantity);
+  if (qtyFor !== line.quantity) {
+    setQtyFor(line.quantity);
+    setQty(String(line.quantity));
+  }
+  const commitQty = () => {
+    const next = Number.parseInt(qty, 10);
+    if (!Number.isFinite(next) || next < 0) {
+      setQty(String(line.quantity));
+      return;
+    }
+    if (next !== line.quantity) void billActions.setQuantity(line.id, next, station);
+  };
+  const title = describe?.title ?? line.name;
+  const detail =
+    describe?.detail ??
+    (line.kind === "tee_player"
+      ? `Tee Time: ${line.tee_date ?? ""} ${line.tee_time ?? ""}`.trim()
+      : line.kind === "sim_booking"
+        ? `Bay Sheet: ${line.tee_date ?? ""} ${line.tee_time ?? ""}`.trim()
+        : line.sku);
+
+  return (
+    <tr className="border-b border-[#e4e4e8] align-middle">
+      <td className="py-2 pl-3">
+        <button
+          aria-label={`Remove ${line.name}`}
+          className="flex h-7 w-7 items-center justify-center border border-[#c7c7cc] bg-white text-[#6b7280] hover:border-[#c0262d] hover:text-[#c0262d]"
+          onClick={() => void billActions.setQuantity(line.id, 0, station)}
+          title="Remove this line"
+          type="button"
+        >
+          <svg aria-hidden className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" viewBox="0 0 16 16">
+            <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5M7 7v4M9 7v4" />
+          </svg>
+        </button>
+      </td>
+      <td className="min-w-0 py-2 pl-2">
+        <span className="block text-[14px] leading-snug text-[#2a6ebb]">{title}</span>
+        {detail ? <span className="block text-[13px] leading-snug text-[#2a6ebb]">{detail}</span> : null}
+        {line.discount > 0 ? (
+          <span className="block text-[11px] text-[#1f6b3a]">Discount −{formatMoney(line.discount)}</span>
+        ) : null}
+      </td>
+      <td className="py-2 text-right text-[14px] tabular-nums">{formatMoney(line.unit_price)}</td>
+      <td className="py-2 pl-3">
+        <input
+          aria-label={`Quantity of ${line.name}`}
+          className="w-14 border border-[#c7c7cc] px-2 py-1.5 tabular-nums outline-none focus:border-[#4533ff] disabled:bg-[#f7f7f9]"
+          disabled={fixed}
+          inputMode="numeric"
+          onBlur={commitQty}
+          onChange={(event) => setQty(event.target.value.replace(/[^0-9]/g, ""))}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+          title={fixed ? "One player per line" : undefined}
+          value={qty}
+        />
+      </td>
+      <td className="py-2 text-center text-[14px]">Yes</td>
+      <td className="py-2 pr-3 text-right text-[14px] tabular-nums">{formatMoney(line.line_total)}</td>
+    </tr>
+  );
+}
+
+/** Item 찾기 + 분류 버튼. 활성 상품만, 처음 열 때 한 번 읽는다. */
+function ItemFinder({ station, disabled }: { station: BillStation; disabled: boolean }) {
+  const [products, setProducts] = useState<Product[] | "error" | null>(null);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<RetailCategory | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    retailApi
+      .listProducts({ active: true })
+      .then((list) => {
+        if (alive) setProducts(list);
+      })
+      .catch(() => {
+        if (alive) setProducts("error");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const needle = query.trim().toLowerCase();
+  const list = Array.isArray(products) ? products : [];
+  const shown = needle
+    ? list.filter(
+        (item) =>
+          item.name.toLowerCase().includes(needle) ||
+          item.sku.toLowerCase().includes(needle) ||
+          (item.barcode ?? "").toLowerCase() === needle,
+      )
+    : category
+      ? list.filter((item) => item.category === category)
+      : [];
+  const open = needle !== "" || category !== null;
+
+  async function add(product: Product) {
+    const added = await billActions.addProduct(product.id, station);
+    if (added) setQuery("");
+  }
+
+  return (
+    <div className="border-b border-[#d4d4d8] bg-[#e8f1dc] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <form
+          className="flex"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (shown.length === 1) void add(shown[0]);
+          }}
+        >
+          <input
+            aria-label="Search items by name, SKU or barcode"
+            className="w-48 border border-[#c7c7cc] bg-white px-2 py-1.5 outline-none focus:border-[#4533ff]"
+            disabled={disabled}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setCategory(null);
+            }}
+            placeholder="Item"
+            type="search"
+            value={query}
+          />
+          <button
+            className="border border-l-0 border-[#c7c7cc] bg-white px-3 py-1.5 hover:bg-[#f2f2f5] disabled:opacity-40"
+            disabled={disabled}
+            type="submit"
+          >
+            Search
+          </button>
+        </form>
+        <span className="w-2" />
+        {QUICK_CATEGORIES.map((item) => (
+          <button
+            aria-pressed={category === item.category}
+            className={`px-3 py-1.5 text-white disabled:opacity-40 ${item.color} ${
+              category === item.category ? "ring-2 ring-[#1f2328] ring-offset-1" : ""
+            }`}
+            disabled={disabled}
+            key={item.category}
+            onClick={() => {
+              setQuery("");
+              setCategory((current) => (current === item.category ? null : item.category));
+            }}
+            type="button"
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {open ? (
+        <div className="mt-2">
+          {products === null ? (
+            <p className="text-[#6b7280]">Loading items…</p>
+          ) : products === "error" ? (
+            <p className="text-[#8a1f1f]">Could not load items.</p>
+          ) : shown.length === 0 ? (
+            <p className="text-[#6b7280]">No items match.</p>
+          ) : (
+            <div className="grid max-h-48 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1.5 overflow-y-auto">
+              {shown.map((product) => (
+                <button
+                  className="flex min-h-12 flex-col justify-between border border-[#c7c7cc] bg-white px-2 py-1 text-left hover:border-[#4533ff] disabled:opacity-40"
+                  disabled={disabled || (product.stock !== null && product.stock <= 0)}
+                  key={product.id}
+                  onClick={() => void add(product)}
+                  type="button"
+                >
+                  <span className="line-clamp-2 font-bold">{product.name}</span>
+                  <span className="text-[#4e5560] tabular-nums">
+                    {formatMoney(product.price)}
+                    {product.stock !== null ? ` · ${product.stock} left` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       ) : null}
     </div>
   );
@@ -500,18 +999,20 @@ function BillLineRow({ line, station }: { line: Bill["lines"][number]; station: 
 
 function PaymentsEditor({
   billId,
+  initialMethod = "card",
   payments,
   remaining,
   setPayments,
   terminalSettings,
 }: {
   billId: number;
+  initialMethod?: PaymentMethod;
   payments: PendingPayment[];
   remaining: number;
   setPayments: (update: (current: PendingPayment[]) => PendingPayment[]) => void;
   terminalSettings: TerminalSettings;
 }) {
-  const [method, setMethod] = useState<PaymentMethod>("card");
+  const [method, setMethod] = useState<PaymentMethod>(initialMethod);
   const [amountInput, setAmountInput] = useState("");
   const [authCode, setAuthCode] = useState("");
   const [last4, setLast4] = useState("");
