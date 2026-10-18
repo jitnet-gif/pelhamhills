@@ -12,6 +12,8 @@
  *    화면을 닫았다 열어도 결제 줄이 되살아난다. 결제 줄을 지우면 환불한다(신용카드는 카드 없이, Interac 은
  *    손님이 카드를 다시 댄다). 연동이 꺼진 기기("keyed"): 직원이 단말기에 금액을 치고 승인번호를 여기 적는다.
  * 3. 남은 금액이 0 이 되면 Charge. 서버는 한 트랜잭션에서 재고·티 시트 paid·영수증 번호를 처리한다.
+ *    단말기 승인으로 남은 금액이 0 이 되면 Charge 를 누르지 않아도 저절로 마무리하고, "결제 완료 ·
+ *    영수증을 뽑을까요?" 만 묻는다(2026-10-18).
  *
  * 현금은 받은 돈을 적으면 거스름돈을 보여 주고, 서버에는 **계산서에 들어간 몫**만 보낸다
  * (서버는 결제 합이 합계와 정확히 같아야 받는다).
@@ -20,7 +22,7 @@
  * 들어가고, 쓰고 남는 크레딧은 사라진다(화면이 미리 알린다). 만료·사용 여부는 서버가 결제할 때 다시 본다.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   newCheckoutId,
@@ -180,6 +182,8 @@ export default function BillPanel({
   const [receipt, setReceipt] = useState<Sale | null>(null);
   const [payments, setPayments] = useState<PendingPayment[]>([]);
   const [charging, setCharging] = useState(false);
+  // 단말기 승인이 막 결제 줄이 됐다. 남은 금액이 0 이면 아래 효과가 Charge 를 대신 누른다.
+  const autoChargeRef = useRef(false);
 
   // 결제 한 번 = checkout_id 하나. 계산서나 결제 줄이 바뀌면 새로 만든다. 연결이 끊겨 다시
   // 누르는 경우에만 같은 값을 쓴다 — 서버가 같은 결제를 두 번 받지 않는다.
@@ -267,7 +271,7 @@ export default function BillPanel({
   const noCharge = Boolean(bill) && lines.length > 0 && total === 0;
   const canCharge = remaining === 0 && (payments.length > 0 || noCharge);
 
-  async function charge() {
+  async function charge(fromTerminal = false) {
     if (!bill || !canCharge || charging) return;
     if (!cashier.trim()) {
       setCashierError("Enter who is ringing this in. Close-outs and tips go by this name.");
@@ -285,9 +289,19 @@ export default function BillPanel({
     setReceipt(paid);
     setPayments([]);
     onPaid?.(paid);
+    // 카드를 대고 끝난 결제는 영수증을 뽑을지 화면이 묻는다. 그때는 자동 인쇄를 하지 않는다.
     // 인쇄는 다음 틱으로. `window.print()` 가 스크립트를 멈추면 비워진 화면이 인쇄 뒤에야 그려진다.
-    if (autoPrint) window.setTimeout(() => printReceipt(paid), 0);
+    if (autoPrint && !fromTerminal) window.setTimeout(() => printReceipt(paid), 0);
   }
+
+  // 카드를 대서 계산서가 다 찼으면 바로 마무리한다. 현금 등 다른 줄이 남았으면 평소처럼 Charge 를 누른다.
+  useEffect(() => {
+    if (!autoChargeRef.current) return;
+    autoChargeRef.current = false;
+    // 이 렌더의 결제 줄로 마무리한다(다음 틱 — 렌더 중 상태를 바꾸지 않게).
+    if (canCharge) window.setTimeout(() => void charge(true), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 결제 줄이 더해진 그 렌더에서 한 번만 본다.
+  }, [payments]);
 
   if (receipt) {
     const done = () => {
@@ -372,6 +386,7 @@ export default function BillPanel({
                 initialMethod={initialMethod}
                 payments={payments}
                 remaining={remaining}
+                onTerminalApproved={() => (autoChargeRef.current = true)}
                 setPayments={setPayments}
                 terminalSettings={terminalSettings}
               />
@@ -431,6 +446,7 @@ export default function BillPanel({
               initialMethod={initialMethod}
               payments={payments}
               remaining={remaining}
+              onTerminalApproved={() => (autoChargeRef.current = true)}
               setPayments={setPayments}
               terminalSettings={terminalSettings}
             />
@@ -1002,12 +1018,15 @@ function PaymentsEditor({
   initialMethod = "card",
   payments,
   remaining,
+  onTerminalApproved,
   setPayments,
   terminalSettings,
 }: {
   billId: number;
   initialMethod?: PaymentMethod;
   payments: PendingPayment[];
+  /** 리더가 승인해 결제 줄이 하나 더해졌을 때. */
+  onTerminalApproved?: () => void;
   remaining: number;
   setPayments: (update: (current: PendingPayment[]) => PendingPayment[]) => void;
   terminalSettings: TerminalSettings;
@@ -1167,6 +1186,7 @@ function PaymentsEditor({
           setPayments((current) => [...current, fromTerminal(key, record)]);
           setAmountInput("");
           setReceiptPhone("");
+          onTerminalApproved?.();
         } catch (error) {
           setFormError(terminalErrorText(error));
         } finally {
@@ -1726,59 +1746,39 @@ function Row({ label, value }: { label: string; value: string }) {
 
 // ===== 결제 끝 ==========================================================
 
+/** 결제가 끝나면 "결제 완료" 와 영수증을 뽑을지만 묻는다. 어느 쪽을 골라도 새 계산서로 간다. */
 function PaidReceipt({ sale, onDone }: { sale: Sale; onDone: () => void }) {
-  const methods = useMemo(
-    () =>
-      (sale.payments ?? []).map((payment, index) => (
-        <li className="flex items-baseline justify-between gap-2" key={index}>
-          <span>
-            {PAYMENT_LABELS[payment.method]}
-            {payment.auth_code ? <span className="text-[11px] text-[#6b7280]"> · {payment.auth_code}</span> : null}
-            {payment.rain_check_code ? (
-              <span className="text-[11px] text-[#6b7280]"> · {payment.rain_check_code}</span>
-            ) : null}
-          </span>
-          <span className="tabular-nums">{formatMoney(payment.amount)}</span>
-        </li>
-      )),
-    [sale.payments],
-  );
+  const card = (sale.payments ?? []).find((payment) => payment.card_last4);
   return (
-    <div className="grid gap-3 p-3">
-      <div>
-        <p className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Paid</p>
-        <p className="text-lg font-bold">{sale.receipt_no}</p>
+    <div className="grid gap-4 p-3 text-center">
+      <div className="grid gap-1 py-4">
+        <p className="text-3xl leading-none text-[#1f6b3a]" aria-hidden>
+          ✓
+        </p>
+        <p className="text-xl font-bold">Payment complete</p>
+        <p className="text-2xl font-bold tabular-nums">{formatMoney(sale.total)}</p>
         <p className="text-xs text-[#6b7280]">
-          {sale.business_date}
-          {sale.cashier ? ` · ${sale.cashier}` : ""}
+          {sale.receipt_no}
+          {card ? ` · ${PAYMENT_LABELS[card.method]} ••••${card.card_last4}` : ""}
         </p>
       </div>
-      <ul className="grid gap-1 border-y border-[#d4d4d8] py-2 text-sm">
-        {sale.lines.map((line, index) => (
-          <li className="flex items-baseline justify-between gap-2" key={line.id ?? index}>
-            <span className="min-w-0 truncate">
-              {line.quantity}× {line.name}
-            </span>
-            <span className="shrink-0 tabular-nums">{formatMoney(line.line_total)}</span>
-          </li>
-        ))}
-      </ul>
-      <dl className="grid gap-1 text-sm">
-        <Row label="Subtotal" value={formatMoney(sale.subtotal)} />
-        {sale.discount > 0 ? <Row label="Discount" value={`−${formatMoney(sale.discount)}`} /> : null}
-        <Row label="HST" value={formatMoney(sale.tax)} />
-        <div className="flex items-baseline justify-between gap-2 border-t border-[#d4d4d8] pt-1.5">
-          <dt className="font-bold">Total</dt>
-          <dd className="text-xl font-bold tabular-nums">{formatMoney(sale.total)}</dd>
-        </div>
-      </dl>
-      <ul className="grid gap-1 text-sm">{methods}</ul>
-      <Button className="min-h-12" full onClick={() => printReceipt(sale)}>
-        Print receipt
-      </Button>
-      <Button className="min-h-14 text-base" full onClick={onDone} tone="primary">
-        New bill
-      </Button>
+      <p className="text-base font-bold">Print a receipt?</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Button className="min-h-14 text-base" full onClick={onDone}>
+          No
+        </Button>
+        <Button
+          className="min-h-14 text-base"
+          full
+          onClick={() => {
+            printReceipt(sale);
+            onDone();
+          }}
+          tone="primary"
+        >
+          Print
+        </Button>
+      </div>
     </div>
   );
 }
