@@ -50,8 +50,8 @@ const DEMO_GROUPS: Record<number, string> = {
   6: "Outerwear",
   7: "Gloves",
   12: "Beer",
-  13: "Hot Food",
-  14: "Drinks",
+  13: "Grill",
+  14: "Juice & Water",
 };
 
 export const demoProducts: Product[] = [
