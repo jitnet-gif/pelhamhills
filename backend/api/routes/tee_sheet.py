@@ -57,8 +57,7 @@ HOLD_TTL_SECONDS = 180
 WEEKDAY_RATE = 47.79
 WEEKEND_RATE = 58.41
 
-# 1인 카트 요금(세전, 달러). **2026-10-18 클럽 확인: 18홀 $19.47.** 9홀은 아직 따로 정해진 게
-# 없어 예전 단일 요금 $19.00 을 그대로 쓴다(2026-09-15 확인값).
+# 1인 카트 요금(세전, 달러). **2026-10-18 클럽 확인: 18홀 $19.47, 9홀 $11.50.**
 #
 # 참고로 Chronogolf export(2026-04~09, 좌석 25,108행)에 남아 있는 과거 금액은 여러 가지였다:
 # 19.47(6,607행, 18홀 일반), 17.70(2,607행, Public Senior), 9.74(1,760행, 9홀), 11.50(1,369행, 미상).
@@ -67,7 +66,7 @@ WEEKEND_RATE = 58.41
 #
 # 같은 값이 DB 의 `pelham_tee_cart_fee`(0035)에도 있다. 바꾸면 둘을 같이 고쳐라.
 CART_FEE = 19.47
-NINE_HOLE_CART_FEE = 19.00
+NINE_HOLE_CART_FEE = 11.50
 
 
 def cart_fee_for(rate_plan: str, holes: int) -> float:

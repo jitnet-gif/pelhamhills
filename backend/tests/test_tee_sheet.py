@@ -527,23 +527,23 @@ def _cart_booking(client, **extra):
 def test_cart_fee_is_filled_in_and_stays_editable(client):
     url, (ann, bob) = _cart_booking(client)
 
-    # 2026-10-18 클럽 요금: 18홀 세전 $19.47, 9홀 $19.00. 자동값이면 홀 수를 따라간다.
+    # 2026-10-18 클럽 요금: 18홀 세전 $19.47, 9홀 $11.50. 자동값이면 홀 수를 따라간다.
     on = client.patch(f"{url}/players/{ann}", json={"cart": True}).json()
     assert (on["players"][0]["cart"], on["players"][0]["cartFee"]) == (True, 19.47)
     assert on["audit"][0]["message"] == "Cart added for Ann Senior ($19.47)."
     assert client.patch(f"{url}/players/{bob}", json={"cart": True}).json()["players"][1]["cartFee"] == 19.47
-    assert [p["cartFee"] for p in client.patch(url, json={"holes": 9}).json()["players"]] == [19.00, 19.00]   # 9홀 카트는 $19.00
+    assert [p["cartFee"] for p in client.patch(url, json={"holes": 9}).json()["players"]] == [11.50, 11.50]
 
     # 이름에 Cart 가 든 회원 요금제는 카트 포함 → 0. 일반 요금제로 돌리면 자동값이 돌아온다.
     member = client.patch(f"{url}/players/{ann}", json={"ratePlan": "Weekday Member - Single with Weekday Cart"}).json()
     assert member["players"][0]["cartFee"] == 0
-    assert client.patch(f"{url}/players/{ann}", json={"ratePlan": "Public"}).json()["players"][0]["cartFee"] == 19.00  # 지금 9홀
+    assert client.patch(f"{url}/players/{ann}", json={"ratePlan": "Public"}).json()["players"][0]["cartFee"] == 11.50  # 지금 9홀
 
     # 사람이 고친 금액은 요금제·홀 수가 바뀌어도 그대로다.
-    client.patch(f"{url}/players/{bob}", json={"cartFee": 11.5})
+    client.patch(f"{url}/players/{bob}", json={"cartFee": 15.0})
     kept = client.patch(f"{url}/players/{bob}", json={"ratePlan": "Public Senior"}).json()
-    assert kept["players"][1]["cartFee"] == 11.5
-    assert client.patch(url, json={"holes": 18}).json()["players"][1]["cartFee"] == 11.5
+    assert kept["players"][1]["cartFee"] == 15.0
+    assert client.patch(url, json={"holes": 18}).json()["players"][1]["cartFee"] == 15.0
 
     # 끄면 0, 다시 켜면 새로 계산된다.
     off = client.patch(f"{url}/players/{bob}", json={"cart": False}).json()
