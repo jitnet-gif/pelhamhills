@@ -462,6 +462,23 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     };
   }, [menuFor]);
 
+  // Add Products 드롭다운도 바깥을 누르거나 Esc 로 닫는다. 레일의 바구니·카드의 + 는 스스로 여닫는다.
+  useEffect(() => {
+    if (!productsOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target as Element | null)?.closest?.("[data-products-menu]")) setProductsOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProductsOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [productsOpen]);
+
   useEffect(() => {
     if (saveState.kind !== "saved") return;
     const timer = setTimeout(() => setSaveState({ kind: "idle", nonce: 0 }), SAVED_FLASH_MS);
@@ -1307,20 +1324,6 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
           </div>
         ) : null}
 
-        {productsOpen && productTarget ? (
-          <ProductsPanel
-            busy={busy}
-            catalog={catalog}
-            holes={booking.holes}
-            onAddExtra={(item) => addExtra(productTarget, item)}
-            onClose={() => setProductsOpen(false)}
-            onToggleCart={() =>
-              void controller.patchPlayer(booking.id, productTarget.id, { cart: productTarget.cart !== true })
-            }
-            player={productTarget}
-          />
-        ) : null}
-
         {cloneOpen ? (
           <ClonePanel
             busy={cloning}
@@ -1713,26 +1716,42 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   </div>
                 ))}
 
-                {/* 레퍼런스의 줄 아래 + — 이 선수를 대상으로 Add Products 를 연다. */}
-                <button
-                  className={`mt-1 border py-1 text-[15px] leading-none disabled:opacity-40 ${
-                    productsOpen && productTarget?.id === player.id
-                      ? "border-[#4533ff] bg-[#f3f2ff] text-[#4533ff]"
-                      : "border-[#d7d7dc] bg-[#f2f2f4] text-[#4e5560] hover:bg-[#e8e8ec]"
-                  }`}
-                  disabled={busy || player.cancelled || player.paid}
-                  onClick={() => openProducts(player.id)}
-                  title={
-                    player.paid
-                      ? "Paid — mark unpaid to add more"
-                      : cartOn
-                        ? "Add extras (pull cart, range basket) for this player"
-                        : "Add a half cart or extras (pull cart, range basket) for this player"
-                  }
-                  type="button"
-                >
-                  +
-                </button>
+                {/* 레퍼런스의 줄 아래 + — 이 선수의 Add Products 를 카드 안 드롭다운으로 연다. 카드 옆에 패널을
+                    따로 펼치지 않는다. 카드 줄은 가로 스크롤 상자 안이라 띄우지 않고 + 바로 아래에 끼워 넣는다. */}
+                <div className="mt-1 flex flex-col" data-products-menu>
+                  <button
+                    aria-expanded={productsOpen && productTarget?.id === player.id}
+                    className={`border py-1 text-[15px] leading-none disabled:opacity-40 ${
+                      productsOpen && productTarget?.id === player.id
+                        ? "border-[#4533ff] bg-[#f3f2ff] text-[#4533ff]"
+                        : "border-[#d7d7dc] bg-[#f2f2f4] text-[#4e5560] hover:bg-[#e8e8ec]"
+                    }`}
+                    disabled={busy || player.cancelled || player.paid}
+                    onClick={() =>
+                      productsOpen && productTarget?.id === player.id ? setProductsOpen(false) : openProducts(player.id)
+                    }
+                    title={
+                      player.paid
+                        ? "Paid — mark unpaid to add more"
+                        : cartOn
+                          ? "Add extras (pull cart, range basket) for this player"
+                          : "Add a half cart or extras (pull cart, range basket) for this player"
+                    }
+                    type="button"
+                  >
+                    +
+                  </button>
+                  {productsOpen && productTarget?.id === player.id ? (
+                    <ProductsMenu
+                      busy={busy}
+                      catalog={catalog}
+                      holes={booking.holes}
+                      onAddExtra={(item) => addExtra(player, item)}
+                      onToggleCart={() => void controller.patchPlayer(booking.id, player.id, { cart: !cartOn })}
+                      player={player}
+                    />
+                  ) : null}
+                </div>
 
                 {player.cancelled ? (
                   <div className="mt-1 flex justify-between text-[#8a3f26]">
@@ -2091,6 +2110,7 @@ function IconRail({
       <button
         aria-pressed={productsOpen}
         className={`${cell} ${productsOpen ? "bg-white text-[#1f2328]" : "text-[#4e5560] hover:bg-white/60"}`}
+        data-products-menu
         onClick={onToggleProducts}
         title="Add Products"
         type="button"
@@ -2208,18 +2228,17 @@ function ClonePanel({
 }
 
 /**
- * Add Products — 레퍼런스(Lightspeed)의 바구니 패널. 카드 왼쪽에 펼친다.
- *   Carts  : 대상 선수의 Half Cart 를 켜고 끈다(카드의 카트 줄과 같은 값 — 요금은 서버가 채운다).
+ * Add Products — 카드의 + 아래에 펼치는 드롭다운 목록. 카드 옆에 패널을 따로 펼치지 않는다.
+ *   Carts  : 이 선수의 Half Cart 를 켜고 끈다(카드의 카트 줄과 같은 값 — 요금은 서버가 채운다).
  *   Extras : 0026 카탈로그. 누를 때마다 그 선수 몫에 한 줄 붙는다(같은 것을 두 번 붙일 수 있다).
  */
-function ProductsPanel({
+function ProductsMenu({
   player,
   holes,
   catalog,
   busy,
   onToggleCart,
   onAddExtra,
-  onClose,
 }: {
   player: Player;
   holes: number;
@@ -2227,64 +2246,57 @@ function ProductsPanel({
   busy: boolean;
   onToggleCart: () => void;
   onAddExtra: (item: TeeExtraItem) => void;
-  onClose: () => void;
 }) {
-  const tile =
-    "flex min-h-[64px] flex-col justify-between border border-[#c7c7cc] bg-[#f7f7f9] px-2 py-1.5 text-left hover:border-[#4533ff] disabled:cursor-not-allowed disabled:opacity-40";
+  const row =
+    "flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-[#f2f2f5] disabled:cursor-not-allowed disabled:opacity-40";
+  const heading = "px-2 pb-0.5 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-[#9aa0a6]";
   const cartOn = player.cart === true;
   const locked = player.paid || player.cancelled;
   return (
-    <div className="w-[300px] shrink-0 overflow-y-auto border-r border-[#c7c7cc] bg-white p-3">
-      <div className="flex items-center gap-2">
-        <Glyph className="h-5 w-5" name="basket" />
-        <h3 className="text-sm font-bold">Add Products</h3>
-        <button className="ml-auto px-1 text-[17px] leading-none" onClick={onClose} title="Close" type="button">
-          <span aria-hidden>&times;</span>
-        </button>
-      </div>
-      <p className="mt-1 truncate text-[#4e5560]">
-        For {player.name || player.type}
-        {locked ? (player.paid ? " — paid, mark unpaid to change" : " — cancelled") : ""}
-      </p>
+    <div className="border border-t-0 border-[#c7c7cc] bg-white py-1 text-[12px] shadow-md" role="menu">
+      {locked ? (
+        <p className="px-2 py-1 text-[#8a3f26]">{player.paid ? "Paid — mark unpaid to change" : "Cancelled"}</p>
+      ) : null}
+      <p className={heading}>Carts</p>
+      <button
+        aria-checked={cartOn}
+        className={row}
+        disabled={busy || locked}
+        onClick={onToggleCart}
+        role="menuitemcheckbox"
+        title={cartOn ? "Take the half cart off this player" : "Add a half cart — the fee comes from the rate plan"}
+        type="button"
+      >
+        <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="cart" />
+        <span className="min-w-0 truncate">Half Cart ({holes} Holes)</span>
+        <span className={`ml-auto shrink-0 ${cartOn ? "text-[#4533ff]" : "text-[#9aa0a6]"}`}>
+          {cartOn ? "✓ Added" : "Add"}
+        </span>
+      </button>
 
-      <p className="mt-3 text-[13px] text-[#4e5560]">Carts</p>
-      <div className="mt-1 grid grid-cols-2 gap-1.5">
-        <button
-          aria-pressed={cartOn}
-          className={`${tile} ${cartOn ? "border-[#4533ff] bg-[#f3f2ff]" : ""}`}
-          disabled={busy || locked}
-          onClick={onToggleCart}
-          title={cartOn ? "Take the half cart off this player" : "Add a half cart — the fee comes from the rate plan"}
-          type="button"
-        >
-          <span className="line-clamp-2 font-bold">Half Cart ({holes} Holes)</span>
-          <span className="text-[#4e5560]">{cartOn ? `Added · ${money(player.cartFee ?? 0)}` : `${holes} holes`}</span>
-        </button>
-      </div>
-
-      <p className="mt-4 text-[13px] text-[#4e5560]">Extras</p>
+      <p className={heading}>Extras</p>
       {catalog === null ? (
-        <p className="mt-1 text-[#9aa0a6]">Loading…</p>
+        <p className="px-2 py-1 text-[#9aa0a6]">Loading…</p>
       ) : catalog === "error" ? (
-        <p className="mt-1 text-[#8a3f26]">Could not load extras. Close and open again to retry.</p>
+        <p className="px-2 py-1 text-[#8a3f26]">Could not load extras. Close and open again to retry.</p>
       ) : catalog.length === 0 ? (
-        <p className="mt-1 text-[#9aa0a6]">No extras are turned on.</p>
+        <p className="px-2 py-1 text-[#9aa0a6]">No extras are turned on.</p>
       ) : (
-        <div className="mt-1 grid grid-cols-2 gap-1.5">
-          {catalog.map((item) => (
-            <button
-              className={tile}
-              disabled={busy || locked}
-              key={item.code}
-              onClick={() => onAddExtra(item)}
-              title={`Add ${item.name} for this player`}
-              type="button"
-            >
-              <span className="line-clamp-2 font-bold">{item.name}</span>
-              <span className="self-end tabular-nums">{money(Number(item.price))}</span>
-            </button>
-          ))}
-        </div>
+        catalog.map((item) => (
+          <button
+            className={row}
+            disabled={busy || locked}
+            key={item.code}
+            onClick={() => onAddExtra(item)}
+            role="menuitem"
+            title={`Add ${item.name} for this player`}
+            type="button"
+          >
+            <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="basket" />
+            <span className="min-w-0 truncate">{item.name}</span>
+            <span className="ml-auto shrink-0 tabular-nums">{money(Number(item.price))}</span>
+          </button>
+        ))
       )}
     </div>
   );
