@@ -439,3 +439,55 @@ test("a tee reprint finds the bill that took the green fee, and only one bill", 
   assert.equal(paidBillFor(bills, "b-1", [p("p9")]), null);
   assert.equal(paidBillFor(bills, "b-2", [p("p1")]), null);
 });
+
+// ===== ESC/POS (블루투스 TM-m30 경로, `lib/retail/escpos.ts`) =====
+
+const { escposReceipt, encodeText, spread, wrap, rasterFromRgba } = await import("../lib/retail/escpos.ts");
+
+/** 바이트 배열 안에서 부분 배열이 몇 번 나오나. */
+function countSeq(bytes, seq) {
+  let count = 0;
+  for (let i = 0; i + seq.length <= bytes.length; i++) {
+    if (seq.every((value, j) => bytes[i + j] === value)) count++;
+  }
+  return count;
+}
+
+test("ESC/POS lines are 48 columns with the amount flush right and never cut", () => {
+  assert.equal(spread("Subtotal", "$12.50"), `Subtotal${" ".repeat(34)}$12.50`); // 8 + 34 + 6 = 48
+  assert.equal(spread("x".repeat(60), "$1,000.00"), `${"x".repeat(38)} $1,000.00`); // 38 + 1 + 9 = 48
+  assert.deepEqual(wrap("one two three", 7), ["one two", "three"]);
+  assert.deepEqual(wrap("abcdefghij", 4), ["abcd", "efgh", "ij"]);
+  assert.deepEqual(wrap("", 10), [""]);
+});
+
+test("ESC/POS text uses code page 1252 and drops control characters", () => {
+  // é = 0xE9, – (en dash) = 0x96, 😀 → ?, 줄바꿈은 빠진다
+  assert.deepEqual([...encodeText("Café – 😀\nA")], [0x43, 0x61, 0x66, 0xe9, 0x20, 0x96, 0x20, 0x3f, 0x41]);
+});
+
+test("ESC/POS cuts after every copy, prints a Code 128 barcode, and opens the drawer only when asked", () => {
+  const sheet = [
+    { kind: "text", text: "Hi", align: "center" },
+    { kind: "barcode", value: "PH-1" },
+  ];
+  const two = escposReceipt([sheet, sheet]);
+  assert.deepEqual([...two.slice(0, 5)], [0x1b, 0x40, 0x1b, 0x74, 16]); // ESC @, ESC t 16
+  assert.equal(countSeq(two, [0x1d, 0x56, 66, 4]), 2); // GS V 66 4 — 장마다 한 번
+  // GS k 73 n "{B" "PH-1": n = 2 + 4 = 6
+  assert.equal(countSeq(two, [0x1d, 0x6b, 73, 6, 0x7b, 0x42, 0x50, 0x48, 0x2d, 0x31]), 2);
+  assert.equal(countSeq(two, [0x1b, 0x70, 0, 25, 250]), 0);
+  assert.equal(countSeq(escposReceipt([sheet], { openDrawer: true }), [0x1b, 0x70, 0, 25, 250]), 1);
+});
+
+test("ESC/POS logo is a GS v 0 raster; transparent pixels stay white", () => {
+  // 9×1 픽셀: 검정, 투명, 흰색, 검정 ×6 → 한 줄 2바이트 (폭 16점으로 올림)
+  const px = [[0, 0, 0, 255], [0, 0, 0, 0], [255, 255, 255, 255], ...Array(6).fill([0, 0, 0, 255])];
+  const raster = rasterFromRgba(Uint8ClampedArray.from(px.flat()), 9, 1);
+  assert.equal(raster.width, 16);
+  assert.deepEqual([...raster.data], [0b10011111, 0b10000000]);
+  const bytes = escposReceipt([[{ kind: "logo" }]], { logo: raster });
+  assert.equal(countSeq(bytes, [0x1d, 0x76, 0x30, 0, 2, 0, 1, 0, 0b10011111, 0b10000000]), 1);
+  // 로고 그림이 없으면 로고 블록은 아무것도 보내지 않는다
+  assert.equal(countSeq(escposReceipt([[{ kind: "logo" }]]), [0x1d, 0x76, 0x30]), 0);
+});

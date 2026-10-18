@@ -1,6 +1,8 @@
 /**
- * 영수증을 **브라우저 인쇄**로 찍는다. 프로 샵 PC 에 Epson TM-m30III 드라이버가 깔려
- * 있으면 그대로 감열 프린터로 나간다. 설치 절차: `docs/pro-shop-receipt-printing-2026-09-12.md`.
+ * 영수증을 찍는다. 기기마다 두 경로 중 하나다(`receiptPrinter.ts`, 계산대의 Receipt printer 설정):
+ * - **브라우저 인쇄**: PC 에 Epson TM-m30III 드라이버가 깔려 있으면 그대로 감열 프린터로 나간다.
+ * - **블루투스**: 페어링된 TM-m30 에 ESC/POS 를 직접 보낸다(Chrome·Edge). 실패하면 브라우저 인쇄로 넘어간다.
+ * 설치 절차: `docs/pro-shop-receipt-printing-2026-09-12.md`.
  *
  * React 포털이 아니라 `body` 바로 아래의 **컨테이너 하나**를 직접 채운다. 계산대의
  * 장바구니 본문은 데스크톱 사이드바와 모바일 시트에 두 번 그려지고, 매출 탭도 켜진 채로
@@ -14,7 +16,16 @@
 import { CLUB } from "@/lib/nav";
 import { rainCheckBlocks, type RainCheck } from "@/lib/pos/rainCheck";
 
-import { receiptDocBlocks, receiptHtml, saleReceipt, type ReceiptDoc, type ReceiptHeader } from "./receipt";
+import {
+  PAYMENT_LABELS,
+  receiptDocBlocks,
+  receiptHtml,
+  saleReceipt,
+  type ReceiptBlock,
+  type ReceiptDoc,
+  type ReceiptHeader,
+} from "./receipt";
+import { printBluetooth, readReceiptPrinterMode } from "./receiptPrinter";
 import type { Sale } from "./types";
 
 const ROOT_ID = "receipt-print-root";
@@ -40,14 +51,16 @@ export function receiptSheetHtml(
   doc: ReceiptDoc,
   options: { reprint?: boolean; copyLabel?: string } = {},
 ): string {
-  return receiptHtml(
-    receiptDocBlocks(doc, {
-      header: CLUB_HEADER,
-      register: REGISTER_NAME,
-      reprint: options.reprint,
-      copyLabel: options.copyLabel,
-    }),
-  );
+  return receiptHtml(receiptSheetBlocks(doc, options));
+}
+
+function receiptSheetBlocks(doc: ReceiptDoc, options: { reprint?: boolean; copyLabel?: string }): ReceiptBlock[] {
+  return receiptDocBlocks(doc, {
+    header: CLUB_HEADER,
+    register: REGISTER_NAME,
+    reprint: options.reprint,
+    copyLabel: options.copyLabel,
+  });
 }
 
 /**
@@ -59,7 +72,19 @@ const COPY_LABELS = ["CUSTOMER COPY", "MERCHANT COPY"];
 
 /** 판매가 아닌 결제(티 시트 카드의 Payment)도 같은 모양의 영수증으로 찍는다. */
 export function printReceiptDoc(doc: ReceiptDoc, options: { reprint?: boolean } = {}): void {
-  printSheets(COPY_LABELS.map((copyLabel) => receiptSheetHtml(doc, { ...options, copyLabel })));
+  printSheets(
+    COPY_LABELS.map((copyLabel) => receiptSheetBlocks(doc, { ...options, copyLabel })),
+    { openDrawer: !options.reprint && paidInCash(doc) },
+  );
+}
+
+/**
+ * 현금을 받은 영수증인가. 블루투스 경로는 이때만 현금함을 연다 — 드라이버 경로는 모든 인쇄에
+ * 열리던 것(문서의 "한계")을 고친 셈이다. 재인쇄에는 열지 않는다.
+ */
+function paidInCash(doc: ReceiptDoc): boolean {
+  const cash = PAYMENT_LABELS.cash;
+  return doc.payments?.length ? doc.payments.some((payment) => payment.label === cash) : doc.paymentLabel === cash;
 }
 
 /** 레인체크 전표 한 장의 HTML. 화면 미리보기와 종이가 같다. */
@@ -73,11 +98,21 @@ export function rainCheckSheetHtml(check: RainCheck, options: { reprint?: boolea
  */
 export function printRainChecks(checks: readonly RainCheck[], options: { reprint?: boolean } = {}): void {
   if (checks.length === 0) return;
-  printSheets(checks.map((check) => rainCheckSheetHtml(check, options)));
+  printSheets(checks.map((check) => rainCheckBlocks(check, { header: CLUB_HEADER, reprint: options.reprint })));
 }
 
-function printSheets(sheets: readonly string[]): void {
+function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: boolean } = {}): void {
   if (typeof window === "undefined") return;
+  if (readReceiptPrinterMode() !== "bluetooth") return printInBrowser(sheets);
+  printBluetooth(sheets, options).catch((error: unknown) => {
+    // 종이가 안 나오면 직원이 알아야 한다. 인쇄 창으로 넘겨 다른 프린터라도 고를 수 있게 한다.
+    const reason = error instanceof Error ? error.message : String(error);
+    window.alert(`Bluetooth receipt printer did not respond (${reason}). Opening the print dialog instead.`);
+    printInBrowser(sheets);
+  });
+}
+
+function printInBrowser(sheets: readonly ReceiptBlock[][]): void {
 
   let root = document.getElementById(ROOT_ID);
   if (!root) {
@@ -86,7 +121,7 @@ function printSheets(sheets: readonly string[]): void {
     document.body.appendChild(root);
   }
   root.className = "rc-sheet";
-  root.innerHTML = sheets.map((sheet) => `<div class="rc-copy">${sheet}</div>`).join("");
+  root.innerHTML = sheets.map((sheet) => `<div class="rc-copy">${receiptHtml(sheet)}</div>`).join("");
 
   const container = root;
   const clear = () => {

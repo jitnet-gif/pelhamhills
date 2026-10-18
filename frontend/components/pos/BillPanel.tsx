@@ -51,6 +51,8 @@ import { PAYMENT_METHODS, formatMoney, parseMoney, type PaymentMethod, type Sale
 
 import { Button, EmptyNote, ErrorNote, Field, Select, TextInput } from "@/components/retail/ui";
 
+import { ReceiptPrinterSetup } from "./ReceiptPrinterSetup";
+
 // ===== 자동 인쇄 스위치 (이 브라우저에만) ==============================
 
 const AUTO_PRINT_KEY = "pelham.retail.autoPrint";
@@ -347,6 +349,7 @@ export default function BillPanel({ station, demo = false, onPaid, revealPayment
             />
             Print receipt after charge
           </label>
+          <ReceiptPrinterSetup />
           <TerminalSetup settings={terminalSettings} />
           <Button
             className="min-h-14 text-base"
