@@ -103,16 +103,16 @@ const DAY_TIMER_COL = DAY_CART_COL + 1;
 const DAY_ROW_END = DAY_TIMER_COL + 1;
 /** Time 열 폭. gridTemplateColumns 와 Rate 열의 sticky `left` 오프셋이 **같은 값**을
  *  써야 한다 — 어긋나면 Rate 열이 조용히 고정 해제된다. 그래서 상수 하나로 둔다. */
-const DAY_TIME_COL_PX = 88;
-const DAY_RATE_COL_PX = 64;
+const DAY_TIME_COL_PX = 100;
+const DAY_RATE_COL_PX = 80;
 /** 셀에 이름이 들어가므로 행이 주간 뷰보다 넉넉해야 한다. */
 // 일간 뷰 행 높이. 실제 값은 CSS 변수 `--day-row` 가 정하고 이 상수는 폴백이다.
 // 인라인 style 로 그리드 트랙을 만들기 때문에 Tailwind 브레이크포인트가 닿지 않는데,
 // 데스크톱은 한 화면에 슬롯을 많이 보여 주는 밀도가 중요하고 휴대폰은 손가락으로
 // 정확히 누르는 것이 더 중요하다. CSS 변수면 한 줄로 둘 다 만족한다
 // (globals.css 에서 1023px 이하일 때만 44px 로 키운다).
-const DAY_ROW_PX = 36;
-const DAY_BAND_PX = 22;
+const DAY_ROW_PX = 42;
+const DAY_BAND_PX = 26;
 
 /** 시(hour) 밴드용. 파싱 불가 슬롯(minutes=MAX_SAFE_INTEGER 폴백)은 밴드를 만들지 않는다. */
 function slotHour(slot: TeeSlot): number | null {
@@ -376,7 +376,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
   const dayBodyRowEnd = dayLines.length + DAY_ROW_BASE;
 
   const gridTemplateColumns = isDayView
-    ? `${DAY_TIME_COL_PX}px ${DAY_RATE_COL_PX}px repeat(${DAY_SEATS}, minmax(112px, 1fr)) 56px 44px`
+    ? `${DAY_TIME_COL_PX}px ${DAY_RATE_COL_PX}px repeat(${DAY_SEATS}, minmax(140px, 1fr)) 64px 48px`
     : `86px 48px repeat(${columns.length}, minmax(120px, 1fr)) 64px`;
 
   const gridTemplateRows = isDayView
@@ -515,8 +515,11 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
           헤더 행과 Time/Rate 열을 position:sticky 로 고정("프리즈")할 수 있다.
           페이지 본문은 여전히 가로로 밀리지 않는다. */}
       <div className="min-h-0 min-w-0 flex-1 overflow-auto border-t border-[#d6d6dc] bg-white">
-        <div className={isDayView ? "min-w-[700px]" : "min-w-[1050px]"}>
-          <div className="grid text-xs" style={{ gridTemplateColumns, gridTemplateRows }}>
+        <div className={isDayView ? "min-w-[860px]" : "min-w-[1050px]"}>
+          <div
+            className={`grid ${isDayView ? "text-[15px] subpixel-antialiased" : "text-xs"}`}
+            style={{ gridTemplateColumns, gridTemplateRows }}
+          >
             {/* ================= 주간 뷰 본문 (그대로 유지) =================
                 주간 뷰는 컬럼이 **날짜**라서 헤더 행이 있어야 어느 칸이 어느 날인지 알 수 있다.
                 일간 시트에는 헤더 행이 없다 — 컬럼이 그냥 좌석 1~4번이고, 날짜는 위의
@@ -744,7 +747,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                         style={{ gridColumn: `1 / ${DAY_ROW_END}`, gridRow }}
                       >
                         {/* 가로 스크롤 시에도 시각 라벨이 보이도록 라벨만 sticky. */}
-                        <span className="sticky left-0 px-2 text-[11px] font-semibold text-[#4e5560]">
+                        <span className="sticky left-0 px-2 text-[13px] font-semibold text-[#4e5560]">
                           {line.label}
                         </span>
                       </div>
@@ -769,7 +772,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                   return (
                     <Fragment key={line.key}>
                       <div
-                        className={`sticky left-0 z-20 flex items-center bg-white px-2 font-bold text-[#1f2328] ${rule}`}
+                        className={`sticky left-0 z-20 flex items-center bg-white px-2 text-[15px] font-bold text-[#111315] ${rule}`}
                         style={{ gridColumn: 1, gridRow }}
                       >
                         {slot.time}
@@ -811,7 +814,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                         >
                           <span
                             aria-hidden
-                            className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[#c2c2cc] text-[11px] leading-none font-bold text-[#9aa0a6] group-hover:border-[#4533ff] group-hover:text-[#4533ff]"
+                            className="flex h-[19px] w-[19px] items-center justify-center rounded-full border border-[#c2c2cc] text-[14px] leading-none font-bold text-[#9aa0a6] group-hover:border-[#4533ff] group-hover:text-[#4533ff]"
                           >
                             +
                           </span>
@@ -820,7 +823,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
 
                       {/* Cart: 0이면 아예 아무것도 그리지 않는다 (스크린샷과 동일). */}
                       <div
-                        className={`flex items-center justify-center gap-1 text-[11px] text-[#3f4650] ${rule}`}
+                        className={`flex items-center justify-center gap-1 text-[14px] text-[#3f4650] ${rule}`}
                         style={{ gridColumn: DAY_CART_COL, gridRow }}
                         title={carts > 0 ? `${carts} cart(s) booked at ${slot.time}` : undefined}
                       >
@@ -862,7 +865,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                               ? `Check in ${checkInTarget.title}`
                               : `Nothing to check in at ${slot.time}`
                           }
-                          className={`flex h-11 w-11 items-center justify-center rounded-sm border border-[#c7c7cc] text-[11px] leading-none lg:h-[22px] lg:w-[22px] ${FOCUS_RING} ${
+                          className={`flex h-11 w-11 items-center justify-center rounded-sm border border-[#c7c7cc] text-[14px] leading-none lg:h-[28px] lg:w-[28px] ${FOCUS_RING} ${
                             checkInTarget
                               ? "text-[#3f4650] hover:border-[#4533ff] hover:bg-[#f0efff]"
                               : "text-[#c7c7cc]"
@@ -1041,7 +1044,7 @@ function DaySegmentCard({
       // scroll-mt: 고정 헤더 뒤에 숨은 채로 스크롤되지 않게.
       // 세그먼트가 셀을 꽉 채우므로 행 밑줄도 스스로 그린다 — 안 그리면 위아래
       // 행의 같은 색 세그먼트가 한 덩어리로 뭉쳐 보인다.
-      className={`z-10 flex min-w-0 scroll-mt-10 items-stretch overflow-hidden rounded-sm text-left text-[11px] leading-none ${rule} ${FOCUS_RING} ${daySurfaceClass(
+      className={`z-10 flex min-w-0 scroll-mt-10 items-stretch overflow-hidden rounded-sm text-left text-[15px] leading-none ${rule} ${FOCUS_RING} ${daySurfaceClass(
         booking,
       )} ${cancelled ? "opacity-60" : ""} ${selected ? "ring-2 ring-[#111315] ring-inset" : ""} ${
         onDragStart ? "cursor-grab active:cursor-grabbing" : ""
@@ -1059,13 +1062,13 @@ function DaySegmentCard({
             <span
               aria-hidden
               title="9 holes"
-              className="rounded-[2px] bg-[#2b2f38] px-[3px] py-px text-[9px] font-bold text-white"
+              className="rounded-[2px] bg-[#2b2f38] px-[4px] py-px text-[11px] font-bold text-white"
             >
               9
             </span>
           )}
           {booking.notes.trim().length > 0 && (
-            <span aria-hidden title={booking.notes} className="text-[10px] leading-none">
+            <span aria-hidden title={booking.notes} className="text-[13px] leading-none">
               🗒
             </span>
           )}
@@ -1088,13 +1091,13 @@ function DaySegmentCard({
           return (
             <span
               key={player.id}
-              className={`flex min-w-0 flex-1 items-center gap-1 px-1 ${TONE_CLASS[tone]} ${
+              className={`flex min-w-0 flex-1 items-center gap-1.5 px-1.5 ${TONE_CLASS[tone]} ${
                 dead ? "line-through opacity-70" : ""
               }`}
             >
               <span
                 aria-hidden
-                className="h-[7px] w-[7px] shrink-0 rounded-full border border-current opacity-70"
+                className="h-[10px] w-[10px] shrink-0 rounded-full border-[1.5px] border-current opacity-80"
               />
               <span className="truncate">
                 {/* type 이 아니라 이름으로 가른다. 온라인 예약(0003 `pelham_tee_book`)은
@@ -1178,7 +1181,7 @@ function RateTag({ slot, open }: { slot: TeeSlot; open: boolean }) {
   return (
     <span
       title={`${kind ? `${kind} rate` : "Rate"} ${money(slot.rate)}${open ? "" : " · no open spots"}`}
-      className={`flex h-[26px] w-full items-center justify-center bg-[#f2f2f4] pr-1.5 text-[12px] font-semibold tabular-nums ${
+      className={`flex h-[30px] w-full items-center justify-center bg-[#f2f2f4] pr-1.5 text-[15px] font-semibold tabular-nums ${
         open ? "text-[#1f2328]" : "text-[#c2c5cb]"
       } ${holiday ? "shadow-[inset_0_0_0_1px_#e0a46a]" : ""}`}
       style={{ clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%)" }}
