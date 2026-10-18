@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
+import { greenFeeFor } from "@/lib/greenFee";
 import { money } from "@/lib/teeSheet/dates";
 import type { PlayerType, TeeSheetController } from "@/lib/teeSheet/types";
 
@@ -181,9 +182,7 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
   const selectedSlot = useMemo(() => slots.find((slot) => slot.time === time) ?? null, [slots, time]);
 
   // 요금은 선택한 슬롯과 홀 수에서 파생된다 — 사용자가 직접 고친 뒤에는 입력값을 그대로 쓴다.
-  // 9홀은 18홀 요금의 절반(센트 반올림). DB 의 `pelham_tee_rate_for`(0033)와 같은 값이어야 한다.
-  const slotRate = selectedSlot ? (holes === 9 ? Math.round(Math.round(selectedSlot.rate * 100) / 2) / 100 : selectedSlot.rate) : null;
-  const rate = rateTouched ? rateInput : slotRate !== null ? slotRate.toFixed(2) : "";
+  const rate = rateTouched ? rateInput : selectedSlot ? greenFeeFor(selectedSlot.rate, holes).toFixed(2) : "";
 
   const autoTitle = useMemo(() => {
     const lead = players[0];

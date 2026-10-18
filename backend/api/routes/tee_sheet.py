@@ -426,6 +426,18 @@ def slot_rate_for(iso_date: str) -> float:
     return WEEKEND_RATE if kind == "weekend" else WEEKDAY_RATE
 
 
+def green_fee_for(iso_date: str, holes: int) -> float:
+    """그 날, 그 홀 수의 1인 그린피(세전). 9홀은 18홀 요금의 절반, 센트에서 반올림(half-up).
+
+    DB 의 `pelham_tee_rate_for`(0033)와 같은 값이어야 한다 — 파이썬 `round` 는 은행가 반올림이라
+    58.41 의 절반을 29.20 으로 만든다. 그래서 센트 정수로 계산한다.
+    """
+    rate = slot_rate_for(iso_date)
+    if holes != 9:
+        return rate
+    return (round(rate * 100) + 1) // 2 / 100
+
+
 def generate_slots(iso_date: str) -> list[TeeSlot]:
     rate = slot_rate_for(iso_date)
     kind = day_type_for(iso_date)
@@ -835,6 +847,13 @@ def patch_booking(booking_id: str, body: PatchBookingRequest) -> TeeBooking:
         if "holes" in fields and fields["holes"] is not None and fields["holes"] != booking.holes:
             old_holes = booking.holes
             booking.holes = fields["holes"]
+            # 그린피도 아직 자동값이고 아무도 결제하지 않았으면 새 홀 수의 값으로(0033 과 같은 규칙).
+            # 같은 요청에 rate 를 직접 보냈으면 아래에서 그 값이 덮어쓴다.
+            if not any(p.paid for p in booking.players) and _same_money(
+                booking.rate, green_fee_for(booking.date, old_holes)
+            ):
+                booking.rate = green_fee_for(booking.date, booking.holes)
+                _audit(booking, f"Rate set to ${booking.rate:.2f}.")
             # 카트 요금이 아직 자동값이면 새 홀 수의 값으로 따라간다. 사람이 고친 금액과
             # 이미 결제한 사람의 금액은 그대로 둔다 — 결제한 뒤에 금액이 바뀌면 재인쇄한
             # 영수증이 받은 돈과 달라진다.

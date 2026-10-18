@@ -889,6 +889,7 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
         ]
         hold.title = f"{last}, {first}".strip(", ")
         hold.holes = body.holes
+        hold.rate = ts.green_fee_for(hold.date, body.holes)
 
         # 카트. 예전에는 전화 예약에 카트가 전혀 적히지 않아, 계산서에 카트 요금이 빠졌다.
         # 계산서는 사람마다 `cart`/`cartFee` 를 읽고, `cartCount` 는 실제 카트 대수다.
@@ -1233,24 +1234,12 @@ def get_rates(body: RatesRequest) -> RatesResponse:
     숫자는 전부 `tee_sheet` 의 요금 함수에서 온다 — `slot_rate_for`(주말/평일과
     `RATE_OVERRIDES`)와 `cart_fee_for`. 세율은 리테일의 `TAX_RATE` 한 벌을 쓴다.
 
-    **9홀 요금은 코드에 없다.** 데모 시나리오에는 오후·트와일라잇·가을 요금이
-    나오지만 요금표에는 평일/주말 두 가지뿐이다. 없는 요금을 여기서 지어내면
-    손님이 전화로 들은 금액과 프로 샵에서 내는 금액이 달라진다. 그래서 9홀은
-    금액을 말하지 않고 사람에게 넘긴다.
+    9홀은 18홀 요금의 절반이다(2026-10-18 클럽 결정, `green_fee_for`·DB 0033).
     """
     _touch_session(body.conversation_id)
     iso_date = resolve_date(body.date)
 
-    if body.holes == 9:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Nine-hole pricing is not in our rate table, so do not quote a number. "
-                "Offer to transfer the caller to the pro shop."
-            ),
-        )
-
-    green = ts.slot_rate_for(iso_date)
+    green = ts.green_fee_for(iso_date, body.holes)
     cart = ts.cart_fee_for("Public", body.holes)
     subtotal = round(green * body.players + cart * body.riders, 2)
     tax = round(subtotal * TAX_RATE, 2)
@@ -1273,7 +1262,7 @@ def get_rates(body: RatesRequest) -> RatesResponse:
         tax=tax,
         total=total,
         message=(
-            f"On {spoken_date(iso_date)} it is ${green:.2f} per player for 18 holes "
+            f"On {spoken_date(iso_date)} it is ${green:.2f} per player for {body.holes} holes "
             f"before tax,{cart_part} so ${total:.2f} in total for {body.players} "
             f"{players_word} with tax. Read the total, not the breakdown, unless they ask."
         ),
@@ -1377,6 +1366,11 @@ def modify_booking(body: ModifyRequest) -> ModifyResponse:
 
         if body.holes is not None and body.holes != booking.holes:
             changes.append(f"holes {booking.holes} to {body.holes}")
+            # 그린피가 자동값이면 새 홀 수의 값으로(직원 시트·DB 0033 과 같은 규칙).
+            if not any(p.paid for p in booking.players) and ts._same_money(
+                booking.rate, ts.green_fee_for(booking.date, booking.holes)
+            ):
+                booking.rate = ts.green_fee_for(booking.date, body.holes)
             booking.holes = body.holes
 
         if not changes:

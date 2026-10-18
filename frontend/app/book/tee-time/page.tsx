@@ -33,6 +33,7 @@ import {
 } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
+import { greenFeeFor } from "@/lib/greenFee";
 import { CLUB, bookNav, lookupHref } from "@/lib/nav";
 import type { TeeBooking } from "@/lib/teeSheet/types";
 
@@ -449,7 +450,8 @@ function BookingForm({
   const size = Math.min(party, maxParty);
   const carts = cart ? Math.ceil(size / 2) : 0;
   const ready = name.trim().length > 0 && email.trim().length > 0 && !submitting;
-  const total = slot.rate * size;
+  const fee = greenFeeFor(slot.rate, holes);
+  const total = fee * size;
 
   const submit = async () => {
     setSubmitting(true);
@@ -513,7 +515,7 @@ function BookingForm({
           </div>
           <div className="min-w-0">
             <dt className="font-semibold text-[#8a6f30]">Green fee</dt>
-            <dd>${slot.rate.toFixed(2)} per player</dd>
+            <dd>${fee.toFixed(2)} per player</dd>
           </div>
           <div className="min-w-0">
             <dt className="font-semibold text-[#8a6f30]">Estimated total</dt>

@@ -4,6 +4,7 @@
  *
  * 요금은 **DB 가 실제로 매기는 값**을 옮겨 적은 것이다 — 손으로 정한 숫자가 아니다:
  *   - 그린피: `pelham_tee_rate(date)` (0025) — 평일 47.79, 주말·공휴일 58.41 (세전)
+ *   - 9홀: `pelham_tee_rate_for(date, 9)` (0033) — 18홀의 절반, 평일 23.90, 주말·공휴일 29.21 (세전)
  *   - 세금: `pelham_pos_tax` (0005) — HST 13%. 온라인 결제도 세전 요금에 이것을 더한다.
  *   - 추가 품목: `pelham_tee_extras` (0026) 의 기본값
  * 정적 export 라서 여기서 함수를 부를 수 없고(anon 에게 실행 권한도 없다), 그래서 문자열로 둔다.
@@ -23,12 +24,19 @@ import { BOOK_TEE_TIME, CLUB, SITE_MEMBERSHIPS } from "@/lib/nav";
 export const metadata: Metadata = {
   title: `Golf Rates | ${CLUB.name}`,
   description:
-    "Public green fees at Pelham Hills Golf Club — weekday and weekend/holiday rates, pull carts and driving range baskets.",
+    "Public green fees at Pelham Hills Golf Club — 18 and 9 holes, weekday and weekend/holiday rates, pull carts and driving range baskets.",
 };
 
 const greenFees = [
-  { name: "Weekday", when: "Monday – Friday", base: "$47.79", total: "$54.00" },
-  { name: "Weekend & Holiday", when: "Saturday, Sunday & statutory holidays", base: "$58.41", total: "$66.00" },
+  { name: "Weekday", when: "Monday – Friday", base: "$47.79", total: "$54.00", nineBase: "$23.90", nineTotal: "$27.01" },
+  {
+    name: "Weekend & Holiday",
+    when: "Saturday, Sunday & statutory holidays",
+    base: "$58.41",
+    total: "$66.00",
+    nineBase: "$29.21",
+    nineTotal: "$33.01",
+  },
 ];
 
 const extras = [
@@ -73,7 +81,13 @@ export default function GolfRatesPage() {
                 <p className="mt-1 text-[#516050]">{fee.when}</p>
                 <p className="mt-6 font-serif text-5xl font-semibold tabular-nums">{fee.total}</p>
                 <p className="mt-2 text-sm text-[#516050]">
-                  Includes HST · {fee.base} + 13% HST
+                  18 holes · includes HST · {fee.base} + 13% HST
+                </p>
+                <p className="mt-5 border-t border-[#d8d1c3] pt-4 text-[#182118]">
+                  <span className="font-serif text-2xl font-semibold tabular-nums">{fee.nineTotal}</span>{" "}
+                  <span className="text-sm text-[#516050]">
+                    9 holes · includes HST · {fee.nineBase} + 13% HST
+                  </span>
                 </p>
               </article>
             ))}

@@ -534,9 +534,18 @@ def test_get_rates_uses_the_tee_sheets_own_numbers(client):
     assert body["total"] == round(subtotal + round(subtotal * voice.TAX_RATE, 2), 2)
 
 
-def test_get_rates_refuses_nine_holes_instead_of_inventing_one(client):
-    """9홀 요금은 요금표에 없다. 지어내면 전화와 프로 샵의 금액이 달라진다."""
-    assert rates(client, holes=9).status_code == 422
+def test_get_rates_quotes_nine_holes_at_half_the_day_rate(client):
+    """9홀 = 18홀 요금의 절반(DB 0033 과 같은 값). 센트는 half-up — 58.41 → 29.21."""
+    body = rates(client, holes=9).json()
+    assert body["green_fee_per_player"] == ts.green_fee_for(TOMORROW, 9)
+    assert "9 holes" in body["message"]
+
+
+def test_green_fee_for_rounds_half_cents_up():
+    """파이썬 round 는 은행가 반올림이라 29.20 이 된다. DB 의 round 와 맞아야 한다."""
+    assert ts.green_fee_for("2026-10-24", 9) == 29.21  # 토요일 58.41
+    assert ts.green_fee_for("2026-10-20", 9) == 23.90  # 화요일 47.79
+    assert ts.green_fee_for("2026-10-20", 18) == ts.slot_rate_for("2026-10-20")
 
 
 def test_get_rates_charges_a_cart_per_rider(client):
@@ -589,6 +598,8 @@ def test_modify_changes_the_number_of_holes(client):
     done = modify(client, booking["booking_id"], "c-mod", holes=9)
     assert done.status_code == 200
     assert done.json()["booking"]["holes"] == 9
+    # 그린피도 9홀 요금으로 따라간다.
+    assert done.json()["booking"]["rate"] == ts.green_fee_for(TOMORROW, 9)
 
 
 def test_modify_cannot_move_the_tee_time(client):
