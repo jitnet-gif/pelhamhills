@@ -285,7 +285,7 @@ export default function RegisterTab({
                 onClick={() => setPhoneScanOpen(true)}
                 type="button"
               >
-                <QrIcon />
+                <BarcodeIcon />
                 <span className="hidden sm:inline">Phone</span>
               </button>
               <button
@@ -523,14 +523,17 @@ function ProductButton({ product, onAdd }: { product: Product; onAdd: () => void
   );
 }
 
-/** QR 모양. 이모지에는 QR 이 없어서 직접 그린다. */
-function QrIcon() {
+/** 바코드 모양. 이모지에는 바코드가 없어서 직접 그린다. */
+function BarcodeIcon() {
   return (
-    <svg aria-hidden className="size-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <rect height="7" width="7" x="3" y="3" />
-      <rect height="7" width="7" x="14" y="3" />
-      <rect height="7" width="7" x="3" y="14" />
-      <path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3" />
+    <svg aria-hidden className="size-4" fill="currentColor" viewBox="0 0 24 24">
+      <rect height="16" width="2" x="2" y="4" />
+      <rect height="16" width="1" x="5.5" y="4" />
+      <rect height="16" width="2.5" x="8" y="4" />
+      <rect height="16" width="1" x="12" y="4" />
+      <rect height="16" width="2" x="14.5" y="4" />
+      <rect height="16" width="1" x="18" y="4" />
+      <rect height="16" width="2" x="20" y="4" />
     </svg>
   );
 }
