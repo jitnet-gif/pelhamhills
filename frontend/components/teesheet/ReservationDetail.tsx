@@ -1670,20 +1670,25 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   className={`mt-1.5 flex items-center justify-center gap-1.5 px-1 py-1.5 font-bold text-white disabled:opacity-40 ${
                     !player.paid && useBills && billOf(player.id) ? "bg-[#168a3c]" : "bg-[#4533ff]"
                   }`}
-                  disabled={
-                    busy ||
-                    player.cancelled ||
-                    (useBills && !player.paid && (billState.busy || Boolean(billOf(player.id))))
-                  }
-                  onClick={() =>
-                    player.paid || !useBills ? openReceipt([player], player.paid) : void addToBill([player])
-                  }
+                  disabled={busy || player.cancelled || (useBills && !player.paid && billState.busy)}
+                  onClick={() => {
+                    if (player.paid || !useBills) return openReceipt([player], player.paid);
+                    const onBill = billOf(player.id);
+                    // 이미 담긴 선수: 그 계산서를 이 계산대의 "지금 계산서" 로 불러와 펼친다. 다른 탭·계산대에서
+                    // 담았거나 계산서를 잠시 놓아 두면(park) 패널이 비어 있어 받을 길이 없었다.
+                    if (onBill) {
+                      if (billState.bill?.id !== onBill.id) void billActions.select(onBill.id);
+                      setPayOpen(true);
+                      return;
+                    }
+                    void addToBill([player]);
+                  }}
                   title={
                     player.paid
                       ? "Paid — show the receipt to print again"
                       : useBills
                         ? billOf(player.id)
-                          ? `Already on bill #${billOf(player.id)?.id}`
+                          ? `On bill #${billOf(player.id)?.id} — open it to take payment`
                           : "Put this player's round on the current bill"
                         : "Show the receipt, then take payment"
                   }
