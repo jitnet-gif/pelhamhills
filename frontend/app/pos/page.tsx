@@ -11,9 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { POS_LAST_STATION } from "@/components/pos/PosRegister";
-
-/** Chrome·Edge 가 주는 설치 요청. 표준 타입에 아직 없다. */
-type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 const STATIONS = [
   { id: "snack-bar", href: "/pos/snack-bar", label: "Snack Bar / Bev Cart", note: "Food & Beverage only" },
@@ -23,9 +21,7 @@ const STATIONS = [
 export default function PosHome() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
-  const [standalone, setStandalone] = useState(false);
-  const [ios, setIos] = useState(false);
+  const { standalone, ios, install } = useInstallPrompt();
 
   useEffect(() => {
     let last: string | null = null;
@@ -41,27 +37,8 @@ export default function PosHome() {
       router.replace(station.href);
       return;
     }
-    setStandalone(
-      window.matchMedia("(display-mode: standalone)").matches ||
-        (navigator as Navigator & { standalone?: boolean }).standalone === true,
-    );
-    setIos(/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
     setReady(true);
   }, [router]);
-
-  useEffect(() => {
-    const onPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as InstallPrompt);
-    };
-    const onInstalled = () => setInstallPrompt(null);
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
 
   if (!ready) return <main className="min-h-[100dvh] bg-[#111315]" />;
 
@@ -87,13 +64,10 @@ export default function PosHome() {
           ))}
         </div>
 
-        {standalone ? null : installPrompt ? (
+        {standalone ? null : install ? (
           <button
             className="min-h-12 bg-[#4533ff] px-4 text-sm font-bold text-white hover:bg-[#3a2ae0]"
-            onClick={() => {
-              void installPrompt.prompt();
-              void installPrompt.userChoice.finally(() => setInstallPrompt(null));
-            }}
+            onClick={install}
             type="button"
           >
             Install Pelham POS on this device

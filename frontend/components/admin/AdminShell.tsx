@@ -46,6 +46,7 @@ import {
   isActive,
   type AdminDivision,
 } from "@/lib/nav";
+import InstallAppHint from "@/components/admin/InstallAppHint";
 import { ApiError } from "@/lib/teeSheet/api";
 import { todayIso } from "@/lib/teeSheet/dates";
 import { accessToken, getSession, signIn, signOut, subscribe } from "@/lib/teeSheet/session";
@@ -358,6 +359,7 @@ function DesktopSidebar({ pathname, division, onDivisionChange }: DivisionProps 
       </nav>
 
       <SidebarNote />
+      <InstallAppHint className="mx-3 mb-3 shrink-0" />
 
       {/* 레퍼런스의 마지막 두 줄. 도움말 센터는 진짜 링크이고, Share 는 붙일 대상이
           아직 없어서 표시로만 둔다. */}
@@ -646,6 +648,8 @@ function MobileDrawer({
             <NavLink item={item} key={item.href} onClick={onClose} pathname={pathname} />
           ))}
         </nav>
+
+        <InstallAppHint className="mx-4 mb-3" />
 
         <div className="border-t border-white/10 px-4 py-3 text-[11px] text-white/60">
           Pro Shop · Owner
