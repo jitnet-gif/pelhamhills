@@ -41,6 +41,19 @@ function product(
   };
 }
 
+/** 계산대 폴더(0030)를 예시 화면에서도 보이게. 없는 id 는 그룹 없음. */
+const DEMO_GROUPS: Record<number, string> = {
+  1: "Golf Balls",
+  2: "Golf Balls",
+  4: "Shirts",
+  5: "Hats",
+  6: "Outerwear",
+  7: "Gloves",
+  12: "Beer",
+  13: "Hot Food",
+  14: "Drinks",
+};
+
 export const demoProducts: Product[] = [
   product(1, "PH-BALL-PV1", "Titleist Pro V1 (dozen)", "Balls", 8499, 5400, 18),
   product(2, "PH-BALL-CHR", "Callaway Chrome Soft (dozen)", "Balls", 7499, 4800, 3),
@@ -61,7 +74,7 @@ export const demoProducts: Product[] = [
   product(15, "PH-RENT-CART", "Power cart — 18 holes", "Rentals", 3800, 0, null, 0),
   product(16, "PH-RENT-CLUB", "Rental clubs — full set", "Rentals", 4500, 0, null, 0),
   product(17, "PH-BALL-OLD", "Discontinued 2024 logo balls", "Balls", 4900, 3900, 0, 0, false),
-];
+].map((item) => ({ ...item, menu_group: DEMO_GROUPS[item.id] ?? null }));
 
 export const demoLowStock: LowStockItem[] = [
   {

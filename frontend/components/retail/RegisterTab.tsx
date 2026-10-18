@@ -25,6 +25,7 @@ import type { BillStation } from "@/lib/pos/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
 import { billActions, useCurrentBill } from "@/lib/pos/currentBill";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
+import { groupProducts, type MenuGroup } from "@/lib/retail/menuGroups";
 import { LOW_STOCK_RED_BELOW, RETAIL_CATEGORIES, formatMoney, type Product, type RetailCategory } from "@/lib/retail/types";
 
 import { Chip, EmptyNote, ErrorNote, SkeletonCards, TextInput, useOverlayDismiss } from "./ui";
@@ -65,6 +66,8 @@ export default function RegisterTab({
   const [search, setSearch] = useState("");
   const [pickedCategory, setCategory] = useState<RetailCategory | "All">("All");
   const category = lockedCategory ?? pickedCategory;
+  // 열어 둔 메뉴 그룹(폴더). Lightspeed 처럼 그룹 버튼을 먼저 보이고, 누르면 그 안의 상품만 보인다.
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const station: BillStation = lockedCategory === "Food & Beverage" ? "snack_bar" : "pro_shop";
 
   const { bill } = useCurrentBill();
@@ -91,6 +94,16 @@ export default function RegisterTab({
           : true,
       );
   }, [category, products, search]);
+
+  // 검색 중에는 폴더를 건너뛰고 맞는 상품을 바로 늘어놓는다 — 어느 폴더에 있는지 몰라도 찾게.
+  const searching = search.trim() !== "";
+  const menu = useMemo(() => groupProducts(visible), [visible]);
+  const shownGroup = searching ? null : (menu.groups.find((group) => group.key === openGroup) ?? null);
+
+  function pickCategory(next: RetailCategory | "All") {
+    setCategory(next);
+    setOpenGroup(null);
+  }
 
   const lineCount = bill?.lines.length ?? 0;
 
@@ -242,11 +255,11 @@ export default function RegisterTab({
             <div
               className={`-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 ${lockedCategory ? "hidden" : ""}`}
             >
-              <Chip active={category === "All"} onClick={() => setCategory("All")}>
+              <Chip active={category === "All"} onClick={() => pickCategory("All")}>
                 All
               </Chip>
               {RETAIL_CATEGORIES.map((name) => (
-                <Chip active={category === name} key={name} onClick={() => setCategory(name)}>
+                <Chip active={category === name} key={name} onClick={() => pickCategory(name)}>
                   {name}
                 </Chip>
               ))}
@@ -258,9 +271,29 @@ export default function RegisterTab({
               <SkeletonCards count={9} />
             ) : visible.length === 0 ? (
               <EmptyNote>No products match that search.</EmptyNote>
+            ) : searching ? (
+              <ProductGrid onAdd={addToBill} products={visible} />
+            ) : shownGroup ? (
+              <>
+                <nav aria-label="Menu group" className="mb-2 flex min-w-0 items-center gap-1 text-sm font-bold">
+                  <button
+                    className="inline-flex min-h-11 shrink-0 items-center px-2 text-[#4533ff] hover:underline"
+                    onClick={() => setOpenGroup(null)}
+                    type="button"
+                  >
+                    ← {category === "All" ? "All groups" : category}
+                  </button>
+                  <span aria-hidden className="text-[#9ca3af]">/</span>
+                  <span className="min-w-0 truncate px-1">{shownGroup.label}</span>
+                </nav>
+                <ProductGrid onAdd={addToBill} products={shownGroup.products} />
+              </>
             ) : (
               <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
-                {visible.map((product) => (
+                {menu.groups.map((group) => (
+                  <GroupButton group={group} key={group.key} onOpen={() => setOpenGroup(group.key)} />
+                ))}
+                {menu.loose.map((product) => (
                   <ProductButton key={product.id} onAdd={() => addToBill(product)} product={product} />
                 ))}
               </div>
@@ -372,6 +405,34 @@ function CartSheet({
 }
 
 // ===== 상품 카드 ========================================================
+
+function ProductGrid({ products, onAdd }: { products: Product[]; onAdd: (product: Product) => void }) {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
+      {products.map((product) => (
+        <ProductButton key={product.id} onAdd={() => onAdd(product)} product={product} />
+      ))}
+    </div>
+  );
+}
+
+/** 메뉴 그룹 폴더. 상품 카드와 같은 크기지만 어두운 판이라 한눈에 "들어가는 버튼" 으로 보인다. */
+function GroupButton({ group, onOpen }: { group: MenuGroup; onOpen: () => void }) {
+  const count = group.products.length;
+  return (
+    <button
+      className="flex min-h-[104px] min-w-0 flex-col justify-between gap-1 border border-[#111315] bg-[#111315] p-2.5 text-left text-white hover:border-[#4533ff] hover:bg-[#1f2328]"
+      onClick={onOpen}
+      type="button"
+    >
+      <span className="line-clamp-3 text-sm leading-tight font-bold">{group.label}</span>
+      <span className="flex items-baseline justify-between gap-2 text-[11px] text-white/70">
+        <span>{`${count} item${count === 1 ? "" : "s"}`}</span>
+        <span aria-hidden className="text-base text-white">›</span>
+      </span>
+    </button>
+  );
+}
 
 function ProductButton({ product, onAdd }: { product: Product; onAdd: () => void }) {
   // 재고 개념이 없는 렌탈은 `stock: null` 이다. 0 과 구분하지 않으면 "품절" 로

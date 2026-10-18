@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 
 import retailApi, { toRetailError } from "@/lib/retail/api";
+import { menuGroupSuggestions } from "@/lib/retail/menuGroups";
 import {
   LOW_STOCK_RED_BELOW,
   RETAIL_CATEGORIES,
@@ -70,7 +71,8 @@ export default function ProductsTab({
         needle
           ? item.name.toLowerCase().includes(needle) ||
             item.sku.toLowerCase().includes(needle) ||
-            (item.barcode ?? "").toLowerCase().includes(needle)
+            (item.barcode ?? "").toLowerCase().includes(needle) ||
+            (item.menu_group ?? "").toLowerCase().includes(needle)
           : true,
       );
   }, [products, search, showInactive]);
@@ -156,6 +158,7 @@ export default function ProductsTab({
                     <p className="text-sm leading-tight font-bold">{product.name}</p>
                     <p className="truncate text-xs text-[#6b7280]">
                       {product.sku}{product.barcode ? ` · ${product.barcode}` : ""} · {product.category}
+                      {product.menu_group ? ` › ${product.menu_group}` : ""}
                     </p>
                   </div>
                   <p className="shrink-0 text-base font-bold tabular-nums">
@@ -204,6 +207,7 @@ export default function ProductsTab({
                   <Th>SKU</Th>
                   <Th>Name</Th>
                   <Th>Category</Th>
+                  <Th>Menu group</Th>
                   <Th align="right">Price</Th>
                   <Th align="right">Stock</Th>
                   <Th align="right">Reorder</Th>
@@ -220,6 +224,7 @@ export default function ProductsTab({
                     </Td>
                     <Td className="font-bold">{product.name}</Td>
                     <Td className="text-[#6b7280]">{product.category}</Td>
+                    <Td className="text-[#6b7280]">{product.menu_group || "—"}</Td>
                     <Td align="right">{formatMoney(product.price)}</Td>
                     <Td align="right">
                       <StockText product={product} />
@@ -267,6 +272,7 @@ export default function ProductsTab({
 
       {editing ? (
         <ProductDialog
+          allProducts={products}
           defaultCategory={defaultCategory}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -330,6 +336,8 @@ type FormState = {
   sku: string;
   name: string;
   category: RetailCategory;
+  /** 계산대 메뉴 그룹. 빈 문자열이면 그룹 없음(null). */
+  menuGroup: string;
   /** "19.99" 같은 **날 문자열**. 센트 변환은 저장 직전에 한 번만 한다. */
   price: string;
   cost: string;
@@ -346,6 +354,7 @@ function toForm(product: Product | null, defaultCategory: RetailCategory): FormS
       sku: "",
       name: "",
       category: defaultCategory,
+      menuGroup: "",
       price: "",
       cost: "",
       stock: "",
@@ -358,6 +367,7 @@ function toForm(product: Product | null, defaultCategory: RetailCategory): FormS
     sku: product.sku,
     name: product.name,
     category: product.category,
+    menuGroup: product.menu_group ?? "",
     price: (product.price / 100).toFixed(2),
     cost: (product.cost / 100).toFixed(2),
     stock: product.stock === null ? "" : String(product.stock),
@@ -368,11 +378,14 @@ function toForm(product: Product | null, defaultCategory: RetailCategory): FormS
 
 function ProductDialog({
   product,
+  allProducts,
   defaultCategory,
   onClose,
   onSaved,
 }: {
   product: Product | null;
+  /** 그룹 칸의 제안 목록을 만든다. */
+  allProducts: Product[];
   defaultCategory: RetailCategory;
   onClose: () => void;
   onSaved: () => void;
@@ -380,6 +393,10 @@ function ProductDialog({
   const [form, setForm] = useState<FormState>(() => toForm(product, defaultCategory));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const groupOptions = useMemo(
+    () => menuGroupSuggestions(allProducts, form.category),
+    [allProducts, form.category],
+  );
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -398,6 +415,7 @@ function ProductDialog({
           barcode: code,
           name: strip(current.name),
           sku: strip(current.sku),
+          menuGroup: strip(current.menuGroup),
           price: strip(current.price),
           cost: strip(current.cost),
           stock: strip(current.stock),
@@ -424,6 +442,7 @@ function ProductDialog({
       barcode: form.barcode.trim() || null,
       name: form.name.trim(),
       category: form.category,
+      menu_group: form.menuGroup.trim() || null,
       price: priceCents,
       cost: parseMoney(form.cost),
       // 빈 칸은 "재고를 세지 않는 품목"(렌탈)이라는 뜻이라 0 이 아니라 null 이다.
@@ -487,6 +506,22 @@ function ProductDialog({
               </option>
             ))}
           </Select>
+        </Field>
+
+        <Field hint="Folder on the register, e.g. Hot Food, Beer, Men's Shirts. Blank = no folder." label="Menu group">
+          <TextInput
+            autoComplete="off"
+            list="pelham-menu-groups"
+            maxLength={40}
+            onChange={(event) => set("menuGroup", event.target.value)}
+            placeholder="Hot Food"
+            value={form.menuGroup}
+          />
+          <datalist id="pelham-menu-groups">
+            {groupOptions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </Field>
 
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

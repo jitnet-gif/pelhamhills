@@ -39,6 +39,8 @@ export type Product = {
   barcode?: string | null;
   name: string;
   category: RetailCategory;
+  /** 계산대의 메뉴 그룹(Lightspeed 의 그룹 버튼, 예: "Hot Food"). 없으면 null(0030 이전 응답엔 키가 없다). */
+  menu_group?: string | null;
   /** 판매가(센트). */
   price: Cents;
   /** 원가(센트). 마진 계산용이라 고객 화면에는 절대 내보내지 않는다. */
@@ -60,6 +62,8 @@ export type ProductCreate = {
   barcode?: string | null;
   name: string;
   category: RetailCategory;
+  /** 빈 문자열이나 null 이면 그룹 없음. */
+  menu_group?: string | null;
   price: Cents;
   cost?: Cents;
   stock?: number | null;
