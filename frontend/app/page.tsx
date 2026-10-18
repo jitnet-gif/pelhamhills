@@ -11,7 +11,7 @@ import Link from "next/link";
 import SiteFooter from "@/components/site/SiteFooter";
 import SiteHeader from "@/components/site/SiteHeader";
 import { clubHours } from "@/components/site/clubHours";
-import { BOOK_INDOOR, BOOK_TEE_TIME, CLUB, SITE_MEMBERSHIPS } from "@/lib/nav";
+import { BOOK_INDOOR, BOOK_TEE_TIME, CLUB, SITE_GOLF_RATES, SITE_MEMBERSHIPS } from "@/lib/nav";
 
 /**
  * 앵커 섹션이 sticky 헤더에 가리지 않게 하는 여백. 헤더 높이(`SiteHeader` 의
@@ -186,14 +186,12 @@ export default function Home() {
               The course balances approachable play with shot-making variety, framed by trees,
               water features, and the relaxed pace of a community club.
             </p>
-            <a
+            <Link
               className="mt-8 inline-block rounded-sm bg-white px-5 py-3 text-sm font-extrabold tracking-[0.12em] text-[#214d2f] uppercase"
-              href="https://www.pelhamhills.com/golf/rates/"
-              rel="noreferrer"
-              target="_blank"
+              href={SITE_GOLF_RATES}
             >
               See Rates
-            </a>
+            </Link>
           </div>
         </section>
 
