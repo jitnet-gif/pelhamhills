@@ -248,8 +248,8 @@ export default function TeeSheetPage() {
         {/* 하단은 언제나 `auto` — 상세 패널이 **자기 내용 높이**만 가져간다.
             예전에는 예약을 고르면 티 시트와 상세가 1fr 씩 반반으로 나눠 가졌는데,
             그러면 카드 넉 장이 400px 이 안 되는데도 늘 화면 절반을 먹어서 Discount ·
-            Payment 줄과 노란 메모가 접힌 아래로 내려갔다. 티 시트가 절반 밑으로
-            눌리는 것은 아래 `max-h-[50vh]` 가 막는다 — 그게 원래 이 1fr 의 역할이었다. */}
+            Payment 줄과 노란 메모가 접힌 아래로 내려갔다. 상세가 커지면 티 시트 칸이
+            그만큼 줄고 티 시트 안에서 스크롤한다 (아래 `max-h-[85dvh]` 주석 참고). */}
         <section className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]">
           {/* DateNav 은 Fragment 로 header + 툴바 + 토스트를 반환한다. 감싸지 않으면
               각각이 별도 grid 아이템이 되어 행 배정이 밀리고, minmax(0,1fr) 트랙에
@@ -269,11 +269,13 @@ export default function TeeSheetPage() {
               여기에는 Operations 바도 함께 있었지만 레퍼런스 화면에 없어서 뺐다
               (기능은 `/admin/integrations` 로 옮겼다 — 그 파일 머리말 참고).
 
-              상한은 화면 절반이다. `max-h-1/2`(=50%) 를 쓰면 안 된다 — 이 칸은 `auto`
-              트랙이라 백분율 상한이 화면이 아니라 **자기 콘텐츠 높이**를 기준으로 풀려서
-              패널이 늘 절반만 보이고 잘렸다. AdminShell 의 fill 이 화면 높이(100dvh)를
-              고정하므로 50vh 가 "화면 절반" 이라는 원래 의도 그대로다. */}
-          <div className="max-h-[50vh] min-h-0 overflow-y-auto">
+              상한은 화면의 85% 다. 예전 상한 50vh 는 카드 아래쪽(Subtotal · Select)을 잘라
+              상세 패널 안에서 위아래로 굴려야 했다(2026-10-18) — 직원은 패널이 통째로 보이고
+              움직이지 않기를 원한다. 그래서 상세는 자기 높이를 다 갖고, 줄어드는 쪽은 티 시트다.
+              85dvh 는 상세가 비정상적으로 길 때도 위 티 시트 몇 줄을 남기는 안전장치일 뿐이다.
+              `max-h-[85%]` 를 쓰면 안 된다 — 이 칸은 `auto` 트랙이라 백분율 상한이 화면이 아니라
+              **자기 콘텐츠 높이**를 기준으로 풀린다. */}
+          <div className="max-h-[85dvh] min-h-0 overflow-y-auto">
             {controller.selected ? <ReservationDetail controller={controller} /> : null}
           </div>
         </section>
