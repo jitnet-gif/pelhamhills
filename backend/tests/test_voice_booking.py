@@ -534,18 +534,45 @@ def test_get_rates_uses_the_tee_sheets_own_numbers(client):
     assert body["total"] == round(subtotal + round(subtotal * voice.TAX_RATE, 2), 2)
 
 
-def test_get_rates_quotes_nine_holes_at_half_the_day_rate(client):
-    """9홀 = 18홀 요금의 절반(DB 0033 과 같은 값). 센트는 half-up — 58.41 → 29.21."""
+def test_get_rates_quotes_the_nine_hole_rate_and_when_it_starts(client):
+    """9홀은 평일·주말 고정 요금(DB 0034 와 같은 값). 날짜만 받으므로 몇 시부터인지도 알려 준다."""
     body = rates(client, holes=9).json()
-    assert body["green_fee_per_player"] == ts.green_fee_for(TOMORROW, 9)
+    assert body["green_fee_per_player"] == 28.31
     assert "9 holes" in body["message"]
+    assert "10:00 AM" in body["message"]
 
 
-def test_green_fee_for_rounds_half_cents_up():
-    """파이썬 round 는 은행가 반올림이라 29.20 이 된다. DB 의 round 와 맞아야 한다."""
-    assert ts.green_fee_for("2026-10-24", 9) == 29.21  # 토요일 58.41
-    assert ts.green_fee_for("2026-10-20", 9) == 23.90  # 화요일 47.79
+def test_nine_hole_rates_follow_the_club_rate_card():
+    assert ts.green_fee_for("2026-10-20", 9) == 28.31  # 화요일
+    assert ts.green_fee_for("2026-10-24", 9) == 38.94  # 토요일
+    assert ts.green_fee_for("2026-10-12", 9) == 38.94  # 추수감사절(월) — 주말과 같다
     assert ts.green_fee_for("2026-10-20", 18) == ts.slot_rate_for("2026-10-20")
+    assert ts.nine_holes_from("2026-10-20") == 10 * 60
+    assert ts.nine_holes_from("2026-10-24") == 15 * 60
+    assert ts.nine_holes_from("2026-10-12") == 15 * 60
+
+
+def test_confirm_refuses_nine_holes_before_the_nine_hole_start(client):
+    held = hold(client, time="9:58 AM")
+    refused = client.post(
+        f"{API}/voice/tools/confirm-booking",
+        json={"hold_id": held.json()["hold_id"], "first_name": "Jin", "last_name": "Nakamura",
+              "phone": "905-892-1234", "holes": 9, "conversation_id": "c-test"},
+    )
+    assert refused.status_code == 422
+    assert "10:00 AM" in refused.json()["detail"]
+
+
+def test_confirm_books_nine_holes_from_the_nine_hole_start(client):
+    held = hold(client, time="10:07 AM")
+    done = client.post(
+        f"{API}/voice/tools/confirm-booking",
+        json={"hold_id": held.json()["hold_id"], "first_name": "Jin", "last_name": "Nakamura",
+              "phone": "905-892-1234", "holes": 9, "conversation_id": "c-test"},
+    )
+    assert done.status_code == 200, done.text
+    assert done.json()["booking"]["holes"] == 9
+    assert done.json()["booking"]["rate"] == 28.31
 
 
 def test_get_rates_charges_a_cart_per_rider(client):
@@ -593,13 +620,21 @@ def test_modify_cannot_overfill_a_tee_time(client):
 
 
 def test_modify_changes_the_number_of_holes(client):
-    booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
+    booking = book(client, time="10:07 AM", party=2, conversation="c-booked")
     lookup_first(client, "c-mod")
     done = modify(client, booking["booking_id"], "c-mod", holes=9)
     assert done.status_code == 200
     assert done.json()["booking"]["holes"] == 9
     # 그린피도 9홀 요금으로 따라간다.
     assert done.json()["booking"]["rate"] == ts.green_fee_for(TOMORROW, 9)
+
+
+def test_modify_keeps_an_early_tee_time_at_eighteen_holes(client):
+    booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
+    lookup_first(client, "c-mod")
+    refused = modify(client, booking["booking_id"], "c-mod", holes=9)
+    assert refused.status_code == 409
+    assert "10:00 AM" in refused.json()["detail"]
 
 
 def test_modify_cannot_move_the_tee_time(client):

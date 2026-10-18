@@ -11,7 +11,7 @@
  */
 
 import { ApiError } from "@/lib/teeSheet/api";
-import type { TeeBooking, TeeSlot } from "@/lib/teeSheet/types";
+import type { DayType, TeeBooking, TeeSlot } from "@/lib/teeSheet/types";
 
 /** 서버(`tee_sheet.py` 의 `PLAYERS_PER_TEE_TIME`)와 같은 값. */
 export const PLAYERS_PER_TEE_TIME = 4;
@@ -20,6 +20,8 @@ export type OpenTeeTime = {
   time: string;
   minutes: number;
   rate: number;
+  /** 요금 구분 (0034). 9홀 요금·시각을 고른다. 옛 서버에는 없다. */
+  dayType?: DayType;
   /** 이 티타임에 아직 팔 수 있는 자리 수 (0이면 만석). */
   remaining: number;
 };
@@ -146,6 +148,7 @@ export function buildOpenTeeTimes(
       time: slot.time,
       minutes: slot.minutes,
       rate: slot.rate,
+      dayType: slot.dayType,
       remaining: Math.max(PLAYERS_PER_TEE_TIME - (taken.get(slot.time) ?? 0), 0),
     });
   }

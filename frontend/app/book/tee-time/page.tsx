@@ -33,7 +33,7 @@ import {
 } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
-import { greenFeeFor } from "@/lib/greenFee";
+import { greenFeeFor, nineHoleRule, nineHolesOpen } from "@/lib/greenFee";
 import { CLUB, bookNav, lookupHref } from "@/lib/nav";
 import type { TeeBooking } from "@/lib/teeSheet/types";
 
@@ -450,7 +450,9 @@ function BookingForm({
   const size = Math.min(party, maxParty);
   const carts = cart ? Math.ceil(size / 2) : 0;
   const ready = name.trim().length > 0 && email.trim().length > 0 && !submitting;
-  const fee = greenFeeFor(slot.rate, holes);
+  // 9홀은 정해진 시각부터만(0034). 이른 티타임이면 버튼을 끄고 18홀로 둔다.
+  const nineOpen = nineHolesOpen(slot);
+  const fee = greenFeeFor(slot, holes);
   const total = fee * size;
 
   const submit = async () => {
@@ -598,11 +600,12 @@ function BookingForm({
             {([9, 18] as const).map((count) => (
               <button
                 aria-pressed={holes === count}
-                className={`tap-target min-w-0 flex-1 rounded-sm border text-base font-semibold transition ${
+                className={`tap-target min-w-0 flex-1 rounded-sm border text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
                   holes === count
                     ? "border-[#214d2f] bg-[#214d2f] text-white"
-                    : "border-[#d8d1c3] bg-white text-[#182118] hover:border-[#214d2f]"
+                    : "border-[#d8d1c3] bg-white text-[#182118] enabled:hover:border-[#214d2f]"
                 }`}
+                disabled={count === 9 && !nineOpen}
                 key={count}
                 onClick={() => setHoles(count)}
                 type="button"
@@ -611,6 +614,9 @@ function BookingForm({
               </button>
             ))}
           </div>
+          {nineOpen ? null : (
+            <p className="mt-1 text-xs text-[#8a6f30]">{nineHoleRule(slot)}.</p>
+          )}
         </div>
 
         <label className="flex items-start gap-3 text-base" htmlFor="tt-cart">

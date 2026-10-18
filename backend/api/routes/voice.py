@@ -887,6 +887,15 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
             ),
             *[ts.Player(name="Guest", ratePlan="Public") for _ in range(party_size - 1)],
         ]
+        if body.holes == 9 and (ts.label_to_minutes(hold.time) or 0) < ts.nine_holes_from(hold.date):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{ts.nine_holes_rule(hold.date)}, so {hold.time} can only be booked for "
+                    "eighteen holes. Ask the caller whether they want eighteen holes at this time "
+                    "or a later tee time for nine."
+                ),
+            )
         hold.title = f"{last}, {first}".strip(", ")
         hold.holes = body.holes
         hold.rate = ts.green_fee_for(hold.date, body.holes)
@@ -1234,7 +1243,8 @@ def get_rates(body: RatesRequest) -> RatesResponse:
     숫자는 전부 `tee_sheet` 의 요금 함수에서 온다 — `slot_rate_for`(주말/평일과
     `RATE_OVERRIDES`)와 `cart_fee_for`. 세율은 리테일의 `TAX_RATE` 한 벌을 쓴다.
 
-    9홀은 18홀 요금의 절반이다(2026-10-18 클럽 결정, `green_fee_for`·DB 0033).
+    9홀은 평일·주말 고정 요금이고 시간 제한이 있다(2026-10-18 클럽 요금표, `green_fee_for`·DB 0034).
+    날짜만 받으므로 금액과 함께 그 날 9홀이 몇 시부터인지 알려 준다.
     """
     _touch_session(body.conversation_id)
     iso_date = resolve_date(body.date)
@@ -1265,6 +1275,7 @@ def get_rates(body: RatesRequest) -> RatesResponse:
             f"On {spoken_date(iso_date)} it is ${green:.2f} per player for {body.holes} holes "
             f"before tax,{cart_part} so ${total:.2f} in total for {body.players} "
             f"{players_word} with tax. Read the total, not the breakdown, unless they ask."
+            + (f" {ts.nine_holes_rule(iso_date)} — mention that if they have not picked a time." if body.holes == 9 else "")
         ),
     )
 
@@ -1365,6 +1376,14 @@ def modify_booking(body: ModifyRequest) -> ModifyResponse:
             changes.append(f"players {before} to {body.party_size}")
 
         if body.holes is not None and body.holes != booking.holes:
+            if body.holes == 9 and (ts.label_to_minutes(booking.time) or 0) < ts.nine_holes_from(booking.date):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"{ts.nine_holes_rule(booking.date)}, so the {booking.time} tee time stays at "
+                        "eighteen holes. Offer to cancel and book a later tee time for nine."
+                    ),
+                )
             changes.append(f"holes {booking.holes} to {body.holes}")
             # 그린피가 자동값이면 새 홀 수의 값으로(직원 시트·DB 0033 과 같은 규칙).
             if not any(p.paid for p in booking.players) and ts._same_money(

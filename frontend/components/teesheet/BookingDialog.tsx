@@ -182,7 +182,7 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
   const selectedSlot = useMemo(() => slots.find((slot) => slot.time === time) ?? null, [slots, time]);
 
   // 요금은 선택한 슬롯과 홀 수에서 파생된다 — 사용자가 직접 고친 뒤에는 입력값을 그대로 쓴다.
-  const rate = rateTouched ? rateInput : selectedSlot ? greenFeeFor(selectedSlot.rate, holes).toFixed(2) : "";
+  const rate = rateTouched ? rateInput : selectedSlot ? greenFeeFor(selectedSlot, holes).toFixed(2) : "";
 
   const autoTitle = useMemo(() => {
     const lead = players[0];

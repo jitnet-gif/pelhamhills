@@ -812,14 +812,14 @@ function TeeEditForm({
   const [firstName, setFirstName] = useState(booking.first_name);
   const [lastName, setLastName] = useState(booking.last_name);
   const [phone, setPhone] = useState(booking.phone);
-  const [times, setTimes] = useState<{ time: string; remaining: number }[] | null>(null);
+  const [times, setTimes] = useState<{ time: string; remaining: number; nineHoles?: boolean }[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     setTimes(null);
-    bookingRpc<{ times: { time: string; remaining: number }[] }>("pelham_tee_availability", {
+    bookingRpc<{ times: { time: string; remaining: number; nineHoles?: boolean }[] }>("pelham_tee_availability", {
       p_date: date,
     })
       .then((res) => {
@@ -836,9 +836,11 @@ function TeeEditForm({
   // 남은 자리 수에는 이 예약 자신의 인원도 빠져 있다. 원래 티타임이면 그만큼 돌려받는다.
   const options = (times ?? []).map((t) => {
     const own = date === booking.date && t.time === booking.time ? booking.players : 0;
-    return { time: t.time, free: t.remaining + own, full: t.remaining + own < players };
+    // 9홀은 평일 10시·주말/공휴일 3시부터(0034). 옛 서버는 nineHoles 를 주지 않는다 — 서버가 다시 확인한다.
+    return { time: t.time, free: t.remaining + own, full: t.remaining + own < players, nine: t.nineHoles !== false };
   });
   const timeStillValid = options.some((o) => o.time === time);
+  const nineBlocked = holes === 9 && options.some((o) => o.time === time && !o.nine);
 
   async function save() {
     setError("");
@@ -848,6 +850,10 @@ function TeeEditForm({
     }
     if (!timeStillValid) {
       setError("Please pick a tee time.");
+      return;
+    }
+    if (nineBlocked) {
+      setError("Nine holes start at 10:00 AM on weekdays and 3:00 PM on weekends and holidays. Pick a later tee time or 18 holes.");
       return;
     }
     setSaving(true);
@@ -914,6 +920,7 @@ function TeeEditForm({
               <option disabled={o.full} key={o.time} value={o.time}>
                 {o.time}
                 {o.full ? " · full" : ` · ${o.free} open`}
+                {holes === 9 && !o.nine ? " · 18 holes only" : ""}
               </option>
             ))}
           </select>

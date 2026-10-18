@@ -426,16 +426,34 @@ def slot_rate_for(iso_date: str) -> float:
     return WEEKEND_RATE if kind == "weekend" else WEEKDAY_RATE
 
 
-def green_fee_for(iso_date: str, holes: int) -> float:
-    """그 날, 그 홀 수의 1인 그린피(세전). 9홀은 18홀 요금의 절반, 센트에서 반올림(half-up).
+# 9홀 요금(세전)과 9홀을 칠 수 있는 첫 시각. **2026-10-18 클럽 요금표**: 평일 $28.31 오전 10시부터,
+# 주말·공휴일 $38.94 오후 3시부터(마감까지). 공휴일 개별 18홀 요금과 무관하게 주말 값이다.
+# DB `pelham_tee_rate_for`·`pelham_tee_nine_from`(0034), `frontend/lib/greenFee.ts` 와 같아야 한다.
+NINE_HOLE_RATES = {"weekday": 28.31, "weekend": 38.94}
+NINE_HOLE_FROM_MINUTES = {"weekday": 10 * 60, "weekend": 15 * 60}
 
-    DB 의 `pelham_tee_rate_for`(0033)와 같은 값이어야 한다 — 파이썬 `round` 는 은행가 반올림이라
-    58.41 의 절반을 29.20 으로 만든다. 그래서 센트 정수로 계산한다.
-    """
-    rate = slot_rate_for(iso_date)
-    if holes != 9:
-        return rate
-    return (round(rate * 100) + 1) // 2 / 100
+
+def _nine_kind(iso_date: str) -> str:
+    return "weekday" if day_type_for(iso_date) == "weekday" else "weekend"
+
+
+def green_fee_for(iso_date: str, holes: int) -> float:
+    """그 날, 그 홀 수의 1인 그린피(세전). 9홀은 평일/주말·공휴일 고정 요금이다."""
+    if holes == 9:
+        return NINE_HOLE_RATES[_nine_kind(iso_date)]
+    return slot_rate_for(iso_date)
+
+
+def nine_holes_from(iso_date: str) -> int:
+    """그 날 9홀을 칠 수 있는 첫 티타임(자정부터 분). 그보다 이른 티타임은 손님이 9홀로 못 잡는다."""
+    return NINE_HOLE_FROM_MINUTES[_nine_kind(iso_date)]
+
+
+def nine_holes_rule(iso_date: str) -> str:
+    """손님·에이전트에게 읽어 줄 규칙 한 줄."""
+    if _nine_kind(iso_date) == "weekday":
+        return "Nine holes can be booked from 10:00 AM on weekdays"
+    return "Nine holes can be booked from 3:00 PM on weekends and holidays"
 
 
 def generate_slots(iso_date: str) -> list[TeeSlot]:
