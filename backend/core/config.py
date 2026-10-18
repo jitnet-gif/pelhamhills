@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     )
 
     # 프로 샵 대표 번호. 문자 답장으로 해결되지 않는 일은 이 번호로 안내한다.
-    PROSHOP_PHONE_NUMBER: str = "+12498050556"
+    PROSHOP_PHONE_NUMBER: str = "+14168227609"
 
     # ElevenLabs 설정은 여기 없다 — `backend/api/routes/voice.py` 와
     # `backend/services/voice_agent.py` 가 환경변수를 직접 읽는다 (docs/VOICE_BOOKING.md).

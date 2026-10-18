@@ -211,7 +211,7 @@ def send_confirmation_email(
               </p>
 
               <p style="color: #666; font-size: 12px;">
-                Questions? Contact us at info@pelhamhills.com or call 249-805-0556
+                Questions? Contact us at info@pelhamhills.com or call 416-822-7609
               </p>
             </div>
           </body>
