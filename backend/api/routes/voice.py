@@ -586,6 +586,17 @@ def confirmation_text(summary: BookingSummary) -> str:
     )
 
 
+def not_cancelled_text(reason: str) -> str:
+    """문자 취소("C <코드>")가 안 됐을 때의 답장. 안 됐다는 것과 전화하면 된다는 것을 같이 말한다.
+
+    "Call ... for help" 만 붙이면 손님은 취소가 됐는지 안 됐는지 모른 채 라운드를 놓친다.
+    """
+    return (
+        f"Pelham Hills: we could not cancel your booking. {reason} "
+        f"Please call the pro shop at {settings.PROSHOP_PHONE_NUMBER} and we will cancel it for you."
+    )
+
+
 def _summary(booking: ts.TeeBooking) -> BookingSummary:
     active = [p for p in booking.players if not p.cancelled] or booking.players
     return BookingSummary(

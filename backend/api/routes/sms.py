@@ -99,9 +99,8 @@ def cancel_by_reply(sender: str, code: str) -> str:
     """"C <코드>" 답장 처리. 손님에게 돌려줄 문장을 반환한다."""
     wanted_phone = voice.normalize_phone(sender)
     code = code.strip().upper()
-    help_line = f"Call {settings.PROSHOP_PHONE_NUMBER} for help."
     if not code:
-        return f"Pelham Hills: reply C and the code from your confirmation text, e.g. C 482915. {help_line}"
+        return voice.not_cancelled_text("Reply C and the code from your confirmation text, e.g. C 482915.")
 
     today = voice.today_iso()
     now = datetime.now(timezone.utc)
@@ -115,17 +114,17 @@ def cancel_by_reply(sender: str, code: str) -> str:
         and any(not p.cancelled and voice.normalize_phone(p.phone) == wanted_phone for p in booking.players)
     ]
     if not candidates:
-        return f"Pelham Hills: no upcoming booking matches code {code} for this number. {help_line}"
+        return voice.not_cancelled_text(f"There is no upcoming booking with code {code} for this number.")
 
     with ts.bookings_tx(Scope(ids=set(candidates))) as bookings:
         booking = next((b for b in bookings if b.id in candidates and _live(b, now)), None)
         if booking is None:
-            return f"Pelham Hills: that booking is already cancelled. {help_line}"
+            return "Pelham Hills: that booking is already cancelled. There is nothing else to do."
         at = voice.slot_datetime(booking.date, booking.time)
         if at is not None and (at - voice.club_now()).total_seconds() / 60 < voice.CANCEL_CUTOFF_MINUTES:
-            return (
-                f"Pelham Hills: your tee time is less than {voice.CANCEL_CUTOFF_MINUTES // 60} hours away, "
-                f"so the pro shop has to cancel it. {help_line}"
+            return voice.not_cancelled_text(
+                f"Your tee time is less than {voice.CANCEL_CUTOFF_MINUTES // 60} hours away, "
+                "so it can only be cancelled by the pro shop."
             )
         message = ts._apply_status(booking, ts.BookingStatus.CANCELLED, "Cancelled by text reply")
         ts._audit(booking, message)

@@ -456,18 +456,18 @@ def cancel_by_code(sender: str, code: str) -> str:
 
     발신번호와 코드가 둘 다 맞는 예약만 취소한다. 코드는 확인 문자에만 실려 간다.
     """
-    help_line = f"Call {settings.PROSHOP_PHONE_NUMBER} for help."
+    no_match = f"There is no upcoming booking with code {code} for this number."
     try:
         rows = find(sender, code=code)
         if not rows:
-            return f"Pelham Hills: no upcoming booking matches code {code} for this number. {help_line}"
+            return voice.not_cancelled_text(no_match)
         row = cancel(int(rows[0]["id"]), phone=sender, via="text")
     except HTTPException as exc:
         if exc.status_code == 409:
-            return f"Pelham Hills: {exc.detail} {help_line}"
+            return voice.not_cancelled_text(str(exc.detail))
         if exc.status_code == 503:
-            return f"Pelham Hills: we can't cancel by text right now. {help_line}"
-        return f"Pelham Hills: no upcoming booking matches code {code} for this number. {help_line}"
+            return voice.not_cancelled_text("Cancelling by text is not working right now.")
+        return voice.not_cancelled_text(no_match)
     booking = summary(row)
     when = f"{booking.spoken_date} at {booking.time}"
     if row.get("already"):

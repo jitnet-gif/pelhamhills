@@ -96,6 +96,9 @@ def test_reply_from_another_phone_does_not_cancel(client):
     reply = sms.cancel_by_reply("+12895550000", booking["confirmation_code"])
 
     assert "no upcoming booking" in reply
+    # 안 됐다는 것과 전화하면 취소해 준다는 것을 같이 말한다.
+    assert "could not cancel" in reply
+    assert f"call the pro shop at {voice.settings.PROSHOP_PHONE_NUMBER}" in reply
     assert status_of(booking["booking_id"]) == ts.BookingStatus.RESERVED
 
 
