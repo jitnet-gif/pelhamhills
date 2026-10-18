@@ -4,6 +4,8 @@
 //
 // 레이아웃은 pelhamhills 의 하단 패널을 그대로 따른다:
 //   ┌ 헤더 줄: ☎ 확인코드 · 홀 수 · 날짜 · 시각 ······ [Cancel] [Save]
+//     Cancel 은 저장 안 한 입력을 버리고 패널을 닫는다(예약 취소가 아니다 — 그건 레일의 🗑 에서).
+//     Save 는 언제나 누를 수 있고, 저장한 뒤 패널을 닫는다.
 //   ├ 왼쪽 아이콘 레일 │ 플레이어 카드 가로 나열
 //   └ 노란 메모 줄
 //
@@ -47,7 +49,6 @@ export type ReservationDetailProps = { controller: TeeSheetController };
 // ===== constants =====
 
 const MAX_PLAYERS = 4;
-const PLAYER_DEBOUNCE_MS = 700;
 const SAVED_FLASH_MS = 1800;
 
 const CANCEL_PRESETS = [
@@ -318,11 +319,10 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   // 결제 기록 줄에서 연 계산서 영수증(환불된 것이면 *** REFUNDED *** 가 찍힌다).
   const [billPreview, setBillPreview] = useState<Bill | null>(null);
 
-  // 최신 값을 debounce 타이머 콜백에서 읽기 위한 미러 ref 들.
+  // 비동기 저장 도중에도 최신 값을 읽기 위한 미러 ref 들.
   const bookingRef = useRef<TeeBooking | null>(booking);
   const draftsRef = useRef<Record<string, PlayerDraft>>(playerDrafts);
   const bookingDraftRef = useRef<BookingDraft | null>(bookingDraft);
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const inflightRef = useRef(0);
   // 진행 중인 카트 요금 저장. Payment 가 이것을 기다린다 — 요금 칸에서 바로 Payment 를 누르면
   // blur 의 저장과 결제 요청이 동시에 떠나고, 결제가 먼저 닿으면 영수증에 옛 요금이 찍힌다.
@@ -395,15 +395,9 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teeBillsKey]);
 
-  const clearTimers = useCallback(() => {
-    for (const timer of timersRef.current.values()) clearTimeout(timer);
-    timersRef.current.clear();
-  }, []);
-
   // 선택이 바뀌면 draft 를 버린다 (id 기준 — booking 객체 identity 기준이 아니다.
   // 객체 기준으로 리셋하면 매 PATCH 응답마다 입력 중인 값이 날아간다).
   useEffect(() => {
-    clearTimers();
     setBookingDraft(null);
     setPlayerDrafts({});
     setMode("none");
@@ -422,9 +416,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setRainCheckFor(null);
     setMenuFor(null);
     setSaveState({ kind: "idle", nonce: 0 });
-  }, [bookingId, clearTimers]);
-
-  useEffect(() => clearTimers, [clearTimers]);
+  }, [bookingId]);
 
   // 카탈로그는 패널을 열 때 읽는다. 못 읽었으면 다음에 열 때 다시 묻는다.
   const { loadExtras } = controller;
@@ -496,9 +488,10 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setSaveState((prev) => ({ kind: changed ? "saved" : "idle", nonce: prev.nonce + 1 }));
   }, []);
 
-  /** draft 를 커밋한다. 응답 후에도 draft 가 그대로면(=그 사이 타이핑 없음) 지운다. */
+  /** draft 를 커밋한다. 응답 후에도 draft 가 그대로면(=그 사이 타이핑 없음) 지운다.
+   *  바뀐 게 있어 보냈으면 true, 보낼 게 없었으면 false, 서버가 거절했으면 null(draft 는 남긴다). */
   const commitPlayer = useCallback(
-    async (playerId: string): Promise<boolean> => {
+    async (playerId: string): Promise<boolean | null> => {
       const current = bookingRef.current;
       if (!current) return false;
       const draft = draftsRef.current[playerId];
@@ -540,7 +533,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
       const titleWasTracking = leadChanged && current.title === reservationTitle(current.players);
 
       const updated = await controller.patchPlayer(current.id, playerId, patch);
-      if (updated && titleWasTracking) {
+      if (!updated) return null;
+      if (titleWasTracking) {
         const nextTitle = reservationTitle(updated.players);
         if (nextTitle !== updated.title) {
           await controller.patchBooking(updated.id, { title: nextTitle });
@@ -552,57 +546,14 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     [controller],
   );
 
-  const flushPlayer = useCallback(
-    async (playerId: string) => {
-      const timer = timersRef.current.get(playerId);
-      if (timer) {
-        clearTimeout(timer);
-        timersRef.current.delete(playerId);
-      }
-      // 실제로 바뀐 게 없으면 "saving…" 을 깜빡이지 않는다 (blur 마다 발생하므로).
-      const current = bookingRef.current;
-      const draft = current ? draftsRef.current[playerId] : undefined;
-      const player = current?.players.find((p) => p.id === playerId);
-      if (!current || !draft || !player || Object.keys(playerPatchFrom(player, draft)).length === 0) {
-        await commitPlayer(playerId); // draft 정리만 하고 끝
-        return;
-      }
-      beginSave();
-      let changed = false;
-      try {
-        changed = await commitPlayer(playerId);
-      } finally {
-        endSave(changed);
-      }
-    },
-    [beginSave, commitPlayer, endSave],
-  );
-
-  const schedulePlayerCommit = useCallback(
-    (playerId: string) => {
-      const existing = timersRef.current.get(playerId);
-      if (existing) clearTimeout(existing);
-      timersRef.current.set(
-        playerId,
-        setTimeout(() => {
-          timersRef.current.delete(playerId);
-          void flushPlayer(playerId);
-        }, PLAYER_DEBOUNCE_MS),
-      );
-    },
-    [flushPlayer],
-  );
-
-  const setPlayerField = useCallback(
-    (player: Player, field: keyof PlayerDraft, value: string) => {
-      setPlayerDrafts((prev) => {
-        const base = prev[player.id] ?? playerDraftOf(player);
-        return { ...prev, [player.id]: { ...base, [field]: value } };
-      });
-      schedulePlayerCommit(player.id);
-    },
-    [schedulePlayerCommit],
-  );
+  // 이름·전화·이메일은 draft 로만 들고 있다가 Save 에서 보낸다 — Cancel 이 되돌릴 수 있게.
+  // (예전에는 타이핑을 멈추거나 칸을 벗어나면 바로 저장돼서 Cancel 로 되돌릴 게 없었다.)
+  const setPlayerField = useCallback((player: Player, field: keyof PlayerDraft, value: string) => {
+    setPlayerDrafts((prev) => {
+      const base = prev[player.id] ?? playerDraftOf(player);
+      return { ...prev, [player.id]: { ...base, [field]: value } };
+    });
+  }, []);
 
   /** 그린피 칸을 커밋한다 (blur·Enter). 예전에는 맨 아래 Save 를 눌러야만 저장돼서, 칸만 고치고 나가면
    *  값이 그대로 남아 "가격이 안 바뀐다" 고 보였다. 매니저 승인(0024 `price`)이 필요하면 PIN 창이 뜬다.
@@ -691,32 +642,46 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const bookingDirty = Object.keys(pendingBookingPatch).length > 0;
   const dirty = bookingDirty || dirtyPlayerIds.length > 0;
 
-  const saveAll = useCallback(async () => {
+  /** 남은 draft 를 전부 보낸다. 하나라도 서버가 거절하면 false — 그 draft 는 칸에 남는다. */
+  const saveAll = useCallback(async (): Promise<boolean> => {
     const current = bookingRef.current;
-    if (!current) return;
-    clearTimers();
+    if (!current) return false;
     beginSave();
     let changed = false;
+    let ok = true;
     try {
       // 플레이어부터 순차로. 각 응답이 booking 전체를 교체하므로 병렬 금지.
       for (const player of current.players) {
-        const didChange = await commitPlayer(player.id);
-        changed = changed || didChange;
+        const result = await commitPlayer(player.id);
+        if (result === null) ok = false;
+        changed = changed || result === true;
       }
       const latest = bookingRef.current ?? current;
       const draft = bookingDraftRef.current;
       if (draft) {
         const patch = bookingPatchFrom(latest, draft);
         if (Object.keys(patch).length > 0) {
-          await controller.patchBooking(latest.id, patch);
-          changed = true;
+          if (await controller.patchBooking(latest.id, patch)) changed = true;
+          else ok = false;
         }
-        setBookingDraft((prev) => (prev === draft ? null : prev));
+        if (ok) setBookingDraft((prev) => (prev === draft ? null : prev));
       }
     } finally {
       endSave(changed);
     }
-  }, [beginSave, clearTimers, commitPlayer, controller, endSave]);
+    return ok;
+  }, [beginSave, commitPlayer, controller, endSave]);
+
+  /** 헤더의 Cancel — 저장 안 한 입력(이름·전화·이메일·메모·적다 만 요금)을 버린다.
+   *  홀 수·날짜·시각·요금제·카트처럼 고르는 즉시 저장되는 것은 이미 서버에 있으므로 되돌리지 않는다. */
+  const discardEdits = useCallback(() => {
+    setBookingDraft(null);
+    setPlayerDrafts({});
+    setFeeDrafts({});
+    setDateDraft(null);
+    setMode("none");
+    setCancelReason("");
+  }, []);
 
   // ===== empty state =====
 
@@ -1100,17 +1065,26 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 
         <button
           className="border border-[#c7c7cc] bg-white px-4 py-1.5 font-bold text-[#4e5560] hover:border-[#4533ff] disabled:opacity-40"
-          disabled={busy || booking.status === "cancelled"}
-          onClick={() => setMode(mode === "cancel" ? "none" : "cancel")}
-          title="Cancel this reservation"
+          disabled={busy}
+          onClick={() => {
+            discardEdits();
+            controller.select(null);
+          }}
+          title="Discard what you typed and close"
           type="button"
         >
           Cancel
         </button>
         <button
           className="bg-[#4533ff] px-5 py-1.5 font-bold text-white disabled:cursor-not-allowed disabled:bg-[#b1a8ff]"
-          disabled={busy || !dirty}
-          onClick={() => void saveAll()}
+          disabled={busy}
+          onClick={async () => {
+            // 칸에서 바로 Save 를 누르면 카트 요금의 blur 저장이 아직 가는 중일 수 있다.
+            await Promise.all(feeCommitsRef.current.values());
+            // 실패하면 패널을 열어 둔다 — 고친 값이 칸에 남아 있어 다시 누를 수 있다.
+            if (await saveAll()) controller.select(null);
+          }}
+          title="Save and close"
           type="button"
         >
           Save
@@ -1226,6 +1200,16 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             >
               Delete permanently
             </button>
+            {booking.status !== "cancelled" ? (
+              <button
+                className="border border-[#8a3f26] bg-white px-4 py-2 font-bold text-[#8a3f26] disabled:opacity-40"
+                disabled={busy}
+                onClick={() => setMode("cancel")}
+                type="button"
+              >
+                Cancel reservation instead
+              </button>
+            ) : null}
             <button
               className="border border-[#c7c7cc] bg-white px-4 py-2 font-bold"
               onClick={() => setMode("none")}
@@ -1251,7 +1235,6 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
           historyOpen={historyOpen}
           onTogglePay={() => setPayOpen((open) => !open)}
           payOpen={payOpen && useBills}
-          onClose={() => controller.select(null)}
           onDelete={() => setMode(mode === "delete" ? "none" : "delete")}
           onToggleHistory={() => setHistoryOpen((open) => !open)}
           playerCount={players.length}
@@ -1452,7 +1435,6 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     <span className="sr-only">Last Name</span>
                     <input
                       className="w-full border-b border-[#d7d7dc] px-1 py-1 font-bold outline-none focus:border-[#4533ff]"
-                      onBlur={() => void flushPlayer(player.id)}
                       onChange={(event) => setPlayerField(player, "lastName", event.target.value)}
                       placeholder="Last Name"
                       value={pd.lastName}
@@ -1462,7 +1444,6 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     <span className="sr-only">First Name</span>
                     <input
                       className="w-full border-b border-[#d7d7dc] px-1 py-1 outline-none focus:border-[#4533ff]"
-                      onBlur={() => void flushPlayer(player.id)}
                       onChange={(event) => setPlayerField(player, "firstName", event.target.value)}
                       placeholder="First Name"
                       value={pd.firstName}
@@ -1480,7 +1461,6 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     <input
                       className="w-full border-b border-[#d7d7dc] px-1 py-1 outline-none focus:border-[#4533ff]"
                       inputMode="tel"
-                      onBlur={() => void flushPlayer(player.id)}
                       onChange={(event) => setPlayerField(player, "phone", event.target.value)}
                       placeholder="Phone"
                       value={pd.phone}
@@ -1507,7 +1487,6 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                       emailInvalid ? "border-[#8a3f26]" : "border-[#d7d7dc]"
                     }`}
                     inputMode="email"
-                    onBlur={() => void flushPlayer(player.id)}
                     onChange={(event) => setPlayerField(player, "email", event.target.value)}
                     placeholder="Email"
                     value={pd.email}
@@ -2046,7 +2025,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 /**
  * 상세 패널 왼쪽의 세로 아이콘 레일.
  *
- * 실제로 무언가 하는 것은 결제 · 히스토리 · 복제 · 삭제 · 닫기뿐이다. 나머지 글리프는
+ * 실제로 무언가 하는 것은 결제 · 히스토리 · 복제 · 삭제뿐이다. 나머지 글리프는
  * 레퍼런스의 자리를 지키는 **표시**이고 버튼이 아니다(`<span>`). 눌러도 아무 일이
  * 없는 과녁을 일곱 개 만들어 두면 사용자는 앱이 고장 났다고 생각한다 — 사이드바의
  * Golf 드롭다운, 상단바 글리프와 같은 판단이다.
@@ -2063,7 +2042,6 @@ function IconRail({
   productsOpen,
   onToggleProducts,
   onDelete,
-  onClose,
 }: {
   playerCount: number;
   historyOpen: boolean;
@@ -2076,7 +2054,6 @@ function IconRail({
   productsOpen: boolean;
   onToggleProducts: () => void;
   onDelete: () => void;
-  onClose: () => void;
 }) {
   const cell = "flex h-7 w-9 items-center justify-center";
   return (
@@ -2128,14 +2105,6 @@ function IconRail({
         type="button"
       >
         <Glyph name="copy" />
-      </button>
-      <button
-        className={`${cell} text-[15px] text-[#4e5560] hover:bg-white/60`}
-        onClick={onClose}
-        title="Close and expand the tee sheet"
-        type="button"
-      >
-        <span aria-hidden>&times;</span>
       </button>
       <button
         className={`${cell} text-[#8a3f26] hover:bg-white/60`}
