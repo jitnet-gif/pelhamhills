@@ -20,9 +20,13 @@ export const metadata: Metadata = {
     "Apply online for a 2027 Pelham Hills Golf Club membership at Early Bird rates. Pay in full by November 15, 2026.",
 };
 
-/** 클럽이 관리하는 종이 신청서(요금표 PDF 2쪽). */
-const APPLICATION_PDF =
-  "https://pelhamhills.com/wp-content/uploads/sites/216/2026/09/Pelham_Hills_2027_Rates.pdf";
+/**
+ * 종이 신청서(요금표 PDF v3, 2026-09-14 — 1쪽 요금표, 2쪽 신청서). 옛 사이트 주소로 링크하면 다른 도메인이라
+ * `download` 가 무시되고 새 탭에서 열리기만 해서, 파일을 `public/files/` 에 두고 내려받게 한다.
+ * 클럽이 PDF 를 새로 내면 이 파일을 바꿔 넣는다.
+ */
+const APPLICATION_PDF = "/files/pelham-hills-2027-membership-application.pdf";
+const APPLICATION_PDF_NAME = "Pelham Hills 2027 Membership Application.pdf";
 
 export default function MembershipApplicationPage() {
   return (
@@ -56,7 +60,7 @@ export default function MembershipApplicationPage() {
           <MembershipApplicationForm />
           <p className="mt-8 text-sm leading-6 text-[#516050]">
             Prefer paper?{" "}
-            <a className="font-bold text-[#214d2f] underline" href={APPLICATION_PDF} rel="noreferrer" target="_blank">
+            <a className="font-bold text-[#214d2f] underline" download={APPLICATION_PDF_NAME} href={APPLICATION_PDF}>
               Download the printable application (PDF)
             </a>{" "}
             and bring it to the pro shop. Questions? Call{" "}

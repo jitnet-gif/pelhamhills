@@ -31,6 +31,15 @@
           "value": "image/webp"
         }
       ]
+    },
+    {
+      "source": "/files/:file*.pdf",
+      "headers": [
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        }
+      ]
     }
   ]
 }
