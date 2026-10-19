@@ -39,6 +39,9 @@ export const SITE_HOME = "/";
 
 /** 회원권 요금은 홈 섹션 하나로는 길어서 따로 한 장이다. */
 export const SITE_MEMBERSHIPS = "/memberships";
+/** 회원권 하위 두 장: 온라인 신청서와 Early Bird 혜택 안내. 회원권 첫 장의 두 버튼이 가리킨다. */
+export const SITE_MEMBERSHIP_APPLY = "/memberships/application";
+export const SITE_MEMBERSHIP_EARLY_BIRD = "/memberships/early-bird";
 
 /** 그린피 안내. 옛 사이트 주소(`/golf/rates/`)를 그대로 쓴다 — 밖에 퍼진 링크가 살아 있게. */
 export const SITE_GOLF_RATES = "/golf/rates";

@@ -6,7 +6,7 @@
  * Early Bird 혜택 안내문(Final_2027)에서 옮겼다(2026-10-19).
  * 가격은 계산하지 않고 **원문 표기 그대로** 문자열로 둔다 — 클럽이 요율을 바꾸면 원문과
  * 한 줄씩 대조해서 고치게 된다. 신청서·혜택 안내 파일은 클럽이 원본을 관리하므로 복사하지
- * 않고 그쪽 주소로 연결한다.
+ * 않는다. 두 버튼은 사이트 안의 하위 페이지(온라인 신청서·Early Bird 안내)로 간다(2026-10-19).
  *
  * 서버 컴포넌트다. 홈(`app/page.tsx`)과 같은 이유로 `"use client"` 를 붙이지 마라.
  */
@@ -16,7 +16,13 @@ import Link from "next/link";
 
 import SiteFooter from "@/components/site/SiteFooter";
 import SiteHeader from "@/components/site/SiteHeader";
-import { BOOK_INDOOR, BOOK_TEE_TIME, CLUB } from "@/lib/nav";
+import {
+  BOOK_INDOOR,
+  BOOK_TEE_TIME,
+  CLUB,
+  SITE_MEMBERSHIP_APPLY,
+  SITE_MEMBERSHIP_EARLY_BIRD,
+} from "@/lib/nav";
 
 export const metadata: Metadata = {
   title: `Memberships | ${CLUB.name}`,
@@ -24,10 +30,6 @@ export const metadata: Metadata = {
     "2027 Early Bird membership rates at Pelham Hills Golf Club — full, weekday, intermediate, 9-hole, twilight and junior memberships, power cart packages and driving range passes.",
 };
 
-const APPLICATION_PDF =
-  "https://pelhamhills.com/wp-content/uploads/sites/216/2026/09/Pelham_Hills_2027_Rates.pdf";
-const EARLY_BIRD_FLYER =
-  "https://pelhamhills.com/wp-content/uploads/sites/216/2026/09/Flyer_for_Early_Bird_Special_Benefit_for_Membership_Final_2027_.01.docx";
 
 /** `spousal` 이 없는 회원권은 원문에도 칸이 비어 있다(개인 전용). */
 const memberships: { name: string; access: string; single: string; spousal?: string }[] = [
@@ -122,22 +124,18 @@ export default function MembershipsPage() {
               {CLUB.name}.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
+              <Link
                 className="rounded-sm bg-[#d6c28f] px-6 py-3 text-center text-sm font-extrabold tracking-[0.12em] text-[#182118] uppercase transition hover:bg-[#ead7a1]"
-                href={APPLICATION_PDF}
-                rel="noreferrer"
-                target="_blank"
+                href={SITE_MEMBERSHIP_APPLY}
               >
                 Membership Application
-              </a>
-              <a
+              </Link>
+              <Link
                 className="rounded-sm border border-white/70 px-6 py-3 text-center text-sm font-extrabold tracking-[0.12em] text-white uppercase transition hover:bg-white hover:text-[#214d2f]"
-                href={EARLY_BIRD_FLYER}
-                rel="noreferrer"
-                target="_blank"
+                href={SITE_MEMBERSHIP_EARLY_BIRD}
               >
                 Early Bird Benefits
-              </a>
+              </Link>
             </div>
           </div>
         </section>
@@ -293,11 +291,11 @@ export default function MembershipsPage() {
               <h2 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">Apply and pay by Nov 15.</h2>
               <p className="mt-4 leading-7 text-[#516050]">
                 Fill in the{" "}
-                <a className="font-bold text-[#214d2f] underline" href={APPLICATION_PDF} rel="noreferrer" target="_blank">
-                  membership application
-                </a>{" "}
-                with your membership category, name(s), address, cellphone and email, and bring or send it
-                to the pro shop with payment in full by{" "}
+                <Link className="font-bold text-[#214d2f] underline" href={SITE_MEMBERSHIP_APPLY}>
+                  online membership application
+                </Link>{" "}
+                with your membership category, name(s), address, cellphone and email. The pro shop will
+                confirm it and arrange payment in full by{" "}
                 <strong className="text-[#182118]">November 15, 2026</strong>.
               </p>
             </div>

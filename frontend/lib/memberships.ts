@@ -7,6 +7,7 @@
  * 그쪽은 원문 표기 문자열이라 여기서 다시 숫자로 적는다 — 클럽이 요금을 바꾸면 두 곳을 같이 고친다.
  */
 
+import { bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
@@ -37,12 +38,40 @@ export type Membership = {
   status: MembershipStatus;
   sim_hours_used: number;
   notes: string | null;
+  /** staff: 프로 샵이 넣음 · online: 손님이 `/memberships/application` 에서 신청(0041). */
+  source: "staff" | "online";
   created_at: string;
   updated_at: string;
 };
 
 /** 저장할 때 보내는 꼴. 고칠 때는 바꾼 키만 보낸다. */
-export type MembershipInput = Partial<Omit<Membership, "id" | "created_at" | "updated_at">>;
+export type MembershipInput = Partial<Omit<Membership, "id" | "created_at" | "updated_at" | "source">>;
+
+/** 손님 신청서가 보내는 꼴(0041 `pelham_membership_apply`). */
+export type MembershipApplication = Pick<
+  MembershipInput,
+  | "season"
+  | "member_name"
+  | "phone"
+  | "email"
+  | "address"
+  | "postal_code"
+  | "membership_type"
+  | "plan"
+  | "spouse_name"
+  | "cart_package"
+  | "range_pass"
+  | "amount_due"
+  | "payment_method"
+  | "notes"
+> & { agreed: boolean };
+
+export type ApplicationReceipt = { reference: string; member_name: string; season: number; amount_due: number };
+
+/** 손님용. 공개 키로 부르는 함수는 이것 하나다. */
+export function applyForMembership(input: MembershipApplication): Promise<ApplicationReceipt> {
+  return bookingRpc<ApplicationReceipt>("pelham_membership_apply", { p: input });
+}
 
 /** 고객 명부에서 회원으로 표시됐지만 이 시즌 회원권이 아직 없는 사람. */
 export type RenewalCandidate = {
@@ -100,6 +129,9 @@ export const CREDIT_CARD_SURCHARGE = 0.03;
 
 /** 신청서의 결제 수단 네 가지. 신용카드만 3% 가 붙는다. */
 export const PAYMENT_METHODS = ["Cheque", "Credit card", "E-transfer", "Cash"] as const;
+
+/** 지금 파는 회원권 시즌. 온라인 신청서가 이 시즌으로 낸다. */
+export const MEMBERSHIP_SEASON = 2027;
 
 /** Early Bird 요금이 끝나는 날(이날까지 완납). */
 export const EARLY_BIRD_DEADLINE = "2026-11-15";

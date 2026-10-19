@@ -359,8 +359,13 @@ function MemberCard({ row, onOpen }: { row: Membership; onOpen: () => void }) {
             <span className="font-normal text-[#6b7280]"> &amp; {row.spouse_name}</span>
           ) : null}
         </h3>
-        <span className={`shrink-0 px-1.5 py-0.5 text-[10px] font-bold uppercase ${BADGE[row.status]}`}>
-          {STATUS_LABEL[row.status]}
+        <span className="flex shrink-0 gap-1">
+          {row.source === "online" ? (
+            <span className="bg-[#eceaff] px-1.5 py-0.5 text-[10px] font-bold text-[#3626d6] uppercase">Online</span>
+          ) : null}
+          <span className={`px-1.5 py-0.5 text-[10px] font-bold uppercase ${BADGE[row.status]}`}>
+            {STATUS_LABEL[row.status]}
+          </span>
         </span>
       </div>
       <p className="text-xs text-[#3f434a]">
@@ -384,6 +389,10 @@ function MemberCard({ row, onOpen }: { row: Membership; onOpen: () => void }) {
           </span>
         ) : null}
       </div>
+      {/* 온라인 신청의 금액은 손님 화면이 낸 견적이다(0041). 요금표와 다르면 결제 전에 본다. */}
+      {row.source === "online" && row.status === "pending" && Number(row.amount_due) !== listPrice(row) ? (
+        <p className="text-xs font-bold text-[#8a1f1f]">Check amount — rate card says {money(listPrice(row))}</p>
+      ) : null}
       {row.phone || row.email ? (
         <p className="truncate text-xs text-[#6b7280]">{[row.phone, row.email].filter(Boolean).join(" · ")}</p>
       ) : null}
