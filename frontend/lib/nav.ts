@@ -261,9 +261,9 @@ export function isActive(pathname: string | null | undefined, href: string): boo
 export const CLUB = {
   name: "Pelham Hills Golf Club",
   shortName: "Pelham Hills",
-  address: "196 Webber Road, Welland, ON L3B 5N9",
+  address: "196 Webber Road, Welland, ON L3B 5N8",
   /** 우편 주소 전체. 영수증 머리글이 쓴다 — 클럽이 쓰던 Lightspeed 영수증(2026-09-15)의 표기 그대로. */
-  mailingAddress: ["196 Webber Road", "Welland, Ontario, L3B 5N9", "Canada"],
+  mailingAddress: ["196 Webber Road", "Welland, Ontario, L3B 5N8", "Canada"],
   phone: "+1 (249) 805-0556",
   phoneHref: "tel:+12498050556",
   email: "info@pelhamhills.com",

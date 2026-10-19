@@ -381,8 +381,8 @@ def terminal_location() -> str:
         raise StripeError("Create a Terminal location in the Stripe Dashboard first.")
     created = _request("POST", "/terminal/locations", {
         "display_name": "Pelham Hills Golf Club (test)",
-        "address": {"line1": "Pelham Hills Golf Club", "city": "Fonthill", "state": "ON",
-                    "postal_code": "L0S 1E0", "country": "CA"},
+        "address": {"line1": "196 Webber Road", "city": "Welland", "state": "ON",
+                    "postal_code": "L3B 5N8", "country": "CA"},
     }, idempotency_key="pelham-test-location")
     return str(created.get("id") or "")
 

@@ -32,7 +32,7 @@ function monthYear(iso: string): string {
 }
 
 // ===== 일출 / 일몰 =====
-// Pelham Hills Golf Club, Fonthill ON. 시간대를 고정 상수로 두는 이유: 서버(UTC일 수 있음)와
+// Pelham Hills Golf Club, Welland ON. 시간대를 고정 상수로 두는 이유: 서버(UTC일 수 있음)와
 // 브라우저가 서로 다른 TZ여도 같은 문자열이 나와야 하이드레이션이 깨지지 않는다.
 const CLUB_LAT = 43.03;
 const CLUB_LON = -79.29;

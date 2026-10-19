@@ -38,7 +38,7 @@ const { paidBillFor, teeReceipt, teeReceiptFor } = await import("../lib/teeSheet
 
 const HEADER = {
   name: "Pelham Hills Golf Club",
-  addressLines: ["196 Webber Road", "Welland, Ontario, L3B 5N9", "Canada"],
+  addressLines: ["196 Webber Road", "Welland, Ontario, L3B 5N8", "Canada"],
   phone: "+1 (905) 735-6768",
 };
 
@@ -99,7 +99,7 @@ test("the green-fee receipt follows the Lightspeed layout block by block", () =>
       { kind: "logo" },
       { kind: "text", text: "Pelham Hills Golf Club", align: "center", bold: true, large: true },
       { kind: "text", text: "196 Webber Road", align: "center" },
-      { kind: "text", text: "Welland, Ontario, L3B 5N9", align: "center" },
+      { kind: "text", text: "Welland, Ontario, L3B 5N8", align: "center" },
       { kind: "text", text: "Canada", align: "center" },
       { kind: "text", text: "+1 (905) 735-6768", align: "center" },
       { kind: "text", text: "Sales Receipt", align: "center", bold: true, large: true, gap: true },

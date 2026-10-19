@@ -84,7 +84,7 @@ CLUB_NAME = os.getenv("CLUB_NAME", "Pelham Hills Golf Club")
 #: Lightspeed 영수증 2026-09-15 기준). 영업시간·메뉴·분실물 규정 같은 건 넣지 않는다 —
 #: 시연 시나리오에 나오는 그 값들은 클럽 확인 전 샘플이라, 문자로 보내면 틀린 정보가
 #: 손님 손에 남는다.
-CLUB_ADDRESS = "196 Webber Road, Welland, Ontario, L3B 5N9"
+CLUB_ADDRESS = "196 Webber Road, Welland, Ontario, L3B 5N8"
 SITE_URL = os.getenv("PUBLIC_SITE_URL", "https://pelhamhills-golf.vercel.app").rstrip("/")
 
 #: 한 통화가 보낼 수 있는 안내 문자 수. 에이전트가 말에 끌려 같은 문자를 반복해서
