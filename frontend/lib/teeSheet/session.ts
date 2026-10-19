@@ -186,13 +186,19 @@ async function tokenRequest(
  */
 /**
  * 직원은 이메일 대신 짧은 아이디(예: `hwang`)로도 들어온다. GoTrue 는 이메일만 받으므로
- * `@` 가 없는 입력은 클럽 도메인 계정(`hwang@pelhamhills.com`)으로 바꿔 보낸다.
+ * `@` 가 없는 입력은 계정 이메일로 바꿔 보낸다 — 별칭 표에 있으면 그 이메일,
+ * 없으면 클럽 도메인 계정(`<아이디>@pelhamhills.com`).
  */
 const STAFF_ID_DOMAIN = "pelhamhills.com";
+const STAFF_ID_ALIASES: Record<string, string> = {
+  hwang: "proshop@pelhamhills.com",
+};
 
 function loginEmail(login: string): string {
   const value = login.trim();
-  return value.includes("@") ? value : `${value.toLowerCase()}@${STAFF_ID_DOMAIN}`;
+  if (value.includes("@")) return value;
+  const id = value.toLowerCase();
+  return STAFF_ID_ALIASES[id] ?? `${id}@${STAFF_ID_DOMAIN}`;
 }
 
 export async function signIn(login: string, password: string): Promise<StaffSession> {
