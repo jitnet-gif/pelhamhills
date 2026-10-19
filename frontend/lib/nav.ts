@@ -109,6 +109,7 @@ export const adminNav: NavItem[] = [
   { label: "Dynamic Pricing", href: "/admin/dynamic-pricing", glyph: "↗" },
   { label: "Events", href: "/admin/events", glyph: "▤" },
   { label: "Customers", href: "/admin/customers", glyph: "●" },
+  { label: "Memberships", href: "/admin/memberships", glyph: "★" },
   { label: "Tour Operators", href: "/admin/tour-operators", glyph: "✈" },
   { label: "Promotions", href: "/admin/promotions", glyph: "▶" },
   { label: "Calls & SMS", href: "/admin/calls", glyph: "☏" },
