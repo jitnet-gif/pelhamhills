@@ -76,10 +76,14 @@ export default function SiteHeader() {
   const handleAnchorClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
     setMenuOpen(false);
     if (!href.startsWith("/#")) return; // 진짜 페이지 이동은 라우터에 맡긴다
+    // 홈이 아닌 장(`/memberships`, `/golf/rates` …)에는 그 섹션이 없다. 여기서 막으면
+    // 아무 일도 안 일어나므로, 브라우저가 홈으로 넘어가 앵커로 점프하게 둔다.
+    const target = document.querySelector(href.slice(1));
+    if (!target) return;
     event.preventDefault();
     document.body.style.overflow = "";
     // 섹션마다 `scroll-mt-*` 가 걸려 있어서 sticky 헤더에 제목이 가리지 않는다.
-    document.querySelector(href.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
