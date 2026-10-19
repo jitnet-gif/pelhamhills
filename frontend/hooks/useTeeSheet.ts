@@ -79,7 +79,7 @@ const FALLBACK_SLOT_TIMES = [
   "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
 ];
 
-const FALLBACK_RATE = 47.79;
+const FALLBACK_RATE = 40.71;
 
 const FALLBACK_SLOTS: TeeSlot[] = FALLBACK_SLOT_TIMES.map((time) => ({
   time,

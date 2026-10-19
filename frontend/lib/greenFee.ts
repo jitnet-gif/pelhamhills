@@ -18,7 +18,7 @@ const NINE_HOLES = {
 type SlotLike = { rate: number; minutes: number; dayType?: DayType };
 
 function nineTerms(slot: SlotLike) {
-  const kind = slot.dayType ?? (Math.round(slot.rate * 100) === 4779 ? "weekday" : "weekend");
+  const kind = slot.dayType ?? (Math.round(slot.rate * 100) === 4071 ? "weekday" : "weekend");
   return kind === "weekday" ? NINE_HOLES.weekday : NINE_HOLES.weekend;
 }
 

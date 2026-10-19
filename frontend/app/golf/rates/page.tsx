@@ -3,11 +3,11 @@
  * 이 사이트로 넘어온 뒤로 그 주소는 404 였다(2026-10-18). 같은 주소에 이 장을 둔다.
  *
  * 요금은 **DB 가 실제로 매기는 값**을 옮겨 적은 것이다 — 손으로 정한 숫자가 아니다:
- *   - 그린피: `pelham_tee_rate(date)` (0025) — 평일 47.79, 주말·공휴일 58.41 (세전)
+ *   - 그린피: `pelham_tee_rate(date)` (0039) — 평일 40.71, 주말·공휴일 58.41 (세전)
  *   - 9홀: `pelham_tee_rate_for(date, 9)` (0034) — 평일 28.31(오전 10시부터, 세전). 주말·공휴일은 9홀 없음(0037)
  *   - 세금: `pelham_pos_tax` (0005) — HST 13%. 온라인 결제도 세전 요금에 이것을 더한다.
  *   - 추가 품목: `pelham_tee_extras` (0026) 의 기본값
- *   - 파워 카트: `pelham_tee_cart_fee` (0035) — 1인 18홀 19.47, 9홀 11.50 (세전)
+ *   - 파워 카트: `pelham_tee_cart_fee` (0039) — 1인 18홀 19.47(Senior 17.70), 9홀 11.50 (세전)
  * 정적 export 라서 여기서 함수를 부를 수 없고(anon 에게 실행 권한도 없다), 그래서 문자열로 둔다.
  * DB 에서 요금을 바꾸면 이 파일도 같이 고쳐라. 공휴일별 요금(`pelham_tee_holidays.rate`)은
  * 날마다 달라질 수 있어 여기에는 기본값만 적는다.
@@ -32,8 +32,8 @@ const greenFees = [
   {
     name: "Weekday",
     when: "Monday – Friday",
-    base: "$47.79",
-    total: "$54.00",
+    base: "$40.71",
+    total: "$46.00",
     nineBase: "$28.31",
     nineTotal: "$31.99",
     nineFrom: "10:00 AM",
@@ -51,8 +51,9 @@ const greenFees = [
 ];
 
 const extras = [
-  // 1인 하프 카트 — `pelham_tee_cart_fee` (0035).
+  // 1인 하프 카트 — `pelham_tee_cart_fee` (0039).
   { name: "Power Cart (18 Holes, per player)", price: "$19.47" },
+  { name: "Power Cart (18 Holes, Senior, per player)", price: "$17.70" },
   { name: "Power Cart (9 Holes, per player)", price: "$11.50" },
   { name: "Pull Cart (18 Holes)", price: "$8.00" },
   { name: "Pull Cart (9 Holes)", price: "$5.00" },

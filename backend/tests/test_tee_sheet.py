@@ -153,16 +153,18 @@ def test_slots_shape_and_rates(client):
 
     slots = tuesday["slots"]
     assert tuesday["date"] == "2026-09-08"
-    assert slots[0] == {"time": "6:40 AM", "minutes": 400, "rate": 47.79, "cartsTotal": 4}
+    assert slots[0] == {"time": "6:40 AM", "minutes": 400, "rate": 40.71, "cartsTotal": 4,
+                        "dayType": "weekday", "holiday": None}
     assert slots[1]["time"] == "6:49 AM"
     # 마지막 티는 6:58 PM — Chronogolf export 에 이 시각까지 실제 예약이 있다.
-    assert slots[-1] == {"time": "6:58 PM", "minutes": 18 * 60 + 58, "rate": 47.79, "cartsTotal": 4}
+    assert slots[-1] == {"time": "6:58 PM", "minutes": 18 * 60 + 58, "rate": 40.71, "cartsTotal": 4,
+                        "dayType": "weekday", "holiday": None}
     # 9분 간격이 끝까지 유지되는지
     assert all(b["minutes"] - a["minutes"] == 9 for a, b in zip(slots, slots[1:]))
     assert all(s["cartsTotal"] == 4 for s in slots)
 
     # 2026-09-11 은 그냥 금요일이다. 시드 보존용 오버라이드가 사라졌으므로 평일 요금.
-    assert {s["rate"] for s in friday["slots"]} == {47.79}
+    assert {s["rate"] for s in friday["slots"]} == {40.71}
     assert {s["rate"] for s in saturday["slots"]} == {58.41}
     assert len(friday["slots"]) == len(slots) == len(saturday["slots"])
 
@@ -217,7 +219,7 @@ def test_create_booking_defaults_rate_from_slot(client):
     response = create(client, date="2026-09-08", time="9:04 AM", title="Walk-in, Pat")
     assert response.status_code == 201, response.text
     booking = response.json()
-    assert booking["rate"] == 47.79          # 평일 요금이 슬롯에서 흘러들어와야 한다
+    assert booking["rate"] == 40.71          # 평일 요금이 슬롯에서 흘러들어와야 한다
     assert booking["date"] == "2026-09-08"
     assert booking["status"] == "reserved"
     assert booking["span"] == 1
@@ -527,10 +529,10 @@ def _cart_booking(client, **extra):
 def test_cart_fee_is_filled_in_and_stays_editable(client):
     url, (ann, bob) = _cart_booking(client)
 
-    # 2026-10-18 클럽 요금: 18홀 세전 $19.47, 9홀 $11.50. 자동값이면 홀 수를 따라간다.
+    # 클럽 요금: 18홀 세전 $19.47(Public Senior $17.70), 9홀 $11.50. 자동값이면 홀 수를 따라간다.
     on = client.patch(f"{url}/players/{ann}", json={"cart": True}).json()
-    assert (on["players"][0]["cart"], on["players"][0]["cartFee"]) == (True, 19.47)
-    assert on["audit"][0]["message"] == "Cart added for Ann Senior ($19.47)."
+    assert (on["players"][0]["cart"], on["players"][0]["cartFee"]) == (True, 17.70)
+    assert on["audit"][0]["message"] == "Cart added for Ann Senior ($17.70)."
     assert client.patch(f"{url}/players/{bob}", json={"cart": True}).json()["players"][1]["cartFee"] == 19.47
     assert [p["cartFee"] for p in client.patch(url, json={"holes": 9}).json()["players"]] == [11.50, 11.50]
 
@@ -549,16 +551,16 @@ def test_cart_fee_is_filled_in_and_stays_editable(client):
     off = client.patch(f"{url}/players/{bob}", json={"cart": False}).json()
     assert (off["players"][1]["cart"], off["players"][1]["cartFee"]) == (False, 0)
     assert off["audit"][0]["message"] == "Cart removed for Bob Public."
-    assert client.patch(f"{url}/players/{bob}", json={"cart": True}).json()["players"][1]["cartFee"] == 19.47
+    assert client.patch(f"{url}/players/{bob}", json={"cart": True}).json()["players"][1]["cartFee"] == 17.70  # 위에서 Public Senior 로 바꿨다
 
 
 def test_changing_holes_resets_the_green_fee_until_someone_pays(client):
-    url, (ann, _) = _cart_booking(client)                 # 2026-09-08 화요일 → 18홀 $47.79, 9홀 $28.31
+    url, (ann, _) = _cart_booking(client)                 # 2026-09-08 화요일 → 18홀 $40.71, 9홀 $28.31
     assert client.patch(url, json={"holes": 9}).json()["rate"] == 28.31
 
     # 손으로 고친 금액(0033 때의 절반 요금 $23.90 같은 옛 값 포함)도 홀 수를 바꾸면 요금표 값이 된다.
     client.patch(url, json={"rate": 23.90})
-    assert client.patch(url, json={"holes": 18}).json()["rate"] == 47.79
+    assert client.patch(url, json={"holes": 18}).json()["rate"] == 40.71
 
     # 같은 요청에 준 금액이 이긴다.
     assert client.patch(url, json={"holes": 9, "rate": 30.0}).json()["rate"] == 30.0
@@ -572,7 +574,7 @@ def test_new_players_get_a_cart_fee_unless_one_is_given(client):
     url, _ = _cart_booking(client)
     added = client.post(f"{url}/players", json={"name": "Cy Senior", "ratePlan": "Public Senior", "cart": True})
     assert added.status_code == 200, added.text
-    assert added.json()["players"][-1]["cartFee"] == 19.47
+    assert added.json()["players"][-1]["cartFee"] == 17.70
 
     comp = client.post(f"{url}/players", json={"name": "Di Comp", "cart": True, "cartFee": 0}).json()
     assert comp["players"][-1]["cartFee"] == 0              # 공짜 카트는 공짜로 남는다
@@ -630,13 +632,13 @@ def test_daily_report_counts_cart_fees(client):
     base = 32 * 47.79                                       # 시드 예약 (카트 켠 사람 없음)
     seat = client.get(url).json()["rate"]
 
-    client.patch(f"{url}/players/{ann}", json={"cart": True})       # 19.47
+    client.patch(f"{url}/players/{ann}", json={"cart": True})       # 17.70 (Public Senior)
     client.patch(f"{url}/players/{bob}", json={"cart": True})       # 19.47
     client.patch(f"{url}/players/{ann}", json={"paid": True})
 
     report = client.get(f"{API}/tee-sheet/reports/daily", params={"date": "2026-09-08"}).json()
-    assert report["total_revenue"] == pytest.approx(base + 2 * seat + 19.47 + 19.47, abs=0.01)
-    assert report["collected_revenue"] == pytest.approx(seat + 19.47, abs=0.01)
+    assert report["total_revenue"] == pytest.approx(base + 2 * seat + 17.70 + 19.47, abs=0.01)
+    assert report["collected_revenue"] == pytest.approx(seat + 17.70, abs=0.01)
     assert report["outstanding_revenue"] == pytest.approx(base + seat + 19.47, abs=0.01)
 
 

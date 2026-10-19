@@ -54,18 +54,21 @@ PLAYERS_PER_TEE_TIME = 4
 # 넉넉하고, 손님이 중간에 끊어도 자리가 오래 죽어 있지 않다.
 HOLD_TTL_SECONDS = 180
 
-WEEKDAY_RATE = 47.79
+# 2026-10-19 클럽 요금표: 평일 18홀 $40.71(Public·Public Senior 같다). DB `pelham_tee_rate`(0039)와 같아야 한다.
+WEEKDAY_RATE = 40.71
 WEEKEND_RATE = 58.41
 
 # 1인 카트 요금(세전, 달러). **2026-10-18 클럽 확인: 18홀 $19.47, 9홀 $11.50.**
+# **2026-10-19: Public Senior 18홀 $17.70.**
 #
 # 참고로 Chronogolf export(2026-04~09, 좌석 25,108행)에 남아 있는 과거 금액은 여러 가지였다:
 # 19.47(6,607행, 18홀 일반), 17.70(2,607행, Public Senior), 9.74(1,760행, 9홀), 11.50(1,369행, 미상).
 # 옛 예약의 금액은 그대로 보존된다 — 이 값은 카트를 **새로 켤 때** 채우는 기본값이고,
 # 이미 적힌 금액을 건드리지 않는다.
 #
-# 같은 값이 DB 의 `pelham_tee_cart_fee`(0035)에도 있다. 바꾸면 둘을 같이 고쳐라.
+# 같은 값이 DB 의 `pelham_tee_cart_fee`(0039)에도 있다. 바꾸면 둘을 같이 고쳐라.
 CART_FEE = 19.47
+SENIOR_CART_FEE = 17.70
 NINE_HOLE_CART_FEE = 11.50
 
 
@@ -77,7 +80,9 @@ def cart_fee_for(rate_plan: str, holes: int) -> float:
     """
     if "cart" in (rate_plan or "").lower():
         return 0.0
-    return NINE_HOLE_CART_FEE if holes == 9 else CART_FEE
+    if holes == 9:
+        return NINE_HOLE_CART_FEE
+    return SENIOR_CART_FEE if "senior" in (rate_plan or "").lower() else CART_FEE
 
 
 def _same_money(a: float, b: float) -> bool:
