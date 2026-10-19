@@ -54,9 +54,10 @@ PLAYERS_PER_TEE_TIME = 4
 # 넉넉하고, 손님이 중간에 끊어도 자리가 오래 죽어 있지 않다.
 HOLD_TTL_SECONDS = 180
 
-# 2026-10-19 클럽 요금표: 평일 18홀 $40.71(Public·Public Senior 같다). DB `pelham_tee_rate`(0039)와 같아야 한다.
+# 2026-10-19 클럽 요금표: 평일 18홀 $40.71(Public·Public Senior 같다), 주말·공휴일 $51.33(Chronogolf 가을 요금).
+# DB `pelham_tee_rate`(0040)와 같아야 한다.
 WEEKDAY_RATE = 40.71
-WEEKEND_RATE = 58.41
+WEEKEND_RATE = 51.33
 
 # 1인 카트 요금(세전, 달러). **2026-10-18 클럽 확인: 18홀 $19.47, 9홀 $11.50.**
 # **2026-10-19: Public Senior 18홀 $17.70.**

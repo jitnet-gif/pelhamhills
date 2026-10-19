@@ -165,7 +165,7 @@ def test_slots_shape_and_rates(client):
 
     # 2026-09-11 은 그냥 금요일이다. 시드 보존용 오버라이드가 사라졌으므로 평일 요금.
     assert {s["rate"] for s in friday["slots"]} == {40.71}
-    assert {s["rate"] for s in saturday["slots"]} == {58.41}
+    assert {s["rate"] for s in saturday["slots"]} == {51.33}
     assert len(friday["slots"]) == len(slots) == len(saturday["slots"])
 
 
@@ -226,7 +226,7 @@ def test_create_booking_defaults_rate_from_slot(client):
     assert booking["audit"][0]["message"] == "Reservation created for 2026-09-08 9:04 AM."
 
     weekend = create(client, date="2026-09-12", time="9:04 AM", title="Weekend, Sam").json()
-    assert weekend["rate"] == 58.41
+    assert weekend["rate"] == 51.33
 
 
 def test_create_rejects_unknown_slot_with_422(client):
