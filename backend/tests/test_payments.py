@@ -24,13 +24,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.api.routes import payments, terminal
+from backend.api.routes import membership_payments, payments, terminal
 from backend.services import stripe_gateway as sg
 from backend.services import supabase_rest
 
 API = "/api/v1/payments/online"
 TERM = "/api/v1/payments/terminal"
 HOOK = "/api/v1/payments/stripe/webhook"
+MEMBER = "/api/v1/payments/membership"
+MEMBER_KEY = "0b5e3a52-6f1d-4c1e-9d0a-2f6a9c1b7e44"
 CODE, EMAIL = "T4E7858394", "ben@example.com"
 WHSEC = "whsec_test_secret"
 STAFF = {"Authorization": "Bearer staff-token"}
@@ -335,6 +337,56 @@ class FakeSql:
         return [self._json(t) for t in self.txns.values()
                 if t.get("refund_of") == args["p_refund_of"] and t["result"] == "pending"]
 
+    # ----- 회원권 카드 결제(0042) -----
+    # 회원권 하나(남은 금액 $3,142.53 = Full Single + 카드 3%)와 그 결제 시도들.
+    member_balance = 314253
+    member_rows: dict[str, dict[str, Any]] = {}
+
+    def pelham_membership_pay_start(self, args):
+        if args["p_key"] != MEMBER_KEY or args["p_email"] != EMAIL:
+            raise supabase_rest.RpcRefused(404, "We could not find that membership application.")
+        if self.member_balance <= 0:
+            raise supabase_rest.RpcRefused(409, "This membership is already paid in full.")
+        inv = f"PHM{len(self.member_rows):012X}"
+        self.member_rows[inv] = {"invoice": inv, "status": "pending", "amount": self.member_balance,
+                                 "created_at": _now_iso(), "member_name": "Ben Lee", "season": 2027}
+        return {"invoice": inv, "amount": self.member_balance, "email": EMAIL,
+                "description": "2027 Full Membership (Single) — Pelham Hills Golf Club"}
+
+    def pelham_membership_pay_session(self, args):
+        self.member_rows[args["p_invoice"]]["gateway_session"] = args["p_session"]
+
+    def pelham_membership_payment(self, args):
+        p = args["p"]
+        if "invoice" in p:
+            row = self.member_rows.get(p["invoice"])
+        else:
+            row = next((r for r in self.member_rows.values() if r.get("trans_id") == p["trans_id"]), None)
+        return dict(row) if row else None
+
+    def pelham_membership_pay_complete(self, args):
+        p = args["p"]
+        row = self.member_rows[p["invoice"]]
+        if row["status"] != "pending":
+            return {**row, "needs_reversal": row["status"] == "orphaned"}
+        if p["response_code"] == "1" and p["amount"] > self.member_balance:
+            row.update(status="orphaned", trans_id=p["trans_id"])
+            return {**row, "needs_reversal": True, "reversal_trans_id": p["trans_id"]}
+        ok = p["response_code"] == "1" and p["amount"] == row["amount"]
+        row.update(status="approved" if ok else "declined", trans_id=p["trans_id"], card_last4=p["card_last4"])
+        if ok:
+            self.member_balance -= p["amount"]
+        return {**row, "needs_reversal": False}
+
+    def pelham_membership_refund_finish(self, args):
+        row = next((r for r in self.member_rows.values() if r.get("trans_id") == args["p_trans"]), None)
+        if not row:
+            return None
+        if row["status"] == "approved":
+            self.member_balance += row["amount"]
+        row.update(status="refunded", refund_trans_id=args["p_refund"])
+        return dict(row)
+
     def called(self, function: str) -> list[dict[str, Any]]:
         return [a for f, a, _ in self.calls if f == function]
 
@@ -351,6 +403,8 @@ def env(monkeypatch):
     app = FastAPI()
     app.include_router(payments.router, prefix="/api/v1")
     app.include_router(terminal.router, prefix="/api/v1")
+    app.include_router(membership_payments.router, prefix="/api/v1")
+    sql.member_rows = {}
     return TestClient(app), gw, sql
 
 
@@ -753,3 +807,75 @@ def test_terminal_readers_list(env):
     assert body["environment"] == "test"
     assert body["readers"][0] == {"id": READER, "label": "Pro shop", "device_type": "simulated_stripe_s700",
                                   "status": "online", "simulated": True}
+
+
+# ===== 회원권 카드 결제(0042) ============================================
+
+def _member_checkout(client, sql) -> tuple[str, str]:
+    res = client.post(f"{MEMBER}/checkout", json={"key": MEMBER_KEY, "email": EMAIL})
+    assert res.status_code == 200, res.text
+    invoice = res.json()["invoice"]
+    return invoice, sql.member_rows[invoice]["gateway_session"]
+
+
+def test_membership_checkout_charges_the_sql_balance(env):
+    client, gw, sql = env
+    invoice, session = _member_checkout(client, sql)
+    form = gw.posts("/checkout/sessions")[-1]
+    assert form["line_items[0][price_data][unit_amount]"] == "314253"     # SQL 이 정한 금액 그대로
+    assert form["client_reference_id"] == invoice and invoice.startswith("PHM")
+    assert form["success_url"].endswith(f"/memberships/application/paid?invoice={invoice}")
+
+
+def test_membership_checkout_needs_key_and_email(env):
+    client, gw, _ = env
+    res = client.post(f"{MEMBER}/checkout", json={"key": MEMBER_KEY, "email": "someone@else.com"})
+    assert res.status_code == 404
+    assert not gw.posts("/checkout/sessions")
+
+
+def test_membership_status_asks_stripe_and_records_once(env):
+    client, gw, sql = env
+    invoice, session = _member_checkout(client, sql)
+    assert client.get(f"{MEMBER}/status/{invoice}").json()["status"] == "pending"
+    gw.pay_session(session)
+    body = client.get(f"{MEMBER}/status/{invoice}").json()
+    assert body["status"] == "approved" and body["card_last4"] == "4242"
+    assert "trans_id" not in body and "gateway_session" not in body
+    client.get(f"{MEMBER}/status/{invoice}")
+    assert sql.member_balance == 0
+
+
+def test_membership_paid_twice_is_refunded(env):
+    client, gw, sql = env
+    first, s1 = _member_checkout(client, sql)
+    second, s2 = _member_checkout(client, sql)        # 두 탭에서 열었다
+    gw.pay_session(s1)
+    pid2 = gw.pay_session(s2)
+    client.get(f"{MEMBER}/status/{first}")
+    body = client.get(f"{MEMBER}/status/{second}").json()
+    assert body["reversed"] == "refund" and body["status"] == "refunded"
+    assert gw.refunds[-1]["payment_intent"] == pid2
+
+
+def test_membership_webhook_records_payment(env):
+    client, gw, sql = env
+    invoice, session = _member_checkout(client, sql)
+    gw.pay_session(session)
+    res = _signed(client, {"type": "checkout.session.completed",
+                           "data": {"object": {"id": session, "client_reference_id": invoice}}})
+    assert res.status_code == 200 and res.json()["status"] == "approved"
+    assert not sql.called("pelham_online_pay_complete")
+
+
+def test_membership_dashboard_refund_unpays_membership(env):
+    client, gw, sql = env
+    invoice, session = _member_checkout(client, sql)
+    pid = gw.pay_session(session)
+    client.get(f"{MEMBER}/status/{invoice}")
+    gw.refunds.append({"id": "re_dash", "payment_intent": pid, "status": "succeeded", "amount": 314253,
+                       "metadata": {}})
+    res = _signed(client, {"type": "charge.refunded", "data": {"object": {"payment_intent": pid}}})
+    assert res.status_code == 200 and res.json()["status"] == "refunded"
+    assert sql.member_balance == 314253
+    assert not sql.called("pelham_online_refund_finish")

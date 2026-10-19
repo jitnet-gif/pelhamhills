@@ -28,6 +28,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from backend.api.routes import membership_payments as membership
 from backend.api.routes import payments as online
 from backend.services import payment_texts
 from backend.services import stripe_gateway as sg
@@ -455,6 +456,13 @@ async def stripe_webhook(request: Request) -> dict[str, Any]:
 
 def _on_checkout(session: dict[str, Any]) -> dict[str, Any]:
     invoice = str(session.get("client_reference_id") or "").upper()
+    # 회원권 카드 결제(0042, `membership_payments.py`). 같은 세션 확인, 기록은 회원권 장부에.
+    if invoice.startswith(membership.INVOICE_PREFIX) and session.get("id"):
+        session_invoice, paid = sg.checkout_payment(str(session["id"]))
+        if not paid or session_invoice.upper() != invoice:
+            return {"ok": True, "ignored": "not paid yet"}
+        result = membership.settle(paid, invoice)
+        return {"ok": True, "status": result.get("status")}
     if not invoice.startswith("PHW") or not session.get("id"):
         return {"ok": True, "ignored": "not an online booking payment"}
     session_invoice, paid = sg.checkout_payment(str(session["id"]))
@@ -468,6 +476,12 @@ def _on_refund(charge: dict[str, Any]) -> dict[str, Any]:
     pi = str(charge.get("payment_intent") or "")
     if not pi:
         return {"ok": True, "ignored": "no payment intent"}
+    # 회원권 카드 결제를 Stripe 대시보드에서 환불했다 → 회원권의 낸 금액에서 뺀다(0042).
+    member_payment = supabase_rest.rpc("pelham_membership_payment", {"p": {"trans_id": pi}})
+    if member_payment:
+        done = supabase_rest.rpc("pelham_membership_refund_finish",
+                                 {"p_trans": pi, "p_refund": sg.latest_refund(pi) or ""})
+        return {"ok": True, "status": (done or {}).get("status")}
     payment = supabase_rest.rpc("pelham_online_payment", {"p": {"trans_id": pi}})
     if payment:
         done = supabase_rest.rpc("pelham_online_refund_finish", {"p": {

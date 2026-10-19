@@ -7,6 +7,7 @@
  * 그쪽은 원문 표기 문자열이라 여기서 다시 숫자로 적는다 — 클럽이 요금을 바꾸면 두 곳을 같이 고친다.
  */
 
+import { paymentsApiBase } from "@/lib/booking/payments";
 import { bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
@@ -66,11 +67,99 @@ export type MembershipApplication = Pick<
   | "notes"
 > & { agreed: boolean };
 
-export type ApplicationReceipt = { reference: string; member_name: string; season: number; amount_due: number };
+export type ApplicationReceipt = {
+  reference: string;
+  /** 카드 결제를 여는 열쇠(0042). 신청 이메일과 함께 낸다. */
+  pay_key: string;
+  member_name: string;
+  season: number;
+  /** SQL 요금표 금액(0042). 신용카드면 3% 포함. */
+  amount_due: number;
+  payment_method: string | null;
+};
 
-/** 손님용. 공개 키로 부르는 함수는 이것 하나다. */
+/** 손님용. 공개 키로 부르는 함수는 이것 하나다. 금액은 SQL 이 요금표로 정한다(0042). */
 export function applyForMembership(input: MembershipApplication): Promise<ApplicationReceipt> {
   return bookingRpc<ApplicationReceipt>("pelham_membership_apply", { p: input });
+}
+
+// ===== 카드 결제(Stripe Checkout, `backend/api/routes/membership_payments.py`) =====
+
+export type MembershipPayCredentials = { key: string; email: string };
+
+export type MembershipPayment = {
+  invoice: string;
+  /** 센트. */
+  amount: number;
+  status: "pending" | "approved" | "declined" | "error" | "orphaned" | "refunded";
+  card_brand?: string | null;
+  card_last4?: string | null;
+  reference?: string;
+  member_name?: string;
+  season?: number;
+  membership_type?: MembershipType;
+  plan?: MembershipPlan;
+  membership_status?: MembershipStatus;
+  /** 남은 금액(달러). */
+  balance?: number;
+  reversed?: "void" | "refund";
+  reversal_failed?: boolean;
+};
+
+async function payCall<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${paymentsApiBase()}/payments/membership${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    });
+  } catch {
+    throw new ApiError(0, "Network error");
+  }
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`.trim();
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body?.detail === "string" && body.detail) message = body.detail;
+    } catch {
+      // JSON 이 아닌 오류 본문. 상태 줄을 그대로 쓴다.
+    }
+    throw new ApiError(response.status, message);
+  }
+  return (await response.json()) as T;
+}
+
+/** 결과 화면이 "다시 결제" 를 열 수 있게 이 탭에만 열쇠를 남긴다. 저장소가 막혀 있어도 결제는 된다. */
+const PAY_CREDS_KEY = "pelham.membership.pay";
+
+export function rememberPayCredentials(creds: MembershipPayCredentials): void {
+  try {
+    sessionStorage.setItem(PAY_CREDS_KEY, JSON.stringify(creds));
+  } catch {
+    // 사생활 보호 모드 등. 결과 화면이 다시 결제 버튼을 못 그릴 뿐이다.
+  }
+}
+
+export function recallPayCredentials(): MembershipPayCredentials | null {
+  try {
+    const raw = sessionStorage.getItem(PAY_CREDS_KEY);
+    const value = raw ? (JSON.parse(raw) as MembershipPayCredentials) : null;
+    return value?.key && value?.email ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 결제 페이지를 연다: 서버가 남은 금액으로 Stripe Checkout 세션을 만들고, 이 탭이 그리로 넘어간다. */
+export async function startMembershipCheckout(creds: MembershipPayCredentials): Promise<void> {
+  rememberPayCredentials(creds);
+  const { url } = await payCall<{ url: string }>("/checkout", { method: "POST", body: JSON.stringify(creds) });
+  if (!/^https:\/\/checkout\.stripe\.com\//.test(url)) throw new ApiError(502, "Online payment is not available right now.");
+  window.location.assign(url);
+}
+
+export function membershipPaymentStatus(invoice: string): Promise<MembershipPayment> {
+  return payCall<MembershipPayment>(`/status/${encodeURIComponent(invoice)}`);
 }
 
 /** 고객 명부에서 회원으로 표시됐지만 이 시즌 회원권이 아직 없는 사람. */

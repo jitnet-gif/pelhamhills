@@ -4,9 +4,13 @@
  * 온라인 회원권 신청서. 종이 신청서(요금표 PDF 2쪽)의 칸 그대로 — 회원권 종류, 이름(들), 주소,
  * 우편번호, 결제 방법, 휴대폰, 이메일 — 에 카트 패키지·연습장 이용권을 더했다.
  *
- * 내면 0041 `pelham_membership_apply` 가 `/admin/memberships` 명부에 Pending 으로 넣는다. 결제는
- * 여기서 받지 않는다: 수표·현금·e-Transfer 가 섞여 있고, 카드도 클럽이 3% 를 더해 직접 받는다.
- * 합계는 요금표로 계산한 견적이며 직원이 결제 전에 다시 본다.
+ * 내면 `pelham_membership_apply`(0042)가 `/admin/memberships` 명부에 Pending 으로 넣는다. 금액은 SQL 의
+ * 요금표가 정한다 — 여기 합계는 같은 요금표로 미리 보여 주는 값이다.
+ *
+ * Credit card 를 고르면 제출 직후 Stripe Checkout(카드 3% 포함)으로 넘어가 바로 낸다
+ * (`backend/api/routes/membership_payments.py`). 돌아오는 곳은 `/memberships/application/paid`.
+ * 결제 서버가 안 닿으면 신청은 이미 된 것이므로 접수 화면에서 "Pay by card" 로 다시 열 수 있다.
+ * 수표·현금·e-Transfer 는 지금처럼 프로 샵이 받는다.
  */
 
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -21,6 +25,7 @@ import {
   PAYMENT_METHODS,
   RANGE_PASS_PRICE,
   applyForMembership,
+  startMembershipCheckout,
   listPrice,
   money,
   typeInfo,
@@ -36,7 +41,7 @@ const INPUT =
 /** 결제 방법마다 신청 뒤에 할 일. 신청서 2쪽 문구 그대로. */
 const PAY_NEXT: Record<string, string> = {
   Cheque: "Make your cheque payable to “Pelham Hills Golf” only and drop it off at the pro shop.",
-  "Credit card": "The pro shop will call to take your card payment (a 3% card charge applies).",
+  "Credit card": "You'll pay securely by card on the next page (Stripe). The 3% card charge is included.",
   "E-transfer": "Send an Interac e-Transfer to pelhamhillsgolf@gmail.com.",
   Cash: "Pay in cash at the pro shop.",
 };
@@ -54,6 +59,24 @@ export default function MembershipApplicationForm() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ApplicationReceipt | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
+
+  /** Stripe 결제 페이지로 넘어간다. 실패하면 접수 화면에 남아 다시 누를 수 있다. */
+  const payByCard = async (done: ApplicationReceipt) => {
+    setPaying(true);
+    setPayError(null);
+    try {
+      await startMembershipCheckout({ key: done.pay_key, email: form.email ?? "" });
+    } catch (err) {
+      setPaying(false);
+      setPayError(
+        err instanceof ApiError && err.status === 409
+          ? err.message
+          : "We couldn't open the card payment page. Your application is saved — try again, or the pro shop will call you.",
+      );
+    }
+  };
 
   const type = typeInfo(form.membership_type ?? "full");
   const total = listPrice({
@@ -85,9 +108,9 @@ export default function MembershipApplicationForm() {
     }
     setSending(true);
     setError(null);
+    let done: ApplicationReceipt;
     try {
-      setReceipt(await applyForMembership({ ...form, amount_due: total }));
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      done = await applyForMembership(form);
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 0
@@ -96,9 +119,13 @@ export default function MembershipApplicationForm() {
             ? "Online applications aren't open yet. Please call the pro shop."
             : ((err as Error)?.message ?? "Something went wrong."),
       );
-    } finally {
       setSending(false);
+      return;
     }
+    setSending(false);
+    setReceipt(done);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (done.payment_method === "Credit card") await payByCard(done);
   };
 
   if (receipt) {
@@ -116,11 +143,33 @@ export default function MembershipApplicationForm() {
           <dt className="text-[#516050]">Estimated total</dt>
           <dd className="font-bold tabular-nums">{money(receipt.amount_due)} (HST incl.)</dd>
         </dl>
-        <p className="mt-6 leading-7 text-[#516050]">
-          {PAY_NEXT[form.payment_method ?? ""] ?? "The pro shop will contact you about payment."} Payment in
-          full is due by <strong className="text-[#182118]">November 15, 2026</strong>. Your simulator coupons
-          are sent once you&rsquo;re paid in full.
-        </p>
+        {receipt.payment_method === "Credit card" ? (
+          <div className="mt-6 grid gap-3">
+            {payError ? (
+              <p className="rounded-sm border border-[#e2a5a5] bg-[#fdf0f0] px-3 py-2 text-sm font-bold text-[#8a1f1f]" role="alert">
+                {payError}
+              </p>
+            ) : (
+              <p className="leading-7 text-[#516050]">
+                {paying ? "Opening the secure card payment page…" : "Pay now by card to finish your membership."}
+              </p>
+            )}
+            <button
+              className="min-h-12 rounded-sm bg-[#214d2f] px-6 text-sm font-extrabold tracking-[0.12em] text-white uppercase transition hover:bg-[#163820] disabled:opacity-60"
+              disabled={paying}
+              onClick={() => void payByCard(receipt)}
+              type="button"
+            >
+              {paying ? "Opening…" : `Pay ${money(receipt.amount_due)} by Card`}
+            </button>
+          </div>
+        ) : (
+          <p className="mt-6 leading-7 text-[#516050]">
+            {PAY_NEXT[form.payment_method ?? ""] ?? "The pro shop will contact you about payment."} Payment in
+            full is due by <strong className="text-[#182118]">November 15, 2026</strong>. Your simulator coupons
+            are sent once you&rsquo;re paid in full.
+          </p>
+        )}
       </div>
     );
   }
@@ -245,7 +294,8 @@ export default function MembershipApplicationForm() {
           ))}
         </div>
         <p className="text-sm leading-6 text-[#516050]">
-          {PAY_NEXT[form.payment_method ?? ""]} We don&rsquo;t take payment on this page.
+          {PAY_NEXT[form.payment_method ?? ""]}
+          {form.payment_method === "Credit card" ? "" : " We don\u2019t take payment on this page."}
         </p>
         <Label text="Anything we should know? (optional)">
           <textarea className={`${INPUT} min-h-24 py-2`} onChange={text("notes")} value={form.notes ?? ""} />
@@ -284,7 +334,11 @@ export default function MembershipApplicationForm() {
           disabled={sending}
           type="submit"
         >
-          {sending ? "Sending…" : "Submit Application"}
+          {sending
+            ? "Sending…"
+            : form.payment_method === "Credit card"
+              ? `Submit & Pay ${money(total)} by Card`
+              : "Submit Application"}
         </button>
       </div>
     </form>
