@@ -29,8 +29,10 @@ import {
 } from "@/components/retail/ui";
 import {
   CART_PACKAGES,
+  CREDIT_CARD_SURCHARGE,
   EARLY_BIRD_DEADLINE,
   MEMBERSHIP_TYPES,
+  PAYMENT_METHODS,
   RANGE_PASS_PRICE,
   STATUS_LABEL,
   balance,
@@ -301,6 +303,8 @@ export default function MembershipsAdminPage() {
                       phone: c.phone,
                       email: c.email,
                       member_number: c.member_number,
+                      address: c.address,
+                      postal_code: c.postal_code,
                       membership_type: guess.membership_type ?? "full",
                       plan: guess.plan,
                       cart_package: guess.cart_package,
@@ -337,7 +341,10 @@ const BADGE: Record<MembershipStatus, string> = {
 function MemberCard({ row, onOpen }: { row: Membership; onOpen: () => void }) {
   const type = typeInfo(row.membership_type);
   const owing = balance(row);
-  const extras = [cartLabel(row.cart_package), row.range_pass ? "Range pass" : null].filter(Boolean);
+  const extras = [
+    cartLabel(row.cart_package),
+    type.rangeIncluded ? "Range included" : row.range_pass ? "Range pass" : null,
+  ].filter(Boolean);
 
   return (
     <button
@@ -370,9 +377,10 @@ function MemberCard({ row, onOpen }: { row: Membership; onOpen: () => void }) {
           )}
           <span className="text-[#6b7280]"> of {money(row.amount_due)}</span>
         </span>
+        {/* 쿠폰은 완납해야 지급된다(Early Bird 안내문). */}
         {type.simHours > 0 ? (
           <span className="tabular-nums text-[#6b7280]">
-            Simulator {Number(row.sim_hours_used)}/{type.simHours} h
+            {owing > 0 ? `Simulator ${type.simHours} h once paid` : `Simulator ${Number(row.sim_hours_used)}/${type.simHours} h`}
           </span>
         ) : null}
       </div>
@@ -422,8 +430,6 @@ function RenewalCard({ candidate, onStart }: { candidate: RenewalCandidate; onSt
   );
 }
 
-const PAYMENT_METHODS = ["Credit card", "Debit", "Cash", "Cheque", "E-transfer", "Other"];
-
 function MembershipModal({
   id,
   draft,
@@ -453,7 +459,9 @@ function MembershipModal({
       const next = { ...current, [key]: value };
       // 개인 전용 회원권으로 바꾸면 부부 요금이 남지 않게.
       if (key === "membership_type" && !typeInfo(value as MembershipType).spousal) next.plan = "single";
-      if (!dueTouched && ["membership_type", "plan", "cart_package", "range_pass"].includes(key)) {
+      // Full 은 연습장 포함이라 이용권을 따로 달지 않는다.
+      if (key === "membership_type" && typeInfo(value as MembershipType).rangeIncluded) next.range_pass = false;
+      if (!dueTouched && ["membership_type", "plan", "cart_package", "range_pass", "payment_method"].includes(key)) {
         next.amount_due = listPrice(priceKeys(next));
       }
       return next;
@@ -497,6 +505,14 @@ function MembershipModal({
         <Field label="Email">
           <TextInput autoComplete="off" onChange={text("email")} type="email" value={form.email ?? ""} />
         </Field>
+        <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+          <Field label="Address">
+            <TextInput autoComplete="off" onChange={text("address")} value={form.address ?? ""} />
+          </Field>
+          <Field label="Postal code">
+            <TextInput autoComplete="off" className="uppercase" onChange={text("postal_code")} value={form.postal_code ?? ""} />
+          </Field>
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <Field hint={type.access} label="Membership">
@@ -538,16 +554,28 @@ function MembershipModal({
             </Select>
           </Field>
           <Field label="Driving range">
-            <Select onChange={(event) => set("range_pass", event.target.value === "yes")} value={form.range_pass ? "yes" : "no"}>
-              <option value="no">No pass</option>
-              <option value="yes">Range pass {money(RANGE_PASS_PRICE)}</option>
-            </Select>
+            {type.rangeIncluded ? (
+              <Select disabled value="included">
+                <option value="included">Included with Full</option>
+              </Select>
+            ) : (
+              <Select onChange={(event) => set("range_pass", event.target.value === "yes")} value={form.range_pass ? "yes" : "no"}>
+                <option value="no">No pass</option>
+                <option value="yes">Range pass {money(RANGE_PASS_PRICE)}</option>
+              </Select>
+            )}
           </Field>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <Field
-            hint={Number(form.amount_due) === price ? "Rate card price, HST incl." : `Rate card: ${money(price)}`}
+            hint={
+              Number(form.amount_due) === price
+                ? form.payment_method === "Credit card"
+                  ? `Rate card + ${CREDIT_CARD_SURCHARGE * 100}% card fee, HST incl.`
+                  : "Rate card price, HST incl."
+                : `Rate card: ${money(price)}`
+            }
             label="Amount due"
           >
             <TextInput
@@ -577,7 +605,7 @@ function MembershipModal({
           <Field label="Paid on">
             <TextInput onChange={text("paid_on")} type="date" value={form.paid_on ?? ""} />
           </Field>
-          <Field label="Paid by">
+          <Field hint={form.payment_method === "Credit card" ? `+${CREDIT_CARD_SURCHARGE * 100}% card fee` : undefined} label="Paid by">
             <Select onChange={text("payment_method")} value={form.payment_method ?? ""}>
               <option value="">—</option>
               {PAYMENT_METHODS.map((m) => (
@@ -648,6 +676,7 @@ function priceKeys(m: MembershipInput) {
     plan: m.plan ?? "single",
     cart_package: m.cart_package ?? null,
     range_pass: !!m.range_pass,
+    payment_method: m.payment_method ?? null,
   };
 }
 

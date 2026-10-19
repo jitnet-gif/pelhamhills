@@ -10,7 +10,7 @@
 --   pelham_staff_membership_save(id, p)       새로 넣기(id 가 null) · 고치기(p 에 있는 키만)
 --   pelham_staff_membership_renewals(season)  고객 명부의 회원 중 그 시즌 회원권이 아직 없는 사람
 --
--- 요금은 DB 가 정하지 않는다. 화면이 `/memberships` 요금표대로 `amount_due` 를 채워 넣고
+-- 요금은 DB 가 정하지 않는다. (신용카드 3% 수수료도 화면이 `amount_due` 에 넣는다.) 화면이 `/memberships` 요금표대로 `amount_due` 를 채워 넣고
 -- 직원이 고칠 수 있다 — 부부 카트 두 대, 중간 가입 할인 같은 예외를 DB 가 다 알 수 없다.
 
 create table if not exists public.pelham_memberships (
@@ -24,6 +24,9 @@ create table if not exists public.pelham_memberships (
   phone           text,
   email           text,
   member_number   text,
+  -- 신청서(PDF 2쪽)의 ADDRESS · POSTAL CODE 칸.
+  address         text,
+  postal_code     text,
 
   -- full · weekday · intermediate · nine_hole · twilight · junior
   membership_type text not null
@@ -51,6 +54,11 @@ create table if not exists public.pelham_memberships (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+
+-- 이 파일을 처음 돌린 뒤에 생긴 칸. 다시 돌려도 되게 따로 붙인다.
+alter table public.pelham_memberships
+  add column if not exists address     text,
+  add column if not exists postal_code text;
 
 -- 한 사람이 같은 시즌에 두 줄 생기지 않게. 명부에 없는 회원(customer_ref 비어 있음)은 막지 않는다.
 create unique index if not exists pelham_memberships_customer_season_uq
@@ -80,6 +88,8 @@ as $$
     'phone', r.phone,
     'email', r.email,
     'member_number', r.member_number,
+    'address', r.address,
+    'postal_code', r.postal_code,
     'membership_type', r.membership_type,
     'plan', r.plan,
     'spouse_name', r.spouse_name,
@@ -175,7 +185,7 @@ begin
     end if;
 
     insert into public.pelham_memberships (
-      season, customer_ref, member_name, phone, email, member_number, membership_type, plan,
+      season, customer_ref, member_name, phone, email, member_number, address, postal_code, membership_type, plan,
       spouse_name, cart_package, range_pass, amount_due, amount_paid, paid_on, payment_method,
       status, sim_hours_used, notes
     ) values (
@@ -185,6 +195,8 @@ begin
       public.pelham_membership_text(p, 'phone'),
       public.pelham_membership_text(p, 'email'),
       public.pelham_membership_text(p, 'member_number'),
+      public.pelham_membership_text(p, 'address'),
+      upper(public.pelham_membership_text(p, 'postal_code')),
       t,
       coalesce(v_plan, 'single'),
       public.pelham_membership_text(p, 'spouse_name'),
@@ -212,6 +224,8 @@ begin
          phone           = case when p ? 'phone' then public.pelham_membership_text(p, 'phone') else phone end,
          email           = case when p ? 'email' then public.pelham_membership_text(p, 'email') else email end,
          member_number   = case when p ? 'member_number' then public.pelham_membership_text(p, 'member_number') else member_number end,
+         address         = case when p ? 'address' then public.pelham_membership_text(p, 'address') else address end,
+         postal_code     = case when p ? 'postal_code' then upper(public.pelham_membership_text(p, 'postal_code')) else postal_code end,
          membership_type = coalesce(t, membership_type),
          plan            = coalesce(v_plan, plan),
          spouse_name     = case when p ? 'spouse_name' then public.pelham_membership_text(p, 'spouse_name') else spouse_name end,
@@ -250,6 +264,8 @@ begin
              'phone', c.phone,
              'email', c.email,
              'member_number', c.member_number,
+             'address', c.address_line1,
+             'postal_code', c.postal_code,
              'player_type', c.player_type,
              'rounds', c.rounds_booked_played
            ) order by lower(c.last_name), lower(c.first_name))

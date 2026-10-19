@@ -2,6 +2,8 @@
  * 회원권 안내. 예전에는 이 사이트에 없어서 홈과 푸터가 옛 pelhamhills.com 으로 내보냈다.
  *
  * 내용은 pelhamhills.com/memberships (2027 "Early Bird", 2026-10-06 확인) 를 옮긴 것이다.
+ * 결제 방법·환불/이월 규정·완납 후 쿠폰 지급은 클럽의 요금표 PDF(v3, 2026-09-14) 2쪽 신청서와
+ * Early Bird 혜택 안내문(Final_2027)에서 옮겼다(2026-10-19).
  * 가격은 계산하지 않고 **원문 표기 그대로** 문자열로 둔다 — 클럽이 요율을 바꾸면 원문과
  * 한 줄씩 대조해서 고치게 된다. 신청서·혜택 안내 파일은 클럽이 원본을 관리하므로 복사하지
  * 않고 그쪽 주소로 연결한다.
@@ -29,7 +31,7 @@ const EARLY_BIRD_FLYER =
 
 /** `spousal` 이 없는 회원권은 원문에도 칸이 비어 있다(개인 전용). */
 const memberships: { name: string; access: string; single: string; spousal?: string }[] = [
-  { name: "Full Membership", access: "Play anytime", single: "$3,051.00", spousal: "$5,152.80" },
+  { name: "Full Membership", access: "Play anytime · Driving range included", single: "$3,051.00", spousal: "$5,152.80" },
   {
     name: "Weekday Membership",
     access: "Weekdays anytime / Excludes Holidays",
@@ -72,6 +74,28 @@ const cartPackages = [
   },
   { name: "18-Hole Member Rate (1/2 Cart)", price: "$20.00", note: "Per 18 holes" },
   { name: "9-Hole Member Rate (1/2 Cart)", price: "$11.00", note: "Per 9 holes" },
+];
+
+/** 신청서 2쪽의 결제 수단. 순서도 원문 그대로. */
+const paymentMethods = [
+  { name: "Cheque", detail: "Payable to \u201cPelham Hills Golf\u201d only \u2014 do not add \u201cClub\u201d, \u201cCourse\u201d or anything else." },
+  { name: "Credit Card", detail: "An additional 3% is charged on credit card payments." },
+  { name: "Interac e-Transfer", detail: "Send to pelhamhillsgolf@gmail.com." },
+  { name: "Cash", detail: "At the pro shop." },
+];
+
+/** 의료 사유일 때만. 원문 표 두 개 그대로. */
+const refundRates = [
+  { when: "Before the season opening", rate: "100% except admin fee ($150)" },
+  { when: "On or before May 15", rate: "60%" },
+  { when: "On or before June 15", rate: "30%" },
+  { when: "On or after June 16", rate: "0%" },
+];
+const carryOverRates = [
+  { when: "Before the season opening", rate: "100% with admin fee ($150)" },
+  { when: "On or before June 30", rate: "50%" },
+  { when: "On or before July 31", rate: "30%" },
+  { when: "On or after August 1", rate: "Can\u2019t carry over" },
 ];
 
 const rangePasses = [
@@ -185,6 +209,10 @@ export default function MembershipsPage() {
                 <li>
                   <strong className="text-[#182118]">Free golf simulator</strong> hourly coupons
                 </li>
+                <li>
+                  <strong className="text-[#182118]">Discounted green fees</strong> for your guests
+                  (details in April 2027)
+                </li>
               </ul>
               <Link
                 className="mt-8 inline-block rounded-sm bg-[#214d2f] px-6 py-3 text-sm font-extrabold tracking-[0.12em] text-white uppercase transition hover:bg-[#163820]"
@@ -208,8 +236,8 @@ export default function MembershipsPage() {
                 ))}
               </div>
               <p className="mt-3 text-sm leading-6 text-[#516050]">
-                Coupons expire {SIMULATOR_COUPON_EXPIRES}. Available on Bays #1 &amp; #2 (VIP Bay #3
-                excluded).
+                Coupons are sent electronically once your membership is paid in full, and expire{" "}
+                {SIMULATOR_COUPON_EXPIRES}. Available on Bays #1 &amp; #2 (VIP Bay #3 excluded).
               </p>
             </div>
           </div>
@@ -255,6 +283,74 @@ export default function MembershipsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="bg-[#ebe5d7] px-5 py-12 sm:py-16 lg:px-8">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+            <div>
+              <p className="text-sm font-bold tracking-[0.2em] text-[#8a6f30] uppercase">How to Join</p>
+              <h2 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">Apply and pay by Nov 15.</h2>
+              <p className="mt-4 leading-7 text-[#516050]">
+                Fill in the{" "}
+                <a className="font-bold text-[#214d2f] underline" href={APPLICATION_PDF} rel="noreferrer" target="_blank">
+                  membership application
+                </a>{" "}
+                with your membership category, name(s), address, cellphone and email, and bring or send it
+                to the pro shop with payment in full by{" "}
+                <strong className="text-[#182118]">November 15, 2026</strong>.
+              </p>
+            </div>
+            <div className="rounded-sm border border-[#d8d1c3] bg-white">
+              {paymentMethods.map((row) => (
+                <div className="border-b border-[#d8d1c3] p-5 last:border-b-0" key={row.name}>
+                  <p className="font-bold">{row.name}</p>
+                  <p className="mt-1 text-sm text-[#516050]">{row.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16 lg:px-8">
+          <p className="text-sm font-bold tracking-[0.2em] text-[#8a6f30] uppercase">Membership Policies</p>
+          <h2 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">Before you sign up.</h2>
+          <ul className="mt-6 grid max-w-3xl gap-3 leading-7 text-[#516050]">
+            <li>
+              Memberships are <strong className="text-[#182118]">non-refundable and non-transferable</strong>{" "}
+              except for medical reasons.
+            </li>
+            <li>A maximum of 36 holes of golf per day is permitted with a golf membership.</li>
+            <li>
+              A membership can be refunded or carried over to the next season{" "}
+              <strong className="text-[#182118]">only for a medical issue</strong>, with a doctor&rsquo;s note
+              stating that you are unable to golf. The amount depends on when you stop playing:
+            </li>
+          </ul>
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            {[
+              { title: "Refund", head: "Refund rate", rows: refundRates },
+              { title: "Carry over to next season", head: "Credit toward next season", rows: carryOverRates },
+            ].map((table) => (
+              <div key={table.title}>
+                <h3 className="font-serif text-xl font-semibold">{table.title}</h3>
+                <div className="mt-3 rounded-sm border border-[#d8d1c3] bg-white">
+                  <div className="flex justify-between gap-4 border-b border-[#d8d1c3] bg-[#ebe5d7] px-5 py-3 text-xs font-bold tracking-[0.16em] text-[#516050] uppercase">
+                    <span>Stopped playing</span>
+                    <span className="text-right">{table.head}</span>
+                  </div>
+                  {table.rows.map((row) => (
+                    <div
+                      className="flex items-baseline justify-between gap-4 border-b border-[#d8d1c3] px-5 py-4 last:border-b-0"
+                      key={row.when}
+                    >
+                      <span>{row.when}</span>
+                      <span className="text-right font-bold">{row.rate}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 

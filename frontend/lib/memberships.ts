@@ -2,7 +2,8 @@
  * 시즌별 회원권 명부(0040) — `/admin/memberships` 가 부르는 직원 함수.
  * 함수 이름과 인자는 `supabase/migrations/0040_memberships.sql` 와 글자 그대로 같다.
  *
- * 요금은 공개 요금표(`app/memberships/page.tsx`, 2027 Early Bird, HST 포함)와 같은 숫자다.
+ * 요금은 클럽의 2027 Early Bird 요금표 PDF(v3, 2026-09-14)와 공개 요금표(`app/memberships/page.tsx`)의
+ * HST 포함 금액과 같은 숫자다. 결제 수단·3% 카드 수수료는 같은 PDF 2쪽 신청서를 따른다.
  * 그쪽은 원문 표기 문자열이라 여기서 다시 숫자로 적는다 — 클럽이 요금을 바꾸면 두 곳을 같이 고친다.
  */
 
@@ -22,6 +23,8 @@ export type Membership = {
   phone: string | null;
   email: string | null;
   member_number: string | null;
+  address: string | null;
+  postal_code: string | null;
   membership_type: MembershipType;
   plan: MembershipPlan;
   spouse_name: string | null;
@@ -48,6 +51,8 @@ export type RenewalCandidate = {
   phone: string | null;
   email: string | null;
   member_number: string | null;
+  address: string | null;
+  postal_code: string | null;
   /** 지난 요금제 이름. "Weekday Member - Single with Weekday Cart" 꼴. */
   player_type: string | null;
   rounds: number;
@@ -70,10 +75,12 @@ export const MEMBERSHIP_TYPES: {
   single: number;
   /** 없으면 개인 전용. */
   spousal?: number;
-  /** Early Bird 실내 골프 쿠폰 시간. */
+  /** Early Bird 실내 골프 쿠폰 시간. 완납해야 지급된다. */
   simHours: number;
+  /** 연습장 이용이 회원권에 들어 있다(Full). 연습장 이용권을 따로 팔지 않는다. */
+  rangeIncluded?: boolean;
 }[] = [
-  { key: "full", label: "Full", access: "Play anytime", single: 3051, spousal: 5152.8, simHours: 10 },
+  { key: "full", label: "Full", access: "Anytime · driving range included", single: 3051, spousal: 5152.8, simHours: 10, rangeIncluded: true },
   { key: "weekday", label: "Weekday", access: "Weekdays, excl. holidays", single: 2316.5, spousal: 3955, simHours: 8 },
   { key: "intermediate", label: "Intermediate", access: "Ages 18–35, anytime", single: 2316.5, simHours: 8 },
   { key: "nine_hole", label: "9-Hole", access: "Weekdays after 10 AM", single: 1638.5, spousal: 2881.5, simHours: 6 },
@@ -87,6 +94,12 @@ export const CART_PACKAGES: { key: CartPackage; label: string; price: number }[]
 ];
 
 export const RANGE_PASS_PRICE = 395.5;
+
+/** 신청서 2쪽: "Additional 3% charge for Credit Card Payment". */
+export const CREDIT_CARD_SURCHARGE = 0.03;
+
+/** 신청서의 결제 수단 네 가지. 신용카드만 3% 가 붙는다. */
+export const PAYMENT_METHODS = ["Cheque", "Credit card", "E-transfer", "Cash"] as const;
 
 /** Early Bird 요금이 끝나는 날(이날까지 완납). */
 export const EARLY_BIRD_DEADLINE = "2026-11-15";
@@ -106,19 +119,23 @@ export function cartLabel(key: CartPackage | null): string | null {
 }
 
 /**
- * 요금표대로의 금액. 카트 패키지는 한 사람 몫(1/2 카트) 하나로 센다 — 부부가 둘 다 사면
- * 직원이 금액을 고친다.
+ * 요금표대로의 금액(HST 포함). 카트 패키지는 한 사람 몫(1/2 카트) 하나로 센다 — 부부가 둘 다
+ * 사면 직원이 금액을 고친다. Full 은 연습장이 포함이라 이용권 값을 더하지 않는다.
+ * 신용카드로 내면 합계에 3% 를 얹는다.
  */
 export function listPrice(m: {
   membership_type: MembershipType;
   plan: MembershipPlan;
   cart_package: CartPackage | null;
   range_pass: boolean;
+  payment_method?: string | null;
 }): number {
   const type = typeInfo(m.membership_type);
   const base = m.plan === "spousal" && type.spousal ? type.spousal : type.single;
   const cart = CART_PACKAGES.find((c) => c.key === m.cart_package)?.price ?? 0;
-  return round2(base + cart + (m.range_pass ? RANGE_PASS_PRICE : 0));
+  const range = m.range_pass && !type.rangeIncluded ? RANGE_PASS_PRICE : 0;
+  const subtotal = base + cart + range;
+  return round2(m.payment_method === "Credit card" ? subtotal * (1 + CREDIT_CARD_SURCHARGE) : subtotal);
 }
 
 export function balance(m: Pick<Membership, "amount_due" | "amount_paid">): number {
