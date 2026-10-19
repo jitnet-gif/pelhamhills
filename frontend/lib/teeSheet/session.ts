@@ -179,15 +179,27 @@ async function tokenRequest(
 }
 
 /**
- * 이메일·비밀번호 로그인. 실패는 `ApiError` 로 올린다 — 예약 화면과 같은 오류 타입이다.
+ * 아이디(또는 이메일)·비밀번호 로그인. 실패는 `ApiError` 로 올린다 — 예약 화면과 같은 오류 타입이다.
  *
  * 401/400 에는 GoTrue 의 영어 원문("Invalid login credentials") 대신 우리 문구를 쓴다.
  * 한국어 화면에 영어 한 줄이 튀어나오면 직원은 무엇이 잘못됐는지 알기 어렵다.
  */
-export async function signIn(email: string, password: string): Promise<StaffSession> {
+/**
+ * 직원은 이메일 대신 짧은 아이디(예: `hwang`)로도 들어온다. GoTrue 는 이메일만 받으므로
+ * `@` 가 없는 입력은 클럽 도메인 계정(`hwang@pelhamhills.com`)으로 바꿔 보낸다.
+ */
+const STAFF_ID_DOMAIN = "pelhamhills.com";
+
+function loginEmail(login: string): string {
+  const value = login.trim();
+  return value.includes("@") ? value : `${value.toLowerCase()}@${STAFF_ID_DOMAIN}`;
+}
+
+export async function signIn(login: string, password: string): Promise<StaffSession> {
+  const email = loginEmail(login);
   let response: Response;
   try {
-    response = await tokenRequest("password", { email: email.trim(), password });
+    response = await tokenRequest("password", { email, password });
   } catch {
     throw new ApiError(0, "로그인 서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
   }
@@ -202,12 +214,12 @@ export async function signIn(email: string, password: string): Promise<StaffSess
   if (!response.ok) {
     const message =
       response.status === 400 || response.status === 401
-        ? "이메일 또는 비밀번호가 올바르지 않습니다."
+        ? "아이디 또는 비밀번호가 올바르지 않습니다."
         : authErrorMessage(payload, `로그인에 실패했습니다 (${response.status}).`);
     throw new ApiError(response.status, message);
   }
 
-  const session = toSession((payload ?? {}) as TokenResponse, email.trim());
+  const session = toSession((payload ?? {}) as TokenResponse, email);
   if (!session) throw new ApiError(500, "로그인 응답을 이해할 수 없습니다. 잠시 후 다시 시도해 주세요.");
   setSession(session);
   return session;

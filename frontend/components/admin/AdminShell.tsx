@@ -848,25 +848,26 @@ function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
         <form className="bg-white p-5 shadow-sm" onSubmit={submit}>
           <h1 className="text-base font-bold">직원 로그인</h1>
           <p className="mt-1 text-xs leading-5 text-[#6b7280]">
-            GPS 앱에서 쓰는 관리자 계정으로 들어옵니다. 예약 화면을 찾으시나요?{" "}
+            직원 아이디와 비밀번호로 들어옵니다. 예약 화면을 찾으시나요?{" "}
             <Link className="font-semibold text-[#4533ff] underline" href={SITE_HOME}>
               클럽 홈
             </Link>
           </p>
 
           <label className="mt-4 block text-xs font-bold" htmlFor="staff-email">
-            이메일
+            아이디
           </label>
           <input
             autoCapitalize="none"
             autoComplete="username"
+            autoCorrect="off"
             className="mt-1 h-11 w-full border border-[#d4d4d8] px-3 text-base"
             id="staff-email"
-            inputMode="email"
-            name="email"
+            name="username"
             onChange={(event) => setEmail(event.target.value)}
             required
-            type="email"
+            spellCheck={false}
+            type="text"
             value={email}
           />
 
