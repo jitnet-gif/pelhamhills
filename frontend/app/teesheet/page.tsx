@@ -36,13 +36,32 @@ export default function TeeSheetPage() {
   const { bookings, createBooking, focusedDate, pushToast, select, setFocusedDate, slots } = controller;
   // `/teesheet?date=YYYY-MM-DD&booking=<id>` — 다른 화면(Calls & SMS 의 예약 통화)에서 그 예약을 연 채로 온다.
   // 처음 한 번만 읽는다. 예약이 아직 안 읽혔어도 선택은 id 로 걸어 두면 읽히는 대로 상세가 열린다.
+  // 그 예약 칸은 격자에 그려지는 대로 화면 가운데로 굴리고 몇 번 깜빡여서 어디 있는지 보인다.
+  const blinkRef = useRef<string | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const date = params.get("date");
     const booking = params.get("booking");
     if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) setFocusedDate(date);
-    if (booking) select(booking);
+    if (booking) {
+      select(booking);
+      blinkRef.current = booking;
+    }
   }, [select, setFocusedDate]);
+  // 예약을 읽기 전에는 칸이 없다 — 예약·날짜·뷰가 바뀔 때마다 다시 찾고, 찾으면 한 번만 한다.
+  // 깜빡임은 React 가 모르는 `data-blink` 속성으로 건다. 5초 폴링으로 다시 그려도 className 처럼 지워지지 않는다.
+  useEffect(() => {
+    const id = blinkRef.current;
+    if (!id) return;
+    const cells = document.querySelectorAll<HTMLElement>(`[data-booking-id="${CSS.escape(id)}"]`);
+    if (cells.length === 0) return;
+    blinkRef.current = null;
+    cells[0].scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    for (const cell of cells) {
+      cell.dataset.blink = "";
+      cell.addEventListener("animationend", () => delete cell.dataset.blink, { once: true });
+    }
+  }, [bookings, focusedDate, controller.view]);
   // 다이얼로그는 이제 **막다른 길을 막는 용도**로만 남는다 (아래 addReservation 참고).
   const [dialogOpen, setDialogOpen] = useState(false);
   // 합산 계산서 서랍. 그린피를 담고 여기서 바로 결제하거나, 리테일 화면으로 넘어가 상품을 더 담는다.

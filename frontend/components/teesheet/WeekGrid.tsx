@@ -997,6 +997,7 @@ function BookingBar({ booking, selected, onSelect, dragging, onDragStart, onDrag
       onDragEnd={onDragEnd}
       onClick={() => onSelect(booking.id)}
       aria-pressed={selected}
+      data-booking-id={booking.id}
       title={`${booking.title} · ${booking.time} · ${STATUS_LABEL[booking.status]}`}
       style={blocked ? HATCH_STYLE : undefined}
       className={`flex h-[19px] min-w-0 flex-1 items-center gap-1 overflow-hidden rounded-sm px-1.5 text-left text-[11px] leading-none font-bold shadow-sm ${FOCUS_RING} ${
@@ -1043,6 +1044,7 @@ function DaySegmentCard({
     <button
       type="button"
       data-slot-time={slotTime}
+      data-booking-id={booking.id}
       draggable={Boolean(onDragStart)}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -1172,6 +1174,7 @@ function OffGridStrip({ title, hint, bookings, selectedId, onSelect, dayTone }: 
               type="button"
               onClick={() => onSelect(booking.id)}
               aria-pressed={booking.id === selectedId}
+              data-booking-id={booking.id}
               className={`flex items-center gap-2 rounded-sm border border-[#d6d6dc] px-2 py-1 text-left text-[11px] ${FOCUS_RING} ${
                 dayTone ? daySurfaceClass(booking) : COLOR_CLASS[booking.color]
               } ${isDead(booking) ? "line-through opacity-60" : ""} ${
