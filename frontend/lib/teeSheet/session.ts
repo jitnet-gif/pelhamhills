@@ -17,7 +17,7 @@
  * 자리를 대신한다.
  *
  * ## 세션이 사는 곳
- * `localStorage` 한 칸. 정적 export 라 세션을 심어 줄 서버도, 읽어 줄 미들웨어도 없다.
+ * `localStorage` 한 칸(현금 리포트 사이트는 따로 한 칸 — 아래 `storageKey`). 정적 export 라 세션을 심어 줄 서버도, 읽어 줄 미들웨어도 없다.
  * 토큰은 프로 샵 태블릿·직원 휴대폰의 브라우저 안에서만 살고, 탭을 옮기면
  * `storage` 이벤트로 같이 움직인다.
  *
@@ -36,7 +36,20 @@ export const SUPABASE_URL = (
 export const PUBLISHABLE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_oMJG_-xpWr6AI5o3KnrU_A_kJENaKSY";
 
-const STORAGE_KEY = "pelham.staff.session";
+/**
+ * 세션 저장 칸. 현금 리포트 사이트(`/cash`)는 칸이 따로다(2026-10-20 클럽 요청) — 같은 브라우저에서
+ * 프로 샵 계정으로 티 시트를 쓰는 중에도 현금 리포트는 자기 계정으로 **따로** 로그인·로그아웃한다.
+ * 이 파일을 부르는 모든 직원 호출(staffRpc·retail·rain check …)이 지금 주소의 칸을 따라간다.
+ */
+export const CASH_SITE_PATH = "/cash";
+const STAFF_STORAGE_KEY = "pelham.staff.session";
+const CASH_STORAGE_KEY = "pelham.cash.session";
+
+function storageKey(): string {
+  if (typeof window === "undefined") return STAFF_STORAGE_KEY;
+  const path = window.location.pathname;
+  return path === CASH_SITE_PATH || path.startsWith(`${CASH_SITE_PATH}/`) ? CASH_STORAGE_KEY : STAFF_STORAGE_KEY;
+}
 
 /** 만료 이 시간 전부터는 미리 갱신한다. 요청 도중 토큰이 죽는 것을 막는 여유분. */
 const REFRESH_MARGIN_MS = 60_000;
@@ -56,7 +69,8 @@ export type StaffSession = {
 // 읽는다.
 
 let cached: StaffSession | null = null;
-let loaded = false;
+/** 캐시가 어느 칸에서 읽은 것인가. 화면 이동으로 칸이 바뀌면 다시 읽는다. */
+let loadedKey: string | null = null;
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -66,7 +80,7 @@ function notify(): void {
 function readStored(): StaffSession | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey());
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<StaffSession>;
     if (typeof parsed?.accessToken !== "string" || typeof parsed?.refreshToken !== "string") {
@@ -88,8 +102,8 @@ function readStored(): StaffSession | null {
 function writeStored(session: StaffSession | null): void {
   if (typeof window === "undefined") return;
   try {
-    if (session) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    else window.localStorage.removeItem(STORAGE_KEY);
+    if (session) window.localStorage.setItem(storageKey(), JSON.stringify(session));
+    else window.localStorage.removeItem(storageKey());
   } catch {
     // 저장이 막혀도 이번 탭에서는 메모리 캐시로 계속 쓸 수 있다.
   }
@@ -97,16 +111,17 @@ function writeStored(session: StaffSession | null): void {
 
 /** 지금 들고 있는 세션(만료됐을 수도 있다). 화면에서는 effect 안에서만 부른다. */
 export function getSession(): StaffSession | null {
-  if (!loaded) {
+  const key = storageKey();
+  if (loadedKey !== key) {
     cached = readStored();
-    loaded = true;
+    loadedKey = key;
   }
   return cached;
 }
 
 function setSession(session: StaffSession | null): void {
   cached = session;
-  loaded = true;
+  loadedKey = storageKey();
   writeStored(session);
   notify();
 }
@@ -123,9 +138,9 @@ export function subscribe(listener: () => void): () => void {
 // 띄워 두는 일이 흔한데, 한쪽만 로그인 상태로 남으면 어느 쪽이 진짜인지 알 수 없다.
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
-    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    if (event.key !== null && event.key !== storageKey()) return;
     cached = readStored();
-    loaded = true;
+    loadedKey = storageKey();
     notify();
   });
 }
@@ -192,7 +207,7 @@ async function tokenRequest(
 const STAFF_ID_DOMAIN = "pelhamhills.com";
 const STAFF_ID_ALIASES: Record<string, string> = {
   hwang: "proshop@pelhamhills.com",
-  // 현금 리포트 계정(0046 의 pelham_cash_viewers). `/admin/reports/cash/` 는 이 계정만 열린다.
+  // 현금 리포트 계정(0046 의 pelham_cash_viewers). 현금 리포트 사이트 `/cash` 는 이 계정만 열린다.
   emmeline: "admin@pelhamhills.ca",
 };
 

@@ -60,7 +60,7 @@ async function loadDays(dates: string[]): Promise<{ days: DayData[]; failed: num
   return { days, failed };
 }
 
-/** `cash` 는 현금 리포트(`/admin/reports/cash/`)에서만 참이다 — `buildAccountingWorkbook` 참고. */
+/** `cash` 는 현금 리포트(`/cash`)에서만 참이다 — `buildAccountingWorkbook` 참고. */
 export default function AccountingWorkbook({ cash = false }: { cash?: boolean }) {
   const today = localBusinessDate();
   const [from, setFrom] = useState(() => monthStart(today));

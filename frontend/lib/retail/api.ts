@@ -161,7 +161,7 @@ export const retailApi = {
   listLowStock: () => call<LowStockItem[]>("pelham_staff_pos_low_stock"),
 
   /**
-   * 이 계정이 현금 리포트(`/admin/reports/cash/`)를 볼 수 있는가(0046). 0046 이 아직 안 돌았으면
+   * 이 계정이 현금 리포트(`/cash`)를 볼 수 있는가(0046). 0046 이 아직 안 돌았으면
    * 아무도 못 보는 것으로 친다(명단이 없으니 Emmeline 인지 알 수 없다).
    */
   cashAccess: async (): Promise<boolean> => {

@@ -11,11 +11,11 @@
  * 나눈다 — `lib/retail/divisions.ts`. 여기는 데모로 내려가지 않는다: 서버가 안 되면 오류를
  * 보여 준다. 가짜 숫자 옆의 진짜 숫자가 이 화면이 고치려던 바로 그 문제다.
  *
- * 현금은 여기 없다(2026-10-19). 현금까지 든 리포트는 `/admin/reports/cash/` 에서 현금 리포트 계정만
- * 본다 — 그 계정으로 로그인했을 때만 오른쪽 위에 링크가 뜬다. 탭은 `components/reports/ReportsView.tsx`.
+ * 현금은 여기 없다(2026-10-19). 현금까지 든 리포트는 따로 로그인하는 사이트 `/cash` 에서 현금 리포트
+ * 계정만 본다(2026-10-20). 여기 로그인한 계정이 그 계정일 때만 오른쪽 위에 링크가 뜬다 — 그래도 `/cash` 는
+ * 자기 로그인을 따로 묻는다. 탭은 `components/reports/ReportsView.tsx`.
  */
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
@@ -43,9 +43,10 @@ export default function ReportsPage() {
       <ReportsView
         aside={
           cashAccess ? (
-            <Link className="text-sm font-semibold text-[#4533ff] hover:underline" href="/admin/reports/cash">
+            // 일반 <a>: 페이지를 새로 열어야 `/cash` 의 따로 된 로그인 칸을 읽는다.
+            <a className="text-sm font-semibold text-[#4533ff] hover:underline" href="/cash">
               Cash report →
-            </Link>
+            </a>
           ) : null
         }
         cash={false}
