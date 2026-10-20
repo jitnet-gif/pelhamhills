@@ -8,39 +8,86 @@
 // 색 체계가 두 개라는 점을 반드시 기억할 것:
 //   1) `booking.color` ("blue" | "gold" | "gray") 는 여전히 **주간 뷰**의
 //      COLOR_CLASS 막대 색을 결정한다. 이건 예약 단위 색이다.
-//   2) **일간 시트**에서는 셀 배경이 플레이어 단위 톤(아래 PlayerTone)이며,
-//      booking.color 중에서는 "blue" 만 의미가 있다 — GolfNow 같은 외부
-//      온라인 채널 예약 표시. "gold"/"gray" 는 일간 시트에서 무시된다.
+//   2) **일간 시트**에서는 셀 배경이 플레이어 단위 톤(아래 PlayerTone)이고,
+//      톤은 거의 전부 player.ratePlan(요금제 이름 = 회원 등급)으로 정한다.
+//      booking.color 중에서는 "blue" 만 의미가 있다 — 퍼블릭 요금 손님이
+//      GolfNow 같은 외부 온라인 채널로 들어왔다는 표시. "gold"/"gray" 는 무시된다.
 // 다음 사람이 두 체계를 헷갈리지 않도록 여기 명시해 둔다.
 
 import type { Player, TeeBooking } from "@/lib/teeSheet/types";
 
-export type PlayerTone = "member" | "full" | "guest" | "online";
+/** 프로 샵이 정한 일간 시트 색 범례 (2026-10-19). */
+export type PlayerTone =
+  | "publicJunior" // green
+  | "employee" // purple
+  | "intermediate" // teal
+  | "weekday" // light pink
+  | "full" // dark pink
+  | "public" // yellow
+  | "golfnow" // dark blue
+  | "nineHole" // blue
+  | "senior" // light blue
+  | "twilight"; // brown
 
 /**
- * 우선순위 규칙 (위에서 먼저 맞는 것으로 결정):
- *   1. booking.color === "blue"  → "online"  (예약 전체가 온라인/외부 채널)
- *   2. player.type === "Guest"   → "guest"
- *   3. player.ratePlan 이 "Full Member" 로 시작 → "full"
- *   4. 그 외                      → "member"
+ * 요금제 이름(대소문자 무시)으로 판정한다. 위에서 먼저 맞는 것이 이긴다:
+ *   1. "golfnow"                         → golfnow
+ *   2. "staff" / "employee"              → employee
+ *   3. "junior"                          → publicJunior (Junior Member 도 같은 초록)
+ *   4. "senior"                          → senior
+ *   5. "twilight"                        → twilight
+ *   6. "9 hole" / "nine hole" / "9-hole" → nineHole
+ *   7. "intermediate"                    → intermediate
+ *   8. "weekday"                         → weekday
+ *   9. "full"                            → full
+ *  10. 그 밖의 "member"                   → weekday (연분홍 = 일반 회원)
+ *  11. 나머지(Public·Guest·빈 값)          → booking.color 가 "blue" 면 golfnow, 아니면 public
  *
- * 1번이 플레이어 단위 규칙보다 위에 있는 이유: 온라인 채널 예약은 정산 주체가
- * 클럽이 아니라 채널이므로, 그 안의 개별 요금제보다 "어디서 들어온 예약인가"가
- * 프런트 데스크에 더 중요한 정보다.
+ * 등급 단어를 "member" 보다 먼저 보는 이유: "Twilight Member", "9 Hole Member" 처럼
+ * 회원 요금제 이름에 등급이 들어 있다(backend customer_store `_MEMBER_TIERS` 와 같은 목록).
+ * 회원이 GolfNow 로 잡은 예약이라도 회원 색이 우선이다 — 결제 주체가 회원 계정이기 때문.
  */
 export function playerTone(booking: TeeBooking, player: Player): PlayerTone {
-  if (booking.color === "blue") return "online";
-  if (player.type === "Guest") return "guest";
-  if (player.ratePlan.trim().startsWith("Full Member")) return "full";
-  return "member";
+  const plan = (player.ratePlan ?? "").trim().toLowerCase();
+  if (plan.includes("golfnow") || plan.includes("golf now")) return "golfnow";
+  if (plan.includes("staff") || plan.includes("employee")) return "employee";
+  if (plan.includes("junior")) return "publicJunior";
+  if (plan.includes("senior")) return "senior";
+  if (plan.includes("twilight")) return "twilight";
+  if (/\b(9|nine)[ -]?hole/.test(plan)) return "nineHole";
+  if (plan.includes("intermediate")) return "intermediate";
+  if (plan.includes("weekday")) return "weekday";
+  if (plan.startsWith("full")) return "full";
+  if (plan.includes("member")) return "weekday";
+  return booking.color === "blue" ? "golfnow" : "public";
 }
 
-/** Chronogolf 스크린샷에서 샘플링한 실제 색. Tailwind 가 스캔할 수 있도록 리터럴로 둔다. */
+/** 범례 순서·이름. 화면에 범례를 그릴 때 이 목록을 쓴다. */
+export const TONE_LABEL: Record<PlayerTone, string> = {
+  full: "Full member",
+  weekday: "Weekday member",
+  intermediate: "Intermediate member",
+  nineHole: "9-hole member",
+  twilight: "Twilight member",
+  employee: "Employee",
+  public: "Public tee time",
+  golfnow: "GolfNow (public)",
+  senior: "Senior public",
+  publicJunior: "Public junior",
+};
+
+/** Tailwind 가 스캔할 수 있도록 리터럴로 둔다. */
 export const TONE_CLASS: Record<PlayerTone, string> = {
-  member: "bg-[#e3bfd4] text-[#2b1f27]",
+  publicJunior: "bg-[#2e9d4f] text-white",
+  employee: "bg-[#7a3fc8] text-white",
+  intermediate: "bg-[#139a96] text-white",
+  weekday: "bg-[#f3c1d8] text-[#2b1f27]",
   full: "bg-[#d6219b] text-white",
-  guest: "bg-[#ffd400] text-[#1d232b]",
-  online: "bg-[#0a58ca] text-white",
+  public: "bg-[#ffd400] text-[#1d232b]",
+  golfnow: "bg-[#0b2a7a] text-white",
+  nineHole: "bg-[#2f7de1] text-white",
+  senior: "bg-[#a8d8f5] text-[#11283a]",
+  twilight: "bg-[#8a5a2b] text-white",
 };
 
 /** 플레이어가 죽은 상태(취소/노쇼)인지 — 셀에 취소선을 그을지 결정한다. */

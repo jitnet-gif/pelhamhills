@@ -23,7 +23,7 @@ import { retailApi, toRetailError } from "@/lib/retail/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
 import { formatMoney } from "@/lib/retail/types";
 import { confirmationCode } from "@/lib/teeSheet/receipt";
-import { GUEST_NAME } from "@/lib/teeSheet/tone";
+import { GUEST_NAME, TONE_CLASS, TONE_LABEL, type PlayerTone } from "@/lib/teeSheet/tone";
 
 /** 티 시트 영수증 바코드: `ABCD-1234`(확인 코드), 뒤에 `-플레이어4자` 또는 `-ALL`. */
 const TEE_TICKET = /^([A-Z0-9]{4}-[A-Z0-9]{4})(?:-([A-Z0-9]{4}|ALL))?$/;
@@ -88,10 +88,9 @@ export default function TeeSheetPage() {
         // 빈 플레이어 한 명을 같이 만든다: 0명짜리 예약은 좌석을 잡지 않아서
         // 누른 칸이 그대로 `+` 로 남고, 격자 대신 off-grid 줄에 떨어진다.
         //
-        // `type` 은 "Existing Customer" 로 넘긴다. 서버 기본값인 "Guest" 로 두면 셀이
-        // 노란 게스트 톤(playerTone)으로 칠해진다 — 이 자리는 익명 손님이 아니라 직원이
-        // 이름을 채울 빈 자리다. 이름 없는 자리를 Guest 로 부르는 일은 playerLabel 의
-        // 폴백이 한다.
+        // `type` 은 "Existing Customer" 로 넘긴다 — 이 자리는 익명 손님이 아니라 직원이
+        // 이름을 채울 빈 자리다. 셀 색은 요금제(서버 기본 "Public" → 노랑)로 정해지고
+        // (playerTone), 이름 없는 자리를 Guest 로 부르는 일은 playerLabel 의 폴백이 한다.
         const created = await createBooking({
           date,
           time,
@@ -222,6 +221,7 @@ export default function TeeSheetPage() {
         // 레퍼런스에서는 파란 Add 버튼이 상단바 오른쪽 끝에 있다. 예전에는 티 시트가
         // 자기 헤더 줄을 하나 더 그려서 거기 달았는데, 그래서 화면 머리가 세 겹이었다.
         <span className="flex items-center gap-1.5">
+        <ToneLegend />
         {billState.missing ? null : (
           <button
             className="inline-flex min-h-11 items-center gap-1 border border-[#4533ff] bg-white px-3 text-xs font-bold text-[#4533ff] lg:min-h-0 lg:py-1.5"
@@ -307,5 +307,26 @@ export default function TeeSheetPage() {
         open={dialogOpen}
       />
     </AdminShell>
+  );
+}
+
+/** 일간 시트 셀 색 범례. 색 규칙 자체는 tone.ts 하나에만 있다 — 여기선 목록만 그린다. */
+function ToneLegend() {
+  return (
+    <details className="relative">
+      <summary
+        className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 border border-[#c7c7cc] bg-white px-3 text-xs font-bold text-[#3f4650] lg:min-h-0 lg:py-1.5"
+        title="What the tee sheet colors mean"
+      >
+        Colors
+      </summary>
+      <ul className="absolute right-0 z-50 mt-1 w-52 space-y-1 border border-[#c7c7cc] bg-white p-2 text-xs shadow-lg">
+        {(Object.keys(TONE_LABEL) as PlayerTone[]).map((tone) => (
+          <li className={`px-2 py-1 font-semibold ${TONE_CLASS[tone]}`} key={tone}>
+            {TONE_LABEL[tone]}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
