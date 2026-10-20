@@ -55,6 +55,8 @@ class FakeStripe:
                                                             "device_type": "simulated_stripe_s700",
                                                             "status": "online", "action": None}}
         self.fail: dict[str, tuple[int, str, str]] = {}
+        self.configs: dict[str, dict[str, Any]] = {"tmc_default": {"id": "tmc_default", "tipping": {
+            "cad": {"percentages": [15, 18, 20], "smart_tip_threshold": 1000, "fixed_amounts": [100, 200, 300]}}}}
         self.n = 0
 
     def _id(self, prefix: str) -> str:
@@ -103,7 +105,7 @@ class FakeStripe:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path.removeprefix("/v1")
         query = dict(parse_qsl(request.url.query.decode()))
-        form = dict(parse_qsl(request.content.decode())) if request.content else {}
+        form = dict(parse_qsl(request.content.decode(), keep_blank_values=True)) if request.content else {}
         self.requests.append((request.method, path, form, query))
         assert request.headers["authorization"] == "Bearer sk_test_123"
         # 계정 기본 버전(endive~)은 payment_method_types 를 거절한다. 늘 고정 버전으로 보낸다.
@@ -171,6 +173,13 @@ class FakeStripe:
             elif action == "cancel_action":
                 r["action"] = None
             return httpx.Response(200, json=r)
+        if path == "/terminal/configurations" and m == "GET":
+            return httpx.Response(200, json={"data": list(self.configs.values())})
+        if path.startswith("/terminal/configurations/") and m == "POST":
+            cfg = self.configs[path.rsplit("/", 1)[1]]
+            cfg["tipping"] = {"cad": {"percentages": [int(v) for k, v in sorted(form.items())
+                                                      if k.startswith("tipping[cad][percentages]")]}}
+            return httpx.Response(200, json=cfg)
         if path == "/terminal/readers" and m == "GET":
             return httpx.Response(200, json={"data": list(self.readers.values())})
         if path.startswith("/test_helpers/terminal/readers/"):
@@ -403,6 +412,7 @@ def env(monkeypatch):
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
     gw, sql = FakeStripe(), FakeSql()
     monkeypatch.setattr(sg, "_transport", httpx.MockTransport(gw))
+    monkeypatch.setattr(sg, "_tip_options_set", False)
     monkeypatch.setattr(supabase_rest, "rpc", sql)
     monkeypatch.setattr(supabase_rest, "rpc_as", sql.as_user)
     monkeypatch.setattr(payments, "_credential_check", {"at": None, "result": None, "env": None})
@@ -736,6 +746,21 @@ def test_terminal_tip_is_suggested_on_food_and_beverage_only(env):
     _sale(client, amount=2000)
     sent = gw.posts(f"/terminal/readers/{READER}/process_payment_intent")[1]
     assert sent["process_config[tipping][amount_eligible]"] == "2000"
+
+
+def test_terminal_tip_buttons_are_15_and_10_percent(env):
+    client, gw, sql = env
+    sql.bill = {"id": 7, "subtotal": 3000, "discount": 0, "tax": 390, "total": 3390, "lines": [
+        {"category": "Food & Beverage", "line_total": 3000}]}
+    _sale(client, amount=3390)
+    sent = gw.posts("/terminal/configurations/tmc_default")
+    assert len(sent) == 1
+    assert sent[0]["tipping[cad][percentages][0]"] == "15" and sent[0]["tipping[cad][percentages][1]"] == "10"
+    assert "tipping[cad][percentages][2]" not in sent[0]
+    assert sent[0]["tipping[cad][fixed_amounts]"] == "" and sent[0]["tipping[cad][smart_tip_threshold]"] == ""
+    # 한 번 맞추면 다시 묻지 않는다.
+    _sale(client, amount=3390)
+    assert len(gw.posts("/terminal/configurations/tmc_default")) == 1
 
 
 def test_terminal_simulated_interac_tap_is_debit(env):

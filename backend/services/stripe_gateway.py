@@ -336,6 +336,31 @@ def create_terminal_intent(*, amount_cents: int, txn_id: int, reference: str, bi
     }, idempotency_key=f"terminal-sale-{txn_id}")
 
 
+# 리더 팁 화면의 버튼: 15% · 10% · Custom(리더가 늘 붙인다) · No tip.
+TIP_PERCENTAGES = [15, 10]
+_tip_options_set = False
+
+
+def ensure_tip_options() -> None:
+    """리더 설정(Terminal Configuration)의 팁 % 를 TIP_PERCENTAGES 로 맞춘다. 프로세스마다 한 번.
+    금액이 작을 때 고정 금액을 보여 주는 smart tip 은 끈다 — 늘 % 와 Custom 만 보인다.
+    실패해도 결제는 막지 않는다(리더는 원래 설정대로 팁을 묻는다)."""
+    global _tip_options_set
+    if _tip_options_set:
+        return
+    try:
+        for cfg in _request("GET", "/terminal/configurations", {"limit": 100}).get("data") or []:
+            cad = ((cfg.get("tipping") or {}).get(CURRENCY) or {})
+            if cad.get("percentages") == TIP_PERCENTAGES and not cad.get("fixed_amounts") \
+                    and not cad.get("smart_tip_threshold"):
+                continue
+            _request("POST", f"/terminal/configurations/{cfg['id']}", {"tipping": {CURRENCY: {
+                "percentages": TIP_PERCENTAGES, "fixed_amounts": "", "smart_tip_threshold": ""}}})
+        _tip_options_set = True
+    except Exception as exc:
+        logger.warning("리더 팁 % 를 맞추지 못함 (%s)", getattr(exc, "message", type(exc).__name__))
+
+
 def process_on_reader(reader_id: str, pi_id: str, tip_eligible_cents: int | None = None) -> dict[str, Any]:
     """리더에 결제를 띄운다. 팁은 음식·음료(F&B)에만 받는다: `tip_eligible_cents` 가 0 이면 팁 화면을
     건너뛰고, 양수면 그 금액을 기준으로 팁 % 를 제안한다(그린피·카트 등은 팁 기준에서 빠진다).
@@ -346,6 +371,7 @@ def process_on_reader(reader_id: str, pi_id: str, tip_eligible_cents: int | None
             config["skip_tipping"] = True
         else:
             config["tipping"] = {"amount_eligible": int(tip_eligible_cents)}
+            ensure_tip_options()
     return _request("POST", f"/terminal/readers/{reader_id}/process_payment_intent", {
         "payment_intent": pi_id,
         "process_config": config,

@@ -84,6 +84,7 @@
 
 - 실제 S700 에서 `card_present` 승인번호가 `receipt.authorization_code` 로 오는지. 없으면 승인번호 자리에
   charge id(`ch_…`)가 들어간다(기록·환불에는 지장 없다).
-- 리더의 팁 화면은 Stripe Dashboard 의 Terminal 설정(Configuration → Tipping)으로 켠다. 켜면 팁이
-  `amount_details.tip` 으로 와서 결제 줄의 팁이 된다.
+- 리더의 팁 버튼은 15% · 10% · Custom · No tip. 백엔드가 F&B 결제 때 Terminal Configuration 의
+  `tipping.cad.percentages` 를 [15, 10] 으로 맞춘다(`stripe_gateway.ensure_tip_options`, smart tip 고정 금액은 끔).
+  팁은 `amount_details.tip` 으로 와서 결제 줄의 팁이 된다.
 - 영수증의 EMV 필수 항목(AID·애플리케이션 이름 등)은 아직 인쇄하지 않는다.
