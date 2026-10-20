@@ -453,7 +453,9 @@ function BookingForm({
   // 9홀은 정해진 시각부터만(0034). 이른 티타임이면 버튼을 끄고 18홀로 둔다.
   const nineOpen = nineHolesOpen(slot);
   const fee = greenFeeFor(slot, holes);
-  const total = fee * size;
+  // 카트는 1인 요금(세전) — 웹 예약은 모두 Public 이다. 진짜 값은 DB(0050·`pelham_tee_cart_fee_on`)가 매긴다.
+  const cartFee = cart ? (holes === 9 ? 11.5 : 19.47) : 0;
+  const total = (fee + cartFee) * size;
 
   const submit = async () => {
     setSubmitting(true);
@@ -519,6 +521,12 @@ function BookingForm({
             <dt className="font-semibold text-[#8a6f30]">Green fee</dt>
             <dd>${fee.toFixed(2)} per player</dd>
           </div>
+          {cartFee > 0 ? (
+            <div className="min-w-0">
+              <dt className="font-semibold text-[#8a6f30]">Power cart ({holes} holes)</dt>
+              <dd>${cartFee.toFixed(2)} per player</dd>
+            </div>
+          ) : null}
           <div className="min-w-0">
             <dt className="font-semibold text-[#8a6f30]">Estimated total</dt>
             <dd className="font-bold text-[#214d2f]">${total.toFixed(2)}</dd>
@@ -633,7 +641,7 @@ function BookingForm({
                 두 명이 타므로 인원의 절반(올림)만 잡는다. */}
             <span className="block text-sm text-[#5c6459]">
               {carts > 0
-                ? `We will hold ${carts} cart${carts === 1 ? "" : "s"} for your group. Pay at the pro shop.`
+                ? `We will hold ${carts} cart${carts === 1 ? "" : "s"} for your group — $${(holes === 9 ? 11.5 : 19.47).toFixed(2)} per player for ${holes} holes, plus HST.`
                 : "Walking. Tell us if that changes."}
             </span>
           </span>
@@ -701,6 +709,7 @@ function Confirmation({
   onBookAnother: () => void;
 }) {
   const players = booking.players.length;
+  const cartTotal = booking.players.reduce((sum, p) => sum + (p.cart ? (p.cartFee ?? 0) : 0), 0);
   const code = booking.confirmationCode ?? booking.id;
   // 온라인 결제의 본인 확인도 조회 화면과 같다: 코드 + 예약한 사람의 이메일.
   const email = booking.players.find((p) => p.email)?.email ?? "";
@@ -724,7 +733,9 @@ function Confirmation({
               : "Walking"}
           </p>
           <p className="mt-1 text-sm text-[#3d453d]">
-            ${booking.rate.toFixed(2)} per player · ${(booking.rate * players).toFixed(2)} total
+            {`$${booking.rate.toFixed(2)} per player`}
+            {cartTotal > 0 ? ` + cart $${cartTotal.toFixed(2)}` : ""}
+            {` · $${(booking.rate * players + cartTotal).toFixed(2)} total`}
           </p>
 
           <div className="mt-4 border-t border-[#d8d1c3] pt-4">

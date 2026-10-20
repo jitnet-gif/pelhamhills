@@ -89,7 +89,12 @@ export const teeSheetApi = {
 
   getBooking: (id: string): Promise<TeeBooking> => staffBooking(id),
 
-  createBooking: (input: CreateBookingInput): Promise<TeeBooking> => staffBookingCreate(input),
+  // 생성 함수는 저장 전 doc 을 돌려준다. 카트 요금(0050)·시각별 요금(0045)은 BEFORE 트리거가
+  // 저장 직전에 붙이므로 한 번 다시 읽는다. 다시 읽기가 실패해도 예약은 들어갔다.
+  createBooking: async (input: CreateBookingInput): Promise<TeeBooking> => {
+    const created = await staffBookingCreate(input);
+    return staffBooking(created.id).catch(() => created);
+  },
 
   patchBooking: (id: string, patch: PatchBookingInput): Promise<TeeBooking> =>
     staffBookingPatch(id, patch),
