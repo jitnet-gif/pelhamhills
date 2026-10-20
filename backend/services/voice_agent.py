@@ -213,8 +213,9 @@ async def conversation_audio(conversation_id: str) -> tuple[bytes, str]:
 # ElevenLabs 가 직접 걸고, 손님이 받으면 에이전트가 말한다.
 
 def marketing_agent_id() -> str:
-    """프로모션 전화를 거는 에이전트. 따로 없으면 예약 에이전트."""
-    return os.getenv("ELEVENLABS_MARKETING_AGENT_ID", "").strip() or agent_id()
+    """프로모션 전화를 거는 에이전트. 예약 에이전트로 대신하지 않는다 — 그 에이전트는 "전화 주셔서
+    감사합니다"로 시작하고 프로모션 내용({{promo_message}})도 수신거부 도구도 모른다. 없으면 전화가 꺼진다."""
+    return os.getenv("ELEVENLABS_MARKETING_AGENT_ID", "").strip()
 
 
 def outbound_phone_number_id() -> str:

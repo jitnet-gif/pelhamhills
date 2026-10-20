@@ -9,7 +9,7 @@
 | 변수 | 값 |
 |---|---|
 | `ELEVENLABS_API_KEY` | 이미 있음. `convai_write` 권한이 있어야 전화를 건다 |
-| `ELEVENLABS_MARKETING_AGENT_ID` | 아래에서 만든 에이전트 id. 비우면 예약 에이전트가 건다 |
+| `ELEVENLABS_MARKETING_AGENT_ID` | 아래에서 만든 에이전트 id. 비우면 AI 전화 캠페인이 꺼진다(예약 에이전트로 대신하지 않는다) |
 | `ELEVENLABS_PHONE_NUMBER_ID` | 걸 때 쓸 번호의 id — `python scripts/elevenlabs_sync_agent.py --phones` |
 | `MARKETING_CALL_GAP_SECONDS` | 전화 사이 간격(기본 20초). 요금제의 동시 통화 수에 맞춘다 |
 
