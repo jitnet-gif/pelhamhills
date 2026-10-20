@@ -32,6 +32,7 @@ import type {
   RateDay,
   SlotsResponse,
   TeeBooking,
+  PriceReviewRow,
   TeeExtraItem,
   WeekReport,
 } from "./types";
@@ -166,6 +167,17 @@ export const staffTeeExtras = () => staffRpc<TeeExtraItem[]>("pelham_staff_tee_e
 
 export const staffPlayerExtras = (bookingId: string, playerId: string, codes: string[]) =>
   staffRpc<TeeBooking>("pelham_staff_player_extras", { p_id: bookingId, p_player: playerId, p_codes: codes });
+
+export const staffPlayerGreenFee = (bookingId: string, playerId: string, fee: number | null, reason: string) =>
+  staffRpc<TeeBooking>("pelham_staff_player_green_fee", {
+    p_id: bookingId,
+    p_player: playerId,
+    p_fee: fee,
+    p_reason: reason,
+  });
+
+export const staffPriceReview = (from: string, to: string) =>
+  staffRpc<PriceReviewRow[]>("pelham_staff_price_review", { p_from: from, p_to: to });
 
 export const staffReportDaily = (date: string) =>
   staffRpc<DailyReport>("pelham_staff_report_daily", { p_date: date });

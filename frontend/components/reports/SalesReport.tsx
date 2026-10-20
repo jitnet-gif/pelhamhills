@@ -19,6 +19,7 @@ import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
 import { formatMoney, type RetailDailyReport, type Sale } from "@/lib/retail/types";
 
+import PriceReview from "@/components/reports/PriceReview";
 import SaleDetail from "@/components/reports/SaleDetail";
 import SalesDrilldown, { type Drill } from "@/components/reports/SalesDrilldown";
 import StaffCloseout from "@/components/reports/StaffCloseout";
@@ -228,6 +229,9 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
               </section>
             ))}
           </div>
+
+          {/* 요금표와 다른 그린피·카트 요금(0055). 매니저가 승인한 정정도 여기서 다시 본다. */}
+          <PriceReview date={date} />
 
           <div className="grid min-w-0 gap-3 lg:grid-cols-3">
             {/* 계산서를 연 계산대별. 서랍·단말기 대사용이지 사업부 매출이 아니다 —

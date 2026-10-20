@@ -321,6 +321,9 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   // 카트 요금 입력 중인 글자. 이름·전화 draft 와 따로 둔다 — 그 draft 는 필드 전체를 한 번에
   // 찍어 두므로, 카트를 켜서 서버가 요금을 채운 직후에 이름 draft 가 커밋되면 옛 요금(0)을 되돌려 보낸다.
   const [feeDrafts, setFeeDrafts] = useState<Record<string, string>>({});
+  // 그린피 입력 중인 글자(선수별, 0055)와 정상가가 아닌 금액의 사유를 묻는 칸.
+  const [greenDrafts, setGreenDrafts] = useState<Record<string, string>>({});
+  const [priceAsk, setPriceAsk] = useState<{ playerId: string; fee: number; reason: string } | null>(null);
   // 영수증을 찍지 못한 이유 (결제가 서버에 기록되지 않았을 때).
   const [receiptNote, setReceiptNote] = useState<{ playerId: string; text: string } | null>(null);
   // 결제 전에 보여 주는 영수증 창. 한 사람일 수도(카드의 Payment), 일행 전체일 수도(Pay all) 있다.
@@ -571,31 +574,41 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     });
   }, []);
 
-  /** 그린피 칸을 커밋한다 (blur·Enter). 예전에는 맨 아래 Save 를 눌러야만 저장돼서, 칸만 고치고 나가면
-   *  값이 그대로 남아 "가격이 안 바뀐다" 고 보였다. 매니저 승인(0024 `price`)이 필요하면 PIN 창이 뜬다.
-   *  숫자가 아니거나 그대로면 보내지 않고, 실패(승인 취소 포함)하면 칸을 서버 값으로 되돌린다. */
-  const commitRate = useCallback(
-    async (text: string) => {
+  /** 그린피 칸을 커밋한다 (blur·Enter). 이 사람 몫만 바뀐다(0055) — 그룹·패밀리 예약이라도 한 명씩 고친다.
+   *  요금표 값과 같으면 정정을 지우고(PIN 없음), 다르면 카드 안에 사유 칸을 연다. 사유를 적고 Save 를 누르면
+   *  서버가 매니저 승인(0024 `price`)을 요구해 PIN 창이 뜬다. 정상가가 아닌 금액은 Reports 의 Price review 에 남는다. */
+  const commitGreenFee = useCallback(
+    (playerId: string, text: string) => {
+      setGreenDrafts((prev) => {
+        if (!(playerId in prev)) return prev;
+        const next = { ...prev };
+        delete next[playerId];
+        return next;
+      });
       const current = bookingRef.current;
-      if (!current) return;
-      const rate = Number(text);
-      const resetRate = () =>
-        setBookingDraft((prev) => (prev ? { ...prev, rate: String(bookingRef.current?.rate ?? current.rate) } : prev));
-      if (text.trim() === "" || !Number.isFinite(rate) || rate < 0) {
-        resetRate();
+      const player = current?.players.find((p) => p.id === playerId);
+      const fee = Number(text);
+      if (!current || !player || text.trim() === "" || !Number.isFinite(fee) || fee < 0) return;
+      const cents = Math.round(fee * 100);
+      if (cents === Math.round(greenFeeOf(current, player) * 100)) return;
+      const standard = player.priceOverride?.standard;
+      if (typeof standard === "number" && cents === Math.round(standard * 100)) {
+        void controller.setPlayerGreenFee(current.id, playerId, null, "");
         return;
       }
-      const cents = Math.round(rate * 100);
-      if (cents === Math.round(current.rate * 100)) {
-        resetRate();
-        return;
-      }
-      const updated = await controller.patchBooking(current.id, { rate: cents / 100 });
-      if (updated) setBookingDraft((prev) => (prev ? { ...prev, rate: String(updated.rate) } : prev));
-      else resetRate();
+      // 같은 예약에서 바로 전에 적은 사유를 채워 둔다 — 일행 여럿을 같은 이유로 고칠 때 다시 치지 않게.
+      const lastReason = current.players.find((p) => p.priceOverride?.reason)?.priceOverride?.reason ?? "";
+      setPriceAsk({ playerId, fee: cents / 100, reason: lastReason });
     },
     [controller],
   );
+
+  const savePriceAsk = useCallback(async () => {
+    const current = bookingRef.current;
+    if (!current || !priceAsk || !priceAsk.reason.trim()) return;
+    const updated = await controller.setPlayerGreenFee(current.id, priceAsk.playerId, priceAsk.fee, priceAsk.reason.trim());
+    if (updated) setPriceAsk(null);
+  }, [controller, priceAsk]);
 
   /** 홀 수를 바로 저장한다. 서버(0036)가 그린피를 새 홀 수의 요금표 값으로 바꿔 돌려주므로 그린피 칸도 그 값으로 맞춘다. */
   const commitHoles = useCallback(
@@ -1627,31 +1640,105 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   </div>
                 </div>
 
-                {/* 그린피 한 줄. 금액은 예약 단위 `rate` 라서 한 카드에서 고치면 모든
-                    카드가 같이 바뀐다 — title 로 그 사실을 말해 둔다. 레퍼런스처럼
-                    글자로 보이지만 실제로는 입력칸이다 (요금 편집을 잃지 않으려고). */}
-                <div className="mt-1.5 flex items-center gap-1 border border-[#d7d7dc] px-1.5 py-1.5">
+                {/* 그린피 한 줄 — 이 사람 몫만(0055). 그룹·패밀리 예약이라도 한 명씩 고친다. 요금표와 다른 금액은
+                    사유 + 매니저 PIN 이 있어야 저장되고, Reports 의 Price review 에 남는다. 결제한 뒤에는 잠근다.
+                    레퍼런스처럼 글자로 보이지만 실제로는 입력칸이다. */}
+                <div
+                  className={`mt-1.5 flex items-center gap-1 border px-1.5 py-1.5 ${
+                    player.priceOverride ? "border-[#e0b44c] bg-[#fff8e6]" : "border-[#d7d7dc]"
+                  }`}
+                >
                   <Glyph className="h-3.5 w-3.5 text-[#4e5560]" name="golf" />
                   <span className="truncate">{booking.holes} Hole Green Fee</span>
+                  {player.priceOverride ? (
+                    <span
+                      className="shrink-0 bg-[#e0b44c] px-1 text-[9px] font-bold uppercase tracking-wide text-white"
+                      title={`Rate plan $${player.priceOverride.standard.toFixed(2)} · ${player.priceOverride.reason}${
+                        player.priceOverride.manager ? ` · approved by ${player.priceOverride.manager}` : ""
+                      }`}
+                    >
+                      Adjusted
+                    </span>
+                  ) : null}
                   <span aria-hidden className="ml-auto text-[#9aa0a6]">
                     $
                   </span>
                   <input
-                    aria-label="Green fee for every player on this reservation"
-                    className="w-12 bg-transparent text-right tabular-nums outline-none focus:text-[#4533ff]"
+                    aria-label={`Green fee for ${player.name}`}
+                    className="w-12 bg-transparent text-right tabular-nums outline-none focus:text-[#4533ff] disabled:text-[#1f2328]"
+                    disabled={player.paid || player.cancelled}
                     inputMode="decimal"
-                    onBlur={(event) => void commitRate(event.currentTarget.value)}
-                    onChange={(event) => setBookingDraft({ ...draft, rate: event.target.value })}
+                    onBlur={(event) => commitGreenFee(player.id, event.currentTarget.value)}
+                    onChange={(event) => setGreenDrafts((prev) => ({ ...prev, [player.id]: event.target.value }))}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") event.currentTarget.blur();
                     }}
-                    title="Green fee — one rate for the whole reservation. Changing it needs a manager PIN."
-                    value={draft.rate}
+                    title="Green fee for this player only. A price that is not the rate plan needs a reason and a manager PIN, and shows on the report."
+                    value={
+                      greenDrafts[player.id] ??
+                      (priceAsk?.playerId === player.id ? priceAsk.fee : greenFeeOf(booking, player)).toFixed(2)
+                    }
                   />
                   <LineMark paid={player.paid} selected={selected} />
                 </div>
-                {draft.rate.trim() !== "" && !Number.isFinite(Number(draft.rate)) ? (
+                {greenDrafts[player.id] !== undefined && !Number.isFinite(Number(greenDrafts[player.id])) ? (
                   <span className="mt-1 block text-[10px] text-[#8a3f26]">Not a number — will not be saved</span>
+                ) : null}
+                {player.priceOverride && priceAsk?.playerId !== player.id ? (
+                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-[#8a5a00]">
+                    <span className="min-w-0 truncate">
+                      Rate plan ${player.priceOverride.standard.toFixed(2)} · {player.priceOverride.reason}
+                      {player.priceOverride.manager ? ` · ${player.priceOverride.manager}` : ""}
+                    </span>
+                    {player.paid || player.cancelled ? null : (
+                      <button
+                        className="ml-auto shrink-0 font-semibold text-[#4533ff] hover:underline disabled:opacity-40"
+                        disabled={busy}
+                        onClick={() => void controller.setPlayerGreenFee(booking.id, player.id, null, "")}
+                        title="Go back to the rate plan price"
+                        type="button"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+                {priceAsk?.playerId === player.id ? (
+                  <form
+                    className="mt-1 grid gap-1 border border-[#e0b44c] bg-[#fff8e6] p-1.5 text-[11px]"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void savePriceAsk();
+                    }}
+                  >
+                    <span className="text-[#8a5a00]">
+                      ${priceAsk.fee.toFixed(2)} is not the rate plan price. Why? (shows on the report)
+                    </span>
+                    <input
+                      autoFocus
+                      className="w-full border-b border-[#d7d7dc] bg-white px-1 py-1 outline-none focus:border-[#4533ff]"
+                      maxLength={200}
+                      onChange={(event) => setPriceAsk({ ...priceAsk, reason: event.target.value })}
+                      placeholder="Reason, e.g. family discount"
+                      value={priceAsk.reason}
+                    />
+                    <div className="flex justify-end gap-1">
+                      <button
+                        className="px-2 py-1 text-[#4e5560] hover:bg-[#f2f2f5]"
+                        onClick={() => setPriceAsk(null)}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="bg-[#4533ff] px-2 py-1 font-semibold text-white disabled:opacity-40"
+                        disabled={busy || !priceAsk.reason.trim()}
+                        type="submit"
+                      >
+                        Save · manager PIN
+                      </button>
+                    </div>
+                  </form>
                 ) : null}
                 {/* 카트 한 줄. 켜면 서버가 금액을 채운다(`cart_fee_for`) — 세전 18홀 $19.47(Senior $17.70) · 9홀 $11.50 이고,
                     카트가 포함된 회원 요금제만 $0 이다. 그린피와 달리 이 사람 것만 바뀐다.

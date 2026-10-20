@@ -1151,6 +1151,34 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
     [pushToast, runBookingMutation],
   );
 
+  const setPlayerGreenFee = useCallback(
+    (bookingId: string, playerId: string, fee: number | null, reason: string): Promise<TeeBooking | null> => {
+      const booking = bookingsRef.current.find((item) => item.id === bookingId);
+      const player = booking?.players.find((item) => item.id === playerId);
+      if (!booking || !player) {
+        pushToast("error", "플레이어를 찾을 수 없습니다 — that player no longer exists.");
+        setMessage("Player not found — the reservation may have changed.");
+        return Promise.resolve(null);
+      }
+
+      return runBookingMutation({
+        bookingId,
+        // 정정 표시(priceOverride)는 서버만 붙인다. 낙관적으로는 금액만 바꿔 둔다.
+        apply: (current) =>
+          fee === null
+            ? current
+            : {
+                ...current,
+                players: current.players.map((item) => (item.id === playerId ? { ...item, greenFee: fee } : item)),
+              },
+        call: () => teeSheetApi.setPlayerGreenFee(bookingId, playerId, fee, reason),
+        statusText: `${player.name || "Player"} green fee updated.`,
+        failText: "그린피 수정 실패 — could not change the green fee",
+      });
+    },
+    [pushToast, runBookingMutation],
+  );
+
   const loadExtras = useCallback(() => teeSheetApi.listExtras(), []);
 
   // --- misc actions ---
@@ -1308,6 +1336,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       patchPlayer,
       removePlayer,
       setPlayerExtras,
+      setPlayerGreenFee,
       loadExtras,
 
       // misc
@@ -1338,6 +1367,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       selectedId,
       setFocusedDate,
       setPlayerExtras,
+      setPlayerGreenFee,
       setStatus,
       setView,
       slots,

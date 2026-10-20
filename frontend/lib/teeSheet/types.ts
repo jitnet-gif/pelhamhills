@@ -41,6 +41,8 @@ export type Player = {
   cartFee: number;
   /** 요금제로 매긴 1인 그린피(세전, 0045). 회원 0, 시니어 40.71 … 없으면 예약 `rate`(퍼블릭가)를 낸다. */
   greenFee?: number;
+  /** 매니저가 승인한 이 사람만의 그린피 정정(0055). 서버 장부에서만 붙는다. 없으면 키가 없다. */
+  priceOverride?: PriceOverride;
   /** 결제로 표시된 시각(ISO). 서버만 찍는다. 이 필드가 생기기 전의 결제에는 없다. */
   paidAt: string | null;
   /** 고객 명부(`pelham_customers.customer_ref`)와 연결된 선수(0053). 예약 창에서 회원을 골랐을 때만 있다. */
@@ -49,6 +51,33 @@ export type Player = {
   memberNumber?: string;
   /** 이 사람 몫에 붙은 추가 품목(풀카트·레인지 바스켓, 0026). 붙일 때의 값이 복사돼 있다. 없으면 키가 없다. */
   extras?: TeeExtra[];
+};
+
+/** 선수 한 명의 그린피 정정(0055). `standard` 는 요금표대로라면 내는 값, `at` 은 승인 시각(ISO). */
+export type PriceOverride = { greenFee: number; standard: number; manager: string; reason: string; at: string };
+
+/** 리포트의 Price review 한 줄(0055 `pelham_staff_price_review`) — 요금표와 다른 그린피·카트 요금. */
+export type PriceReviewRow = {
+  bookingId: string;
+  date: string;
+  time: string;
+  title: string;
+  code: string;
+  holes: 9 | 18;
+  playerId: string;
+  player: string;
+  ratePlan: string;
+  paid: boolean;
+  greenStandard: number;
+  greenCharged: number;
+  cartStandard: number;
+  cartCharged: number;
+  difference: number;
+  /** player = 선수별 정정, reservation = 예약 전체 그린피 변경, cart = 카트 요금 변경. */
+  kind: "player" | "reservation" | "cart";
+  reason: string;
+  manager: string;
+  approvedAt: string | null;
 };
 
 /** 선수에게 붙은 추가 품목 한 줄. price 는 세전 달러(`rate`·`cartFee` 와 같다). */
@@ -149,7 +178,7 @@ export type PatchBookingInput = Partial<{
 }>;
 
 export type AddPlayerInput = Partial<Omit<Player, "id" | "paidAt">>;
-export type PatchPlayerInput = Partial<Omit<Player, "id" | "paidAt" | "extras">>;
+export type PatchPlayerInput = Partial<Omit<Player, "id" | "paidAt" | "extras" | "priceOverride">>;
 
 // ===== Reports =====
 
@@ -296,6 +325,8 @@ export type TeeSheetController = {
   removePlayer: (bookingId: string, playerId: string) => Promise<TeeBooking | null>;
   /** 선수의 추가 품목을 통째로 바꾼다(0026). 순서대로, 같은 품목을 두 번 넣을 수 있다. */
   setPlayerExtras: (bookingId: string, playerId: string, extras: TeeExtra[]) => Promise<TeeBooking | null>;
+  /** 한 선수의 그린피만 정한다(0055). 정상가와 다르면 사유와 매니저 PIN 이 필요하다. null = 요금제 값으로. */
+  setPlayerGreenFee: (bookingId: string, playerId: string, fee: number | null, reason: string) => Promise<TeeBooking | null>;
   /** 추가 품목 카탈로그(켜진 것만). 0026 이 없으면 실패한다. */
   loadExtras: () => Promise<TeeExtraItem[]>;
 

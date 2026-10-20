@@ -35,6 +35,7 @@ import {
   staffBookings,
   staffPlayerAdd,
   staffPlayerExtras,
+  staffPlayerGreenFee,
   staffPlayerPatch,
   staffPlayerRemove,
   staffReportDaily,
@@ -119,6 +120,9 @@ export const teeSheetApi = {
 
   setPlayerExtras: (bookingId: string, playerId: string, codes: string[]): Promise<TeeBooking> =>
     staffPlayerExtras(bookingId, playerId, codes),
+
+  setPlayerGreenFee: (bookingId: string, playerId: string, fee: number | null, reason: string): Promise<TeeBooking> =>
+    staffPlayerGreenFee(bookingId, playerId, fee, reason),
 
   // ===== Reports =====
   getDailyReport: (date: string): Promise<DailyReport> => staffReportDaily(date),
