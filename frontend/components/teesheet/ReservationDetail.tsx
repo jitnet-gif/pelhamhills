@@ -49,7 +49,8 @@ export type ReservationDetailProps = { controller: TeeSheetController };
 
 // ===== constants =====
 
-const MAX_PLAYERS = 4;
+/** 예약 한 건 최대 인원 = 기본 4 + 직원 추가 4. 티타임 전체 합계는 서버(0052)가 다시 센다. */
+const MAX_PLAYERS = SEATS_PER_TEE_TIME;
 const SAVED_FLASH_MS = 1800;
 
 const CANCEL_PRESETS = [

@@ -170,10 +170,11 @@ def test_a_hold_blocks_the_website_too(client):
     held = hold(client, time="8:01 AM", party=4)
     assert held.status_code == 200
 
+    # 직원 시트는 4자리 위로 4명을 더 넣을 수 있다. 홀드 4명이 세어지면 5명은 넘친다.
     web = client.post(
         f"{API}/tee-sheet/bookings",
         json={"date": TOMORROW, "time": "8:01 AM", "title": "Web, Walk-in",
-              "players": [{"name": "Web Walkin"}]},
+              "players": [{"name": f"Web Walkin{i}"} for i in range(5)]},
     )
     assert web.status_code == 409
 

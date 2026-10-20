@@ -48,6 +48,9 @@ CARTS_PER_SLOT = 4
 # 하나의 티 타임은 플레이어 4자리다. 이 4자리는 **여러 예약이 나눠 가질 수 있다**
 # (예: 7:43 AM 에 회원 2인 예약 + GolfNow 온라인 2인 예약). Chronogolf 와 동일한 규칙.
 PLAYERS_PER_TEE_TIME = 4
+# 직원은 정원 4자리에 **4명까지 더** 넣을 수 있다 (2026-10-20, 클럽 요청). 손님 쪽 길(웹·전화·
+# 대기자)은 여전히 PLAYERS_PER_TEE_TIME 만 판다. DB 쪽 같은 규칙은 0052.
+STAFF_PLAYERS_PER_TEE_TIME = 8
 
 # 음성 에이전트가 손님 이름과 전화번호를 받아 적는 동안 자리를 잠가 두는 시간.
 # 통화 한 건이 "3시에 두 명" 에서 확정까지 가는 데 보통 40~60초 걸린다. 3분이면
@@ -219,7 +222,7 @@ class TeeBooking(BaseModel):
     status: BookingStatus = BookingStatus.RESERVED
     cartCount: int = Field(default=0, ge=0, le=4)
     notes: str = ""
-    players: list[Player] = Field(default_factory=list, max_length=4)
+    players: list[Player] = Field(default_factory=list, max_length=STAFF_PLAYERS_PER_TEE_TIME)
     audit: list[AuditEntry] = Field(default_factory=list)
     cancelReason: str | None = None
     source: BookingSource = BookingSource.STAFF
@@ -254,7 +257,7 @@ class CreateBookingRequest(BaseModel):
     color: Literal["blue", "gold", "gray"] = "gold"
     notes: str = ""
     span: int = Field(default=1, ge=1, le=7)
-    players: list[Player] = Field(default_factory=list, max_length=4)
+    players: list[Player] = Field(default_factory=list, max_length=STAFF_PLAYERS_PER_TEE_TIME)
 
 
 class PatchBookingRequest(BaseModel):
@@ -720,17 +723,19 @@ def require_tee_time_capacity(
     time_label: str,
     incoming: int,
     exclude_id: str | None = None,
+    limit: int = PLAYERS_PER_TEE_TIME,
 ) -> None:
-    """티 타임 정원(4명) 검사. 절대 아무것도 변경하지 않는다 (읽기 전용).
+    """티 타임 정원 검사. 절대 아무것도 변경하지 않는다 (읽기 전용).
 
-    한 티 타임에 예약이 몇 건이든 상관없다. 합계 인원만 4명을 넘지 않으면 된다.
+    한 티 타임에 예약이 몇 건이든 상관없다. 합계 인원만 `limit` 을 넘지 않으면 된다.
+    손님 길은 기본값 4, 직원 시트는 STAFF_PLAYERS_PER_TEE_TIME(8) 을 넘긴다.
     """
     taken = tee_time_players(bookings, iso_date, time_label, exclude_id)
-    if taken + incoming > PLAYERS_PER_TEE_TIME:
+    if taken + incoming > limit:
         raise HTTPException(
             status_code=409,
             detail=(
-                f"{time_label} on {iso_date} only holds {PLAYERS_PER_TEE_TIME} players; "
+                f"{time_label} on {iso_date} only holds {limit} players; "
                 f"{taken} are already taken and {incoming} more were requested"
             ),
         )
@@ -786,7 +791,10 @@ def create_booking(body: CreateBookingRequest) -> TeeBooking:
     # 정원은 그날의 예약만으로 결정된다. require_slot 이 날짜를 이미 검증했다.
     with bookings_tx(Scope(dates={body.date})) as bookings:
         # 생성 엔드포인트는 기본 플레이어를 만들지 않는다. 요청에 실려 온 인원이 곧 정원 소비량.
-        require_tee_time_capacity(bookings, body.date, time_label, incoming=len(body.players))
+        require_tee_time_capacity(
+            bookings, body.date, time_label, incoming=len(body.players),
+            limit=STAFF_PLAYERS_PER_TEE_TIME,
+        )
         booking = TeeBooking(
             date=body.date,
             time=time_label,
@@ -897,6 +905,7 @@ def patch_booking(booking_id: str, body: PatchBookingRequest) -> TeeBooking:
                     require_tee_time_capacity(
                         bookings, new_date, new_time,
                         incoming=len(booking.players), exclude_id=booking.id,
+                        limit=STAFF_PLAYERS_PER_TEE_TIME,
                     )
                 booking.date = new_date
                 booking.time = new_time
@@ -959,6 +968,7 @@ def patch_booking(booking_id: str, body: PatchBookingRequest) -> TeeBooking:
                 require_tee_time_capacity(
                     bookings, booking.date, booking.time,
                     incoming=len(booking.players), exclude_id=booking.id,
+                    limit=STAFF_PLAYERS_PER_TEE_TIME,
                 )
             message = _apply_status(booking, status, fields.get("cancelReason"))
             _audit(booking, message)
@@ -995,11 +1005,14 @@ def add_player(booking_id: str, body: AddPlayerRequest) -> TeeBooking:
     with bookings_tx(Scope(ids={booking_id}, dates={current.date})) as bookings:
         booking = _find(bookings, booking_id)
         # 두 개의 서로 다른 한계를 구분한다.
-        # 1) 예약 하나가 담을 수 있는 인원 = 4 -> 422 (요청 자체가 모델 제약 위반)
-        # 2) 티 타임 전체가 담을 수 있는 인원 = 4 -> 409 (다른 예약과의 자원 충돌)
-        # 순서가 중요하다: 둘 다 걸리는 예약(4명짜리 꽉 찬 티 타임)은 422 를 돌려준다.
-        if len(booking.players) >= PLAYERS_PER_TEE_TIME:
-            raise HTTPException(status_code=422, detail="A tee time can contain at most 4 players")
+        # 1) 예약 하나가 담을 수 있는 인원 = 8 -> 422 (요청 자체가 모델 제약 위반)
+        # 2) 티 타임 전체가 담을 수 있는 인원 = 8 -> 409 (다른 예약과의 자원 충돌)
+        # 순서가 중요하다: 둘 다 걸리는 예약(8명짜리 꽉 찬 티 타임)은 422 를 돌려준다.
+        if len(booking.players) >= STAFF_PLAYERS_PER_TEE_TIME:
+            raise HTTPException(
+                status_code=422,
+                detail=f"A tee time can contain at most {STAFF_PLAYERS_PER_TEE_TIME} players",
+            )
         # 취소된 예약은 자리를 잡지 않으므로 (2) 를 물어볼 이유가 없다. 물어보면
         # "취소된 예약에 사람을 더할 수 있는가" 가 **무관한 다른 예약**의 인원수에 좌우된다.
         # 되살릴 때 PATCH status 게이트가 정원을 다시 검사하므로 넘칠 길은 없다.
@@ -1007,7 +1020,9 @@ def add_player(booking_id: str, body: AddPlayerRequest) -> TeeBooking:
             # 미리 읽은 날짜로 범위를 잡았다. 그사이 다른 날로 옮겨졌으면 409.
             _require_date_in_tx(bookings, booking.date)
             # exclude_id 를 주지 않는다: taken 에 이 예약의 인원이 이미 포함돼야 incoming=1 이 맞다.
-            require_tee_time_capacity(bookings, booking.date, booking.time, incoming=1)
+            require_tee_time_capacity(
+                bookings, booking.date, booking.time, incoming=1, limit=STAFF_PLAYERS_PER_TEE_TIME,
+            )
         payload = body.model_dump(exclude_none=True)
         player = Player.model_validate(payload)
         _settle_new_player(player, booking.holes, fee_given=body.cartFee is not None)

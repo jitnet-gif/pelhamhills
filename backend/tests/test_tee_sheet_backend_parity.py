@@ -225,7 +225,8 @@ def crud_scenario(env: Env) -> list[tuple[str, int, Any]]:
     file_before = env.data_file.read_bytes() if fake is None else None
     step("full-tee-time", client.post(f"{API}/tee-sheet/bookings", json={
         "date": SEED_DATE, "time": "6:58 AM", "title": "Wobblesworth, Octavius",
-        "players": [{"name": "Octavius Wobblesworth"}],
+        # 6:58 AM 은 4명. 직원 시트 한계 8명을 넘기려면 5명이 필요하다.
+        "players": [{"name": f"Octavius Wobblesworth{i}"} for i in range(5)],
     }), 409)
     if fake is not None:
         assert write_count(fake) == writes_before

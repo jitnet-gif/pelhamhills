@@ -39,13 +39,19 @@ function emptyPlayer(): PlayerDraft {
 }
 
 /**
- * 한 티타임이 가진 좌석 수. 백엔드의 PLAYERS_PER_TEE_TIME 과 같은 값이어야 한다.
+ * 한 티타임의 기본 좌석 수. 백엔드의 PLAYERS_PER_TEE_TIME 과 같은 값이어야 한다.
  *
  * 내보내는 이유: 티 시트 페이지의 Add 버튼도 "자리가 남은 첫 타임"을 찾을 때 이
  * 값을 본다. 손님 화면에도 같은 상수가 있지만(`components/booking/availability.ts`)
  * 그쪽은 일부러 어드민과 분리해 둔 모듈이라 가져다 쓰지 않는다.
  */
-export const SEATS_PER_TEE_TIME = 4;
+export const STANDARD_SEATS_PER_TEE_TIME = 4;
+
+/**
+ * 직원이 한 티타임에 넣을 수 있는 최대 인원 = 기본 4 + 추가 4. 백엔드의
+ * STAFF_PLAYERS_PER_TEE_TIME(0052 도 같다)과 같은 값이어야 한다. 손님 길은 여전히 4자리.
+ */
+export const SEATS_PER_TEE_TIME = 8;
 
 /**
  * 해당 날짜의 "티타임별로 이미 찬 좌석 수". 취소된 예약은 좌석을 잡지 않는다.
@@ -197,7 +203,7 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
   }
 
   function addPlayer() {
-    setPlayers((current) => (current.length >= 4 ? current : [...current, emptyPlayer()]));
+    setPlayers((current) => (current.length >= SEATS_PER_TEE_TIME ? current : [...current, emptyPlayer()]));
   }
 
   function removePlayer(index: number) {
@@ -216,7 +222,7 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
   const rateValue = Number(rate);
   const playersValid =
     players.length >= 1 &&
-    players.length <= 4 &&
+    players.length <= SEATS_PER_TEE_TIME &&
     players.every((player) => player.firstName.trim() !== "" || player.lastName.trim() !== "");
   // 남은 좌석 판정은 인원 수에 달려 있다 — 1인은 들어가지만 3인은 못 들어가는 티타임이 있다.
   const freeSeats = time === "" ? SEATS_PER_TEE_TIME : seatsFree(seatsTaken, time);
@@ -330,9 +336,11 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
                             {slot.time} · {money(slot.rate)}
                             {free === 0
                               ? " · full"
-                              : free < SEATS_PER_TEE_TIME
-                                ? ` · ${free} of ${SEATS_PER_TEE_TIME} seats left`
-                                : ""}
+                              : free <= SEATS_PER_TEE_TIME - STANDARD_SEATS_PER_TEE_TIME
+                                ? ` · 4 full · +${free} extra`
+                                : free < SEATS_PER_TEE_TIME
+                                  ? ` · ${free - (SEATS_PER_TEE_TIME - STANDARD_SEATS_PER_TEE_TIME)} of ${STANDARD_SEATS_PER_TEE_TIME} seats left`
+                                  : ""}
                           </option>
                         );
                       })}
@@ -408,13 +416,19 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
               />
             </label>
 
-            {/* ===== 플레이어 (1–4명) ===== */}
+            {/* ===== 플레이어 (1–4명, 직원은 4명 더 = 최대 8명) ===== */}
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
-                <span className={LABEL}>Players ({players.length}/4)</span>
+                <span className={LABEL}>
+                  Players ({Math.min(players.length, STANDARD_SEATS_PER_TEE_TIME)}/{STANDARD_SEATS_PER_TEE_TIME}
+                  {players.length > STANDARD_SEATS_PER_TEE_TIME
+                    ? ` +${players.length - STANDARD_SEATS_PER_TEE_TIME} extra`
+                    : ""}
+                  )
+                </span>
                 <button
                   className="border border-[#d4d4d8] bg-white px-2 py-1 text-xs font-bold hover:bg-[#f2f2f4] disabled:opacity-40"
-                  disabled={players.length >= 4}
+                  disabled={players.length >= SEATS_PER_TEE_TIME}
                   onClick={addPlayer}
                   type="button"
                 >
@@ -496,8 +510,8 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
             {time !== "" && players.length > freeSeats ? (
               <p className="text-xs font-semibold text-[#8a3f26]">
                 {freeSeats === 0
-                  ? `${time} is full — all ${SEATS_PER_TEE_TIME} seats are taken. Pick another tee time.`
-                  : `${time} has only ${freeSeats} of ${SEATS_PER_TEE_TIME} seats left, but you are booking ${players.length} players. Remove a player or pick another tee time.`}
+                  ? `${time} is full — all ${SEATS_PER_TEE_TIME} seats (4 + 4 extra) are taken. Pick another tee time.`
+                  : `${time} has only ${freeSeats} of ${SEATS_PER_TEE_TIME} seats (4 + 4 extra) left, but you are booking ${players.length} players. Remove a player or pick another tee time.`}
               </p>
             ) : null}
           </div>

@@ -95,9 +95,12 @@ function isDead(booking: TeeBooking): boolean {
 
 // ===================== 일간 시트 전용 상수 =====================
 
-/** 한 티타임의 플레이어 칸 수. 백엔드 정원과 같은 값. */
-const DAY_SEATS = 4;
-/** 트랙 라인 번호: 1=Time, 2=Rate, 3..6=플레이어, 7=Cart, 8=Timer, 9=끝 라인. */
+/** 한 티타임의 기본 플레이어 칸 수. 손님이 살 수 있는 정원과 같은 값. */
+const DAY_BASE_SEATS = 4;
+/** 직원이 더 넣을 수 있는 칸까지 합친 칸 수(4 + 4). 백엔드 STAFF_PLAYERS_PER_TEE_TIME 과 같은 값.
+ *  5~8번째 칸은 기본 4칸이 다 찬 행에서만 ⊕ 를 띄운다 — 평소에는 빈 여분 칸으로 남는다. */
+const DAY_SEATS = 8;
+/** 트랙 라인 번호: 1=Time, 2=Rate, 3..10=플레이어(7..10 은 여분), 11=Cart, 12=Timer, 13=끝 라인. */
 const DAY_PLAYER_COL = 3;
 const DAY_CART_COL = DAY_PLAYER_COL + DAY_SEATS;
 const DAY_TIMER_COL = DAY_CART_COL + 1;
@@ -138,12 +141,14 @@ type DaySegment = { booking: TeeBooking; start: number; width: number };
 type DayPack = {
   segments: DaySegment[];
   free: number[];
+  /** 아직 열지 않은 여분 칸(기본 4칸이 덜 찼을 때의 5~8번째). 행 밑줄을 잇는 빈 칸만 그린다. */
+  idle: number[];
   overflow: TeeBooking[];
   /** 좌석을 하나도 잡지 않는 예약(취소됨 · 플레이어 0명). 행에는 놓을 수 없고 아래 스트립으로 간다. */
   unseated: TeeBooking[];
 };
 
-const EMPTY_PACK: DayPack = { segments: [], free: [0, 1, 2, 3], overflow: [], unseated: [] };
+const EMPTY_PACK: DayPack = { segments: [], free: [0, 1, 2, 3], idle: [4, 5, 6, 7], overflow: [], unseated: [] };
 
 /**
  * 백엔드 `tee_time_players()` 와 **글자 그대로 같은** 좌석 산술.
@@ -155,7 +160,7 @@ const EMPTY_PACK: DayPack = { segments: [], free: [0, 1, 2, 3], overflow: [], un
 function daySeats(booking: TeeBooking): number {
   if (booking.status === "cancelled") return 0;
   // 정원을 넘는 인원(백엔드상 불가능하지만 레거시 레코드는 있을 수 있다)도
-  // 사라지면 안 되므로 4칸까지는 그린다.
+  // 사라지면 안 되므로 8칸까지는 그린다.
   return Math.min(booking.players.length, DAY_SEATS);
 }
 
@@ -345,14 +350,19 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
         used += seats;
       }
       // 여기까지의 `used` 는 백엔드 tee_time_players() 결과와 같은 값이다.
+      // 기본 4칸이 다 찼을 때만 여분 칸(5~8)을 판다.
       const free: number[] = [];
-      for (let seat = used; seat < DAY_SEATS; seat += 1) free.push(seat);
-      map.set(slot.time, { segments, free, overflow, unseated });
+      const idle: number[] = [];
+      for (let seat = used; seat < DAY_SEATS; seat += 1) {
+        if (seat < DAY_BASE_SEATS || used >= DAY_BASE_SEATS) free.push(seat);
+        else idle.push(seat);
+      }
+      map.set(slot.time, { segments, free, idle, overflow, unseated });
     }
     return map;
   }, [isDayView, rows, buckets, focusedDate]);
 
-  // 4칸을 넘겨 자리를 못 받은 예약 — 아래 스트립으로 반드시 드러낸다.
+  // 8칸을 넘겨 자리를 못 받은 예약 — 아래 스트립으로 반드시 드러낸다.
   const dayOverflow = useMemo(() => {
     const out: TeeBooking[] = [];
     for (const pack of dayPacks.values()) out.push(...pack.overflow);
@@ -377,7 +387,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
   const dayBodyRowEnd = dayLines.length + DAY_ROW_BASE;
 
   const gridTemplateColumns = isDayView
-    ? `${DAY_TIME_COL_PX}px ${DAY_RATE_COL_PX}px repeat(${DAY_SEATS}, minmax(140px, 1fr)) 64px 48px`
+    ? `${DAY_TIME_COL_PX}px ${DAY_RATE_COL_PX}px repeat(${DAY_BASE_SEATS}, minmax(140px, 1fr)) repeat(${DAY_SEATS - DAY_BASE_SEATS}, minmax(96px, 0.7fr)) 64px 48px`
     : `86px 48px repeat(${columns.length}, minmax(120px, 1fr)) 64px`;
 
   const gridTemplateRows = isDayView
@@ -835,7 +845,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                         className={`sticky z-20 flex items-center justify-center bg-white px-1 ${rule}`}
                         style={{ gridColumn: 2, gridRow, left: DAY_TIME_COL_PX }}
                       >
-                        <RateTag slot={slot} open={pack.free.length > 0} />
+                        <RateTag slot={slot} open={pack.free.some((seat) => seat < DAY_BASE_SEATS)} />
                       </div>
 
                       {/* 세그먼트 = 예약 하나. 좌→우 순서는 dayPacks 가 확정해 둔다. */}
@@ -864,18 +874,42 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                           data-slot-time={slot.time}
                           onClick={() => onCreateAt(focusedDate, slot.time)}
                           {...dropTarget(focusedDate, slot.time)}
-                          aria-label={`Create reservation on ${shortDate(focusedDate)} at ${slot.time}`}
-                          title={`Create reservation at ${slot.time}`}
-                          className={`group relative flex scroll-mt-10 items-center justify-center hover:bg-[#f0efff] ${dropHighlight(focusedDate, slot.time)} ${rule} ${FOCUS_RING}`}
+                          aria-label={
+                            seat >= DAY_BASE_SEATS
+                              ? `Add an extra player on ${shortDate(focusedDate)} at ${slot.time}`
+                              : `Create reservation on ${shortDate(focusedDate)} at ${slot.time}`
+                          }
+                          title={
+                            seat >= DAY_BASE_SEATS
+                              ? `Extra seat ${seat + 1} of ${DAY_SEATS} — ${slot.time} already has ${DAY_BASE_SEATS} players`
+                              : `Create reservation at ${slot.time}`
+                          }
+                          className={`group relative flex scroll-mt-10 items-center justify-center hover:bg-[#f0efff] ${
+                            seat >= DAY_BASE_SEATS ? "bg-[#fffaf0]" : ""
+                          } ${dropHighlight(focusedDate, slot.time)} ${rule} ${FOCUS_RING}`}
                           style={{ gridColumn: DAY_PLAYER_COL + seat, gridRow }}
                         >
                           <span
                             aria-hidden
-                            className="flex h-[19px] w-[19px] items-center justify-center rounded-full border border-[#c2c2cc] text-[14px] leading-none font-bold text-[#9aa0a6] group-hover:border-[#4533ff] group-hover:text-[#4533ff]"
+                            className={`flex h-[19px] w-[19px] items-center justify-center rounded-full border text-[14px] leading-none font-bold group-hover:border-[#4533ff] group-hover:text-[#4533ff] ${
+                              seat >= DAY_BASE_SEATS
+                                ? "border-dashed border-[#d9a441] text-[#b7832a]"
+                                : "border-[#c2c2cc] text-[#9aa0a6]"
+                            }`}
                           >
                             +
                           </span>
                         </button>
+                      ))}
+
+                      {/* 아직 열리지 않은 여분 칸. 밑줄만 이어 그린다. */}
+                      {pack.idle.map((seat) => (
+                        <div
+                          key={`day-idle-${slot.time}-${seat}`}
+                          aria-hidden
+                          className={`bg-[#fafafb] ${rule}`}
+                          style={{ gridColumn: DAY_PLAYER_COL + seat, gridRow }}
+                        />
                       ))}
 
                       {/* Cart: 0이면 아예 아무것도 그리지 않는다 (스크린샷과 동일). */}

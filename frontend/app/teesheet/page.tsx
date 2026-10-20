@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../../components/admin/AdminShell";
 import BillDrawer from "../../components/pos/BillDrawer";
 import BillPanel from "../../components/pos/BillPanel";
-import BookingDialog, { SEATS_PER_TEE_TIME } from "../../components/teesheet/BookingDialog";
+import BookingDialog, { STANDARD_SEATS_PER_TEE_TIME } from "../../components/teesheet/BookingDialog";
 import DateNav from "../../components/teesheet/DateNav";
 import ReservationDetail from "../../components/teesheet/ReservationDetail";
 import WeekGrid from "../../components/teesheet/WeekGrid";
@@ -142,7 +142,7 @@ export default function TeeSheetPage() {
     return (
       [...slots]
         .sort((a, b) => a.minutes - b.minutes)
-        .find((slot) => (taken.get(slot.time) ?? 0) < SEATS_PER_TEE_TIME)?.time ?? null
+        .find((slot) => (taken.get(slot.time) ?? 0) < STANDARD_SEATS_PER_TEE_TIME)?.time ?? null
     );
   }, [bookings, focusedDate, slots]);
 

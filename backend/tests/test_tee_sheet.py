@@ -68,6 +68,11 @@ def create(client, **payload):
     return client.post(f"{API}/tee-sheet/bookings", json=payload)
 
 
+def party(n: int, last: str = "Extra") -> list[dict]:
+    """직원 시트용 n명 일행. 정원(4) 위 여분 4자리(최대 8)를 채울 때 쓴다."""
+    return [{"name": f"Guest{i} {last}"} for i in range(1, n + 1)]
+
+
 # ===== 저장소 / 시드 ===================================================
 
 def test_store_seeds_the_file_and_persists(client, tmp_path):
@@ -253,13 +258,16 @@ def test_create_rejects_unknown_slot_with_422(client):
     assert garbage.status_code == 422
 
 
-def test_create_shares_a_tee_time_until_it_hits_four_players(client):
-    """한 티 타임에 예약이 몇 건이든 상관없다. 합계 인원 4명이 한계다."""
-    # 6:58 AM 은 이미 4명(b-xeric). 한 명도 더 못 들어간다.
+def test_create_shares_a_tee_time_until_it_hits_eight_players(client):
+    """한 티 타임에 예약이 몇 건이든 상관없다. 직원 시트는 합계 8명(4 + 여분 4)이 한계다."""
+    # 6:58 AM 은 이미 4명(b-xeric). 직원은 4명을 더 넣을 수 있다.
+    extra = create(client, date="2026-09-08", time="6:58 AM", title="Extra, Ed", players=party(4))
+    assert extra.status_code == 201, extra.text
+    # 이제 8명. 한 명도 더 못 들어간다.
     clash = create(client, date="2026-09-08", time="6:58 AM", title="Clash, Joe",
                    players=[{"name": "Joe Clash"}])
     assert clash.status_code == 409
-    assert "only holds 4 players" in clash.json()["detail"]
+    assert "only holds 8 players" in clash.json()["detail"]
 
     # 7:07 AM 은 3명(b-dune) -> 두 번째 예약 1명은 통과해야 한다.
     shared = create(client, date="2026-09-08", time="7:07 AM", title="Single, Sam",
@@ -270,17 +278,15 @@ def test_create_shares_a_tee_time_until_it_hits_four_players(client):
     assert len(at_707) == 2
     assert sum(len(b["players"]) for b in at_707) == 4
 
-    # 이제 7:07 AM 도 꽉 찼다.
+    # 이제 7:07 AM 은 기본 4자리가 찼다. 여분 4자리 위로는 못 넣는다.
     overflow = create(client, date="2026-09-08", time="7:07 AM", title="Late, Larry",
-                      players=[{"name": "Larry Late"}])
+                      players=party(5, "Late"))
     assert overflow.status_code == 409
 
-    # 7:25 AM 은 2명(b-ridge): 3명은 넘치고 2명은 딱 맞는다.
-    too_big = create(client, date="2026-09-08", time="7:25 AM", title="Three, Tom",
-                     players=[{"name": "A One"}, {"name": "B Two"}, {"name": "C Three"}])
+    # 7:25 AM 은 2명(b-ridge): 7명은 넘치고 6명은 딱 맞는다.
+    too_big = create(client, date="2026-09-08", time="7:25 AM", title="Seven, Tom", players=party(7))
     assert too_big.status_code == 409
-    fits = create(client, date="2026-09-08", time="7:25 AM", title="Two, Tim",
-                  players=[{"name": "A One"}, {"name": "B Two"}])
+    fits = create(client, date="2026-09-08", time="7:25 AM", title="Six, Tim", players=party(6))
     assert fits.status_code == 201, fits.text
 
     # 같은 시각이라도 날짜가 다르면 정원도 따로다.
@@ -291,6 +297,9 @@ def test_create_shares_a_tee_time_until_it_hits_four_players(client):
 
 def test_cancelled_reservation_releases_its_tee_time_slots(client):
     """취소된 예약은 티 타임 자리를 붙들고 있으면 안 된다."""
+    # 7:43 AM 은 4명(b-cedar 2 + b-willow 2). 여분 4자리까지 채운다.
+    assert create(client, date="2026-09-08", time="7:43 AM", title="Extra, Ed",
+                  players=party(4)).status_code == 201
     blocked = create(client, date="2026-09-08", time="7:43 AM", title="Waiting, Wes",
                      players=[{"name": "Wes Waiting"}])
     assert blocked.status_code == 409
@@ -303,22 +312,21 @@ def test_cancelled_reservation_releases_its_tee_time_slots(client):
 
 
 def test_reinstating_a_cancelled_reservation_cannot_overflow_the_tee_time(client):
-    """놓아 준 자리가 이미 팔렸으면 되살리기는 409 여야 한다 (정원 6명이 되면 안 된다)."""
+    """놓아 준 자리가 이미 팔렸으면 되살리기는 409 여야 한다 (정원 10명이 되면 안 된다)."""
     url = f"{API}/tee-sheet/bookings/b-cedar"          # 7:43 AM, 2명
     assert client.patch(url, json={"status": "cancelled"}).status_code == 200
 
-    taken = create(client, date="2026-09-08", time="7:43 AM", title="Fast, Fran",
-                   players=[{"name": "Fran Fast"}, {"name": "Finn Fast"}])
+    taken = create(client, date="2026-09-08", time="7:43 AM", title="Fast, Fran", players=party(6, "Fast"))
     assert taken.status_code == 201, taken.text
 
     revived = client.patch(url, json={"status": "reserved"})
     assert revived.status_code == 409
-    assert "only holds 4 players" in revived.json()["detail"]
+    assert "only holds 8 players" in revived.json()["detail"]
     assert client.get(url).json()["status"] == "cancelled"   # 거절이 아무것도 바꾸지 않았다
 
     day = client.get(f"{API}/tee-sheet/bookings", params={"date": "2026-09-08"}).json()
     active = [b for b in day if b["time"] == "7:43 AM" and b["status"] != "cancelled"]
-    assert sum(len(b["players"]) for b in active) == 4
+    assert sum(len(b["players"]) for b in active) == 8
 
     # 자리가 다시 나면 되살릴 수 있다.
     assert client.delete(f"{API}/tee-sheet/bookings/{taken.json()['id']}").status_code == 204
@@ -426,10 +434,12 @@ def test_patch_moves_booking_to_another_slot(client):
 
     # 존재하지 않는 슬롯으로는 이동 불가
     assert client.patch(url, json={"time": "7:26 AM"}).status_code == 422
-    # 정원이 이미 찬 티 타임으로도 이동 불가 (4명 + 4명 = 8명)
+    # 정원을 넘기는 티 타임으로도 이동 불가 (4명 + 1명 + 4명 = 9명)
+    assert create(client, date="2026-09-08", time="6:58 AM", title="Extra, Ed",
+                  players=party(1)).status_code == 201
     conflict = client.patch(url, json={"date": "2026-09-08", "time": "6:58 AM"})
     assert conflict.status_code == 409
-    assert "only holds 4 players" in conflict.json()["detail"]
+    assert "only holds 8 players" in conflict.json()["detail"]
     # 실패한 이동이 원본을 건드리지 않았는지
     assert client.get(url).json()["date"] == "2026-09-12"
 
@@ -440,7 +450,9 @@ def test_patch_moves_into_a_tee_time_that_still_has_room(client):
     assert moved.status_code == 200, moved.text
     assert moved.json()["time"] == "7:07 AM"
 
-    # 그 자리는 이제 꽉 찼다. 4명짜리 b-ford 은 못 들어간다.
+    # 여분 1자리를 더 채우면 남는 자리는 3. 4명짜리 b-ford 은 못 들어간다.
+    assert create(client, date="2026-09-08", time="7:07 AM", title="Extra, Ed",
+                  players=party(1)).status_code == 201
     blocked = client.patch(f"{API}/tee-sheet/bookings/b-ford", json={"time": "7:07 AM"})
     assert blocked.status_code == 409
     assert client.get(f"{API}/tee-sheet/bookings/b-ford").json()["time"] == "7:16 AM"
@@ -454,7 +466,9 @@ def test_cancelled_booking_moves_into_a_full_tee_time_but_cannot_be_reinstated_t
     url = f"{API}/tee-sheet/bookings/b-cedar"          # 7:43 AM, 2명
     assert client.patch(url, json={"status": "cancelled"}).status_code == 200
 
-    # 6:58 AM 은 b-xeric 4명으로 꽉 차 있다. 그래도 취소된 예약은 옮겨갈 수 있다.
+    # 6:58 AM 을 b-xeric 4명 + 여분 4명으로 꽉 채운다. 그래도 취소된 예약은 옮겨갈 수 있다.
+    assert create(client, date="2026-09-08", time="6:58 AM", title="Extra, Ed",
+                  players=party(4)).status_code == 201
     moved = client.patch(url, json={"time": "6:58 AM"})
     assert moved.status_code == 200, moved.text
     after_move = client.get(url).json()
@@ -465,7 +479,7 @@ def test_cancelled_booking_moves_into_a_full_tee_time_but_cannot_be_reinstated_t
     # 옮겨간 자리에는 남는 자리가 없다 -> 되살리기는 여전히 409 (오버플로 구멍이 아니다).
     revived = client.patch(url, json={"status": "reserved"})
     assert revived.status_code == 409
-    assert "only holds 4 players" in revived.json()["detail"]
+    assert "only holds 8 players" in revived.json()["detail"]
     still = client.get(url).json()
     assert (still["status"], still["time"]) == ("cancelled", "6:58 AM")
 
@@ -652,11 +666,14 @@ def test_daily_report_counts_cart_fees(client):
 
 
 def test_player_guards(client):
-    # 예약 하나가 담을 수 있는 인원(4명)을 넘기면 422. 티 타임 정원 초과(409)보다 먼저 걸린다.
-    full = f"{API}/tee-sheet/bookings/b-xeric"          # 이미 4명
-    too_many = client.post(f"{full}/players", json={"name": "Fifth Wheel"})
+    # 예약 하나가 담을 수 있는 인원(8명)을 넘기면 422. 티 타임 정원 초과(409)보다 먼저 걸린다.
+    full = f"{API}/tee-sheet/bookings/b-xeric"          # 4명 -> 여분 4명까지 들어간다
+    for n in range(5, 9):
+        grew = client.post(f"{full}/players", json={"name": f"Wheel {n}"})
+        assert grew.status_code == 200, grew.text
+    too_many = client.post(f"{full}/players", json={"name": "Ninth Wheel"})
     assert too_many.status_code == 422
-    assert "at most 4 players" in too_many.json()["detail"]
+    assert "at most 8 players" in too_many.json()["detail"]
 
     single = create(client, date="2026-09-08", time="9:22 AM", title="Solo, Han",
                     players=[{"name": "Han Solo"}]).json()
@@ -667,16 +684,20 @@ def test_player_guards(client):
 
 
 def test_add_player_rejected_when_the_whole_tee_time_is_full(client):
-    """예약 자체는 4명 미만이지만 티 타임 전체가 4명이면 409 (자원 충돌)."""
+    """예약 자체는 8명 미만이지만 티 타임 전체가 8명이면 409 (자원 충돌)."""
     url = f"{API}/tee-sheet/bookings/b-willow"             # 7:43 AM, 2명 (+ b-cedar 2명)
     assert len(client.get(url).json()["players"]) == 2
+    assert create(client, date="2026-09-08", time="7:43 AM", title="Extra, Ed",
+                  players=party(4)).status_code == 201
 
-    blocked = client.post(f"{url}/players", json={"name": "Fifth Wheel"})
+    blocked = client.post(f"{url}/players", json={"name": "Ninth Wheel"})
     assert blocked.status_code == 409
-    assert "only holds 4 players" in blocked.json()["detail"]
+    assert "only holds 8 players" in blocked.json()["detail"]
     assert len(client.get(url).json()["players"]) == 2    # 거절이 아무것도 바꾸지 않았다
 
-    # 7:52 AM 도 합계 4명이라 1명짜리 b-brook 에도 못 넣는다.
+    # 7:52 AM 도 여분까지 채워 합계 8명이면 1명짜리 b-brook 에도 못 넣는다.
+    assert create(client, date="2026-09-08", time="7:52 AM", title="Extra, Ed",
+                  players=party(4)).status_code == 201
     solo = f"{API}/tee-sheet/bookings/b-brook"
     assert client.post(f"{solo}/players", json={"name": "Sixth Wheel"}).status_code == 409
 
@@ -695,35 +716,35 @@ def test_add_player_to_a_cancelled_booking_ignores_tee_time_capacity(client):
     for url in (crowded, quiet):
         assert client.patch(url, json={"status": "cancelled"}).status_code == 200
 
-    # b-willow 가 비운 자리를 이웃 b-cedar 이 가져가 7:43 AM 의 4자리를 **혼자** 다 쓴다.
+    # b-willow 가 비운 자리를 이웃 b-cedar 이 가져가 7:43 AM 의 8자리를 **혼자** 다 쓴다.
     neighbour = f"{API}/tee-sheet/bookings/b-cedar"
-    for name in ("Third Wheel", "Fourth Wheel"):
-        grew = client.post(f"{neighbour}/players", json={"name": name})
+    for n in range(3, 9):
+        grew = client.post(f"{neighbour}/players", json={"name": f"Wheel {n}"})
         assert grew.status_code == 200, grew.text
-    assert len(client.get(neighbour).json()["players"]) == 4
-    assert module.tee_time_players(module.read_bookings(), "2026-09-08", "7:43 AM") == 4
+    assert len(client.get(neighbour).json()["players"]) == 8
+    assert module.tee_time_players(module.read_bookings(), "2026-09-08", "7:43 AM") == 8
 
     # 이제 두 취소 예약은 이웃 사정이 정반대다. 그래도 **똑같이** 행동해야 한다.
     for url in (crowded, quiet):
-        for name in ("Third Wheel", "Fourth Wheel"):
-            added = client.post(f"{url}/players", json={"name": name})
+        for n in range(3, 9):
+            added = client.post(f"{url}/players", json={"name": f"Wheel {n}"})
             assert added.status_code == 200, f"{url}: {added.text}"
-        assert len(client.get(url).json()["players"]) == 4
-        # 예약 하나가 담을 수 있는 인원(4명) 제한은 취소돼도 그대로 살아 있다.
-        fifth = client.post(f"{url}/players", json={"name": "Fifth Wheel"})
-        assert fifth.status_code == 422
-        assert "at most 4 players" in fifth.json()["detail"]
+        assert len(client.get(url).json()["players"]) == 8
+        # 예약 하나가 담을 수 있는 인원(8명) 제한은 취소돼도 그대로 살아 있다.
+        ninth = client.post(f"{url}/players", json={"name": "Ninth Wheel"})
+        assert ninth.status_code == 422
+        assert "at most 8 players" in ninth.json()["detail"]
 
-    # 4자리를 이웃이 다 쓰고 있는 쪽은 되살릴 수 없다 -> 오버플로 구멍이 아니다.
+    # 8자리를 이웃이 다 쓰고 있는 쪽은 되살릴 수 없다 -> 오버플로 구멍이 아니다.
     blocked = client.patch(crowded, json={"status": "reserved"})
     assert blocked.status_code == 409
-    assert "only holds 4 players" in blocked.json()["detail"]
+    assert "only holds 8 players" in blocked.json()["detail"]
     assert client.get(crowded).json()["status"] == "cancelled"
 
-    # 조용한 티 타임의 예약은 4명 그대로 되살아난다.
+    # 조용한 티 타임의 예약은 8명 그대로 되살아난다.
     revived = client.patch(quiet, json={"status": "reserved"})
     assert revived.status_code == 200, revived.text
-    assert len(revived.json()["players"]) == 4
+    assert len(revived.json()["players"]) == 8
 
 
 # ===== 리포트 =========================================================
