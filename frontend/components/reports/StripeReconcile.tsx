@@ -248,24 +248,106 @@ function Verdict({ report }: { report: ReconcileReport }) {
   );
 }
 
+type SortKey = "level" | "at" | "payment" | "stripe" | "record" | "ours" | "diff" | "check";
+type Sort = { key: SortKey; dir: "asc" | "desc" };
+
+const LEVEL_RANK: Record<Level, number> = { ok: 0, warn: 1, error: 2 };
+
+const COLUMNS: { key: SortKey; label: string; right?: boolean }[] = [
+  { key: "level", label: "Status" },
+  { key: "at", label: "Time" },
+  { key: "payment", label: "Payment" },
+  { key: "stripe", label: "Stripe", right: true },
+  { key: "record", label: "Our record" },
+  { key: "ours", label: "Ours", right: true },
+  { key: "diff", label: "Diff", right: true },
+  { key: "check", label: "What to check" },
+];
+
+// 정렬 값. null 은 방향과 상관없이 맨 아래로 보낸다(값 없는 줄이 위를 차지하지 않게).
+function sortValue(row: ReconcileRow, key: SortKey): number | string | null {
+  switch (key) {
+    case "level":
+      return LEVEL_RANK[row.level];
+    case "at":
+      return row.at ? Date.parse(row.at) : null;
+    case "payment":
+      return `${SOURCE_LABEL[row.source]} ${cardText(row)}`.toLowerCase();
+    case "stripe":
+      return row.stripe ? row.stripe.amount - row.stripe.refunded : null;
+    case "record":
+      return row.ours ? `${row.ours.label} ${row.ours.receipt_no ?? ""}`.toLowerCase() : null;
+    case "ours":
+      return row.ours ? row.ours.amount - row.ours.refunded : null;
+    case "diff":
+      return rowDifference(row);
+    case "check":
+      return row.issues.length ? row.issues.map((issue) => issue.message).join(" ").toLowerCase() : null;
+  }
+}
+
+function sortRows(rows: ReconcileRow[], sort: Sort): ReconcileRow[] {
+  const sign = sort.dir === "asc" ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index, value: sortValue(row, sort.key) }))
+    .sort((a, b) => {
+      if (a.value === null || b.value === null) {
+        if (a.value === b.value) return a.index - b.index;
+        return a.value === null ? 1 : -1;
+      }
+      const order =
+        typeof a.value === "number" && typeof b.value === "number"
+          ? a.value - b.value
+          : String(a.value).localeCompare(String(b.value), undefined, { numeric: true });
+      // 같은 값이면 시간 순, 그것도 같으면 원래 순서.
+      return order * sign || (Date.parse(a.row.at ?? "") || 0) - (Date.parse(b.row.at ?? "") || 0) || a.index - b.index;
+    })
+    .map((item) => item.row);
+}
+
 function ReconcileTable({ rows, environment }: { rows: ReconcileRow[]; environment: "test" | "live" }) {
+  const [sort, setSort] = useState<Sort>({ key: "at", dir: "asc" });
+  const sorted = useMemo(() => sortRows(rows, sort), [rows, sort]);
+
+  function toggle(key: SortKey) {
+    setSort((current) =>
+      current.key === key ? { key, dir: current.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
+    );
+  }
+
   return (
     <div className="-mx-3 overflow-x-auto">
       <table className="w-full min-w-[900px] text-sm">
         <thead>
           <tr className="border-b border-[#d4d4d8] text-left text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Time</th>
-            <th className="px-3 py-2">Payment</th>
-            <th className="px-3 py-2 text-right">Stripe</th>
-            <th className="px-3 py-2">Our record</th>
-            <th className="px-3 py-2 text-right">Ours</th>
-            <th className="px-3 py-2 text-right">Diff</th>
-            <th className="px-3 py-2">What to check</th>
+            {COLUMNS.map((column) => {
+              const active = sort.key === column.key;
+              return (
+                <th
+                  aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                  className={`px-3 py-2 ${column.right ? "text-right" : ""}`}
+                  key={column.key}
+                >
+                  <button
+                    className={`inline-flex items-center gap-1 uppercase hover:text-[#111827] ${
+                      active ? "text-[#111827]" : ""
+                    }`}
+                    onClick={() => toggle(column.key)}
+                    title={`Sort by ${column.label}`}
+                    type="button"
+                  >
+                    {column.label}
+                    <span aria-hidden className={active ? "" : "opacity-30"}>
+                      {active ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
+                    </span>
+                  </button>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {sorted.map((row) => (
             <ReconcileLine environment={environment} key={row.key} row={row} />
           ))}
         </tbody>
