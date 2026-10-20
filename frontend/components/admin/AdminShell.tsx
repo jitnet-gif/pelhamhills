@@ -340,7 +340,7 @@ function DesktopSidebar({ pathname, division, onDivisionChange }: DivisionProps 
       </Link>
 
       <div className="flex shrink-0 items-baseline justify-between border-b border-white/10 px-4 py-2.5 text-[11px]">
-        <span className="font-semibold">ProShop Sale</span>
+        <span className="font-semibold">Pro Shop</span>
         <span className="flex items-baseline gap-1 text-white/50">
           Owner
           <span aria-hidden className="text-[9px] leading-none">
@@ -652,7 +652,7 @@ function MobileDrawer({
         <InstallAppHint className="mx-4 mb-3" />
 
         <div className="border-t border-white/10 px-4 py-3 text-[11px] text-white/60">
-          ProShop Sale · Owner
+          Pro Shop · Owner
         </div>
       </div>
     </div>

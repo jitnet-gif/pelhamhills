@@ -107,7 +107,7 @@ export const GOLF_GPS_MAP_EDITOR = "https://golf-gps-pelhamhills-seven.vercel.ap
 export const adminNav: NavItem[] = [
   { label: "Tee Sheet", href: "/admin", glyph: "▦" },
   // 프로 샵 계산대. 티 시트에서 담은 그린피를 여기서 받으므로 골프 메뉴에도 둔다(2026-10-12).
-  { label: "Pro Shop", href: "/admin/retail", glyph: "🛒" },
+  { label: "ProShop Sale", href: "/admin/retail", glyph: "🛒" },
   { label: "Tee Times & Pricing", href: "/admin/pricing", glyph: "◉" },
   { label: "Dynamic Pricing", href: "/admin/dynamic-pricing", glyph: "↗" },
   { label: "Events", href: "/admin/events", glyph: "▤" },
