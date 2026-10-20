@@ -20,8 +20,8 @@
 //     한 행에 예약이 둘일 수 있다 — 백엔드가 합계 4명 이하면 같은 티타임 공유를
 //     허용한다. 세그먼트는 좌→우로 깔리고 남는 칸은 기존 `+` 생성 버튼이 채운다.
 
-import { Fragment, useCallback, useMemo, useState } from "react";
-import type { CSSProperties, DragEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties, DragEvent, MouseEvent as ReactMouseEvent } from "react";
 
 import {
   columnLabel,
@@ -39,6 +39,7 @@ import { GUEST_NAME, TONE_CLASS, isDeadPlayer, playerLabel, playerTone } from "@
 import type {
   BookingColor,
   BookingStatus,
+  Player,
   TeeBooking,
   TeeSheetController,
   TeeSlot,
@@ -425,6 +426,42 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
   const [hoverTime, setHoverTime] = useState<string | null>(null);
   const { moveBooking, pushToast, select } = controller;
 
+  // ===== 일간 시트: 선수 칸 우클릭 → 그 한 명만 예약에서 뺀다 =====
+  // 그룹 예약이라도 세그먼트 전체가 아니라 우클릭한 칸의 선수만 지운다. 저장은 상세 패널 ⋮ → Delete 와
+  // 같은 `controller.removePlayer`(매니저 PIN 은 staffRpc 가 띄운다). 마지막 한 명은 서버도 막으므로
+  // 메뉴에서 예약 취소를 상세 패널로 안내한다.
+  const [playerMenu, setPlayerMenu] = useState<{ bookingId: string; playerId: string; x: number; y: number } | null>(null);
+  const openPlayerMenu = useCallback(
+    (booking: TeeBooking, player: Player, event: ReactMouseEvent) => {
+      event.preventDefault();
+      select(booking.id);
+      setPlayerMenu({ bookingId: booking.id, playerId: player.id, x: event.clientX, y: event.clientY });
+    },
+    [select],
+  );
+  useEffect(() => {
+    if (!playerMenu) return;
+    const close = () => setPlayerMenu(null);
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Element && event.target.closest("[data-grid-player-menu]"))) close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [playerMenu]);
+  const menuBooking = playerMenu ? visibleBookings.find((booking) => booking.id === playerMenu.bookingId) : undefined;
+  const menuPlayer = menuBooking?.players.find((player) => player.id === playerMenu?.playerId);
+
   const draggedBooking = useMemo(
     () => (dragId ? visibleBookings.find((booking) => booking.id === dragId) ?? null : null),
     [dragId, visibleBookings],
@@ -809,6 +846,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                           booking={booking}
                           selected={booking.id === selectedId}
                           onSelect={controller.select}
+                          onPlayerMenu={openPlayerMenu}
                           rule={rule}
                           slotTime={slot.time}
                           style={{
@@ -968,6 +1006,41 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
           dayTone={isDayView}
         />
       </div>
+
+      {playerMenu && menuBooking && menuPlayer ? (
+        <div
+          data-grid-player-menu
+          role="menu"
+          className="fixed z-50 min-w-[220px] border border-[#c7c7cc] bg-white py-1 text-[12px] shadow-lg"
+          style={{
+            left: Math.min(playerMenu.x, window.innerWidth - 236),
+            top: Math.min(playerMenu.y, window.innerHeight - 110),
+          }}
+        >
+          <p className="truncate px-3 pt-1 pb-1.5 text-[11px] text-[#6b7280]">
+            {playerLabel(menuPlayer)} · {menuBooking.title} · {menuBooking.time}
+          </p>
+          {menuBooking.players.length > 1 ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#c0262d] hover:bg-[#fff1ee]"
+              title="Remove only this player — the rest of the group stays booked"
+              onClick={() => {
+                setPlayerMenu(null);
+                void controller.removePlayer(menuBooking.id, menuPlayer.id);
+              }}
+            >
+              Remove {playerLabel(menuPlayer)}
+              <span className="ml-auto pl-2 text-[10px] text-[#9aa0a6]">Manager</span>
+            </button>
+          ) : (
+            <p className="px-3 py-1.5 text-[#4e5560]">
+              Last player on this reservation — cancel or delete the reservation in the detail panel.
+            </p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1035,7 +1108,14 @@ function DaySegmentCard({
   dragging,
   onDragStart,
   onDragEnd,
-}: BookingButtonProps & { rule: string; style: CSSProperties; slotTime: string }) {
+  onPlayerMenu,
+}: BookingButtonProps & {
+  rule: string;
+  style: CSSProperties;
+  slotTime: string;
+  /** 선수 칸 우클릭 — 그 한 명만 지우는 메뉴를 연다. */
+  onPlayerMenu?: (booking: TeeBooking, player: Player, event: ReactMouseEvent) => void;
+}) {
   const blocked = booking.status === "blocked";
   const cancelled = isDead(booking);
   const hasChrome = booking.holes === 9 || booking.notes.trim().length > 0;
@@ -1116,6 +1196,8 @@ function DaySegmentCard({
           return (
             <span
               key={player.id}
+              onContextMenu={onPlayerMenu ? (event) => onPlayerMenu(booking, player, event) : undefined}
+              title={onPlayerMenu ? `${playerLabel(player)} — right-click to remove just this player` : undefined}
               className={`flex min-w-0 flex-1 items-center gap-1.5 px-1.5 ${TONE_CLASS[tone]} ${
                 dead ? "line-through opacity-70" : ""
               }`}
