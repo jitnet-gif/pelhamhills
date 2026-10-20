@@ -323,6 +323,7 @@ export default function RegisterHome({
           <RegisterClose
             date={today}
             onCancel={() => setDialog(null)}
+            blindCash={!cashAccess}
             onStaffCloseout={cashAccess ? () => setDialog({ kind: "staff" }) : undefined}
             registerName={registerName}
             station={station}

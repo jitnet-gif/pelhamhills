@@ -257,11 +257,12 @@ export type RegisterCloseRow = {
   countable: boolean;
   /** Start+Adds — 시작 잔돈. 현금 줄만. */
   start: Cents;
-  payments: Cents;
-  payment_count: number;
+  /** 블라인드 카운트(`cash_blind`)면 현금 줄에서 null. */
+  payments: Cents | null;
+  payment_count: number | null;
   withdraws: Cents;
-  /** Total Remaining = start + payments − withdraws. */
-  remaining: Cents;
+  /** Total Remaining = start + payments − withdraws. 블라인드 카운트면 현금 줄에서 null. */
+  remaining: Cents | null;
   /** 마지막으로 센 값. 아직 안 셌으면 null. */
   counted: Cents | null;
 };
@@ -274,7 +275,7 @@ export type RegisterCloseReport = {
   rows: RegisterCloseRow[];
   close: {
     opening_float: Cents;
-    /** 센 순간의 Total Remaining. */
+    /** 센 순간의 Total Remaining. 블라인드 카운트면 cash 가 없다. */
     expected: Partial<Record<PaymentMethod, Cents>>;
     counted: Partial<Record<PaymentMethod, Cents>>;
     cash_counts: CashCounts;
@@ -283,6 +284,11 @@ export type RegisterCloseReport = {
     /** 센 뒤에 이 계산대에서 결제·환불이 있었다 — 다시 세야 한다. */
     stale: boolean;
   } | null;
+  /**
+   * 현금 리포트 계정이 아니라 서버가 현금 줄의 기대 금액을 지웠다(0046, 블라인드 카운트). 직원은 시작 잔돈만
+   * 남기고 나머지를 현금 매출로 넘긴다 — 현금 매출이 얼마여야 하는지는 모른다.
+   */
+  cash_blind?: boolean;
 };
 
 export type RegisterCloseSave = {

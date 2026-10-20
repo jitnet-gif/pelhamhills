@@ -8,8 +8,13 @@
 --   pelham_staff_pos_report_daily  — 명단 밖 계정에는 by_payment 에서 cash 줄을 뺀다(나머지는 그대로).
 --   pelham_staff_closeout_report / _save / _reopen (0010 담당자별 마감·팁 나누기)
 --                                  — 명단 밖 계정은 PT403 으로 거절한다. 마감 화면 전체가 현금 대사라서다.
+--   pelham_staff_register_close_report (0023 계산대 마감)
+--                                  — 명단 밖 계정에는 **블라인드 카운트**: 현금 줄의 Payments·Total Remaining 과
+--                                    마감 기록의 expected.cash 를 null 로 보낸다. 직원은 시작 잔돈 $200 만 남기고
+--                                    나머지를 전부 현금 매출로 넘긴다 — 현금 매출이 얼마여야 하는지는 모른다
+--                                    (2026-10-20 클럽 결정). 센 금액은 그대로 저장되고, 과부족은 현금 리포트 계정이 본다.
 --   pelham_staff_cash_access()     — 새 함수. 지금 계정이 현금 리포트를 볼 수 있는가(화면이 링크를 띄울지 정한다).
--- 바뀌지 않는 것: 계산대 마감(0023, 계산대 홈의 Close Register), 계산서 하나하나의 결제 수단.
+-- 바뀌지 않는 것: 계산서 하나하나의 결제 수단, 카드·체크카드 마감 숫자.
 --
 -- 명단은 SQL editor 에서 바꾼다(화면이 없다). 계정은 Supabase Auth 의 이메일로 적는다:
 --   insert into public.pelham_cash_viewers (email) values ('someone@example.com') on conflict do nothing;
@@ -20,7 +25,7 @@
 -- 구현: 0024·0026 과 같이 원래 함수를 `<이름>_base` 로 옮기고 같은 이름·같은 인자의 얇은 함수를 둔다.
 -- **0005·0010 을 다시 실행하면 잠금이 풀린다** — 그 뒤엔 이 파일을 다시 실행하면 된다.
 --
--- 전제: 0004, 0005, 0010. 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
+-- 전제: 0004, 0005, 0010, 0023. 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
 
 do $$
 begin
@@ -32,6 +37,9 @@ begin
   end if;
   if to_regprocedure('public.pelham_staff_closeout_report(date)') is null then
     raise exception '0046 needs 0010 first (pelham_staff_closeout_report is missing).';
+  end if;
+  if to_regprocedure('public.pelham_staff_register_close_report(date, text)') is null then
+    raise exception '0046 needs 0023 first (pelham_staff_register_close_report is missing).';
   end if;
 end;
 $$;
@@ -93,7 +101,8 @@ begin
       ('pelham_staff_pos_report_daily', 'date'),
       ('pelham_staff_closeout_report', 'date'),
       ('pelham_staff_closeout_save', 'date, jsonb'),
-      ('pelham_staff_closeout_reopen', 'date, text')
+      ('pelham_staff_closeout_reopen', 'date, text'),
+      ('pelham_staff_register_close_report', 'date, text')
     ) as t(fn, args)
   loop
     select p.prosrc into v_src from pg_proc p
@@ -173,6 +182,37 @@ begin
 end;
 $$;
 
+-- 계산대 마감 표. 명단 밖 계정에는 현금 줄의 기대 금액을 지운다(블라인드 카운트). 합계도 화면이 현금을 빼고
+-- 더할 수 없게, 지운 칸은 0 이 아니라 null 이다. 마감 저장(_save)은 끝에 이 함수를 부르므로 따로 감싸지 않는다.
+create or replace function public.pelham_staff_register_close_report(p_date date, p_station text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_report jsonb := public.pelham_staff_register_close_report_base(p_date, p_station);
+begin
+  if public.pelham_is_cash_viewer() then
+    return v_report;
+  end if;
+  return v_report || jsonb_build_object(
+    'rows', coalesce((
+      select jsonb_agg(case when e.value->>'method' = 'cash'
+                            then e.value || jsonb_build_object('payments', null, 'payment_count', null, 'remaining', null)
+                            else e.value end
+                       order by e.ordinality)
+        from jsonb_array_elements(v_report->'rows') with ordinality as e(value, ordinality)
+    ), '[]'::jsonb),
+    'close', case when jsonb_typeof(v_report->'close') = 'object'
+                  then jsonb_set(v_report->'close', '{expected}', (v_report->'close'->'expected') - 'cash')
+                  else v_report->'close' end,
+    'cash_blind', true
+  );
+end;
+$$;
+
 -- 지금 계정이 현금 리포트를 볼 수 있는가. 직원이 아니면 다른 직원 함수와 같이 PT401.
 create or replace function public.pelham_staff_cash_access()
 returns boolean
@@ -196,17 +236,20 @@ revoke all on function public.pelham_staff_pos_report_daily_base(date) from publ
 revoke all on function public.pelham_staff_closeout_report_base(date) from public, anon, authenticated;
 revoke all on function public.pelham_staff_closeout_save_base(date, jsonb) from public, anon, authenticated;
 revoke all on function public.pelham_staff_closeout_reopen_base(date, text) from public, anon, authenticated;
+revoke all on function public.pelham_staff_register_close_report_base(date, text) from public, anon, authenticated;
 
 revoke all on function public.pelham_staff_pos_report_daily(date) from public, anon, authenticated;
 revoke all on function public.pelham_staff_closeout_report(date) from public, anon, authenticated;
 revoke all on function public.pelham_staff_closeout_save(date, jsonb) from public, anon, authenticated;
 revoke all on function public.pelham_staff_closeout_reopen(date, text) from public, anon, authenticated;
+revoke all on function public.pelham_staff_register_close_report(date, text) from public, anon, authenticated;
 revoke all on function public.pelham_staff_cash_access() from public, anon, authenticated;
 
 grant execute on function public.pelham_staff_pos_report_daily(date) to authenticated;
 grant execute on function public.pelham_staff_closeout_report(date) to authenticated;
 grant execute on function public.pelham_staff_closeout_save(date, jsonb) to authenticated;
 grant execute on function public.pelham_staff_closeout_reopen(date, text) to authenticated;
+grant execute on function public.pelham_staff_register_close_report(date, text) to authenticated;
 grant execute on function public.pelham_staff_cash_access() to authenticated;
 
 notify pgrst, 'reload schema';
