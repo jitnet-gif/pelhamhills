@@ -14,6 +14,8 @@ import {
 
 import { greenFeeFor } from "@/lib/greenFee";
 import { money } from "@/lib/teeSheet/dates";
+import { useSlotLocks } from "@/hooks/useSlotLocks";
+import { isSlotLocked } from "@/lib/teeSheet/sun";
 import type { PlayerType, TeeSheetController } from "@/lib/teeSheet/types";
 
 import { MemberSuggestions, memberSummary, useMemberSearch, type MemberHit } from "./MemberSearch";
@@ -111,6 +113,8 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
 
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  // 잠긴 칸(일출 전·일몰 2시간 전 이후·직원 블록)은 고를 수 없다. 격자에서 이미 막혀 여기로 오지 않는다.
+  const { locks } = useSlotLocks(date ? [date] : []);
   const [holes, setHoles] = useState<9 | 18>(18);
   const [rateInput, setRateInput] = useState("");
   const [rateTouched, setRateTouched] = useState(false);
@@ -429,10 +433,14 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
                         // 꽉 찬 슬롯만 비활성화한다. 일부만 찬 슬롯은 남은 좌석을 알려 주고
                         // 고를 수 있게 둔다 — 그것이 분할 예약이 생기는 정상 경로다.
                         const free = seatsFree(seatsTaken, slot.time);
+                        const dark = isSlotLocked(date, slot.minutes, locks);
                         return (
-                          <option disabled={free === 0} key={slot.time} value={slot.time}>
+                          <option disabled={free === 0 || dark} key={slot.time} value={slot.time}>
+                            {dark ? "🔒 " : ""}
                             {slot.time} · {money(slot.rate)}
-                            {free === 0
+                            {dark
+                              ? " · locked"
+                              : free === 0
                               ? " · full"
                               : free <= SEATS_PER_TEE_TIME - STANDARD_SEATS_PER_TEE_TIME
                                 ? ` · 4 full · +${free} extra`

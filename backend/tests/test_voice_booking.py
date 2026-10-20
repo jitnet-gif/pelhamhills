@@ -127,6 +127,52 @@ def test_find_hides_tee_times_that_already_passed_today(client):
         assert ts.label_to_minutes(label) > 6 * 60, f"{label} 은 이미 지난 시각이다"
 
 
+def test_sun_times_match_the_tee_sheet_header():
+    """DateNav·SQL `pelham_tee_sun` 과 같은 값. 2026-10-20 Welland: 7:35 AM / 6:28 PM."""
+    assert ts.sun_minutes("2026-10-20") == (7 * 60 + 35, 18 * 60 + 28)
+
+
+def test_the_first_tee_is_at_sunrise_and_the_last_two_hours_before_sunset():
+    """일출 7:35 에 칸이 하나 더 생기고(격자 7:34·7:43 사이), 일몰 6:28 PM 의 2시간 전 4:28 PM 까지만 판다."""
+    times = [slot.minutes for slot in ts.daylight_slots("2026-10-20")]
+    assert times[0] == 7 * 60 + 35
+    assert times[1] == 7 * 60 + 43  # 나머지 격자는 그대로
+    assert times[-1] <= 16 * 60 + 28
+    assert 7 * 60 + 35 in [slot.minutes for slot in ts.generate_slots("2026-10-20")]
+    assert ts.require_slot("2026-10-20", "7:35 AM").minutes == 7 * 60 + 35
+
+
+def test_staff_block_and_release_override_the_sun(monkeypatch):
+    """블록한 칸은 해가 있어도 닫히고, 릴리스한 칸은 해 뜨기 전이어도 열린다."""
+    monkeypatch.setattr(ts, "slot_locks", lambda iso: {9 * 60 + 4: True, 7 * 60 + 25: False})
+    times = [slot.minutes for slot in ts.daylight_slots("2026-10-20")]
+    assert 9 * 60 + 4 not in times
+    assert 7 * 60 + 25 in times
+    assert ts.slot_lock_reason("2026-10-20", 9 * 60 + 4) == "that tee time is closed"
+
+
+def test_find_offers_nothing_before_sunrise(client):
+    """9월 9일 일출은 6:49 — 격자 첫 칸 6:40 은 팔지 않고, 6:49 에 첫 티가 있다."""
+    sunrise, _ = ts.sun_minutes(TOMORROW)
+    assert sunrise > 6 * 60 + 40
+    # 전부 잡지 않은 날이라 `total_open` 은 열린 칸 수 그대로다.
+    assert open_count(client, party=1) == len(ts.daylight_slots(TOMORROW))
+    assert ts.daylight_slots(TOMORROW)[0].minutes == sunrise
+
+
+def test_a_hold_before_sunrise_is_refused(client):
+    response = hold(client, time="6:40 AM")
+    assert response.status_code == 409
+    assert "before sunrise" in response.json()["detail"]
+
+
+def test_a_hold_too_close_to_sunset_is_refused(client):
+    """9월 9일 일몰 7:41 PM → 마지막 티 5:41 PM. 6:04 PM 은 격자 위지만 팔지 않는다."""
+    response = hold(client, time="6:04 PM")
+    assert response.status_code == 409
+    assert "too close to sunset" in response.json()["detail"]
+
+
 def test_find_respects_the_booking_window(client):
     far = (FIXED_NOW.date() + timedelta(days=voice.BOOKING_WINDOW_DAYS + 1)).isoformat()
     response = find(client, date=far)

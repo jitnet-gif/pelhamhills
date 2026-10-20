@@ -418,10 +418,10 @@ EXPECTED_BATCH = [
     {"task": "send_reminders", "date": SEED_DATE, "bookings": 11, "recipients": 32, "sent": 32,
      "failed": 0, "status": "success"},
     {"task": "generate_report", "date": SEED_DATE, "total_tee_times": 11, "booked_slots": 32,
-     "total_revenue": 1529.28, "occupancy_rate": 9.64, "status": "success"},
-    # 격자가 6:58 PM 까지라 하루 83슬롯이다 (6:40 AM 부터 9분 간격).
-    {"task": "refresh_availability", "date": SEED_DATE, "total_slots": 83, "taken_slots": 9,
-     "open_slots": 74, "status": "success"},
+     "total_revenue": 1529.28, "occupancy_rate": 9.52, "status": "success"},
+    # 격자가 6:58 PM 까지라 하루 83슬롯(6:40 AM 부터 9분 간격)에 그날 일출 칸 하나를 더해 84다(0051).
+    {"task": "refresh_availability", "date": SEED_DATE, "total_slots": 84, "taken_slots": 9,
+     "open_slots": 75, "status": "success"},
 ]
 
 

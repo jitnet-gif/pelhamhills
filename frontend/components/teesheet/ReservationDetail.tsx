@@ -29,6 +29,8 @@ import { CLUB_TIME_ZONE, PAYMENT_LABELS, saleReceipt } from "@/lib/retail/receip
 import { computeTax, formatMoney } from "@/lib/retail/types";
 import { greenFeeOf } from "@/lib/greenFee";
 import { longDate, money } from "@/lib/teeSheet/dates";
+import { useSlotLocks } from "@/hooks/useSlotLocks";
+import { isSlotLocked, slotLockReason } from "@/lib/teeSheet/sun";
 import { clubDate, confirmationCode, paidBillFor, teeReceiptFor } from "@/lib/teeSheet/receipt";
 import { reservationTitle } from "@/lib/teeSheet/tone";
 import type {
@@ -283,6 +285,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   // 합산 계산서(0005). 훅이라 아래 이른 return 보다 위에 둔다.
   const billState = useCurrentBill();
   const booking = controller.selected;
+  const { locks } = useSlotLocks(booking ? [booking.date] : []);
   const bookingId = booking?.id ?? null;
   // 레인체크(0011). 0011 이 아직 안 돌았으면 missing — 버튼을 숨긴다.
   const rainChecks = useRainChecks(bookingId);
@@ -794,7 +797,12 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
       taken.set(item.time, (taken.get(item.time) ?? 0) + item.players.length);
     }
     return sorted
-      .filter((slot) => slot.minutes > start && (taken.get(slot.time) ?? 0) + groupSize <= SEATS_PER_TEE_TIME)
+      .filter(
+        (slot) =>
+          slot.minutes > start &&
+          !isSlotLocked(booking.date, slot.minutes, locks) &&
+          (taken.get(slot.time) ?? 0) + groupSize <= SEATS_PER_TEE_TIME,
+      )
       .slice(0, MAX_CLONES)
       .map((slot) => slot.time);
   })();
@@ -1009,11 +1017,15 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             onChange={(event) => void moveTo(booking.date, event.target.value)}
             value={booking.time}
           >
-            {timeOptions.map((time) => (
-              <option key={time} value={time}>
-                {time}
-              </option>
-            ))}
+            {timeOptions.map((time) => {
+              // 잠긴 칸(일출 전·일몰 2시간 전 이후·직원 블록)은 고를 수 없다. 이 예약이 이미 그 시각이면 그대로 보여 준다.
+              const dark = time !== booking.time && Boolean(slotLockReason(booking.date, time, locks));
+              return (
+                <option disabled={dark} key={time} value={time}>
+                  {dark ? `🔒 ${time}` : time}
+                </option>
+              );
+            })}
           </select>
         </label>
 

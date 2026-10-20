@@ -17,12 +17,14 @@ import ReservationDetail from "../../components/teesheet/ReservationDetail";
 import WeekGrid from "../../components/teesheet/WeekGrid";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner";
 import { useTeeSheet } from "../../hooks/useTeeSheet";
+import { useSlotLocks } from "@/hooks/useSlotLocks";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
 import { retailApi, toRetailError } from "@/lib/retail/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
 import { formatMoney } from "@/lib/retail/types";
 import { confirmationCode } from "@/lib/teeSheet/receipt";
+import { isSlotLocked } from "@/lib/teeSheet/sun";
 import { GUEST_NAME, TONE_CLASS, TONE_LABEL, type PlayerTone } from "@/lib/teeSheet/tone";
 
 /** 티 시트 영수증 바코드: `ABCD-1234`(확인 코드), 뒤에 `-플레이어4자` 또는 `-ALL`. */
@@ -126,6 +128,9 @@ export default function TeeSheetPage() {
     [createBooking, focusedDate, select, setFocusedDate],
   );
 
+  // 잠긴 칸(일출 전·일몰 2시간 전 이후·직원 블록)은 Add 가 고르지 않는다.
+  const { locks: slotLocks } = useSlotLocks([focusedDate]);
+
   /**
    * 보고 있는 날짜에서 **자리가 남은 가장 이른 티 타임**. 없으면 null.
    *
@@ -142,9 +147,12 @@ export default function TeeSheetPage() {
     return (
       [...slots]
         .sort((a, b) => a.minutes - b.minutes)
-        .find((slot) => (taken.get(slot.time) ?? 0) < STANDARD_SEATS_PER_TEE_TIME)?.time ?? null
+        .find(
+          (slot) => !isSlotLocked(focusedDate, slot.minutes, slotLocks) && (taken.get(slot.time) ?? 0) < STANDARD_SEATS_PER_TEE_TIME,
+        )
+        ?.time ?? null
     );
-  }, [bookings, focusedDate, slots]);
+  }, [bookings, focusedDate, slotLocks, slots]);
 
   /**
    * 상단바의 Add. 격자의 빈 칸과 같은 결과를 내야 한다 — 창을 띄우지 않고 예약을

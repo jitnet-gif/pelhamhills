@@ -44,6 +44,8 @@ import type {
   TeeSheetController,
   TeeSlot,
 } from "@/lib/teeSheet/types";
+import { useSlotLocks } from "@/hooks/useSlotLocks";
+import { isSlotLocked, slotLockKey, slotLockReason } from "@/lib/teeSheet/sun";
 
 export type WeekGridProps = {
   controller: TeeSheetController;
@@ -436,6 +438,24 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
   const [hoverTime, setHoverTime] = useState<string | null>(null);
   const { moveBooking, pushToast, select } = controller;
 
+  // ===== 칸 잠금: 자동(일출 전·일몰 2시간 전 이후) + 직원의 블록·릴리스(0051). PIN 없이 누구나. =====
+  const { locks, setLock } = useSlotLocks(columns);
+  const toggleLock = useCallback(
+    async (date: string, time: string, minutes: number, lock: boolean) => {
+      // 릴리스는 그 칸을 웹·전화 손님에게도 연다. 손이 미끄러져 여는 일이 없게 한 번 묻는다.
+      if (!lock && !window.confirm(`Release ${time} on ${shortDate(date)}? It opens for booking (web and phone too).`)) {
+        return;
+      }
+      try {
+        await setLock(date, time, minutes, lock);
+        pushToast("success", `${time} on ${shortDate(date)} ${lock ? "blocked" : "released"}.`);
+      } catch (error) {
+        pushToast("error", error instanceof Error ? error.message : "Could not change the lock.");
+      }
+    },
+    [pushToast, setLock],
+  );
+
   // ===== 일간 시트: 선수 칸 우클릭 → 그 한 명만 예약에서 뺀다 =====
   // 그룹 예약이라도 세그먼트 전체가 아니라 우클릭한 칸의 선수만 지운다. 저장은 상세 패널 ⋮ → Delete 와
   // 같은 `controller.removePlayer`(매니저 PIN 은 staffRpc 가 띄운다). 마지막 한 명은 서버도 막으므로
@@ -490,9 +510,10 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
     (date: string, time: string) => {
       if (!draggedBooking) return false;
       if (draggedBooking.date === date && draggedBooking.time === time) return false;
+      if (draggedBooking.status !== "blocked" && isSlotLocked(date, timeToMinutes(time), locks)) return false;
       return seatsTakenAt(date, time, draggedBooking.id) + heldSeats(draggedBooking) <= DAY_SEATS;
     },
-    [draggedBooking, seatsTakenAt],
+    [draggedBooking, locks, seatsTakenAt],
   );
 
   const endDrag = useCallback(() => {
@@ -721,13 +742,28 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
             {rows.map((slot, rowIdx) =>
               columns.map((iso, colIdx) => {
                 if (covered.has(`${rowIdx}|${colIdx}`)) return null;
+                if (isSlotLocked(iso, slot.minutes, locks)) {
+                  return (
+                    <LockedCell
+                      key={`dark-${iso}-${slot.time}`}
+                      reason={slotLockReason(iso, slot.time, locks)}
+                      onRelease={() => void toggleLock(iso, slot.time, slot.minutes, false)}
+                      style={{ gridColumn: dayColStart + colIdx, gridRow: rowIdx + 2 }}
+                    />
+                  );
+                }
                 return (
                   <button
                     key={`empty-${iso}-${slot.time}`}
                     type="button"
                     onClick={() => onCreateAt(iso, slot.time)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      void toggleLock(iso, slot.time, slot.minutes, true);
+                    }}
                     {...dropTarget(iso, slot.time)}
                     aria-label={`Create reservation on ${shortDate(iso)} at ${slot.time}`}
+                    title={`Create reservation at ${slot.time} · right-click to block`}
                     className={`group relative flex scroll-mt-10 items-center justify-center hover:bg-[#f0efff] ${dropHighlight(iso, slot.time)} ${FOCUS_RING}`}
                     style={{ gridColumn: dayColStart + colIdx, gridRow: rowIdx + 2 }}
                   >
@@ -828,17 +864,33 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                   const checkInTarget = pack.segments.find(
                     ({ booking }) => !isDead(booking) && booking.status !== "blocked",
                   )?.booking;
+                  const darkReason = slotLockReason(focusedDate, slot.time, locks);
+                  const released = locks.get(slotLockKey(focusedDate, slot.minutes)) === false;
 
                   return (
                     <Fragment key={line.key}>
                       <div
                         data-slot-time={slot.time}
-                        className={`sticky left-0 z-20 flex items-center px-2 text-[15px] font-bold ${
+                        className={`group sticky left-0 z-20 flex items-center px-2 text-[15px] font-bold ${
                           hoverTime === slot.time ? "bg-[#4533ff] text-white" : "bg-white text-[#111315]"
                         } ${rule}`}
                         style={{ gridColumn: 1, gridRow }}
+                        title={darkReason ?? undefined}
                       >
                         {slot.time}
+                        {/* 블록·릴리스 — 잠기면 🔒 가 늘 보이고, 열린 칸은 마우스를 올리면 🔓.
+                            손으로 연 칸(release)은 🔓 를 늘 띄워 자동 잠금을 풀었다는 걸 알린다. */}
+                        <button
+                          type="button"
+                          onClick={() => void toggleLock(focusedDate, slot.time, slot.minutes, !darkReason)}
+                          aria-label={darkReason ? `Release ${slot.time}` : `Block ${slot.time}`}
+                          title={darkReason ? `${darkReason}` : released ? `Released by staff — click to block ${slot.time}` : `Block ${slot.time}`}
+                          className={`ml-auto flex h-6 w-6 items-center justify-center rounded-sm text-[12px] hover:bg-[#ececf0] ${FOCUS_RING} ${
+                            darkReason || released ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                          }`}
+                        >
+                          <span aria-hidden>{darkReason ? "🔒" : "🔓"}</span>
+                        </button>
                       </div>
                       <div
                         data-slot-time={slot.time}
@@ -866,41 +918,51 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                         />
                       ))}
 
-                      {/* 남는 칸 = 새 예약 자리. */}
-                      {pack.free.map((seat) => (
-                        <button
-                          key={`day-empty-${slot.time}-${seat}`}
-                          type="button"
-                          data-slot-time={slot.time}
-                          onClick={() => onCreateAt(focusedDate, slot.time)}
-                          {...dropTarget(focusedDate, slot.time)}
-                          aria-label={
-                            seat >= DAY_BASE_SEATS
-                              ? `Add an extra player on ${shortDate(focusedDate)} at ${slot.time}`
-                              : `Create reservation on ${shortDate(focusedDate)} at ${slot.time}`
-                          }
-                          title={
-                            seat >= DAY_BASE_SEATS
-                              ? `Extra seat ${seat + 1} of ${DAY_SEATS} — ${slot.time} already has ${DAY_BASE_SEATS} players`
-                              : `Create reservation at ${slot.time}`
-                          }
-                          className={`group relative flex scroll-mt-10 items-center justify-center hover:bg-[#f0efff] ${
-                            seat >= DAY_BASE_SEATS ? "bg-[#fffaf0]" : ""
-                          } ${dropHighlight(focusedDate, slot.time)} ${rule} ${FOCUS_RING}`}
-                          style={{ gridColumn: DAY_PLAYER_COL + seat, gridRow }}
-                        >
-                          <span
-                            aria-hidden
-                            className={`flex h-[19px] w-[19px] items-center justify-center rounded-full border text-[14px] leading-none font-bold group-hover:border-[#4533ff] group-hover:text-[#4533ff] ${
-                              seat >= DAY_BASE_SEATS
-                                ? "border-dashed border-[#d9a441] text-[#b7832a]"
-                                : "border-[#c2c2cc] text-[#9aa0a6]"
-                            }`}
-                          >
-                            +
-                          </span>
-                        </button>
-                      ))}
+                      {/* 남는 칸 = 새 예약 자리. 해 뜨기 전·해 진 뒤면 자물쇠. */}
+                      {darkReason
+                        ? pack.free.map((seat) => (
+                            <LockedCell
+                              key={`day-dark-${slot.time}-${seat}`}
+                              reason={darkReason}
+                              onRelease={() => void toggleLock(focusedDate, slot.time, slot.minutes, false)}
+                              rule={rule}
+                              style={{ gridColumn: DAY_PLAYER_COL + seat, gridRow }}
+                            />
+                          ))
+                        : pack.free.map((seat) => (
+                            <button
+                              key={`day-empty-${slot.time}-${seat}`}
+                              type="button"
+                              data-slot-time={slot.time}
+                              onClick={() => onCreateAt(focusedDate, slot.time)}
+                              {...dropTarget(focusedDate, slot.time)}
+                              aria-label={
+                                seat >= DAY_BASE_SEATS
+                                  ? `Add an extra player on ${shortDate(focusedDate)} at ${slot.time}`
+                                  : `Create reservation on ${shortDate(focusedDate)} at ${slot.time}`
+                              }
+                              title={
+                                seat >= DAY_BASE_SEATS
+                                  ? `Extra seat ${seat + 1} of ${DAY_SEATS} — ${slot.time} already has ${DAY_BASE_SEATS} players`
+                                  : `Create reservation at ${slot.time}`
+                              }
+                              className={`group relative flex scroll-mt-10 items-center justify-center hover:bg-[#f0efff] ${
+                                seat >= DAY_BASE_SEATS ? "bg-[#fffaf0]" : ""
+                              } ${dropHighlight(focusedDate, slot.time)} ${rule} ${FOCUS_RING}`}
+                              style={{ gridColumn: DAY_PLAYER_COL + seat, gridRow }}
+                            >
+                              <span
+                                aria-hidden
+                                className={`flex h-[19px] w-[19px] items-center justify-center rounded-full border text-[14px] leading-none font-bold group-hover:border-[#4533ff] group-hover:text-[#4533ff] ${
+                                  seat >= DAY_BASE_SEATS
+                                    ? "border-dashed border-[#d9a441] text-[#b7832a]"
+                                    : "border-[#c2c2cc] text-[#9aa0a6]"
+                                }`}
+                              >
+                                +
+                              </span>
+                            </button>
+                          ))}
 
                       {/* 아직 열리지 않은 여분 칸. 밑줄만 이어 그린다. */}
                       {pack.idle.map((seat) => (
@@ -1292,6 +1354,35 @@ type OffGridStripProps = {
  * 일간에서는 daySurfaceClass 를 쓴다 — 안 그러면 gold 회원 예약이 스트립에서만
  * 게스트 노랑(#ffd400)으로 보여 읽는 사람이 색의 의미를 알 수 없다.
  */
+/**
+ * 잠긴 빈 자리(일출 전·일몰 2시간 전 이후·직원 블록). 눌러도 예약이 생기지 않고 끌어다 놓을 수도 없다
+ * (드롭은 `canDropAt` 이, 그 밖의 길은 DB 트리거 0051 이 막는다). 누르면 릴리스를 물어본다.
+ */
+function LockedCell({
+  reason,
+  onRelease,
+  rule = "",
+  style,
+}: {
+  reason: string | null;
+  onRelease: () => void;
+  rule?: string;
+  style: CSSProperties;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRelease}
+      aria-label={reason ?? "Locked"}
+      title={reason ?? undefined}
+      className={`flex cursor-not-allowed items-center justify-center bg-[#f3f3f5] text-[11px] text-[#a3a7ad] hover:text-[#4e5560] ${rule} ${FOCUS_RING}`}
+      style={style}
+    >
+      <span aria-hidden>🔒</span>
+    </button>
+  );
+}
+
 function OffGridStrip({ title, hint, bookings, selectedId, onSelect, dayTone }: OffGridStripProps) {
   if (bookings.length === 0) return null;
   return (

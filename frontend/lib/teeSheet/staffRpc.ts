@@ -176,3 +176,13 @@ export const staffReportWeek = (from: string, to: string) =>
 // 0025: 날짜별 요금(주중·주말·공휴일). 요일 탭과 주간 격자 머리에 쓴다.
 export const staffRateDays = (from: string, to: string) =>
   staffRpc<RateDay[]>("pelham_staff_rate_days", { p_from: from, p_to: to });
+
+/** 칸 하나의 수동 블록·릴리스 (0051). `locked` 는 그 칸이 실제로 잠겼는지(자동 판정 포함). */
+export type SlotLockRow = { date: string; time: string; minutes: number; locked: boolean };
+
+export const staffSlotLocks = (from: string, to: string) =>
+  staffRpc<SlotLockRow[]>("pelham_staff_slot_locks", { p_from: from, p_to: to });
+
+/** 직원 누구나 — 매니저 PIN 없음. 자동 판정과 같은 값이면 서버가 수동 설정을 지운다. */
+export const staffSlotLockSet = (date: string, time: string, locked: boolean) =>
+  staffRpc<SlotLockRow>("pelham_staff_slot_lock_set", { p: { date, time, locked } });

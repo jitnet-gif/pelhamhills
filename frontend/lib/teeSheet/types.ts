@@ -104,6 +104,8 @@ export type TeeSlot = {
   rate9?: number;
   nineFrom?: number;
   rateCard?: string;
+  /** 해 뜨기 전·해 진 뒤라 잠긴 칸 (0049). 화면은 `lib/teeSheet/sun.ts` 로 날짜마다 직접 계산한다. */
+  dark?: boolean;
 };
 
 export type DayType = "weekday" | "weekend" | "holiday";

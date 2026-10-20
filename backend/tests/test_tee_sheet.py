@@ -160,12 +160,15 @@ def test_slots_shape_and_rates(client):
     assert tuesday["date"] == "2026-09-08"
     assert slots[0] == {"time": "6:40 AM", "minutes": 400, "rate": 47.79, "cartsTotal": 4,
                         "dayType": "weekday", "holiday": None}
-    assert slots[1]["time"] == "6:49 AM"
+    # 9월 8일 일출 6:47 AM — 그날 격자에는 일출 칸이 하나 더 있다(0051). 나머지는 9분 격자.
+    assert slots[1]["time"] == "6:47 AM"
+    assert slots[2]["time"] == "6:49 AM"
     # 마지막 티는 6:58 PM — Chronogolf export 에 이 시각까지 실제 예약이 있다.
     assert slots[-1] == {"time": "6:58 PM", "minutes": 18 * 60 + 58, "rate": 34.52, "cartsTotal": 4,
                         "dayType": "weekday", "holiday": None}
-    # 9분 간격이 끝까지 유지되는지
-    assert all(b["minutes"] - a["minutes"] == 9 for a, b in zip(slots, slots[1:]))
+    # 일출 칸을 빼면 9분 간격이 끝까지 유지되는지
+    grid = [s for s in slots if s["time"] != "6:47 AM"]
+    assert all(b["minutes"] - a["minutes"] == 9 for a, b in zip(grid, grid[1:]))
     assert all(s["cartsTotal"] == 4 for s in slots)
 
     # 2026 요금표(0045): 가격대는 오후 2시, 5시에 내려간다. 금요일은 17시 이후가 $1 높다.
@@ -617,6 +620,28 @@ def test_new_players_get_a_cart_fee_unless_one_is_given(client):
     # 음수 요금은 모델이 거절한다 (위 예약은 이미 4명이라 POST 로는 인원 제한과 구분이 안 된다).
     cy = added.json()["players"][-1]["id"]
     assert client.patch(f"{url}/players/{cy}", json={"cartFee": -1}).status_code == 422
+
+
+def test_cart_count_alone_puts_riders_on_carts_at_the_holes_price(client):
+    # 웹·새 예약 창은 카트 대수만 보낸다. 한 대에 두 명, 9홀이면 9홀 카트 요금.
+    nine = create(client, date="2026-09-08", time="4:07 PM", title="Nine, Cart", holes=9, cartCount=1, players=[
+        {"name": "Al One", "ratePlan": "Public"},
+        {"name": "Bo Two", "ratePlan": "Public"},
+        {"name": "Cy Three", "ratePlan": "Public"},
+    ]).json()
+    assert [(p["cart"], p["cartFee"]) for p in nine["players"]] == [(True, 11.50), (True, 11.50), (False, 0)]
+
+    eighteen = create(client, date="2026-09-08", time="4:16 PM", title="Full, Cart", cartCount=1, players=[
+        {"name": "Di Four", "ratePlan": "Public"},
+    ]).json()
+    assert (eighteen["players"][0]["cart"], eighteen["players"][0]["cartFee"]) == (True, 19.47)
+
+    # 선수별로 이미 적어 보냈으면 대수로 다시 태우지 않는다.
+    told = create(client, date="2026-09-08", time="4:25 PM", title="Told, Cart", holes=9, cartCount=1, players=[
+        {"name": "Ed Walk", "ratePlan": "Public"},
+        {"name": "Fay Ride", "ratePlan": "Public", "cart": True},
+    ]).json()
+    assert [p["cart"] for p in told["players"]] == [False, True]
 
 
 def test_paid_at_is_stamped_by_the_server_and_cleared_on_unpay(client):

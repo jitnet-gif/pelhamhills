@@ -109,7 +109,7 @@ def _first_fit(
     blocked = voice._blocked_times(bookings, iso_date)
     earliest_tee = now_local + timedelta(minutes=OFFER_MINUTES) + MIN_LEAD_AFTER_HOLD
 
-    for slot in ts.generate_slots(iso_date):
+    for slot in ts.daylight_slots(iso_date):
         if slot.time in blocked or not voice._window_allows(entry, slot.minutes):
             continue
         at = voice.slot_datetime(iso_date, slot.time)

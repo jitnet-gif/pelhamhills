@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import DayTabs from "@/components/admin/DayTabs";
 import { dayNumber, longDate, minutesToTime, toDate, todayIso } from "@/lib/teeSheet/dates";
+import { CLUB_LAT, CLUB_LON, CLUB_TZ, sunMinutes } from "@/lib/teeSheet/sun";
 import type { TeeSheetController, Toast } from "@/lib/teeSheet/types";
 
 export type DateNavProps = { controller: TeeSheetController };
@@ -32,59 +33,7 @@ function monthYear(iso: string): string {
 }
 
 // ===== 일출 / 일몰 =====
-// Pelham Hills Golf Club, Welland ON. 시간대를 고정 상수로 두는 이유: 서버(UTC일 수 있음)와
-// 브라우저가 서로 다른 TZ여도 같은 문자열이 나와야 하이드레이션이 깨지지 않는다.
-const CLUB_LAT = 43.03;
-const CLUB_LON = -79.29;
-const CLUB_TZ = "America/Toronto";
-const CLUB_CLOCK = new Intl.DateTimeFormat("en-US", {
-  hour: "2-digit",
-  hourCycle: "h23",
-  minute: "2-digit",
-  timeZone: CLUB_TZ,
-});
-
-/** UTC 자정 기준 분 → 클럽 현지(America/Toronto) 자정 기준 분. */
-function toClubMinutes(iso: string, utcMinutes: number): number {
-  if (!Number.isFinite(utcMinutes)) return Number.NaN;
-  const [y, m, d] = iso.split("-").map(Number);
-  const instant = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1) + utcMinutes * 60_000);
-  const [hh, mm] = CLUB_CLOCK.format(instant).split(":").map(Number);
-  return hh * 60 + mm;
-}
-
-/**
- * NOAA General Solar Position Calculations (태양 천정각 90.833°)의 축약 구현.
- * 결과는 "클럽 현지 시각" 기준 자정부터의 분이며, 해가 뜨지 않는 위도에서는 acos가 NaN을 낸다.
- */
-function sunMinutes(iso: string): { sunrise: number; sunset: number } {
-  const date = toDate(iso);
-  const dayOfYear = Math.round((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86_400_000) + 1;
-  const g = ((2 * Math.PI) / 365) * (dayOfYear - 1); // fractional year, 정오 기준
-  const eqTime =
-    229.18 *
-    (0.000075 +
-      0.001868 * Math.cos(g) -
-      0.032077 * Math.sin(g) -
-      0.014615 * Math.cos(2 * g) -
-      0.040849 * Math.sin(2 * g));
-  const decl =
-    0.006918 -
-    0.399912 * Math.cos(g) +
-    0.070257 * Math.sin(g) -
-    0.006758 * Math.cos(2 * g) +
-    0.000907 * Math.sin(2 * g) -
-    0.002697 * Math.cos(3 * g) +
-    0.00148 * Math.sin(3 * g);
-  const lat = (CLUB_LAT * Math.PI) / 180;
-  const cosHa = Math.cos((90.833 * Math.PI) / 180) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
-  const ha = (Math.acos(cosHa) * 180) / Math.PI; // |cosHa| > 1 → NaN (백야/극야)
-  const solarNoonUtc = 720 - 4 * CLUB_LON - eqTime; // UTC 자정부터의 분
-  return {
-    sunrise: toClubMinutes(iso, solarNoonUtc - 4 * ha),
-    sunset: toClubMinutes(iso, solarNoonUtc + 4 * ha),
-  };
-}
+// 계산은 `lib/teeSheet/sun.ts` — 시트의 자물쇠 칸·DB 트리거(0048)와 같은 값이어야 한다.
 
 function clockOrDash(minutes: number): string {
   return Number.isFinite(minutes) ? minutesToTime(minutes) : "—";

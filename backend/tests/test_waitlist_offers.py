@@ -61,6 +61,8 @@ class FakeWaitlist:
         return True
 
     def select(self, table, params):
+        if table == "pelham_tee_slot_locks":
+            return []  # 직원 블록·릴리스 없음 — 일출·일몰만 본다
         return [r for r in self.rows if r["status"] == "expired"]
 
 

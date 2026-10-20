@@ -653,6 +653,13 @@ def _require_open_slot(
             detail=f"{time_label} on {spoken_date(iso_date)} is closed for an event.",
         )
 
+    closed = ts.slot_lock_reason(iso_date, slot.minutes)
+    if closed:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{time_label} on {spoken_date(iso_date)} can't be booked: {closed}.",
+        )
+
     at = slot_datetime(iso_date, time_label)
     if at is not None and at <= club_now():
         raise HTTPException(status_code=409, detail=f"{time_label} has already passed today.")
@@ -677,7 +684,7 @@ def find_tee_times(body: FindTeeTimesRequest) -> FindTeeTimesResponse:
     blocked = _blocked_times(bookings, iso_date)
 
     options: list[TeeTimeOption] = []
-    for slot in ts.generate_slots(iso_date):
+    for slot in ts.daylight_slots(iso_date):
         if slot.time in blocked:
             continue
 

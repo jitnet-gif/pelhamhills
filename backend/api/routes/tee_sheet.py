@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import re
 import threading
 import time
@@ -22,6 +23,7 @@ from datetime import date as date_cls, datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Iterator, Literal, Optional
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
@@ -504,23 +506,114 @@ def nine_holes_alternative(iso_date: str) -> str:
     return "a later tee time for nine"
 
 
+def grid_minutes(iso_date: str) -> list[int]:
+    """그날의 칸: 9분 격자 + 일출 칸(0051 `pelham_tee_grid`). 일출에 바로 첫 티를 낸다."""
+    grid = set(range(FIRST_TEE_MINUTES, LAST_TEE_MINUTES + 1, SLOT_INTERVAL_MINUTES))
+    sunrise, _ = sun_minutes(iso_date)
+    if FIRST_TEE_MINUTES < sunrise < LAST_TEE_MINUTES:
+        grid.add(sunrise)
+    return sorted(grid)
+
+
 def generate_slots(iso_date: str) -> list[TeeSlot]:
     kind = day_type_for(iso_date)
-    slots: list[TeeSlot] = []
-    minutes = FIRST_TEE_MINUTES
-    while minutes <= LAST_TEE_MINUTES:
-        slots.append(
-            TeeSlot(
-                time=minutes_to_label(minutes),
-                minutes=minutes,
-                rate=green_fee_for(iso_date, 18, minutes),
-                cartsTotal=CARTS_PER_SLOT,
-                dayType=kind,
-                holiday=HOLIDAYS.get(iso_date),
-            )
+    return [
+        TeeSlot(
+            time=minutes_to_label(minutes),
+            minutes=minutes,
+            rate=green_fee_for(iso_date, 18, minutes),
+            cartsTotal=CARTS_PER_SLOT,
+            dayType=kind,
+            holiday=HOLIDAYS.get(iso_date),
         )
-        minutes += SLOT_INTERVAL_MINUTES
-    return slots
+        for minutes in grid_minutes(iso_date)
+    ]
+
+
+# ===== 일출 · 일몰 · 칸 잠금 =====
+# 손님에게 파는 칸은 **일출 ~ 일몰 2시간 전**(0051). 직원이 티시트에서 칸마다 블록·릴리스한 값
+# (`pelham_tee_slot_locks`)이 그보다 앞선다. 식은 화면(`frontend/lib/teeSheet/sun.ts`)·SQL
+# `pelham_tee_sun` 과 같다: NOAA 축약식, 천정각 90.833°, 분 아래는 버린다. 격자(`generate_slots`)는
+# 잠긴 칸도 담고, 손님에게 내놓는 쪽(`daylight_slots`)만 거른다 — DB 트리거가 모든 쓰기를 한 번 더 막는다.
+
+CLUB_LAT = 43.03
+CLUB_LON = -79.29
+CLUB_TZ = ZoneInfo("America/Toronto")
+
+
+def sun_minutes(iso_date: str) -> tuple[int, int]:
+    """(일출, 일몰) — 클럽 현지 자정부터의 분."""
+    day = parse_iso_date(iso_date)
+    g = 2 * math.pi / 365 * (day.timetuple().tm_yday - 1)
+    eq_time = 229.18 * (
+        0.000075 + 0.001868 * math.cos(g) - 0.032077 * math.sin(g)
+        - 0.014615 * math.cos(2 * g) - 0.040849 * math.sin(2 * g)
+    )
+    decl = (
+        0.006918 - 0.399912 * math.cos(g) + 0.070257 * math.sin(g)
+        - 0.006758 * math.cos(2 * g) + 0.000907 * math.sin(2 * g)
+        - 0.002697 * math.cos(3 * g) + 0.00148 * math.sin(3 * g)
+    )
+    lat = math.radians(CLUB_LAT)
+    cos_ha = math.cos(math.radians(90.833)) / (math.cos(lat) * math.cos(decl)) - math.tan(lat) * math.tan(decl)
+    ha = math.degrees(math.acos(cos_ha))
+    noon_utc = 720 - 4 * CLUB_LON - eq_time
+    midnight_utc = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+
+    def local(utc_minutes: float) -> int:
+        at = (midnight_utc + timedelta(minutes=utc_minutes)).astimezone(CLUB_TZ)
+        return at.hour * 60 + at.minute
+
+    return local(noon_utc - 4 * ha), local(noon_utc + 4 * ha)
+
+
+# 일몰 몇 분 전까지 티타임을 받나. SQL `pelham_tee_window` 의 120 과 같다.
+LAST_TEE_BEFORE_SUNSET_MINUTES = 120
+
+
+def tee_window(iso_date: str) -> tuple[int, int]:
+    """(첫 티, 마지막 티) — 일출, 일몰 2시간 전."""
+    sunrise, sunset = sun_minutes(iso_date)
+    return sunrise, sunset - LAST_TEE_BEFORE_SUNSET_MINUTES
+
+
+def slot_locks(iso_date: str) -> dict[int, bool]:
+    """직원이 손으로 바꾼 칸 {분: 잠김}. Supabase 가 없거나 읽기에 실패하면 빈 값(자동 판정만)."""
+    from backend.services import supabase_rest
+
+    if not supabase_rest.configured():
+        return {}
+    try:
+        rows = supabase_rest.select(
+            "pelham_tee_slot_locks",
+            {"select": "minutes,locked", "booking_date": f"eq.{iso_date}"},
+        )
+    except supabase_rest.SupabaseUnavailable:
+        logger.warning("slot locks unavailable for %s; using sunrise/sunset only", iso_date)
+        return {}
+    return {int(row["minutes"]): bool(row["locked"]) for row in rows}
+
+
+def slot_lock_reason(iso_date: str, minutes: int, locks: dict[int, bool] | None = None) -> str | None:
+    """잠긴 칸이면 손님에게 읽어 줄 이유, 열려 있으면 None."""
+    locks = slot_locks(iso_date) if locks is None else locks
+    first, last = tee_window(iso_date)
+    locked = locks.get(minutes)
+    if locked is False:
+        return None
+    if locked is True:
+        return "that tee time is closed"
+    if minutes < first:
+        return f"that is before sunrise; the first tee time is {minutes_to_label(first)}"
+    if minutes > last:
+        return f"that is too close to sunset; the last tee time is {minutes_to_label(last)}"
+    return None
+
+
+def daylight_slots(iso_date: str) -> list[TeeSlot]:
+    """열린 칸만 — 전화·문자 비서와 대기자 제안이 손님에게 내놓는 목록."""
+    locks = slot_locks(iso_date)
+    return [slot for slot in generate_slots(iso_date) if slot_lock_reason(iso_date, slot.minutes, locks) is None]
 
 
 def slot_index(iso_date: str) -> dict[str, TeeSlot]:
@@ -807,6 +900,11 @@ def create_booking(body: CreateBookingRequest) -> TeeBooking:
             cartCount=body.cartCount,
             players=body.players,
         )
+        # 카트 대수만 오고 선수별 카트가 없으면 앞에서부터 한 대에 두 명씩 태운다 — 계산서는 선수의
+        # cart·cartFee 만 읽는다. DB 의 0050 트리거와 같은 규칙.
+        if booking.cartCount > 0 and not any(player.cart for player in booking.players):
+            for player in booking.players[: booking.cartCount * 2]:
+                player.cart = True
         for player in booking.players:
             _settle_new_player(player, booking.holes, fee_given="cartFee" in player.model_fields_set)
         _audit(booking, f"Reservation created for {booking.date} {booking.time}.")
