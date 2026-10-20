@@ -160,22 +160,54 @@ async function writeBytes(bytes: Uint8Array): Promise<void> {
     const port = await grantedPort();
     if (!port) throw new Error("No receipt printer chosen. On the register home screen, open Receipt Printer → Choose printer.");
     // 블루투스 SPP 는 속도 값을 쓰지 않지만 open() 은 값을 요구한다.
-    await port.open({ baudRate: 115200 });
+    // 프린터가 꺼졌거나 다른 기기에 붙어 있으면 open() 이 끝나지 않는다 — 기다리다 끊는다.
+    await withTimeout(port.open({ baudRate: 115200 }), OPEN_TIMEOUT_MS, PRINTER_SILENT);
     openPort = port;
   }
   const writable = openPort.writable;
   if (!writable) throw new Error("The receipt printer is not accepting data.");
   const writer = writable.getWriter();
   try {
-    // 블루투스 버퍼가 작다 — 조금씩 보낸다.
-    for (let offset = 0; offset < bytes.length; offset += 512) {
-      await writer.ready;
-      await writer.write(bytes.subarray(offset, offset + 512));
-    }
-    await writer.ready;
+    // 블루투스 버퍼가 작다 — 조금씩 보낸다. 연결이 중간에 끊기면 write() 도 끝나지 않는다.
+    await withTimeout(
+      (async () => {
+        for (let offset = 0; offset < bytes.length; offset += 512) {
+          await writer.ready;
+          await writer.write(bytes.subarray(offset, offset + 512));
+        }
+        await writer.ready;
+      })(),
+      WRITE_TIMEOUT_MS,
+      PRINTER_SILENT,
+    );
+  } catch (error) {
+    await writer.abort().catch(() => undefined);
+    throw error;
   } finally {
     writer.releaseLock();
   }
+}
+
+const OPEN_TIMEOUT_MS = 10_000;
+const WRITE_TIMEOUT_MS = 20_000;
+const PRINTER_SILENT =
+  "The Bluetooth printer did not answer. Check it is on, in range and not connected to another device, " +
+  "then turn it off and on, reload this page and try again.";
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 /**
@@ -190,8 +222,10 @@ export function printBluetooth(
     const bytes = escposReceipt(sheets, { logo: await receiptLogo(), openDrawer: options.openDrawer });
     try {
       await writeBytes(bytes);
-    } catch {
+    } catch (error) {
       await closePort();
+      // 프린터가 아예 대답하지 않으면 다시 해도 같다 — 또 기다리게 하지 않는다.
+      if (error instanceof Error && error.message === PRINTER_SILENT) throw error;
       await writeBytes(bytes);
     }
   });
