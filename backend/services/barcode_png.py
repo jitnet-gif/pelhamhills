@@ -19,8 +19,10 @@ import barcode
 
 from backend.services.twilio_sms import public_api_base
 
-#: 바코드로 만들어 주는 코드 꼴. 티타임 6자리, 시뮬레이터 10자리 숫자 확인 번호.
-BARCODE_CODE_RE = re.compile(r"\d{6}|\d{10}")
+#: 바코드로 만들어 주는 코드 꼴. 티타임 6자리, 시뮬레이터 10자리 숫자 확인 번호,
+#: 레인체크 전표 코드(`RC-` + 16진 10자, 0011). 레인체크 그림에도 주소에 있는 코드뿐이고,
+#: 그 주소는 손님에게 간 문자에만 있다.
+BARCODE_CODE_RE = re.compile(r"\d{6}|\d{10}|RC-[0-9A-F]{10}")
 
 MODULE_PX = 4  # 막대 한 칸의 폭. 휴대폰 화면에서 스캐너가 읽기 넉넉한 굵기.
 HEIGHT_PX = 160

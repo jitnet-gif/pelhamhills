@@ -72,6 +72,62 @@ export function useRainChecks(bookingId: string | null): RainCheckList {
   return { checks: current ? state.checks : [], missing: current && state.missing, reload };
 }
 
+// ===== 문자로 보내기 ====================================================
+
+/**
+ * 전표를 손님 휴대폰으로(바코드 MMS). 번호는 예약의 그 사람 번호로 채워 두고 직원이 고칠 수 있다.
+ * 종이 대신이 아니라 종이와 함께다 — 다음에 오면 휴대폰 화면의 바코드를 쏘면 된다.
+ */
+function TextSlip({ check, defaultPhone }: { check: RainCheck; defaultPhone: string }) {
+  const [phone, setPhone] = useState(defaultPhone ?? "");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function send() {
+    if (sending || !phone.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const { to } = await rainCheckApi.text(check.code, phone.trim());
+      setResult({ ok: true, message: `Texted to ${to}.` });
+    } catch (error) {
+      setResult({ ok: false, message: describeRainCheckError(error) });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-1">
+      <div className="flex gap-1">
+        <input
+          className="min-w-0 flex-1 border border-[#d7d7dc] bg-white px-2 py-1 outline-none focus:border-[#4533ff]"
+          inputMode="tel"
+          onChange={(event) => {
+            setPhone(event.target.value);
+            setResult(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void send();
+          }}
+          placeholder="Mobile number"
+          type="tel"
+          value={phone}
+        />
+        <button
+          className="shrink-0 border border-[#c7c7cc] px-2 py-1 font-bold hover:border-[#4533ff] disabled:opacity-40"
+          disabled={sending || !phone.trim()}
+          onClick={() => void send()}
+          type="button"
+        >
+          {sending ? "Sending…" : result?.ok ? "Text again" : "Text barcode"}
+        </button>
+      </div>
+      {result ? <p className={result.ok ? "text-[#1f7a3a]" : "text-[#8a3f26]"}>{result.message}</p> : null}
+    </div>
+  );
+}
+
 // ===== 창 ==============================================================
 
 type Row = {
@@ -274,6 +330,9 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
                         </button>
                       ) : null}
                     </div>
+                    {check.status === "issued" && !check.expired && voiding?.code !== check.code ? (
+                      <TextSlip check={check} defaultPhone={row.player.phone} />
+                    ) : null}
                     {voiding?.code === check.code ? (
                       <div className="grid gap-1 border border-[#c47a63] bg-[#fbeae5] p-2">
                         <input

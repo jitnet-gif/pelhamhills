@@ -6,7 +6,9 @@
  * 금액·만료일·사용 여부는 전부 서버가 판정한다. 화면이 보여 주는 "만료됨"은 안내일 뿐이다.
  */
 
+import { paymentsApiBase } from "@/lib/booking/payments";
 import { ApiError } from "@/lib/teeSheet/api";
+import { accessToken } from "@/lib/teeSheet/session";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 import { clubDateTime, usDate, type ReceiptBlock, type ReceiptHeader } from "@/lib/retail/receipt";
 import { formatMoney, type Cents } from "@/lib/retail/types";
@@ -69,7 +71,33 @@ export const rainCheckApi = {
   byCode: (code: string) => staffRpc<RainCheck>("pelham_staff_rain_check", { p_code: code }),
   void: (code: string, reason: string) =>
     staffRpc<RainCheck>("pelham_staff_rain_check_void", { p_code: code, p_reason: reason }),
+  text: textRainCheck,
 };
+
+/**
+ * 전표를 손님 휴대폰으로 — 바코드 그림을 붙인 문자. Twilio 키는 FastAPI(Fly) 에만 있어서
+ * 그쪽 `/rain-checks/{code}/text` 를 직원 토큰으로 부른다(`backend/api/routes/rain_checks.py`).
+ */
+async function textRainCheck(code: string, phone: string): Promise<{ to: string }> {
+  const token = await accessToken();
+  if (!token) throw new ApiError(401, "Sign in with a pro shop account.");
+  let response: Response;
+  try {
+    response = await fetch(`${paymentsApiBase()}/rain-checks/${encodeURIComponent(code)}/text`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+  } catch {
+    throw new ApiError(0, "Could not reach the server.");
+  }
+  const body = (await response.json().catch(() => null)) as { detail?: unknown; to?: string } | null;
+  if (!response.ok) {
+    const detail = typeof body?.detail === "string" && body.detail ? body.detail : `${response.status}`;
+    throw new ApiError(response.status, detail);
+  }
+  return { to: body?.to ?? phone };
+}
 
 /** 전표 코드. 스캐너가 소문자로 보내도 받는다. 티 시트 영수증 번호(`XXXX-XXXX`)와 겹치지 않는다. */
 export const RAIN_CHECK_CODE = /^RC-[0-9A-F]{10}$/i;
