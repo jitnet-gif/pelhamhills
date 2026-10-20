@@ -1137,6 +1137,10 @@ function DaySegmentCard({
         booking.time,
         STATUS_LABEL[booking.status],
         `${booking.players.length} of ${bookingCapacity(booking)} players`,
+        (() => {
+          const n = booking.players.filter((player) => player.arrived && !player.no_show && !isDeadPlayer(player)).length;
+          return n > 0 ? `${n} arrived` : null;
+        })(),
         `${booking.holes} holes`,
         booking.notes.trim() ? `Note: ${booking.notes.trim()}` : null,
       ]
@@ -1193,19 +1197,35 @@ function DaySegmentCard({
         booking.players.map((player) => {
           const tone = playerTone(booking, player);
           const dead = cancelled || isDeadPlayer(player);
+          // 상세에서 Arrived 를 켠 선수는 빈 동그라미 대신 초록 체크 — 시트만 보고 누가 왔는지 안다.
+          // 칸 바탕색이 요금제마다 달라 체크는 고정 초록에 흰 테두리로 그린다.
+          const arrived = player.arrived && !player.no_show && !dead;
           return (
             <span
               key={player.id}
               onContextMenu={onPlayerMenu ? (event) => onPlayerMenu(booking, player, event) : undefined}
-              title={onPlayerMenu ? `${playerLabel(player)} — right-click to remove just this player` : undefined}
+              title={
+                [playerLabel(player), arrived ? "arrived" : null, onPlayerMenu ? "right-click to remove just this player" : null]
+                  .filter(Boolean)
+                  .join(" — ") || undefined
+              }
               className={`flex min-w-0 flex-1 items-center gap-1.5 px-1.5 ${TONE_CLASS[tone]} ${
                 dead ? "line-through opacity-70" : ""
               }`}
             >
-              <span
-                aria-hidden
-                className="h-[10px] w-[10px] shrink-0 rounded-full border-[1.5px] border-current opacity-80"
-              />
+              {arrived ? (
+                <span
+                  aria-hidden
+                  className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full bg-[#15803d] text-[10px] font-bold leading-none text-white ring-1 ring-white"
+                >
+                  ✓
+                </span>
+              ) : (
+                <span
+                  aria-hidden
+                  className="h-[10px] w-[10px] shrink-0 rounded-full border-[1.5px] border-current opacity-80"
+                />
+              )}
               <span className="truncate">
                 {/* type 이 아니라 이름으로 가른다. 온라인 예약(0003 `pelham_tee_book`)은
                     예약한 본인까지 type "Guest" 로 저장하므로, type 을 보면 대표자 이름이
