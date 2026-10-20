@@ -25,6 +25,8 @@ export type OpenTeeTime = {
   /** 그날 요금표의 9홀 요금·판매 시작(분) (0045). 옛 서버에는 없다. */
   rate9?: number;
   nineFrom?: number;
+  /** 이 시각의 18홀 요금이 그날 기본가와 다르다(트와일라잇, 0041). 옛 서버에는 없다. */
+  twilight?: boolean;
   /** 이 티타임에 아직 팔 수 있는 자리 수 (0이면 만석). */
   remaining: number;
 };

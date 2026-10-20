@@ -14,19 +14,18 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import BookingShell from "@/components/booking/BookingShell";
 import PayOnline from "@/components/booking/PayOnline";
 import VoiceBooking from "@/components/booking/VoiceBooking";
+import { TeeTimeGroups } from "@/components/booking/TeeTimeCards";
 import {
-  DAY_PART_LABEL,
-  type DayPartFilter,
   type OpenTeeTime,
-  dayPartOf,
   describeFailure,
   formatChipDate,
   formatLongDate,
+  fromIsoDate,
   splitName,
   todayIso,
   upcomingDates,
@@ -35,12 +34,13 @@ import { NO_API_MESSAGE } from "@/lib/apiHost";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
 import { greenFeeFor, nineHoleRule, nineHolesOpen } from "@/lib/greenFee";
 import { CLUB, bookNav, lookupHref } from "@/lib/nav";
+import { minutesToTime } from "@/lib/teeSheet/dates";
+import { teeWindow } from "@/lib/teeSheet/sun";
 import type { TeeBooking } from "@/lib/teeSheet/types";
 
 /** 오늘부터 2주. 그 너머는 프로 샵이 요금·행사를 아직 확정하지 않은 구간이다. */
 const DAYS_AHEAD = 14;
 const PARTY_SIZES = [1, 2, 3, 4] as const;
-const DAY_PARTS: DayPartFilter[] = ["all", "morning", "afternoon", "evening"];
 /** 음성 예약 서버(Fly)가 다시 켜지면 true 로. */
 const VOICE_BOOKING_ENABLED = false;
 
@@ -52,7 +52,6 @@ export default function TeeTimeBookingPage() {
 
   const [date, setDate] = useState(todayIso());
   const [party, setParty] = useState(2);
-  const [dayPart, setDayPart] = useState<DayPartFilter>("all");
 
   const [openTimes, setOpenTimes] = useState<OpenTeeTime[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,6 +60,7 @@ export default function TeeTimeBookingPage() {
 
   const [selected, setSelected] = useState<OpenTeeTime | null>(null);
   const [created, setCreated] = useState<TeeBooking | null>(null);
+  const pendingTime = useRef<string | null>(null);
 
   const dates = useMemo(() => upcomingDates(DAYS_AHEAD), []);
 
@@ -79,6 +79,12 @@ export default function TeeTimeBookingPage() {
       .then((response) => {
         if (cancelled) return;
         setOpenTimes(response.times);
+        // 주소로 들어온 티타임(아래 `pendingTime`)은 첫 목록이 오면 한 번만 연다. 그 사이 나갔으면 목록에 남는다.
+        if (pendingTime.current) {
+          const wanted = response.times.find((slot) => slot.time === pendingTime.current && slot.remaining > 0);
+          pendingTime.current = null;
+          if (wanted) setSelected(wanted);
+        }
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -96,10 +102,35 @@ export default function TeeTimeBookingPage() {
 
   const refresh = useCallback(() => setReloadToken((token) => token + 1), []);
 
-  const visible = useMemo(() => {
-    if (!openTimes) return [];
-    return openTimes.filter((slot) => dayPart === "all" || dayPartOf(slot.minutes) === dayPart);
-  }, [openTimes, dayPart]);
+  // 주소에 날짜·시간을 싣는다(`?date=…&time=…`). 링크를 보내거나 새로고침해도 같은 티타임 상세가
+  // 다시 열린다. 정적 export 라 `useSearchParams`(Suspense 필요) 대신 location 을 직접 읽는다.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const wantDate = params.get("date");
+    if (wantDate && dates.includes(wantDate)) setDate(wantDate);
+    const wantTime = params.get("time");
+    if (wantTime) pendingTime.current = wantTime;
+    const onPop = () => {
+      if (!new URLSearchParams(window.location.search).get("time")) setSelected(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [dates]);
+
+  const pick = useCallback(
+    (slot: OpenTeeTime) => {
+      setSelected(slot);
+      window.history.pushState(null, "", `?date=${date}&time=${encodeURIComponent(slot.time)}`);
+      window.scrollTo({ top: 0 });
+    },
+    [date],
+  );
+  const unpick = useCallback(() => {
+    setSelected(null);
+    window.history.replaceState(null, "", `?date=${date}`);
+  }, [date]);
+
+  const visible = useMemo(() => (openTimes ?? []).filter((slot) => slot.remaining > 0), [openTimes]);
 
   const bookable = visible.filter((slot) => slot.remaining >= party).length;
 
@@ -128,7 +159,7 @@ export default function TeeTimeBookingPage() {
           booking={created}
           onBookAnother={() => {
             setCreated(null);
-            setSelected(null);
+            unpick();
             refresh();
           }}
         />
@@ -138,13 +169,13 @@ export default function TeeTimeBookingPage() {
 
   if (selected) {
     return (
-      <BookingShell subtitle={`${formatLongDate(date)} · ${selected.time}`} title="Your details">
+      <BookingShell subtitle={`${formatLongDate(date)} · ${selected.time}`} title="Tee Time">
         <BookingForm
           date={date}
-          onBack={() => setSelected(null)}
+          onBack={unpick}
           onBooked={(booking) => setCreated(booking)}
           onSlotGone={() => {
-            setSelected(null);
+            unpick();
             refresh();
           }}
           party={party}
@@ -194,25 +225,7 @@ export default function TeeTimeBookingPage() {
           </div>
         </Fieldset>
 
-        <Fieldset label="Time of day">
-          <div className="flex gap-2">
-            {DAY_PARTS.map((part) => (
-              <button
-                aria-pressed={dayPart === part}
-                className={`tap-target min-w-0 flex-1 truncate rounded-sm border px-1 text-sm font-semibold transition ${
-                  dayPart === part
-                    ? "border-[#214d2f] bg-[#214d2f] text-white"
-                    : "border-[#d8d1c3] bg-white text-[#182118] hover:border-[#214d2f]"
-                }`}
-                key={part}
-                onClick={() => setDayPart(part)}
-                type="button"
-              >
-                {part === "all" ? "Any" : DAY_PART_LABEL[part]}
-              </button>
-            ))}
-          </div>
-        </Fieldset>
+        <SunTimes date={date} />
       </div>
 
       <div className="mt-8">
@@ -233,15 +246,13 @@ export default function TeeTimeBookingPage() {
             <LoadFailure message={loadError} onRetry={refresh} />
           ) : visible.length === 0 ? (
             <EmptyDay
-              dayPart={dayPart}
-              onClearFilter={() => setDayPart("all")}
               onNextDay={() => {
                 const next = dates[Math.min(dates.indexOf(date) + 1, dates.length - 1)];
                 setDate(next);
               }}
             />
           ) : (
-            <SlotGrid onPick={setSelected} party={party} slots={visible} />
+            <TeeTimeGroups onPick={pick} party={party} slots={visible} />
           )}
         </div>
       </div>
@@ -303,41 +314,19 @@ function Fieldset({ children, label }: { children: ReactNode; label: string }) {
   );
 }
 
-// ===== 시간 격자 =======================================================
+// ===== 해 =============================================================
 
-function SlotGrid({
-  onPick,
-  party,
-  slots,
-}: {
-  onPick: (slot: OpenTeeTime) => void;
-  party: number;
-  slots: OpenTeeTime[];
-}) {
+/** 그날 첫 티·마지막 티. 목록은 서버(0048·`pelham_tee_window`)가 이미 이 사이로 자른다 — 여기는 안내만. */
+function SunTimes({ date }: { date: string }) {
+  const { first, last } = teeWindow(date);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-      {slots.map((slot) => {
-        const full = slot.remaining < party;
-        return (
-          <button
-            className={`tap-target flex min-w-0 flex-col items-center justify-center rounded-sm border px-1 py-2 transition ${
-              full
-                ? "cursor-not-allowed border-[#e2ddd0] bg-[#efece3] text-[#a8a698]"
-                : "border-[#d8d1c3] bg-white text-[#182118] hover:border-[#214d2f] hover:bg-[#f2f6f2]"
-            }`}
-            disabled={full}
-            key={slot.time}
-            onClick={() => onPick(slot)}
-            type="button"
-          >
-            <span className="text-sm font-bold leading-tight">{slot.time}</span>
-            <span className="text-[11px] leading-tight">
-              {slot.remaining === 0 ? "Full" : `${slot.remaining} left`}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <Fieldset label="Daylight">
+      <p className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 rounded-sm border border-[#d6c28f] bg-[#f3ead2] px-4 text-sm font-semibold text-[#5c4a1c]">
+        <span>☀ First tee {minutesToTime(first)}</span>
+        <span>Last tee {minutesToTime(last)}</span>
+      </p>
+    </Fieldset>
   );
 }
 
@@ -345,10 +334,10 @@ function SlotSkeleton() {
   // 스피너 하나로 화면 전체를 비우지 않는다. 자리를 미리 잡아 두면 로딩이 끝났을 때
   // 화면이 튀지 않고, 손님은 "여기에 시간이 나온다" 를 미리 안다.
   return (
-    <div aria-busy="true" className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-      {Array.from({ length: 18 }, (_, index) => (
+    <div aria-busy="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {Array.from({ length: 10 }, (_, index) => (
         <div
-          className="h-14 animate-pulse rounded-sm border border-[#e2ddd0] bg-[#efece3]"
+          className="h-28 animate-pulse rounded-md border border-[#e2ddd0] bg-[#efece3]"
           key={index}
         />
       ))}
@@ -379,33 +368,12 @@ function LoadFailure({ message, onRetry }: { message: string; onRetry: () => voi
   );
 }
 
-function EmptyDay({
-  dayPart,
-  onClearFilter,
-  onNextDay,
-}: {
-  dayPart: DayPartFilter;
-  onClearFilter: () => void;
-  onNextDay: () => void;
-}) {
+function EmptyDay({ onNextDay }: { onNextDay: () => void }) {
   return (
     <div className="rounded-sm border border-[#d6c28f] bg-[#f3ead2] p-5 text-[#5c4a1c]">
-      <p className="font-semibold">
-        {dayPart === "all"
-          ? "There are no tee times left on this day."
-          : `No ${DAY_PART_LABEL[dayPart].toLowerCase()} tee times are left on this day.`}
-      </p>
+      <p className="font-semibold">There are no tee times left on this day.</p>
       <p className="mt-1 text-sm">Try another date — the next two weeks are open above.</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        {dayPart === "all" ? null : (
-          <button
-            className="tap-target rounded-sm border border-[#8a6f30] bg-white px-5 text-sm font-bold text-[#5c4a1c] transition hover:bg-[#f7f4ed]"
-            onClick={onClearFilter}
-            type="button"
-          >
-            Show all times
-          </button>
-        )}
         <button
           className="tap-target rounded-sm bg-[#214d2f] px-5 text-sm font-bold text-white transition hover:bg-[#163820]"
           onClick={onNextDay}
@@ -494,6 +462,16 @@ function BookingForm({
     }
   };
 
+  const [step, setStep] = useState<"choose" | "details">("choose");
+  const greenTotal = fee * size;
+  const cartTotal = cartFee * size;
+  // 미리보기 HST. 진짜 세금은 결제할 때 서버 견적(PayOnline)이 매긴다.
+  const tax = Math.round((greenTotal + cartTotal) * 13) / 100;
+  const segment = (on: boolean) =>
+    `tap-target min-w-0 flex-1 border-l border-[#d8d1c3] text-base font-semibold transition first:border-l-0 disabled:cursor-not-allowed disabled:opacity-40 ${
+      on ? "bg-[#2f8a4f] text-white" : "bg-white text-[#182118] enabled:hover:bg-[#f2f6f2]"
+    }`;
+
   return (
     <div className="min-w-0">
       <button
@@ -504,178 +482,243 @@ function BookingForm({
         <span aria-hidden className="mr-1">
           ←
         </span>
-        Choose a different time
+        All tee times
       </button>
 
-      <div className="mt-3 rounded-sm border border-[#d8d1c3] bg-white p-5">
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div className="min-w-0">
-            <dt className="font-semibold text-[#8a6f30]">Date</dt>
-            <dd>{formatLongDate(date)}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="font-semibold text-[#8a6f30]">Tee time</dt>
-            <dd className="text-base font-bold">{slot.time}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="font-semibold text-[#8a6f30]">Green fee</dt>
-            <dd>${fee.toFixed(2)} per player</dd>
-          </div>
-          {cartFee > 0 ? (
-            <div className="min-w-0">
-              <dt className="font-semibold text-[#8a6f30]">Power cart ({holes} holes)</dt>
-              <dd>${cartFee.toFixed(2)} per player</dd>
-            </div>
-          ) : null}
-          <div className="min-w-0">
-            <dt className="font-semibold text-[#8a6f30]">Estimated total</dt>
-            <dd className="font-bold text-[#214d2f]">${total.toFixed(2)}</dd>
-          </div>
-        </dl>
-      </div>
-
-      {error ? (
-        <div className="mt-4 rounded-sm border border-[#e0b3b3] bg-[#fbeeee] p-4 text-sm text-[#8a2f2f]">
-          <p className="font-semibold">{error}</p>
-          <a className="mt-2 inline-block font-bold underline" href={CLUB.phoneHref}>
-            Call {CLUB.phone}
-          </a>
+      {/* 넓은 화면: 왼쪽 사진·정보(위)와 입력칸(아래), 오른쪽에 붙는 요약 패널.
+          좁은 화면: 사진 → 패널 → 입력칸 순서로 쌓인다(DOM 순서 그대로). */}
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          {/* next/image 를 쓰지 않는다: `output: "export"` (예약 허브와 같은 이유). */}
+          <img
+            alt="Fairway at Pelham Hills Golf Club"
+            className="h-52 w-full rounded-xl object-cover sm:h-72"
+            src="/pelham-hills/hero-course.png"
+          />
+          <h2 className="mt-4 font-serif text-2xl font-semibold">{CLUB.name}</h2>
+          <p className="mt-1 text-sm text-[#5c6459]">{CLUB.address}</p>
+          <p className="mt-3 text-sm text-[#3d453d]">
+            Please arrive 15 minutes before your tee time. Check in at the pro shop.
+          </p>
         </div>
-      ) : null}
 
-      <div className="mt-4 space-y-5 rounded-sm border border-[#d8d1c3] bg-white p-5">
-        <Field htmlFor="tt-name" label="Name">
-          <input
-            autoComplete="name"
-            className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
-            id="tt-name"
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Full name"
-            type="text"
-            value={name}
-          />
-        </Field>
+        <aside className="min-w-0 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+          <div className="rounded-xl border border-[#d8d1c3] bg-white p-5 shadow-sm">
+            <dl className="grid grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,0.6fr)] gap-3">
+              <div className="min-w-0">
+                <dt className="text-xs text-[#5c6459]">Date</dt>
+                <dd className="font-semibold">{shortDate(date)}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-[#5c6459]">Time</dt>
+                <dd className="font-semibold">{slot.time}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-[#5c6459]">Holes</dt>
+                <dd className="font-semibold">{holes}</dd>
+              </div>
+            </dl>
 
-        <Field htmlFor="tt-email" label="Email">
-          <input
-            autoComplete="email"
-            className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
-            id="tt-email"
-            inputMode="email"
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="your@email.com"
-            type="email"
-            value={email}
-          />
-        </Field>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-[#182118] px-3 py-0.5">{nineOpen ? "9 or 18 holes" : "18 holes"}</span>
+              <span className="rounded-full border border-[#182118] px-3 py-0.5">{cart ? "Power cart" : "Walking"}</span>
+              {slot.twilight ? (
+                <span className="rounded-full border border-[#8a6f30] px-3 py-0.5 font-semibold text-[#8a6f30]">Twilight</span>
+              ) : null}
+            </div>
 
-        <Field htmlFor="tt-phone" label="Phone (optional)">
-          <input
-            autoComplete="tel"
-            className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
-            id="tt-phone"
-            inputMode="tel"
-            onChange={(event) => setPhone(event.target.value)}
-            placeholder="(905) 123-4567"
-            type="tel"
-            value={phone}
-          />
-        </Field>
+            <p className="mt-5 text-sm font-semibold text-[#3d453d]">Holes</p>
+            <div className="mt-2 flex overflow-hidden rounded-md border border-[#d8d1c3]">
+              {([9, 18] as const).map((count) => (
+                <button
+                  aria-pressed={holes === count}
+                  className={segment(holes === count)}
+                  disabled={count === 9 && !nineOpen}
+                  key={count}
+                  onClick={() => setHoles(count)}
+                  type="button"
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+            {nineOpen ? null : <p className="mt-1 text-xs text-[#8a6f30]">{nineHoleRule(slot)}.</p>}
 
-        <Field htmlFor="tt-players" label="Players">
-          <select
-            className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
-            id="tt-players"
-            onChange={(event) => setParty(Number(event.target.value))}
-            value={size}
-          >
-            {Array.from({ length: maxParty }, (_, index) => index + 1).map((count) => (
-              <option key={count} value={count}>
-                {count} player{count === 1 ? "" : "s"}
-              </option>
-            ))}
-          </select>
-          {maxParty < 4 ? (
-            <p className="mt-1 text-xs text-[#8a6f30]">
-              Only {maxParty} spot{maxParty === 1 ? "" : "s"} left at {slot.time}.
+            <p className="mt-5 text-sm">
+              <span className="text-lg font-bold">${fee.toFixed(2)}</span>
+              <span className="text-xs font-semibold text-[#5c6459]"> CAD / golfer</span>
             </p>
-          ) : null}
-        </Field>
+            <p className="mt-2 text-sm font-semibold text-[#3d453d]">Number of Golfers</p>
+            <div className="mt-2 flex overflow-hidden rounded-md border border-[#d8d1c3]">
+              {PARTY_SIZES.map((count) => (
+                <button
+                  aria-pressed={size === count}
+                  className={segment(size === count)}
+                  disabled={count > maxParty}
+                  key={count}
+                  onClick={() => setParty(count)}
+                  type="button"
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+            {maxParty < 4 ? (
+              <p className="mt-1 text-xs text-[#8a6f30]">
+                Only {maxParty} spot{maxParty === 1 ? "" : "s"} left at {slot.time}.
+              </p>
+            ) : null}
 
-        <div>
-          <p className="mb-2 text-sm font-semibold text-[#3d453d]">Holes</p>
-          <div className="flex gap-2">
-            {([9, 18] as const).map((count) => (
+            <label className="mt-4 flex items-start gap-3 text-sm" htmlFor="tt-cart">
+              <input
+                checked={cart}
+                className="mt-0.5 h-5 w-5"
+                id="tt-cart"
+                onChange={(event) => setCart(event.target.checked)}
+                type="checkbox"
+              />
+              {/* 서버의 동기화 패스는 cartCount > 인원이면 경고를 남긴다. 카트 한 대에
+                  두 명이 타므로 인원의 절반(올림)만 잡는다. */}
+              <span className="min-w-0">
+                <span className="font-semibold">Power cart</span>
+                <span className="block text-xs text-[#5c6459]">
+                  {carts > 0
+                    ? `${carts} cart${carts === 1 ? "" : "s"} held for your group — $${(holes === 9 ? 11.5 : 19.47).toFixed(2)} per player.`
+                    : "Walking. Tell us if that changes."}
+                </span>
+              </span>
+            </label>
+
+            <dl className="mt-5 space-y-2 border-t border-[#e2ddd0] pt-4 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-[#3d453d]">
+                  Green Fees ({size} Golfer{size === 1 ? "" : "s"} × ${fee.toFixed(2)})
+                </dt>
+                <dd className="tabular-nums">${greenTotal.toFixed(2)}</dd>
+              </div>
+              {cartTotal > 0 ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#3d453d]">
+                    Power cart ({size} × ${cartFee.toFixed(2)})
+                  </dt>
+                  <dd className="tabular-nums">${cartTotal.toFixed(2)}</dd>
+                </div>
+              ) : null}
+              <div className="flex justify-between gap-3">
+                <dt className="text-[#3d453d]">Estimated HST 13%</dt>
+                <dd className="tabular-nums">${tax.toFixed(2)}</dd>
+              </div>
+              <div className="flex justify-between gap-3 border-t border-[#e2ddd0] pt-3 text-base font-bold">
+                <dt>Total</dt>
+                <dd className="tabular-nums">${(total + tax).toFixed(2)} CAD</dd>
+              </div>
+            </dl>
+
+            {error ? (
+              <div className="mt-4 rounded-sm border border-[#e0b3b3] bg-[#fbeeee] p-4 text-sm text-[#8a2f2f]">
+                <p className="font-semibold">{error}</p>
+                <a className="mt-2 inline-block font-bold underline" href={CLUB.phoneHref}>
+                  Call {CLUB.phone}
+                </a>
+              </div>
+            ) : null}
+
+            {step === "choose" ? (
               <button
-                aria-pressed={holes === count}
-                className={`tap-target min-w-0 flex-1 rounded-sm border text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
-                  holes === count
-                    ? "border-[#214d2f] bg-[#214d2f] text-white"
-                    : "border-[#d8d1c3] bg-white text-[#182118] enabled:hover:border-[#214d2f]"
-                }`}
-                disabled={count === 9 && !nineOpen}
-                key={count}
-                onClick={() => setHoles(count)}
+                className="tap-target mt-5 w-full rounded-full bg-[#2f8a4f] py-3 text-base font-bold text-white transition hover:bg-[#256f3f]"
+                onClick={() => {
+                  setStep("details");
+                  // 좁은 화면에서는 입력칸이 패널 아래에 있다 — 그쪽으로 내려 준다.
+                  window.setTimeout(() => document.getElementById("tt-name")?.focus(), 50);
+                }}
                 type="button"
               >
-                {count} holes
+                Continue to Book
               </button>
-            ))}
+            ) : (
+              <button
+                className={`tap-target mt-5 w-full rounded-full py-3 text-base font-bold text-white transition ${
+                  ready ? "bg-[#2f8a4f] hover:bg-[#256f3f]" : "cursor-not-allowed bg-[#a9b0a6]"
+                }`}
+                disabled={!ready}
+                onClick={submit}
+                type="button"
+              >
+                {submitting ? "Booking…" : `Book ${slot.time}`}
+              </button>
+            )}
+            <p className="mt-3 text-center text-xs text-[#5c6459]">
+              No booking fee. Pay online right after booking, or at the pro shop.
+            </p>
           </div>
-          {nineOpen ? null : (
-            <p className="mt-1 text-xs text-[#8a6f30]">{nineHoleRule(slot)}.</p>
-          )}
-        </div>
+        </aside>
 
-        <label className="flex items-start gap-3 text-base" htmlFor="tt-cart">
-          <input
-            checked={cart}
-            className="mt-1 h-5 w-5"
-            id="tt-cart"
-            onChange={(event) => setCart(event.target.checked)}
-            type="checkbox"
-          />
-          <span className="min-w-0">
-            <span className="font-semibold">Power cart</span>
-            {/* 서버의 동기화 패스는 cartCount > 인원이면 경고를 남긴다. 카트 한 대에
-                두 명이 타므로 인원의 절반(올림)만 잡는다. */}
-            <span className="block text-sm text-[#5c6459]">
-              {carts > 0
-                ? `We will hold ${carts} cart${carts === 1 ? "" : "s"} for your group — $${(holes === 9 ? 11.5 : 19.47).toFixed(2)} per player for ${holes} holes, plus HST.`
-                : "Walking. Tell us if that changes."}
-            </span>
-          </span>
-        </label>
+        {step === "details" ? (
+          <div className="min-w-0 space-y-5 rounded-xl border border-[#d8d1c3] bg-white p-5 lg:col-start-1 lg:row-start-2 lg:self-start">
+            <h3 className="font-serif text-xl font-semibold">Your details</h3>
+            <Field htmlFor="tt-name" label="Name">
+              <input
+                autoComplete="name"
+                className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+                id="tt-name"
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Full name"
+                type="text"
+                value={name}
+              />
+            </Field>
 
-        <Field htmlFor="tt-notes" label="Notes (optional)">
-          <textarea
-            className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
-            id="tt-notes"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Anything the pro shop should know"
-            rows={3}
-            value={notes}
-          />
-        </Field>
+            <Field htmlFor="tt-email" label="Email">
+              <input
+                autoComplete="email"
+                className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+                id="tt-email"
+                inputMode="email"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="your@email.com"
+                type="email"
+                value={email}
+              />
+            </Field>
+
+            <Field htmlFor="tt-phone" label="Phone (optional)">
+              <input
+                autoComplete="tel"
+                className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+                id="tt-phone"
+                inputMode="tel"
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="(905) 123-4567"
+                type="tel"
+                value={phone}
+              />
+            </Field>
+
+            <Field htmlFor="tt-notes" label="Notes (optional)">
+              <textarea
+                className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+                id="tt-notes"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Anything the pro shop should know"
+                rows={3}
+                value={notes}
+              />
+            </Field>
+          </div>
+        ) : null}
       </div>
-
-      <button
-        className={`tap-target mt-5 w-full rounded-sm py-3 text-base font-bold text-white transition ${
-          ready ? "bg-[#214d2f] hover:bg-[#163820]" : "cursor-not-allowed bg-[#a9b0a6]"
-        }`}
-        disabled={!ready}
-        onClick={submit}
-        type="button"
-      >
-        {submitting ? "Booking…" : `Book ${slot.time}`}
-      </button>
-
-      <p className="mt-3 text-xs text-[#5c6459]">
-        Pay green fees online right after booking, or at the pro shop. Please arrive 15 minutes before
-        your tee time.
-      </p>
     </div>
   );
+}
+
+/** "Thu., Oct 22, 2026" — 패널은 좁아서 요일·월을 줄인다. */
+function shortDate(iso: string): string {
+  return fromIsoDate(iso).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function Field({
