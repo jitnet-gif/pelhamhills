@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
+  billTakesTip,
   newCheckoutId,
   TERMINAL_METHODS,
   type Bill,
@@ -386,6 +387,7 @@ export default function BillPanel({
                 initialMethod={initialMethod}
                 payments={payments}
                 remaining={remaining}
+                takesTip={billTakesTip(bill)}
                 onTerminalApproved={() => (autoChargeRef.current = true)}
                 setPayments={setPayments}
                 terminalSettings={terminalSettings}
@@ -446,6 +448,7 @@ export default function BillPanel({
               initialMethod={initialMethod}
               payments={payments}
               remaining={remaining}
+              takesTip={billTakesTip(bill)}
               onTerminalApproved={() => (autoChargeRef.current = true)}
               setPayments={setPayments}
               terminalSettings={terminalSettings}
@@ -1020,6 +1023,7 @@ function PaymentsEditor({
   remaining,
   onTerminalApproved,
   setPayments,
+  takesTip,
   terminalSettings,
 }: {
   billId: number;
@@ -1029,6 +1033,8 @@ function PaymentsEditor({
   onTerminalApproved?: () => void;
   remaining: number;
   setPayments: (update: (current: PendingPayment[]) => PendingPayment[]) => void;
+  /** F&B 가 담긴 계산서만 팁을 받는다(`billTakesTip`). */
+  takesTip: boolean;
   terminalSettings: TerminalSettings;
 }) {
   const [method, setMethod] = useState<PaymentMethod>(initialMethod);
@@ -1116,7 +1122,7 @@ function PaymentsEditor({
   const [removing, setRemoving] = useState<number | null>(null);
   // 팁은 계산서 합계 밖이다(매출이 아니라 직원 몫 — 마감에서 근무시간으로 나눈다).
   // 카드·체크카드는 단말기 전표의 팁을, 현금은 손님이 "잔돈은 두세요" 한 만큼을 적는다.
-  const tip = tipInput.trim() ? parseMoney(tipInput) : 0;
+  const tip = takesTip && tipInput.trim() ? parseMoney(tipInput) : 0;
   const isCash = method === "cash";
   const typed = amountInput.trim() ? parseMoney(amountInput) : remaining + (isCash ? tip : 0);
   // 현금: 받은 돈에서 팁을 먼저 떼고 계산서에 넣는다. 남으면 거스름돈.
@@ -1438,7 +1444,8 @@ function PaymentsEditor({
               <p className="text-[#5b4708]">
                 {testMode ? "Stripe test mode — no card is charged. " : ""}
                 <b>{formatMoney(typed)}</b> goes to {terminalSettings.readerLabel || "the card reader"}. The customer
-                taps, inserts or swipes there; tip and approval come back here.
+                taps, inserts or swipes there; {takesTip ? "tip (on food & drink only) and " : ""}approval come
+                back here.
               </p>
               <Field hint="Leave blank to use the phone on the booking" label="Text the approval to (optional)">
                 <TextInput
@@ -1488,7 +1495,7 @@ function PaymentsEditor({
               </div>
             </>
           ) : null}
-          {isRainCheck || integrated ? null : (
+          {isRainCheck || integrated || !takesTip ? null : (
             <Field
               hint={needsTerminal ? "From the terminal slip" : isCash ? "Only if they leave it as a tip" : undefined}
               label="Tip (optional)"

@@ -167,7 +167,7 @@ def test_sale_stores_the_typed_phone_and_rejects_a_bad_one(monkeypatch):
     monkeypatch.setattr(terminal.sg, "configured", lambda: True)
     monkeypatch.setattr(terminal, "_as_staff", lambda request, function, args: {"id": 41, "reference": "R1"})
     monkeypatch.setattr(terminal.sg, "create_terminal_intent", lambda **kw: {"id": "pi_41"})
-    monkeypatch.setattr(terminal.sg, "process_on_reader", lambda reader, pi: None)
+    monkeypatch.setattr(terminal.sg, "process_on_reader", lambda reader, pi, tip=None: None)
     monkeypatch.setattr(terminal, "_service", lambda function, args: {"id": 41, "pending": True})
     stored: list[dict[str, Any]] = []
     monkeypatch.setattr(supabase_rest, "rpc", lambda function, args: stored.append({function: args}))

@@ -65,6 +65,14 @@ export type TeeBill = Bill & {
   } | null;
 };
 
+/**
+ * 팁은 음식·음료(F&B)에만 받는다. 그린피·카트·프로 샵 물건만 있는 계산서는 팁 칸을 띄우지 않는다.
+ * 단말기 쪽 같은 규칙: `backend/api/routes/terminal.py` 의 `tip_eligible`.
+ */
+export function billTakesTip(bill: Pick<Bill, "lines">): boolean {
+  return bill.lines.some((line) => line.category === "Food & Beverage" && line.line_total > 0);
+}
+
 /** 단말기 승인번호가 필요한 결제 수단. */
 export const TERMINAL_METHODS: readonly PaymentMethod[] = ["card", "debit"];
 

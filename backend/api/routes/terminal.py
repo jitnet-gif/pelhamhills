@@ -234,6 +234,35 @@ def _safe_refresh(row: dict[str, Any]) -> dict[str, Any]:
         return row
 
 
+# ===== 팁 (F&B 만) =====================================================
+
+FOOD_AND_BEVERAGE = "Food & Beverage"
+
+
+def tip_eligible(bill: dict[str, Any] | None, amount: int) -> int | None:
+    """이번 결제에서 팁을 받을 수 있는 금액(센트). 팁은 음식·음료에만 받는다 — 그린피·카트·프로 샵 물건은
+    팁 대상이 아니다. F&B 줄 몫만큼 계산서 합계(할인·세금 포함)를 나눠 잡고, 이번 결제 금액을 넘지 않는다.
+    F&B 가 없으면 0(리더가 팁 화면을 건너뛴다). 계산서를 못 읽었으면 None(리더 설정 그대로)."""
+    if not isinstance(bill, dict):
+        return None
+    lines = [line for line in bill.get("lines") or [] if isinstance(line, dict)]
+    subtotal = sum(int(line.get("line_total") or 0) for line in lines)
+    fnb = sum(int(line.get("line_total") or 0) for line in lines if line.get("category") == FOOD_AND_BEVERAGE)
+    if fnb <= 0 or subtotal <= 0:
+        return 0
+    share = round(int(bill.get("total") or 0) * fnb / subtotal)
+    return max(0, min(share, int(amount)))
+
+
+def _bill_for_tip(request: Request, bill_id: int) -> dict[str, Any] | None:
+    try:
+        bill = _as_staff(request, "pelham_staff_bill", {"p_id": bill_id})
+    except HTTPException as exc:
+        logger.warning("팁 기준용 계산서를 읽지 못함: bill=%s (%s)", bill_id, exc.status_code)
+        return None
+    return bill if isinstance(bill, dict) else None
+
+
 # ===== 계산대 ==========================================================
 
 class SaleBody(BaseModel):
@@ -325,7 +354,7 @@ def sale(body: SaleBody, request: Request) -> dict[str, Any]:
                                        description=f"Pelham Hills POS bill {body.bill_id}")
         pi_id = str(pi.get("id") or "")
         row = _service("pelham_terminal_settle", {"p": {"id": row["id"], "payment_intent": pi_id}})
-        sg.process_on_reader(body.reader_id, pi_id)
+        sg.process_on_reader(body.reader_id, pi_id, tip_eligible(_bill_for_tip(request, body.bill_id), body.amount))
     except sg.StripeError as exc:
         if pi_id:
             _try_cancel_intent(pi_id)

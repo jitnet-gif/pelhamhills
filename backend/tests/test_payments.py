@@ -201,6 +201,9 @@ class FakeSql:
         self.txns: dict[int, dict[str, Any]] = {}
         self.refuse: dict[str, Exception] = {}
         self.reverse_next = False
+        # 단말기 결제의 계산서(팁 기준). 기본은 그린피만 — 팁 화면이 뜨지 않는다.
+        self.bill = {"id": 7, "subtotal": 1000, "discount": 0, "tax": 130, "total": 1130,
+                     "lines": [{"category": "Green Fees", "line_total": 1000}]}
 
     # supabase_rest.rpc
     def __call__(self, function: str, args: dict[str, Any]) -> Any:
@@ -283,6 +286,9 @@ class FakeSql:
     # ----- 단말기 -----
     def _json(self, t):
         return {**t, "pending": t["result"] == "pending"}
+
+    def pelham_staff_bill(self, args):
+        return dict(self.bill)
 
     def pelham_staff_terminal_begin(self, args):
         p = args["p"]
@@ -704,6 +710,32 @@ def test_terminal_sale_sends_amount_to_reader_and_records_approval(env):
     assert done["auth_code"] == "123456" and done["card_last4"] == "4242" and done["card_type"] == "credit"
     # 기록은 service_role 로만 쓴다.
     assert all(token is None for f, _, token in sql.calls if f == "pelham_terminal_settle")
+
+
+def test_terminal_skips_tip_screen_without_food_and_beverage(env):
+    client, gw, sql = env
+    _sale(client)
+    sent = gw.posts(f"/terminal/readers/{READER}/process_payment_intent")[0]
+    assert sent["process_config[skip_tipping]"] == "true"
+    assert "process_config[tipping][amount_eligible]" not in sent
+
+
+def test_terminal_tip_is_suggested_on_food_and_beverage_only(env):
+    client, gw, sql = env
+    # 그린피 $50 + 카트 $20 + 음식 $30 = $100, 세금 포함 $113. 팁 기준은 음식 몫 $33.90.
+    sql.bill = {"id": 7, "subtotal": 10000, "discount": 0, "tax": 1300, "total": 11300, "lines": [
+        {"category": "Green Fees", "line_total": 5000},
+        {"category": "Rentals", "line_total": 2000},
+        {"category": "Food & Beverage", "line_total": 3000},
+    ]}
+    _sale(client, amount=11300)
+    sent = gw.posts(f"/terminal/readers/{READER}/process_payment_intent")[0]
+    assert sent["process_config[tipping][amount_eligible]"] == "3390"
+    assert "process_config[skip_tipping]" not in sent
+    # 나눠 낼 때 이번 금액을 넘지 않는다.
+    _sale(client, amount=2000)
+    sent = gw.posts(f"/terminal/readers/{READER}/process_payment_intent")[1]
+    assert sent["process_config[tipping][amount_eligible]"] == "2000"
 
 
 def test_terminal_simulated_interac_tap_is_debit(env):

@@ -336,10 +336,19 @@ def create_terminal_intent(*, amount_cents: int, txn_id: int, reference: str, bi
     }, idempotency_key=f"terminal-sale-{txn_id}")
 
 
-def process_on_reader(reader_id: str, pi_id: str) -> dict[str, Any]:
+def process_on_reader(reader_id: str, pi_id: str, tip_eligible_cents: int | None = None) -> dict[str, Any]:
+    """리더에 결제를 띄운다. 팁은 음식·음료(F&B)에만 받는다: `tip_eligible_cents` 가 0 이면 팁 화면을
+    건너뛰고, 양수면 그 금액을 기준으로 팁 % 를 제안한다(그린피·카트 등은 팁 기준에서 빠진다).
+    None 이면 리더 설정 그대로."""
+    config: dict[str, Any] = {"enable_customer_cancellation": True}
+    if tip_eligible_cents is not None:
+        if tip_eligible_cents <= 0:
+            config["skip_tipping"] = True
+        else:
+            config["tipping"] = {"amount_eligible": int(tip_eligible_cents)}
     return _request("POST", f"/terminal/readers/{reader_id}/process_payment_intent", {
         "payment_intent": pi_id,
-        "process_config": {"enable_customer_cancellation": True},
+        "process_config": config,
     })
 
 
