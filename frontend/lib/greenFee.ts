@@ -1,25 +1,23 @@
 /**
- * 홀 수별 1인 그린피(세전)와 9홀 시각 규칙. 2026-10-18 클럽 요금표:
- *   - 9홀 평일 $28.31, 오전 10시부터 마감까지
- *   - 9홀 주말·공휴일은 손님이 잡을 수 없다(2026-10-18 클럽 결정). 시작 시각을 24:00 으로 두어
- *     어느 티타임도 닿지 않게 한다. $38.94 는 직원 시트가 9홀로 잡을 때의 자동값으로만 남는다.
- * DB 의 `pelham_tee_rate_for`·`pelham_tee_nine_from`(0034·0037), 백엔드 `tee_sheet.py` 의 NINE_HOLE_* 와
- * 같은 값이어야 한다 — 화면이 미리 보여 주는 금액·버튼과 서버가 실제로 받는 것이 달라지지 않게.
- * 요금을 바꾸면 세 곳을 같이 고쳐라.
+ * 그린피 미리보기. 진짜 값은 DB 가 매긴다(0045 `pelham_tee_rate_at`·`pelham_tee_plan_fee`) —
+ * 슬롯이 그 시각의 18홀 요금(`rate`)과 그날 요금표의 9홀 요금·시작 시각(`rate9`·`nineFrom`)을 들고 온다.
+ * 이 파일은 그 값을 읽기만 한다. `rate9` 가 없는 옛 서버만 아래 기본값(가을 숄더)으로 버틴다.
  */
-import type { DayType } from "@/lib/teeSheet/types";
+import type { DayType, Player, TeeBooking } from "@/lib/teeSheet/types";
 
-const NINE_HOLES = {
-  weekday: { rate: 28.31, fromMinutes: 10 * 60, rule: "9 holes from 10:00 AM on weekdays" },
-  weekend: { rate: 38.94, fromMinutes: 24 * 60, rule: "18 holes only on weekends & holidays" },
+const NINE_FALLBACK = {
+  weekday: { rate: 28.31, fromMinutes: 10 * 60 },
+  weekend: { rate: 38.94, fromMinutes: 16 * 60 },
 } as const;
 
-/** 18홀 요금과 dayType 만 아는 슬롯. dayType 이 없으면(0034 이전 서버) 평일 18홀 요금인지로 가른다. */
-type SlotLike = { rate: number; minutes: number; dayType?: DayType };
+type SlotLike = { rate: number; minutes: number; dayType?: DayType; rate9?: number; nineFrom?: number };
 
-function nineTerms(slot: SlotLike) {
-  const kind = slot.dayType ?? (Math.round(slot.rate * 100) === 4071 ? "weekday" : "weekend");
-  return kind === "weekday" ? NINE_HOLES.weekday : NINE_HOLES.weekend;
+function nineTerms(slot: SlotLike): { rate: number; fromMinutes: number } {
+  if (typeof slot.rate9 === "number" && typeof slot.nineFrom === "number") {
+    return { rate: slot.rate9, fromMinutes: slot.nineFrom };
+  }
+  const kind = slot.dayType ?? ([4071, 3540].includes(Math.round(slot.rate * 100)) ? "weekday" : "weekend");
+  return kind === "weekday" ? NINE_FALLBACK.weekday : NINE_FALLBACK.weekend;
 }
 
 export function greenFeeFor(slot: SlotLike, holes: 9 | 18): number {
@@ -31,7 +29,19 @@ export function nineHolesOpen(slot: SlotLike): boolean {
   return slot.minutes >= nineTerms(slot).fromMinutes;
 }
 
-/** "9 holes from 10:00 AM on weekdays" / "18 holes only on weekends & holidays" — 9홀 버튼이 꺼졌을 때 옆에 단다. */
+function clock(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** "9 holes from 4:00 PM on this day" — 9홀 버튼이 꺼졌을 때 옆에 단다. */
 export function nineHoleRule(slot: SlotLike): string {
-  return nineTerms(slot).rule;
+  const from = nineTerms(slot).fromMinutes;
+  return from >= 24 * 60 ? "18 holes only on this day" : `9 holes from ${clock(from)} on this day`;
+}
+
+/** 이 사람이 내는 그린피(세전): 요금제로 매긴 값(회원 0 등), 없으면 예약의 퍼블릭가. */
+export function greenFeeOf(booking: Pick<TeeBooking, "rate">, player: Pick<Player, "greenFee">): number {
+  return typeof player.greenFee === "number" ? player.greenFee : booking.rate;
 }

@@ -2,15 +2,12 @@
  * 그린피 안내. 홈의 "See Rates" 가 옛 WordPress 주소(`/golf/rates/`)를 가리켰는데, 도메인이
  * 이 사이트로 넘어온 뒤로 그 주소는 404 였다(2026-10-18). 같은 주소에 이 장을 둔다.
  *
- * 요금은 **DB 가 실제로 매기는 값**을 옮겨 적은 것이다 — 손으로 정한 숫자가 아니다:
- *   - 그린피: `pelham_tee_rate(date)` (0040) — 평일 40.71, 주말·공휴일 51.33 (세전)
- *   - 9홀: `pelham_tee_rate_for(date, 9)` (0034) — 평일 28.31(오전 10시부터, 세전). 주말·공휴일은 9홀 없음(0037)
+ * 요금은 **DB 가 실제로 매기는 값**의 사본 `lib/rateCard.ts` 에서 읽는다(0045 요금표, 2026-10-19):
+ *   - 그린피: 요금표(날짜) × 가격대(티오프 시각). 9홀은 요금표마다 한 가격·판매 시작 시각
  *   - 세금: `pelham_pos_tax` (0005) — HST 13%. 온라인 결제도 세전 요금에 이것을 더한다.
  *   - 추가 품목: `pelham_tee_extras` (0026, 값은 0040)
- *   - 파워 카트: `pelham_tee_cart_fee` (0039) — 1인 18홀 19.47(Senior 17.70), 9홀 11.50 (세전)
- * 정적 export 라서 여기서 함수를 부를 수 없고(anon 에게 실행 권한도 없다), 그래서 문자열로 둔다.
- * DB 에서 요금을 바꾸면 이 파일도 같이 고쳐라. 공휴일별 요금(`pelham_tee_holidays.rate`)은
- * 날마다 달라질 수 있어 여기에는 기본값만 적는다.
+ *   - 파워 카트: `pelham_tee_cart_fee_on` (0045) — 1인 18홀 19.47(Senior 평일 17.70), 9홀 11.50 (세전)
+ * 공휴일별 요금(`pelham_tee_holidays.rate`)은 날마다 달라질 수 있어 여기에는 기본값만 적는다.
  *
  * 서버 컴포넌트다. 홈(`app/page.tsx`)과 같은 이유로 `"use client"` 를 붙이지 마라.
  */
@@ -21,34 +18,29 @@ import Link from "next/link";
 import SiteFooter from "@/components/site/SiteFooter";
 import SiteHeader from "@/components/site/SiteHeader";
 import { BOOK_TEE_TIME, CLUB, SITE_MEMBERSHIPS } from "@/lib/nav";
+import { RATE_CARDS, type RateCard, withHst } from "@/lib/rateCard";
 
 export const metadata: Metadata = {
   title: `Golf Rates | ${CLUB.name}`,
   description:
-    "Public green fees at Pelham Hills Golf Club — 18 and 9 holes, weekday and weekend/holiday rates, power carts, pull carts and driving range baskets.",
+    "Public green fees at Pelham Hills Golf Club — 18 and 9 holes by season, day and tee time, senior and junior rates, power carts, pull carts and driving range baskets.",
 };
 
-const greenFees = [
+// 손님에게 보이는 요금표: 지금(가을) 시즌을 먼저, 정규 시즌을 다음에. 특별·공휴일 요금표는 문구로만 안내한다.
+const seasons: { title: string; when: string; cards: RateCard[] }[] = [
   {
-    name: "Weekday",
-    when: "Monday – Friday",
-    base: "$40.71",
-    total: "$46.00",
-    nineBase: "$28.31",
-    nineTotal: "$31.99",
-    nineFrom: "10:00 AM",
+    title: "Shoulder season",
+    when: "October 1 – December 15 and April 26 – May 7",
+    cards: ["weekday_shoulder", "weekend_shoulder"].map((code) => RATE_CARDS.find((card) => card.code === code)!),
   },
   {
-    name: "Weekend & Holiday",
-    when: "Saturday, Sunday & statutory holidays",
-    base: "$51.33",
-    total: "$58.00",
-    // 주말·공휴일은 9홀을 받지 않는다(2026-10-18 클럽 결정).
-    nineBase: null,
-    nineTotal: null,
-    nineFrom: null,
+    title: "Main season",
+    when: "May 8 – September 30",
+    cards: ["weekday", "friday", "weekend"].map((code) => RATE_CARDS.find((card) => card.code === code)!),
   },
 ];
+
+const dollars = (value: number) => `$${value.toFixed(2)}`;
 
 const extras = [
   // 1인 하프 카트 — `pelham_tee_cart_fee` (0039).
@@ -88,33 +80,47 @@ export default function GolfRatesPage() {
         <section className="mx-auto max-w-7xl px-5 py-12 sm:py-16 lg:px-8">
           <p className="text-sm font-bold tracking-[0.2em] text-[#8a6f30] uppercase">Green Fees</p>
           <h2 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">Per player</h2>
-          <div className="mt-8 grid gap-5 md:grid-cols-2">
-            {greenFees.map((fee) => (
-              <article className="rounded-sm border border-[#d8d1c3] bg-white p-6" key={fee.name}>
-                <h3 className="font-serif text-2xl font-semibold">{fee.name}</h3>
-                <p className="mt-1 text-[#516050]">{fee.when}</p>
-                <p className="mt-6 font-serif text-5xl font-semibold tabular-nums">{fee.total}</p>
-                <p className="mt-2 text-sm text-[#516050]">
-                  18 holes · includes HST · {fee.base} + 13% HST
-                </p>
-                {fee.nineTotal ? (
-                  <>
-                    <p className="mt-5 border-t border-[#d8d1c3] pt-4 text-[#182118]">
-                      <span className="font-serif text-2xl font-semibold tabular-nums">{fee.nineTotal}</span>{" "}
-                      <span className="text-sm text-[#516050]">
-                        9 holes · includes HST · {fee.nineBase} + 13% HST
-                      </span>
-                    </p>
-                    <p className="mt-1 text-sm text-[#516050]">9 holes from {fee.nineFrom} to close</p>
-                  </>
-                ) : (
-                  <p className="mt-5 border-t border-[#d8d1c3] pt-4 text-sm font-semibold text-[#182118]">
-                    18 holes only — no 9-hole bookings on weekends &amp; holidays
-                  </p>
-                )}
-              </article>
-            ))}
-          </div>
+          {seasons.map((season) => (
+            <div className="mt-8" key={season.title}>
+              <h3 className="font-serif text-2xl font-semibold">{season.title}</h3>
+              <p className="mt-1 text-[#516050]">{season.when}</p>
+              <div className={`mt-5 grid gap-5 ${season.cards.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+                {season.cards.map((card) => (
+                  <article className="rounded-sm border border-[#d8d1c3] bg-white p-6" key={card.code}>
+                    <h4 className="font-serif text-xl font-semibold">{card.name.replace(" 2026", "")}</h4>
+                    <p className="mt-1 text-sm text-[#516050]">{card.applies.split(" · ")[0]}</p>
+                    {card.bands.map((band, index) => (
+                      <p
+                        className={`text-[#182118] ${index === 0 ? "mt-5" : "mt-3 border-t border-[#d8d1c3] pt-3"}`}
+                        key={band.from}
+                      >
+                        <span className={`font-serif font-semibold tabular-nums ${index === 0 ? "text-4xl" : "text-2xl"}`}>
+                          {dollars(withHst(band.rate))}
+                        </span>{" "}
+                        <span className="text-sm text-[#516050]">
+                          18 holes · {band.from === "Open" ? "from open" : `from ${band.from}`} · {dollars(band.rate)} + HST
+                        </span>
+                      </p>
+                    ))}
+                    {card.nine ? (
+                      <p className="mt-3 border-t border-[#d8d1c3] pt-3 text-[#182118]">
+                        <span className="font-serif text-2xl font-semibold tabular-nums">{dollars(withHst(card.nine.rate))}</span>{" "}
+                        <span className="text-sm text-[#516050]">
+                          9 holes · from {card.nine.from} · {dollars(card.nine.rate)} + HST
+                        </span>
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p className="mt-6 max-w-3xl leading-7 text-[#516050]">
+            Seniors: {dollars(withHst(40.71))} for 18 holes and {dollars(withHst(30.97))} for 9 holes (not on shoulder-season
+            weekends). Juniors: {dollars(withHst(35.4))} before 2:00 PM, {dollars(withHst(32.75))} after;{" "}
+            {dollars(withHst(25.67))} for 9 holes. Victoria Day, Canada Day and other holidays follow their own holiday rate
+            card.
+          </p>
           <p className="mt-6 max-w-3xl leading-7 text-[#516050]">
             Tee times run every 9 minutes from 6:40 AM. Holiday rates may vary on select dates —
             the price shown when you book is the price you pay. Rates are subject to change

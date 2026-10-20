@@ -22,6 +22,9 @@ export type OpenTeeTime = {
   rate: number;
   /** 요금 구분 (0034). 9홀 요금·시각을 고른다. 옛 서버에는 없다. */
   dayType?: DayType;
+  /** 그날 요금표의 9홀 요금·판매 시작(분) (0045). 옛 서버에는 없다. */
+  rate9?: number;
+  nineFrom?: number;
   /** 이 티타임에 아직 팔 수 있는 자리 수 (0이면 만석). */
   remaining: number;
 };
@@ -149,6 +152,8 @@ export function buildOpenTeeTimes(
       minutes: slot.minutes,
       rate: slot.rate,
       dayType: slot.dayType,
+      rate9: slot.rate9,
+      nineFrom: slot.nineFrom,
       remaining: Math.max(PLAYERS_PER_TEE_TIME - (taken.get(slot.time) ?? 0), 0),
     });
   }

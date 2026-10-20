@@ -39,6 +39,8 @@ export type Player = {
   cart: boolean;
   /** 1인 카트 요금(달러, 세전 — `rate` 와 같은 단위). 켤 때 서버가 요금제·홀 수로 채운다. */
   cartFee: number;
+  /** 요금제로 매긴 1인 그린피(세전, 0045). 회원 0, 시니어 40.71 … 없으면 예약 `rate`(퍼블릭가)를 낸다. */
+  greenFee?: number;
   /** 결제로 표시된 시각(ISO). 서버만 찍는다. 이 필드가 생기기 전의 결제에는 없다. */
   paidAt: string | null;
   /** 이 사람 몫에 붙은 추가 품목(풀카트·레인지 바스켓, 0026). 붙일 때의 값이 복사돼 있다. 없으면 키가 없다. */
@@ -94,6 +96,10 @@ export type TeeSlot = {
   dayType?: DayType;
   /** 공휴일 이름, 예: "Thanksgiving". 공휴일이 아니면 null. */
   holiday?: string | null;
+  /** 그날 요금표의 9홀 1인 요금과 판매 시작(분), 요금표 이름 (0045). 옛 서버에는 없다. */
+  rate9?: number;
+  nineFrom?: number;
+  rateCard?: string;
 };
 
 export type DayType = "weekday" | "weekend" | "holiday";

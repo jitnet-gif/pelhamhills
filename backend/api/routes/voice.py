@@ -898,7 +898,7 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
             )
         hold.title = f"{last}, {first}".strip(", ")
         hold.holes = body.holes
-        hold.rate = ts.green_fee_for(hold.date, body.holes)
+        hold.rate = ts.green_fee_for(hold.date, body.holes, ts.label_to_minutes(hold.time))
 
         # 카트. 예전에는 전화 예약에 카트가 전혀 적히지 않아, 계산서에 카트 요금이 빠졌다.
         # 계산서는 사람마다 `cart`/`cartFee` 를 읽고, `cartCount` 는 실제 카트 대수다.
@@ -1240,16 +1240,16 @@ def identify_caller(body: IdentifyCallerRequest) -> IdentifyCallerResponse:
 def get_rates(body: RatesRequest) -> RatesResponse:
     """그 날짜에 **실제로 청구되는** 금액. 에이전트가 외운 숫자를 말하지 않게 한다.
 
-    숫자는 전부 `tee_sheet` 의 요금 함수에서 온다 — `slot_rate_for`(주말/평일과
-    `RATE_OVERRIDES`)와 `cart_fee_for`. 세율은 리테일의 `TAX_RATE` 한 벌을 쓴다.
+    숫자는 전부 `tee_sheet` 의 요금 함수에서 온다 — `green_fee_for`·`later_rates_for`(2026 요금표,
+    DB 0045)와 `cart_fee_for`. 세율은 리테일의 `TAX_RATE` 한 벌을 쓴다.
 
-    9홀은 평일 고정 요금이고 오전 10시부터다(2026-10-18 클럽 요금표, `green_fee_for`·DB 0034).
-    날짜만 받으므로 금액과 함께 그 날 9홀이 몇 시부터인지 알려 준다. 주말·공휴일은 9홀을 잡을 수 없다고 말한다.
+    날짜만 받으므로 첫 가격대를 말하고, 오후 가격대와 그 날 9홀이 몇 시부터인지 같이 알려 준다.
     """
     _touch_session(body.conversation_id)
     iso_date = resolve_date(body.date)
 
     green = ts.green_fee_for(iso_date, body.holes)
+    later = ts.later_rates_for(iso_date) if body.holes == 18 else []
     cart = ts.cart_fee_for("Public", body.holes)
     subtotal = round(green * body.players + cart * body.riders, 2)
     tax = round(subtotal * TAX_RATE, 2)
@@ -1272,6 +1272,9 @@ def get_rates(body: RatesRequest) -> RatesResponse:
             f"before tax,{cart_part} so ${total:.2f} in total for {body.players} "
             f"{players_word} with tax. Read the total, not the breakdown, unless they ask."
             + (f" {ts.nine_holes_rule(iso_date)} — mention that if they have not picked a time." if body.holes == 9 else "")
+            + (" Later in the day it drops: "
+               + ", ".join(f"from {label} ${rate:.2f}" for label, rate in later)
+               + " per player before tax — mention it if they want an afternoon time." if later else "")
         )
     return RatesResponse(
         ok=True,
@@ -1395,9 +1398,9 @@ def modify_booking(body: ModifyRequest) -> ModifyResponse:
             changes.append(f"holes {booking.holes} to {body.holes}")
             # 그린피가 자동값이면 새 홀 수의 값으로(직원 시트·DB 0033 과 같은 규칙).
             if not any(p.paid for p in booking.players) and ts._same_money(
-                booking.rate, ts.green_fee_for(booking.date, booking.holes)
+                booking.rate, ts.green_fee_for(booking.date, booking.holes, ts.label_to_minutes(booking.time))
             ):
-                booking.rate = ts.green_fee_for(booking.date, body.holes)
+                booking.rate = ts.green_fee_for(booking.date, body.holes, ts.label_to_minutes(booking.time))
             booking.holes = body.holes
 
         if not changes:

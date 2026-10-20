@@ -147,25 +147,31 @@ def test_every_seeded_time_is_a_real_slot(client):
 # ===== 슬롯 ===========================================================
 
 def test_slots_shape_and_rates(client):
-    tuesday = slots_for(client, "2026-09-08")           # 평일 (시드가 있는 날)
-    friday = slots_for(client, "2026-09-11")            # 평일 (오버라이드가 사라졌다)
-    saturday = slots_for(client, "2026-09-12")          # 주말
+    tuesday = slots_for(client, "2026-09-08")           # 정규 시즌 평일 (시드가 있는 날)
+    friday = slots_for(client, "2026-09-11")            # 정규 시즌 금요일 (Weekend Friday's 요금표)
+    saturday = slots_for(client, "2026-09-12")          # 정규 시즌 주말
 
     slots = tuesday["slots"]
     assert tuesday["date"] == "2026-09-08"
-    assert slots[0] == {"time": "6:40 AM", "minutes": 400, "rate": 40.71, "cartsTotal": 4,
+    assert slots[0] == {"time": "6:40 AM", "minutes": 400, "rate": 47.79, "cartsTotal": 4,
                         "dayType": "weekday", "holiday": None}
     assert slots[1]["time"] == "6:49 AM"
     # 마지막 티는 6:58 PM — Chronogolf export 에 이 시각까지 실제 예약이 있다.
-    assert slots[-1] == {"time": "6:58 PM", "minutes": 18 * 60 + 58, "rate": 40.71, "cartsTotal": 4,
+    assert slots[-1] == {"time": "6:58 PM", "minutes": 18 * 60 + 58, "rate": 34.52, "cartsTotal": 4,
                         "dayType": "weekday", "holiday": None}
     # 9분 간격이 끝까지 유지되는지
     assert all(b["minutes"] - a["minutes"] == 9 for a, b in zip(slots, slots[1:]))
     assert all(s["cartsTotal"] == 4 for s in slots)
 
-    # 2026-09-11 은 그냥 금요일이다. 시드 보존용 오버라이드가 사라졌으므로 평일 요금.
-    assert {s["rate"] for s in friday["slots"]} == {40.71}
-    assert {s["rate"] for s in saturday["slots"]} == {51.33}
+    # 2026 요금표(0045): 가격대는 오후 2시, 5시에 내려간다. 금요일은 17시 이후가 $1 높다.
+    assert {s["rate"] for s in friday["slots"]} == {58.41, 46.90, 39.94}
+    assert {s["rate"] for s in saturday["slots"]} == {58.41, 46.90, 38.94}
+    by_time = {s["time"]: s["rate"] for s in saturday["slots"]}
+    assert by_time["1:52 PM"] == 58.41 and by_time["2:01 PM"] == 46.90 and by_time["5:01 PM"] == 38.94
+    assert {s["time"]: s["rate"] for s in slots}["2:01 PM"] == 38.94
+    # 가을 숄더(10/1–12/15): 평일 40.71 → 35.40, 주말 51.33 → 46.02.
+    assert {s["rate"] for s in slots_for(client, "2026-10-20")["slots"]} == {40.71, 35.40}
+    assert {s["rate"] for s in slots_for(client, "2026-10-24")["slots"]} == {51.33, 46.02}
     assert len(friday["slots"]) == len(slots) == len(saturday["slots"])
 
 
@@ -219,14 +225,17 @@ def test_create_booking_defaults_rate_from_slot(client):
     response = create(client, date="2026-09-08", time="9:04 AM", title="Walk-in, Pat")
     assert response.status_code == 201, response.text
     booking = response.json()
-    assert booking["rate"] == 40.71          # 평일 요금이 슬롯에서 흘러들어와야 한다
+    assert booking["rate"] == 47.79          # 정규 시즌 평일 요금이 슬롯에서 흘러들어와야 한다
     assert booking["date"] == "2026-09-08"
     assert booking["status"] == "reserved"
     assert booking["span"] == 1
     assert booking["audit"][0]["message"] == "Reservation created for 2026-09-08 9:04 AM."
 
     weekend = create(client, date="2026-09-12", time="9:04 AM", title="Weekend, Sam").json()
-    assert weekend["rate"] == 51.33
+    assert weekend["rate"] == 58.41
+
+    afternoon = create(client, date="2026-09-12", time="3:04 PM", title="Afternoon, Lee").json()
+    assert afternoon["rate"] == 46.90          # 오후 2시부터 18홀은 다음 가격대
 
 
 def test_create_rejects_unknown_slot_with_422(client):
@@ -555,12 +564,12 @@ def test_cart_fee_is_filled_in_and_stays_editable(client):
 
 
 def test_changing_holes_resets_the_green_fee_until_someone_pays(client):
-    url, (ann, _) = _cart_booking(client)                 # 2026-09-08 화요일 → 18홀 $40.71, 9홀 $28.31
-    assert client.patch(url, json={"holes": 9}).json()["rate"] == 28.31
+    url, (ann, _) = _cart_booking(client)                 # 2026-09-08 화요일 → 18홀 $47.79, 9홀 $34.52
+    assert client.patch(url, json={"holes": 9}).json()["rate"] == 34.52
 
     # 손으로 고친 금액(0033 때의 절반 요금 $23.90 같은 옛 값 포함)도 홀 수를 바꾸면 요금표 값이 된다.
     client.patch(url, json={"rate": 23.90})
-    assert client.patch(url, json={"holes": 18}).json()["rate"] == 40.71
+    assert client.patch(url, json={"holes": 18}).json()["rate"] == 47.79
 
     # 같은 요청에 준 금액이 이긴다.
     assert client.patch(url, json={"holes": 9, "rate": 30.0}).json()["rate"] == 30.0

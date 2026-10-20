@@ -535,23 +535,24 @@ def test_get_rates_uses_the_tee_sheets_own_numbers(client):
 
 
 def test_get_rates_quotes_the_nine_hole_rate_and_when_it_starts(client):
-    """9홀은 평일·주말 고정 요금(DB 0034 와 같은 값). 날짜만 받으므로 몇 시부터인지도 알려 준다."""
+    """9홀은 요금표마다 한 가격(DB 0045 와 같은 값). 날짜만 받으므로 몇 시부터인지도 알려 준다."""
     body = rates(client, holes=9).json()
-    assert body["green_fee_per_player"] == 28.31
+    assert body["green_fee_per_player"] == 34.52   # 정규 시즌 평일
     assert "9 holes" in body["message"]
     assert "10:00 AM" in body["message"]
 
 
 def test_nine_hole_rates_follow_the_club_rate_card():
-    assert ts.green_fee_for("2026-10-20", 9) == 28.31  # 화요일
-    assert ts.green_fee_for("2026-10-24", 9) == 38.94  # 토요일
-    assert ts.green_fee_for("2026-10-12", 9) == 38.94  # 추수감사절(월) — 주말과 같다
+    assert ts.green_fee_for("2026-10-20", 9) == 28.31  # 가을 숄더 화요일
+    assert ts.green_fee_for("2026-10-24", 9) == 38.94  # 가을 숄더 토요일
+    assert ts.green_fee_for("2026-10-12", 9) == 35.40  # 추수감사절(월) — 공휴일 요금표
+    assert ts.green_fee_for("2026-09-08", 9) == 34.52  # 정규 시즌 화요일
     assert ts.green_fee_for("2026-10-20", 18) == ts.slot_rate_for("2026-10-20")
     assert ts.nine_holes_from("2026-10-20") == 10 * 60
-    # 주말·공휴일은 9홀을 잡을 수 없다 — 어느 티타임도 닿지 않는 24:00.
-    assert ts.nine_holes_from("2026-10-24") == 24 * 60
-    assert ts.nine_holes_from("2026-10-12") == 24 * 60
-    assert "weekends or holidays" in ts.nine_holes_rule("2026-10-24")
+    # 주말·공휴일 요금표는 9홀을 오후 4시부터 판다.
+    assert ts.nine_holes_from("2026-10-24") == 16 * 60
+    assert ts.nine_holes_from("2026-10-12") == 16 * 60
+    assert "4:00 PM" in ts.nine_holes_rule("2026-10-24")
 
 
 def test_confirm_refuses_nine_holes_before_the_nine_hole_start(client):
@@ -574,7 +575,7 @@ def test_confirm_books_nine_holes_from_the_nine_hole_start(client):
     )
     assert done.status_code == 200, done.text
     assert done.json()["booking"]["holes"] == 9
-    assert done.json()["booking"]["rate"] == 28.31
+    assert done.json()["booking"]["rate"] == 34.52   # 정규 시즌 평일 9홀
 
 
 def test_get_rates_charges_a_cart_per_rider(client):

@@ -39,6 +39,7 @@ import { useEffect, useMemo, useState } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import DayTabs from "@/components/admin/DayTabs";
 import { teeSheetApi } from "@/lib/teeSheet/api";
+import { RATE_CARDS, RATE_PLAN_RULES } from "@/lib/rateCard";
 import { addDays, longDate, minutesToTime, money, toDate, todayIso } from "@/lib/teeSheet/dates";
 import type { TeeSlot } from "@/lib/teeSheet/types";
 
@@ -297,12 +298,18 @@ export default function PricingPage() {
               value={data?.weekendRate == null ? "—" : money(data.weekendRate)}
               muted={!isWeekendIso(focusedDate)}
             />
-            {/* 9홀 요금과 카트 요금은 예전 화면에 있었지만 백엔드에는 존재하지 않는다.
-                슬롯은 홀 수와 무관하게 요금이 하나이고, 카트는 **개수**만 있고 금액이 없다.
-                칸을 지우는 대신 "없다" 고 말해 둔다 — 지워 버리면 다음 사람이 또
-                그럴듯한 숫자를 지어 넣는다. */}
-            <Row label="9-hole rate" muted value="not a separate rate" />
-            <Row label="Cart fee" muted value="no charge configured" />
+            <Row label="Rate card" value={slots[0]?.rateCard ?? "—"} />
+            <Row
+              label="9-hole rate"
+              value={
+                slots[0]?.rate9 == null
+                  ? "—"
+                  : (slots[0].nineFrom ?? 0) >= 24 * 60
+                    ? "no 9 holes"
+                    : `${money(slots[0].rate9)} from ${minutesToTime(slots[0].nineFrom ?? 0)}`
+              }
+            />
+            <Row label="Cart fee" value="$19.47 (18) · $11.50 (9) per player" />
           </Card>
         </div>
 
@@ -342,7 +349,69 @@ export default function PricingPage() {
             )}
           </div>
         </section>
+
+        <RateCardTables />
       </div>
     </AdminShell>
+  );
+}
+
+/** 2026 요금표 전체와 요금제 규칙 — DB(0045)가 매기는 값의 사본(`lib/rateCard.ts`). */
+function RateCardTables() {
+  return (
+    <>
+      <section className="border border-[#d6d6dc] bg-white text-xs">
+        <h2 className="border-b border-[#d6d6dc] bg-[#ececf0] px-3 py-1.5 text-[11px] font-bold">
+          2026 rate cards — public green fee per player, before HST
+        </h2>
+        <div className="grid gap-px bg-[#ececf0] sm:grid-cols-2 xl:grid-cols-4">
+          {RATE_CARDS.map((card) => (
+            <div className="bg-white p-3" key={card.code}>
+              <p className="font-bold text-[#111315]">{card.name}</p>
+              <p className="mb-2 text-[11px] text-[#6b7280]">{card.applies}</p>
+              {card.bands.map((band) => (
+                <div className="flex justify-between py-0.5" key={band.from}>
+                  <span>18 holes · {band.from === "Open" ? "open" : `from ${band.from}`}</span>
+                  <span className="font-semibold tabular-nums">{money(band.rate)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-[#ececf0] py-0.5 text-[#4e5560]">
+                <span>9 holes{card.nine ? ` · from ${card.nine.from}` : ""}</span>
+                <span className="tabular-nums">{card.nine ? money(card.nine.rate) : "—"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="border-t border-[#d6d6dc] px-3 py-2 text-[11px] text-[#4e5560]">
+          A holiday with its own rate in <code>pelham_tee_holidays.rate</code> charges that rate all day for 18 holes.
+        </p>
+      </section>
+
+      <section className="border border-[#d6d6dc] bg-white text-xs">
+        <h2 className="border-b border-[#d6d6dc] bg-[#ececf0] px-3 py-1.5 text-[11px] font-bold">
+          Rate plans — set on each player in the tee sheet
+        </h2>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left">
+            <thead className="text-[11px] text-[#6b7280]">
+              <tr>
+                <th className="px-3 py-1.5 font-semibold">Rate plan</th>
+                <th className="px-3 py-1.5 font-semibold">Green fee</th>
+                <th className="px-3 py-1.5 font-semibold">Cart</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RATE_PLAN_RULES.map((rule) => (
+                <tr className="border-t border-[#ececf0]" key={rule.plan}>
+                  <td className="px-3 py-1.5 font-semibold">{rule.plan}</td>
+                  <td className="px-3 py-1.5">{rule.greenFee}</td>
+                  <td className="px-3 py-1.5">{rule.cart}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
   );
 }

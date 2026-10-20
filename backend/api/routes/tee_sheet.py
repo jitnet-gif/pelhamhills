@@ -54,10 +54,8 @@ PLAYERS_PER_TEE_TIME = 4
 # 넉넉하고, 손님이 중간에 끊어도 자리가 오래 죽어 있지 않다.
 HOLD_TTL_SECONDS = 180
 
-# 2026-10-19 클럽 요금표: 평일 18홀 $40.71(Public·Public Senior 같다), 주말·공휴일 $51.33(Chronogolf 가을 요금).
-# DB `pelham_tee_rate`(0040)와 같아야 한다.
+# 예약 rate 의 모델 기본값(가을 숄더 평일 오전). 실제 값은 아래 `green_fee_for` 가 요금표로 매긴다.
 WEEKDAY_RATE = 40.71
-WEEKEND_RATE = 51.33
 
 # 1인 카트 요금(세전, 달러). **2026-10-18 클럽 확인: 18홀 $19.47, 9홀 $11.50.**
 # **2026-10-19: Public Senior 18홀 $17.70.**
@@ -95,7 +93,6 @@ RATE_OVERRIDES: dict[str, float] = {}
 
 # 공휴일 — supabase/migrations/0025_tee_holiday_rates.sql 의 `pelham_tee_holidays` 시드와 같다.
 # 프로덕션은 그 표가 기준이고, 이 사본은 로컬/레거시 API 가 같은 금액을 내게 하려는 것이다.
-HOLIDAY_RATE = WEEKEND_RATE
 HOLIDAYS: dict[str, str] = {
     "2026-01-01": "New Year's Day", "2026-02-16": "Family Day", "2026-04-03": "Good Friday",
     "2026-05-18": "Victoria Day", "2026-07-01": "Canada Day", "2026-08-03": "Civic Holiday",
@@ -420,57 +417,91 @@ def day_type_for(iso_date: str) -> str:
     return "weekend" if parse_iso_date(iso_date).weekday() >= 5 else "weekday"
 
 
+# 2026 요금표(세전) — Lightspeed 요금표 그대로(2026-10-19 클럽 승인). DB 0045 `pelham_tee_rate_cards`·
+# `pelham_tee_rate_bands`·`pelham_tee_card`, `frontend/lib/rateCard.ts` 와 같아야 한다. 바꾸면 셋을 같이 고쳐라.
+#   요금표 → (18홀 가격대 [(시작 분, 요금)], 9홀 요금, 9홀 판매 시작 분)
+RATE_CARDS: dict[str, tuple[list[tuple[int, float]], float, int]] = {
+    "weekday": ([(0, 47.79), (840, 38.94), (1020, 34.52)], 34.52, 600),
+    "friday": ([(0, 58.41), (840, 46.90), (1020, 39.94)], 35.40, 960),
+    "weekend": ([(0, 58.41), (840, 46.90), (1020, 38.94)], 35.40, 960),
+    "june_friday": ([(0, 58.41), (720, 49.56), (1020, 38.94)], 35.40, 960),
+    "sixty": ([(0, 47.79), (780, 38.94), (1020, 34.52)], 34.52, 600),
+    "victoria": ([(0, 47.79), (840, 38.94)], 34.52, 600),
+    "weekday_shoulder": ([(0, 40.71), (840, 35.40)], 28.31, 600),
+    "weekend_shoulder": ([(0, 51.33), (840, 46.02)], 38.94, 960),
+}
+
+
+def rate_card_for(iso_date: str) -> str:
+    """날짜 → 요금표. 공휴일 > 6월 특별 > 정규 시즌(5/8–9/30) > 숄더."""
+    holiday = HOLIDAYS.get(iso_date)
+    if holiday == "Victoria Day":
+        return "victoria"
+    if holiday == "Canada Day":
+        return "weekend"
+    if holiday:
+        return "friday"
+    d = parse_iso_date(iso_date)
+    dow = d.weekday()  # 월 0 … 일 6
+    if "05-08" <= iso_date[5:] <= "09-30":
+        if "2026-06-25" <= iso_date <= "2026-06-30" and dow <= 3:
+            return "sixty"
+        if dow == 4:
+            return "june_friday" if d.month == 6 else "friday"
+        return "weekend" if dow >= 5 else "weekday"
+    return "weekend_shoulder" if dow >= 5 else "weekday_shoulder"
+
+
 def slot_rate_for(iso_date: str) -> float:
-    """날짜별 요금: 오버라이드 > 공휴일 > 주말 > 평일."""
+    """그날의 기본(첫 가격대) 18홀 요금. 오버라이드가 있으면 그 값."""
+    return green_fee_for(iso_date, 18, 0)
+
+
+# 9홀 시작 시각이 이 값이면 그날은 9홀이 없다.
+NO_NINE = 24 * 60
+
+
+def green_fee_for(iso_date: str, holes: int, minutes: int | None = None) -> float:
+    """그 날, 그 홀 수, 그 시각의 1인 퍼블릭 그린피(세전). minutes 가 없으면 첫 가격대."""
+    bands, nine_rate, _ = RATE_CARDS[rate_card_for(iso_date)]
+    if holes == 9:
+        return nine_rate
     override = RATE_OVERRIDES.get(iso_date)
     if override is not None:
         return override
-    kind = day_type_for(iso_date)
-    if kind == "holiday":
-        return HOLIDAY_RATE
-    return WEEKEND_RATE if kind == "weekend" else WEEKDAY_RATE
+    at = minutes or 0
+    return [rate for start, rate in bands if start <= at][-1]
 
 
-# 9홀 요금(세전)과 9홀을 칠 수 있는 첫 시각. **2026-10-18 클럽 요금표**: 평일 $28.31 오전 10시부터
-# 마감까지. 주말·공휴일은 손님이 9홀을 잡을 수 없다(2026-10-18 클럽 결정) — 시작 시각을 하루 끝(24:00)
-# 으로 두어 어느 티타임도 닿지 않게 한다. 주말 요금 $38.94 는 직원 시트가 9홀로 잡을 때의 자동값으로만 남는다.
-# DB `pelham_tee_rate_for`·`pelham_tee_nine_from`(0034·0037), `frontend/lib/greenFee.ts` 와 같아야 한다.
-NINE_HOLE_RATES = {"weekday": 28.31, "weekend": 38.94}
-NINE_HOLE_FROM_MINUTES = {"weekday": 10 * 60, "weekend": 24 * 60}
-
-
-def _nine_kind(iso_date: str) -> str:
-    return "weekday" if day_type_for(iso_date) == "weekday" else "weekend"
-
-
-def green_fee_for(iso_date: str, holes: int) -> float:
-    """그 날, 그 홀 수의 1인 그린피(세전). 9홀은 평일/주말·공휴일 고정 요금이다."""
-    if holes == 9:
-        return NINE_HOLE_RATES[_nine_kind(iso_date)]
-    return slot_rate_for(iso_date)
+def later_rates_for(iso_date: str) -> list[tuple[str, float]]:
+    """첫 가격대 뒤의 18홀 가격대 [("2:00 PM", 35.40), …]. 오버라이드가 걸린 날은 하루 한 값이라 없다."""
+    if iso_date in RATE_OVERRIDES:
+        return []
+    bands = RATE_CARDS[rate_card_for(iso_date)][0]
+    return [(minutes_to_label(start), rate) for start, rate in bands[1:]]
 
 
 def nine_holes_from(iso_date: str) -> int:
     """그 날 9홀을 칠 수 있는 첫 티타임(자정부터 분). 그보다 이른 티타임은 손님이 9홀로 못 잡는다."""
-    return NINE_HOLE_FROM_MINUTES[_nine_kind(iso_date)]
+    return RATE_CARDS[rate_card_for(iso_date)][2]
 
 
 def nine_holes_rule(iso_date: str) -> str:
     """손님·에이전트에게 읽어 줄 규칙 한 줄."""
-    if _nine_kind(iso_date) == "weekday":
-        return "Nine holes can be booked from 10:00 AM on weekdays"
-    return "Nine holes cannot be booked on weekends or holidays"
+    start = nine_holes_from(iso_date)
+    if start >= NO_NINE:
+        return "Nine holes cannot be booked on this day"
+    return f"Nine holes can be booked from {minutes_to_label(start)} on this day"
 
 
 def nine_holes_alternative(iso_date: str) -> str:
-    """9홀이 막혔을 때 손님에게 권할 대안 — 평일은 더 늦은 티타임, 주말·공휴일은 평일."""
-    if _nine_kind(iso_date) == "weekday":
-        return "a later tee time for nine"
-    return "a weekday tee time for nine"
+    """9홀이 막혔을 때 손님에게 권할 대안."""
+    if nine_holes_from(iso_date) >= NO_NINE:
+        return "a weekday tee time for nine"
+    return "a later tee time for nine"
 
 
 def generate_slots(iso_date: str) -> list[TeeSlot]:
-    rate = slot_rate_for(iso_date)
     kind = day_type_for(iso_date)
     slots: list[TeeSlot] = []
     minutes = FIRST_TEE_MINUTES
@@ -479,7 +510,7 @@ def generate_slots(iso_date: str) -> list[TeeSlot]:
             TeeSlot(
                 time=minutes_to_label(minutes),
                 minutes=minutes,
-                rate=rate,
+                rate=green_fee_for(iso_date, 18, minutes),
                 cartsTotal=CARTS_PER_SLOT,
                 dayType=kind,
                 holiday=HOLIDAYS.get(iso_date),
@@ -882,7 +913,7 @@ def patch_booking(booking_id: str, body: PatchBookingRequest) -> TeeBooking:
             # 손으로 고친 금액이라도 덮는다 — 특별 금액은 홀 수를 바꾼 뒤 다시 적는다.
             # 같은 요청에 rate 를 직접 보냈으면 아래에서 그 값이 덮어쓴다.
             if not any(p.paid for p in booking.players):
-                new_rate = green_fee_for(booking.date, booking.holes)
+                new_rate = green_fee_for(booking.date, booking.holes, label_to_minutes(booking.time))
                 if not _same_money(booking.rate, new_rate):
                     booking.rate = new_rate
                     _audit(booking, f"Rate set to ${booking.rate:.2f}.")

@@ -27,6 +27,7 @@ import { localBusinessDate } from "@/lib/retail/api";
 import { printReceiptDoc, receiptSheetHtml } from "@/lib/retail/printReceipt";
 import { CLUB_TIME_ZONE, PAYMENT_LABELS, saleReceipt } from "@/lib/retail/receipt";
 import { computeTax, formatMoney } from "@/lib/retail/types";
+import { greenFeeOf } from "@/lib/greenFee";
 import { longDate, money } from "@/lib/teeSheet/dates";
 import { clubDate, confirmationCode, paidBillFor, teeReceiptFor } from "@/lib/teeSheet/receipt";
 import { reservationTitle } from "@/lib/teeSheet/tone";
@@ -60,9 +61,9 @@ const CANCEL_PRESETS = [
 
 /**
  * 요금제 목록. 백엔드의 `ratePlan` 은 자유 문자열이지만 화면에서는 고르게 한다 —
- * 레퍼런스가 드롭다운이고, 무엇보다 `tone.ts` 의 색 규칙이 "Full Member" 라는
- * **정확한 접두사**를 보기 때문이다. 자유 입력이면 "full member" 같은 오타 하나로
- * 격자의 색이 조용히 달라진다.
+ * 레퍼런스가 드롭다운이고, 무엇보다 `tone.ts` 의 색 규칙이 요금제 이름 속
+ * 등급 단어(Full·Weekday·Intermediate·9 Hole·Twilight·Junior·Senior·Staff·GolfNow)를
+ * 보기 때문이다. 자유 입력이면 오타 하나로 격자의 색이 조용히 달라진다.
  *
  * 서버가 목록에 없는 값을 들고 있으면 그 값을 그대로 한 항목 더 붙인다(아래 참고) —
  * 고르지 않았는데 저장 버튼 한 번에 값이 바뀌어 버리는 일이 없어야 한다.
@@ -70,10 +71,21 @@ const CANCEL_PRESETS = [
 const RATE_PLANS = [
   "Public",
   "Public Senior",
+  "Public Junior",
+  "GolfNow",
+  "Friends & Family",
+  "LS League",
+  "Full Member - Single",
+  "Full Member - Single with 7 Day Cart",
   "Weekday Member - Single",
   "Weekday Member - Single with Weekday Cart",
-  "Full Member - Single with 7 Day Cart",
-  "GolfNow",
+  "Intermediate Member",
+  "Restricted Member",
+  "Corporate Full Member",
+  "9 Hole Member - Single",
+  "Twilight Member - Single",
+  "Junior Member",
+  "Pelham Staff",
 ];
 
 /** Clone 드롭다운에 내놓는 최대 개수 (레퍼런스는 끝없이 늘어나지만 하루 단체가 이 이상인 일은 없다). */
@@ -707,7 +719,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const cartPart = (player: Player) => (player.cart ? (player.cartFee ?? 0) : 0);
   /** 그린피를 뺀 이 사람 몫(카트 + 추가 품목). */
   const addOnsOf = (player: Player) => cartPart(player) + extrasTotal(player);
-  const dueFor = (player: Player) => (player.paid || player.cancelled ? 0 : booking.rate + addOnsOf(player));
+  const dueFor = (player: Player) => (player.paid || player.cancelled ? 0 : greenFeeOf(booking, player) + addOnsOf(player));
 
   // 전체 결제 대상과 그 청구액. 센트는 영수증과 **같은 방식**으로 만든다(사람마다 그린피·카트를
   // 따로 반올림한 뒤 더하고, 세금은 합계에 한 번). 그래야 버튼 금액과 종이의 Total 이 같다.
@@ -715,7 +727,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const unpaidSubtotal = unpaidPlayers.reduce(
     (sum, player) =>
       sum +
-      Math.round(booking.rate * 100) +
+      Math.round(greenFeeOf(booking, player) * 100) +
       Math.round(cartPart(player) * 100) +
       (player.extras ?? []).reduce((cents, extra) => cents + Math.round(extra.price * 100), 0),
     0,
@@ -1735,7 +1747,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 {player.cancelled ? (
                   <div className="mt-1 flex justify-between text-[#8a3f26]">
                     <span>Cancelled</span>
-                    <span>−{money(booking.rate + addOnsOf(player))}</span>
+                    <span>−{money(greenFeeOf(booking, player) + addOnsOf(player))}</span>
                   </div>
                 ) : null}
                 {(() => {
@@ -2309,7 +2321,7 @@ function TakePaymentSummary({
       const name = player.name.trim() || [player.firstName, player.lastName].join(" ").trim();
       if (name && !payers.includes(name)) payers.push(name);
       const parts = [
-        { name: `${booking.holes} Hole Green Fee`, amount: cents(booking.rate) },
+        { name: `${booking.holes} Hole Green Fee`, amount: cents(greenFeeOf(booking, player)) },
         ...(player.cart ? [{ name: `Half Cart (${booking.holes} Holes)`, amount: cents(player.cartFee ?? 0) }] : []),
         ...(player.extras ?? []).map((extra) => ({ name: extra.name, amount: cents(extra.price) })),
       ];

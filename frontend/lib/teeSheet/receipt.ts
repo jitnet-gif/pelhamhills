@@ -16,6 +16,7 @@
  * `paidBillFor` 로 찾은 계산서 영수증을 찍는다.
  */
 
+import { greenFeeOf } from "../greenFee";
 import type { Bill } from "../pos/api";
 import { CLUB_TIME_ZONE, type ReceiptDoc, type ReceiptLine } from "../retail/receipt";
 import { computeTax } from "../retail/types";
@@ -71,7 +72,7 @@ export function teeReceiptFor(
       name: `${booking.holes} Hole Green Fee - ${plan}`,
       detail,
       quantity: 1,
-      amount: toCents(booking.rate),
+      amount: toCents(greenFeeOf(booking, player)),
     });
     if (player.cart) {
       lines.push({
