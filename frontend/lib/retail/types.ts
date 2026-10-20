@@ -184,6 +184,8 @@ export type RetailDailyReport = {
   by_station?: Array<{ station: string; count: number; total: Cents }>;
   tips?: Cents;
   top_products: Array<{ product_id: number; name: string; quantity: number; total: Cents }>;
+  /** 현금 리포트 계정이 아니라 서버가 `by_payment` 의 cash 줄을 뺐다(0046). */
+  cash_hidden?: boolean;
 };
 
 // ===== 담당자별 마감 (0010) ==============================================

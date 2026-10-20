@@ -192,6 +192,8 @@ async function tokenRequest(
 const STAFF_ID_DOMAIN = "pelhamhills.com";
 const STAFF_ID_ALIASES: Record<string, string> = {
   hwang: "proshop@pelhamhills.com",
+  // 현금 리포트 계정(0046 의 pelham_cash_viewers). `/admin/reports/cash/` 는 이 계정만 열린다.
+  emmeline: "admin@pelhamhills.ca",
 };
 
 function loginEmail(login: string): string {

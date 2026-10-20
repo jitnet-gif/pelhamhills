@@ -60,7 +60,8 @@ async function loadDays(dates: string[]): Promise<{ days: DayData[]; failed: num
   return { days, failed };
 }
 
-export default function AccountingWorkbook() {
+/** `cash` 는 현금 리포트(`/admin/reports/cash/`)에서만 참이다 — `buildAccountingWorkbook` 참고. */
+export default function AccountingWorkbook({ cash = false }: { cash?: boolean }) {
   const today = localBusinessDate();
   const [from, setFrom] = useState(() => monthStart(today));
   const [to, setTo] = useState(today);
@@ -102,8 +103,8 @@ export default function AccountingWorkbook() {
   }, [dates, rangeError]);
 
   const workbook = useMemo(
-    () => (days && !rangeError ? buildAccountingWorkbook(from, to, days) : null),
-    [days, from, to, rangeError],
+    () => (days && !rangeError ? buildAccountingWorkbook(from, to, days, { cash }) : null),
+    [days, from, to, rangeError, cash],
   );
   const sheet = workbook?.sheets[active] ?? null;
 

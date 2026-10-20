@@ -20,7 +20,7 @@
 
 import { divisionOf, DIVISIONS } from "@/lib/retail/divisions";
 import { CLUB_TIME_ZONE, PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
-import { PAYMENT_METHODS, type Cents, type RetailDailyReport, type Sale } from "@/lib/retail/types";
+import { PAYMENT_METHODS, type Cents, type PaymentMethod, type RetailDailyReport, type Sale } from "@/lib/retail/types";
 
 // ===== 모델 =============================================================
 
@@ -146,9 +146,24 @@ const statusText = (sale: Sale) => (sale.refunded_at || sale.status === "refunde
 
 // ===== 통합 문서 ========================================================
 
-export function buildAccountingWorkbook(from: string, to: string, days: DayData[]): Workbook {
+/**
+ * `cash` 가 거짓이면(일반 Reports) 결제 수단 칸에서 Cash 를 뺀다. 그때 결제 합은 Net 이 아니라
+ * "현금 아닌 결제" 다 — 서버도 현금 리포트 계정이 아니면 cash 줄을 주지 않는다(0046).
+ */
+export function buildAccountingWorkbook(
+  from: string,
+  to: string,
+  days: DayData[],
+  { cash = false }: { cash?: boolean } = {},
+): Workbook {
   const period = from === to ? from : `${from} to ${to}`;
-  const sheets = [buildSummary(period, days), buildDaily(period, days), buildReceipts(period, days), buildLines(period, days)];
+  const methods = cash ? [...PAYMENT_METHODS] : PAYMENT_METHODS.filter((method) => method !== "cash");
+  const sheets = [
+    buildSummary(period, days, methods, cash),
+    buildDaily(period, days, methods, cash),
+    buildReceipts(period, days),
+    buildLines(period, days),
+  ];
   // 못 읽은 날이 있으면 모든 시트에 적는다 — 파일은 화면의 경고 없이 혼자 돌아다닌다.
   const missing = days.filter((day) => day.report === null).length;
   if (missing > 0) {
@@ -159,7 +174,7 @@ export function buildAccountingWorkbook(from: string, to: string, days: DayData[
 
 // ----- Daily: 하루 한 줄 ------------------------------------------------
 
-const DAILY_COLUMNS: Column[] = [
+const dailyColumns = (methods: PaymentMethod[]): Column[] => [
   { header: "Date", width: 12, format: "date" },
   { header: "Sales #", width: 8, format: "int" },
   ...DIVISIONS.map((division) => ({ header: division.label, width: 14, format: "money" as const })),
@@ -167,17 +182,18 @@ const DAILY_COLUMNS: Column[] = [
   { header: "Discounts", width: 11, format: "money" },
   { header: "HST", width: 11, format: "money" },
   { header: "Net (tax incl.)", width: 14, format: "money" },
-  ...PAYMENT_METHODS.map((method) => ({ header: PAYMENT_LABELS[method], width: 13, format: "money" as const })),
+  ...methods.map((method) => ({ header: PAYMENT_LABELS[method], width: 13, format: "money" as const })),
   { header: "Tips", width: 10, format: "money" },
   { header: "Refunds #", width: 10, format: "int" },
   { header: "Refunded $", width: 12, format: "money" },
 ];
 
-function buildDaily(period: string, days: DayData[]): Sheet {
+function buildDaily(period: string, days: DayData[], methods: PaymentMethod[], cash: boolean): Sheet {
+  const columns = dailyColumns(methods);
   const rows: Row[] = days.map(({ date, report }) => {
     if (!report) {
       // 리포트를 못 읽은 날은 0 으로 채우지 않는다 — 0 은 "매출 없음"이라는 뜻이 된다.
-      return { cells: [date, "Not loaded", ...DAILY_COLUMNS.slice(2).map(() => null)], style: "muted" };
+      return { cells: [date, "Not loaded", ...columns.slice(2).map(() => null)], style: "muted" };
     }
     const byCategory = report.by_category;
     const payment = (method: string) => report.by_payment.find((row) => row.method === method)?.total ?? 0;
@@ -196,7 +212,7 @@ function buildDaily(period: string, days: DayData[]): Sheet {
         dollars(report.discount),
         dollars(report.tax),
         dollars(report.net),
-        ...PAYMENT_METHODS.map((method) => dollars(payment(method))),
+        ...methods.map((method) => dollars(payment(method))),
         dollars(report.tips),
         report.refunded_count,
         dollars(report.refunded_total),
@@ -206,7 +222,7 @@ function buildDaily(period: string, days: DayData[]): Sheet {
 
   const first = FIRST_DATA_ROW;
   const last = FIRST_DATA_ROW + rows.length - 1;
-  const totals: Cell[] = DAILY_COLUMNS.map((_, col) => {
+  const totals: Cell[] = columns.map((_, col) => {
     if (col === 0) return "Total";
     const sum = rows.reduce((acc, row) => {
       const value = row.cells[col];
@@ -218,8 +234,10 @@ function buildDaily(period: string, days: DayData[]): Sheet {
   return {
     name: "Daily",
     title: "Daily sales — Pelham Hills",
-    subtitle: `${period} · gross before order discounts & tax · payments exclude tips (they add up to Net)`,
-    columns: DAILY_COLUMNS,
+    subtitle: cash
+      ? `${period} · gross before order discounts & tax · payments exclude tips (they add up to Net)`
+      : `${period} · gross before order discounts & tax · payments exclude tips · cash not shown`,
+    columns,
     rows: [...rows, { cells: totals, style: "total" }],
     filter: true,
   };
@@ -227,7 +245,7 @@ function buildDaily(period: string, days: DayData[]): Sheet {
 
 // ----- Summary: 기간 손익 요약 -----------------------------------------
 
-function buildSummary(period: string, days: DayData[]): Sheet {
+function buildSummary(period: string, days: DayData[], methods: PaymentMethod[], cash: boolean): Sheet {
   const reports = days.map((day) => day.report).filter((report): report is RetailDailyReport => report !== null);
   const missing = days.length - reports.length;
 
@@ -294,13 +312,13 @@ function buildSummary(period: string, days: DayData[]): Sheet {
   rows.push({ cells: ["PAYMENTS RECEIVED (tips excluded)", "Count", "Amount"], style: "section" });
   const firstPay = excelRow();
   let paid = 0;
-  for (const method of PAYMENT_METHODS) {
+  for (const method of methods) {
     const row = payments.get(method) ?? { count: 0, total: 0 };
     paid += dollars(row.total);
     rows.push({ cells: [PAYMENT_LABELS[method], row.count, dollars(row.total)] });
   }
   rows.push({
-    cells: ["Total payments (= Net sales)", null, sumFormula(2, firstPay, excelRow() - 1, paid)],
+    cells: [cash ? "Total payments (= Net sales)" : "Total non-cash payments", null, sumFormula(2, firstPay, excelRow() - 1, paid)],
     style: "total",
   });
   rows.push({ cells: ["Tips (outside Net, paid to staff)", null, dollars(tips)] });

@@ -34,7 +34,12 @@ import {
   TextInput,
 } from "@/components/retail/ui";
 
-export default function SalesReport() {
+/**
+ * `cash` 가 거짓이면(일반 Reports) 현금 숫자를 그리지 않는다 — By payment 의 Cash 줄과 담당자별 마감
+ * (서랍 현금·팁 나누기). 서버도 현금 리포트 계정이 아니면 같은 것을 주지 않는다(0046). 여기서 한 번 더
+ * 거르는 것은 0046 이 아직 안 돈 프로젝트에서도 일반 화면에 현금이 새지 않게 하려는 것이다.
+ */
+export default function SalesReport({ cash = false }: { cash?: boolean }) {
   // 티 시트의 "Refund" 바로가기는 `?date=YYYY-MM-DD`(결제한 날)로 온다. 그 날 목록을 연다.
   const [date, setDate] = useState(() => {
     const wanted = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("date");
@@ -74,6 +79,10 @@ export default function SalesReport() {
   }, [date]);
 
   const divisions = useMemo(() => (report ? divisionTotals(report) : []), [report]);
+  const payments = useMemo(
+    () => (report ? report.by_payment.filter((row) => cash || row.method !== "cash") : []),
+    [report, cash],
+  );
 
   function applyRefund(updated: Sale) {
     setSales((current) => current.map((sale) => (sale.id === updated.id ? updated : sale)));
@@ -84,7 +93,7 @@ export default function SalesReport() {
       .getDailyReport(date)
       .then(setReport)
       .catch(() => setReport(null));
-    setCloseoutKey((key) => key + 1);
+    if (cash) setCloseoutKey((key) => key + 1);
   }
 
   return (
@@ -247,12 +256,12 @@ export default function SalesReport() {
               )}
             </Panel>
 
-            <Panel title="By payment">
-              {report.by_payment.length === 0 ? (
+            <Panel title={cash ? "By payment" : "By payment (cash not shown)"}>
+              {payments.length === 0 ? (
                 <EmptyNote>Nothing rung in yet.</EmptyNote>
               ) : (
                 <ul className="grid gap-1 text-sm">
-                  {report.by_payment.map((row) => (
+                  {payments.map((row) => (
                     <li key={row.method}>
                       <button
                         className={DRILL_ROW}
@@ -297,7 +306,7 @@ export default function SalesReport() {
         </>
       ) : null}
 
-      <StaffCloseout date={date} refreshKey={closeoutKey} />
+      {cash ? <StaffCloseout date={date} refreshKey={closeoutKey} /> : null}
 
       <Panel title={`Receipts — ${date}`}>
         {loading ? (

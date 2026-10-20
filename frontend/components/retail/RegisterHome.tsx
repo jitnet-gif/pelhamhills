@@ -83,7 +83,23 @@ export default function RegisterHome({
   const [recent, setRecent] = useState<Sale[] | null>(null);
   const [recentError, setRecentError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  // 담당자별 마감(서랍 현금·팁 나누기)은 현금 리포트 계정만 연다(0046). 그 밖의 계정에는 버튼을 숨긴다.
+  const [cashAccess, setCashAccess] = useState(false);
   const today = localBusinessDate();
+
+  useEffect(() => {
+    if (demo) return;
+    let cancelled = false;
+    retailApi
+      .cashAccess()
+      .then((allowed) => {
+        if (!cancelled) setCashAccess(allowed);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [demo]);
 
   // 이어 갈 손님: 지금 계산서가 있으면 그것, 없으면 열린 계산서 목록.
   const continueCount = bill ? Math.max(openBills.length, 1) : openBills.length;
@@ -301,14 +317,14 @@ export default function RegisterHome({
           <RegisterClose
             date={today}
             onCancel={() => setDialog(null)}
-            onStaffCloseout={() => setDialog({ kind: "staff" })}
+            onStaffCloseout={cashAccess ? () => setDialog({ kind: "staff" }) : undefined}
             registerName={registerName}
             station={station}
           />
         </Modal>
       ) : null}
 
-      {dialog?.kind === "staff" ? (
+      {dialog?.kind === "staff" && cashAccess ? (
         <Modal
           onClose={() => setDialog(null)}
           title={`Staff close-out · ${today}`}

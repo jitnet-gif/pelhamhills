@@ -66,8 +66,8 @@ export default function RegisterClose({
   station: string;
   registerName: string;
   onCancel: () => void;
-  /** 담당자별 마감(근무시간·팁)으로. */
-  onStaffCloseout: () => void;
+  /** 담당자별 마감(근무시간·팁)으로. 현금 리포트 계정이 아니면 없다(0046) — 버튼을 그리지 않는다. */
+  onStaffCloseout?: () => void;
 }) {
   const [report, setReport] = useState<RegisterCloseReport | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -111,7 +111,7 @@ function CloseForm({
   registerName: string;
   onSaved: (report: RegisterCloseReport) => void;
   onCancel: () => void;
-  onStaffCloseout: () => void;
+  onStaffCloseout?: () => void;
 }) {
   const saved = report.close;
   // 이미 셌으면 그 숫자로 연다(다시 세기).
@@ -253,9 +253,11 @@ function CloseForm({
         <Button disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
-        <Button className="sm:ml-auto" disabled={busy} onClick={onStaffCloseout}>
-          Staff hours &amp; tip split →
-        </Button>
+        {onStaffCloseout ? (
+          <Button className="sm:ml-auto" disabled={busy} onClick={onStaffCloseout}>
+            Staff hours &amp; tip split →
+          </Button>
+        ) : null}
       </div>
 
       {/* 이 화면 사용법(나레이션 프레젠테이션). 새 탭으로 열어 마감 창은 그대로 둔다. */}
