@@ -159,8 +159,17 @@ export const staffPlayerPatch = (bookingId: string, playerId: string, patch: Pat
     p: patch,
   });
 
-export const staffPlayerRemove = (bookingId: string, playerId: string) =>
-  staffRpc<TeeBooking>("pelham_staff_player_remove", { p_id: bookingId, p_player: playerId });
+/** 사유를 주면 0056 의 3인자 함수 — 사유와 승인 매니저가 예약 기록에 남는다. 0056 이 아직 없으면 예전 함수로. */
+export const staffPlayerRemove = async (bookingId: string, playerId: string, reason?: string) => {
+  const base = { p_id: bookingId, p_player: playerId };
+  if (!reason?.trim()) return staffRpc<TeeBooking>("pelham_staff_player_remove", base);
+  try {
+    return await staffRpc<TeeBooking>("pelham_staff_player_remove", { ...base, p_reason: reason.trim() });
+  } catch (error) {
+    if (!(error instanceof ApiError) || !/could not find the function|PGRST202|schema cache/i.test(error.message)) throw error;
+    return staffRpc<TeeBooking>("pelham_staff_player_remove", base);
+  }
+};
 
 // 0026: 추가 품목(풀카트·레인지 바스켓).
 export const staffTeeExtras = () => staffRpc<TeeExtraItem[]>("pelham_staff_tee_extras");

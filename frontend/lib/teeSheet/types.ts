@@ -322,7 +322,8 @@ export type TeeSheetController = {
   // player actions
   addPlayer: (bookingId: string, input?: AddPlayerInput) => Promise<TeeBooking | null>;
   patchPlayer: (bookingId: string, playerId: string, patch: PatchPlayerInput) => Promise<TeeBooking | null>;
-  removePlayer: (bookingId: string, playerId: string) => Promise<TeeBooking | null>;
+  /** 사유(적요)를 주면 예약 기록에 사유와 승인 매니저가 남는다(0056). 매니저 PIN 이 필요하다. */
+  removePlayer: (bookingId: string, playerId: string, reason?: string) => Promise<TeeBooking | null>;
   /** 선수의 추가 품목을 통째로 바꾼다(0026). 순서대로, 같은 품목을 두 번 넣을 수 있다. */
   setPlayerExtras: (bookingId: string, playerId: string, extras: TeeExtra[]) => Promise<TeeBooking | null>;
   /** 한 선수의 그린피만 정한다(0055). 정상가와 다르면 사유와 매니저 PIN 이 필요하다. null = 요금제 값으로. */

@@ -1096,7 +1096,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
   );
 
   const removePlayer = useCallback(
-    (bookingId: string, playerId: string): Promise<TeeBooking | null> => {
+    (bookingId: string, playerId: string, reason?: string): Promise<TeeBooking | null> => {
       const booking = bookingsRef.current.find((item) => item.id === bookingId);
       const player = booking?.players.find((item) => item.id === playerId);
       if (!booking || !player) {
@@ -1113,7 +1113,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       return runBookingMutation({
         bookingId,
         apply: (current) => ({ ...current, players: current.players.filter((item) => item.id !== playerId) }),
-        call: () => teeSheetApi.removePlayer(bookingId, playerId),
+        call: () => teeSheetApi.removePlayer(bookingId, playerId, reason),
         statusText: `${player.name || "Player"} removed from the reservation.`,
         successToast: `${player.name || "Player"} removed.`,
         failText: "플레이어 삭제 실패 — could not remove the player",

@@ -201,6 +201,11 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
       setLoadError("Pick the expiry date.");
       return;
     }
+    // 적요(사유)는 필수다 — 종이에 찍히고 예약 History 에 승인 매니저와 같이 남는다(0056).
+    if (!note.trim()) {
+      setLoadError("Write the reason for the rain check.");
+      return;
+    }
     if (holesPlayed !== "" && !(Number(holesPlayed) >= 0 && Number(holesPlayed) <= 18)) {
       setLoadError("Holes played must be between 0 and 18.");
       return;
@@ -427,11 +432,14 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
                 />
               </label>
               <label className="grid gap-0.5">
-                <span className="font-bold text-[#5c6270]">Note (printed)</span>
+                <span className="font-bold text-[#5c6270]">Reason (printed · History)</span>
                 <input
-                  className="border-b border-[#d7d7dc] py-1 outline-none focus:border-[#4533ff]"
+                  className={`border-b py-1 outline-none focus:border-[#4533ff] ${
+                    note.trim() ? "border-[#d7d7dc]" : "border-[#c47a63]"
+                  }`}
+                  maxLength={200}
                   onChange={(event) => setNote(event.target.value)}
-                  placeholder="Optional"
+                  placeholder="Rain, lightning, course closed…"
                   value={note}
                 />
               </label>
@@ -467,7 +475,8 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
           </span>
           <button
             className="ml-auto bg-[#4533ff] px-5 py-2 font-bold text-white disabled:cursor-not-allowed disabled:bg-[#b1a8ff]"
-            disabled={working || toIssue.length === 0 || !expiresOn}
+            disabled={working || toIssue.length === 0 || !expiresOn || !note.trim()}
+            title={note.trim() ? undefined : "Write the reason first — it is printed on the slip and kept in History"}
             onClick={() => void issueAll()}
             type="button"
           >

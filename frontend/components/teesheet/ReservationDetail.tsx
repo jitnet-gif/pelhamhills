@@ -23,10 +23,10 @@ import Link from "next/link";
 
 import { type Bill, type BillLine, posApi, type TeeBill } from "@/lib/pos/api";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
-import { localBusinessDate } from "@/lib/retail/api";
+import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import { printReceiptDoc, receiptSheetHtml } from "@/lib/retail/printReceipt";
 import { CLUB_TIME_ZONE, PAYMENT_LABELS, saleReceipt } from "@/lib/retail/receipt";
-import { computeTax, formatMoney } from "@/lib/retail/types";
+import { computeTax, formatMoney, type Sale } from "@/lib/retail/types";
 import { greenFeeOf } from "@/lib/greenFee";
 import { longDate, money } from "@/lib/teeSheet/dates";
 import { useSlotLocks } from "@/hooks/useSlotLocks";
@@ -44,6 +44,7 @@ import type {
 } from "@/lib/teeSheet/types";
 
 import BillPanel from "../pos/BillPanel";
+import SaleDetail from "../reports/SaleDetail";
 import { SEATS_PER_TEE_TIME } from "./BookingDialog";
 import RainCheckDialog, { activeRainCheck, useRainChecks } from "./RainCheckDialog";
 
@@ -90,6 +91,12 @@ const RATE_PLANS = [
   "Junior Member",
   "Pelham Staff",
 ];
+
+/** 선수 카드를 Delete 에 놓았을 때 고르는 사유(적요). 직접 적어도 된다. */
+const REMOVE_PRESETS = ["Booked twice", "Guest not coming", "Moved to another tee time", "Entered by mistake"];
+
+/** 카드를 끌어다 놓는 곳. 셋 다 매니저 PIN 이 필요하고 사유(적요)가 예약 History 에 남는다(0024 · 0056). */
+type DropAction = "raincheck" | "refund" | "delete";
 
 /** Clone 드롭다운에 내놓는 최대 개수 (레퍼런스는 끝없이 늘어나지만 하루 단체가 이 이상인 일은 없다). */
 const MAX_CLONES = 20;
@@ -214,6 +221,7 @@ const GLYPH_PATH: Record<string, string> = {
   umbrella: "M1.8 8a6.2 5.4 0 0 1 12.4 0zM8 2.6V1.8M8 8v4.6a1.3 1.3 0 0 1-2.6 0",
   refund: "M3 5.4a5.6 5.6 0 1 1-.6 4.4M3 2.4v3h3M8 4.8v6.4M9.6 6.2c-.3-.6-.9-.9-1.6-.9-.9 0-1.6.5-1.6 1.2 0 1.6 3.2.9 3.2 2.6 0 .7-.7 1.2-1.6 1.2-.8 0-1.4-.3-1.7-1",
   dots: "M8 3.2h.01M8 8h.01M8 12.8h.01",
+  grip: "M6 3.6h.01M10 3.6h.01M6 8h.01M10 8h.01M6 12.4h.01M10 12.4h.01",
   dollar: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM8 4.4v7.2M9.8 6c-.3-.6-1-1-1.8-1-1 0-1.8.5-1.8 1.3 0 1.8 3.6 1 3.6 2.9 0 .8-.8 1.3-1.8 1.3-.9 0-1.6-.4-1.9-1.1",
   check: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM5.2 8.2l2 2 3.6-4",
   ban: "M8 1.8a6.2 6.2 0 1 1 0 12.4A6.2 6.2 0 0 1 8 1.8zM3.6 3.6l8.8 8.8",
@@ -293,6 +301,13 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const [rainCheckFor, setRainCheckFor] = useState<Player[] | null>(null);
   // 카드의 ⋮ 메뉴(Raincheck · Refund · Mark unpaid · Delete)가 열린 선수.
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  // 카드 드래그 앤 드롭: 끌고 있는 선수와 그 아래 놓일 곳. 놓으면 Rain check · Refund · Delete 창이 뜬다.
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropOver, setDropOver] = useState<DropAction | null>(null);
+  // Delete 에 놓았을 때(또는 ⋮ → Delete) 묻는 사유(적요). 사유와 승인 매니저가 History 에 남는다(0056).
+  const [removeAsk, setRemoveAsk] = useState<{ playerId: string; reason: string } | null>(null);
+  // Refund 에 놓았을 때 여는 계산서 — Reports 의 환불 창과 같은 것(사유 필수 · 카드는 리더에서 먼저).
+  const [refundSale, setRefundSale] = useState<Sale | null>(null);
 
   const [bookingDraft, setBookingDraft] = useState<BookingDraft | null>(null);
   const [playerDrafts, setPlayerDrafts] = useState<Record<string, PlayerDraft>>({});
@@ -434,6 +449,10 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     setBillPreview(null);
     setRainCheckFor(null);
     setMenuFor(null);
+    setDragging(null);
+    setDropOver(null);
+    setRemoveAsk(null);
+    setRefundSale(null);
     setSaveState({ kind: "idle", nonce: 0 });
   }, [bookingId]);
 
@@ -905,6 +924,57 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
         ),
     );
 
+  /** 이 사람의 그린피를 받은 결제 계산서(아직 환불 안 된 것). 없으면 계산서 없이 결제로 표시한 옛 기록이다. */
+  const paidBillOf = (playerId: string) =>
+    bookingBills.find(
+      (bill) =>
+        bill.status === "paid" &&
+        bill.lines.some(
+          (line) => line.kind === "tee_player" && line.booking_id === booking.id && line.player_id === playerId,
+        ),
+    );
+
+  /** Refund: 그 계산서를 Reports 와 같은 환불 창으로 연다. 계산서 하나에 일행·상품이 같이 있으면 통째로 환불된다. */
+  const openRefund = async (player: Player) => {
+    const bill = paidBillOf(player.id);
+    if (!bill) {
+      controller.pushToast("error", "No paid bill on file for this player — refund it from Reports → Daily close.");
+      return;
+    }
+    try {
+      setRefundSale(await retailApi.getSale(bill.id));
+    } catch (error) {
+      controller.pushToast("error", toRetailError(error).message);
+    }
+  };
+
+  /** 놓을 수 있나. 안 되면 그 이유(놓는 곳에 회색으로 보인다). */
+  const dropBlock = (action: DropAction, player: Player): string | null => {
+    if (action === "raincheck") {
+      if (!useRainCheck) return "Not set up";
+      return player.paid && !player.cancelled ? null : "Paid players only";
+    }
+    if (action === "refund") {
+      if (!player.paid) return "Not paid";
+      return paidBillOf(player.id) ? null : "No bill — use Reports";
+    }
+    return players.length > 1 ? null : "Last player";
+  };
+
+  const runDrop = (action: DropAction, player: Player) => {
+    setMenuFor(null);
+    const block = dropBlock(action, player);
+    if (block) {
+      controller.pushToast("error", `${player.name || "Player"}: ${block}.`);
+      return;
+    }
+    if (action === "raincheck") setRainCheckFor([player]);
+    else if (action === "refund") void openRefund(player);
+    else setRemoveAsk({ playerId: player.id, reason: "" });
+  };
+  const draggedPlayer = dragging ? (players.find((player) => player.id === dragging) ?? null) : null;
+  const removePlayer = removeAsk ? (players.find((player) => player.id === removeAsk.playerId) ?? null) : null;
+
   /** 재인쇄: 서버 상태는 건드리지 않는다. 결제 계산서가 있으면 그 영수증(결제 수단·카드 정보 포함)이다. */
   const reprintReceipt = (people: Player[]) => {
     setPreview(null);
@@ -1259,6 +1329,64 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
         </div>
       ) : null}
 
+      {/* ===== 선수 삭제 사유(적요) — 카드를 Delete 에 놓거나 ⋮ → Delete =====
+          매니저 PIN 은 서버가 요구한다(0024). 사유와 승인 매니저는 History 에 남는다(0056). */}
+      {removeAsk && removePlayer ? (
+        <form
+          className="border-b border-[#8a3f26] bg-[#fbeae5] p-3"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const reason = removeAsk.reason.trim();
+            if (!reason) return;
+            if (await controller.removePlayer(booking.id, removePlayer.id, reason)) setRemoveAsk(null);
+          }}
+        >
+          <p className="font-bold text-[#8a3f26]">Remove {removePlayer.name || "this player"} from the reservation — why?</p>
+          {removePlayer.paid ? (
+            <p className="mt-1 text-[#6d3a27]">
+              This player has paid. Removing does not give the money back — drag the card onto Refund first.
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap gap-1">
+            {REMOVE_PRESETS.map((preset) => (
+              <button
+                className="border border-[#d7d7dc] bg-[#f2f2f4] px-2 py-1 hover:border-[#8a3f26]"
+                key={preset}
+                onClick={() => setRemoveAsk({ ...removeAsk, reason: preset })}
+                type="button"
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+          <input
+            autoFocus
+            className="mt-2 w-full border border-[#d7d7dc] bg-white p-2 outline-none focus:border-[#8a3f26]"
+            maxLength={200}
+            onChange={(event) => setRemoveAsk({ ...removeAsk, reason: event.target.value })}
+            placeholder="Reason — written to History with the approving manager"
+            value={removeAsk.reason}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              className="border border-[#8a3f26] bg-[#8a3f26] px-4 py-2 font-bold text-white disabled:opacity-40"
+              disabled={busy || !removeAsk.reason.trim()}
+              type="submit"
+            >
+              Remove player
+            </button>
+            <button
+              className="border border-[#c7c7cc] bg-white px-4 py-2 font-bold"
+              onClick={() => setRemoveAsk(null)}
+              type="button"
+            >
+              Back
+            </button>
+            <span className="text-[10px] text-[#6d3a27]">Manager PIN needed</span>
+          </div>
+        </form>
+      ) : null}
+
       {/* ===== 아이콘 레일 + 플레이어 카드 ===== */}
       <div className="flex items-stretch">
         <IconRail
@@ -1357,6 +1485,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             targets={cloneTargets}
           />
         ) : (
+        <div className="relative flex min-w-0 flex-1">
         <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-x-auto p-2">
           {players.map((player) => {
             const pd = playerDrafts[player.id] ?? playerDraftOf(player);
@@ -1371,10 +1500,31 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 
             return (
               <article
-                className="flex w-[264px] shrink-0 flex-col border border-[#c7c7cc] bg-white p-1.5"
+                className={`flex w-[264px] shrink-0 flex-col border bg-white p-1.5 ${
+                  dragging === player.id ? "border-dashed border-[#4533ff] opacity-50" : "border-[#c7c7cc]"
+                }`}
                 key={player.id}
               >
-                <div className="mb-1.5 flex items-center gap-1.5">
+                {/* 머리 줄이 드래그 손잡이다 — 카드 전체를 끌게 하면 이름·전화 칸에서 글자를 고를 수 없다.
+                    Chrome 은 dragstart 안에서 DOM 이 바뀌면 끌기를 취소하므로 놓을 곳은 다음 틱에 띄운다. */}
+                <div
+                  className={`mb-1.5 flex items-center gap-1.5 ${busy ? "" : "cursor-grab active:cursor-grabbing"}`}
+                  draggable={!busy}
+                  onDragEnd={() => {
+                    setDragging(null);
+                    setDropOver(null);
+                  }}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", player.id);
+                    const card = event.currentTarget.closest("article");
+                    if (card) event.dataTransfer.setDragImage(card, 24, 16);
+                    setMenuFor(null);
+                    window.setTimeout(() => setDragging(player.id), 0);
+                  }}
+                  title="Drag this card onto Rain check, Refund or Delete"
+                >
+                  <Glyph className="-mx-0.5 h-3.5 w-3.5 text-[#b6b6c0]" name="grip" />
                   {player.type === "Guest" ? null : (
                     <span
                       aria-hidden
@@ -1421,7 +1571,19 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                             <span className="ml-auto pl-2 text-[10px] text-[#9aa0a6]">Manager</span>
                           </button>
                         ) : null}
-                        {player.paid ? (
+                        {player.paid && paidBillOf(player.id) ? (
+                          <button
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
+                            onClick={() => runDrop("refund", player)}
+                            role="menuitem"
+                            title="Refund the bill this player was paid on — a reason and a manager PIN are needed"
+                            type="button"
+                          >
+                            <Glyph className="h-4 w-4" name="refund" />
+                            Refund
+                            <span className="ml-auto pl-2 text-[10px] text-[#9aa0a6]">Manager</span>
+                          </button>
+                        ) : player.paid ? (
                           <Link
                             className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
                             href={`/admin/reports?date=${localBusinessDate(player.paidAt ? new Date(player.paidAt) : new Date())}`}
@@ -1451,12 +1613,9 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                         ) : null}
                         <button
                           className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#c0262d] hover:bg-[#fff1ee]"
-                          onClick={() => {
-                            setMenuFor(null);
-                            void controller.removePlayer(booking.id, player.id);
-                          }}
+                          onClick={() => runDrop("delete", player)}
                           role="menuitem"
-                          title="Remove this player from the reservation"
+                          title="Remove this player from the reservation — a reason and a manager PIN are needed"
                           type="button"
                         >
                           <Glyph className="h-4 w-4" name="trash" />
@@ -1954,6 +2113,58 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             </button>
           ) : null}
         </div>
+
+        {/* ===== 놓을 곳 — 카드를 끄는 동안만 카드 위 아래쪽에 뜬다 ===== */}
+        {draggedPlayer ? (
+          <div className="pointer-events-none absolute inset-x-2 bottom-2 z-30 grid grid-cols-3 gap-2">
+            {(
+              [
+                { action: "raincheck", label: "Rain check", glyph: "umbrella", tone: "#2f6f8f", bg: "#eef6fa" },
+                { action: "refund", label: "Refund", glyph: "refund", tone: "#b26a00", bg: "#fff4e0" },
+                { action: "delete", label: "Delete", glyph: "trash", tone: "#c0262d", bg: "#fff1ee" },
+              ] as const
+            ).map((zone) => {
+              const block = dropBlock(zone.action, draggedPlayer);
+              const over = dropOver === zone.action && !block;
+              return (
+                <div
+                  className={`pointer-events-auto flex flex-col items-center justify-center gap-0.5 border-2 border-dashed px-2 py-3 text-center shadow-lg transition-colors ${
+                    block ? "border-[#c7c7cc] bg-[#f2f2f4] text-[#9aa0a6]" : ""
+                  }`}
+                  key={zone.action}
+                  onDragLeave={() => setDropOver((current) => (current === zone.action ? null : current))}
+                  onDragOver={(event) => {
+                    if (block) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    if (dropOver !== zone.action) setDropOver(zone.action);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragging(null);
+                    setDropOver(null);
+                    runDrop(zone.action, draggedPlayer);
+                  }}
+                  style={
+                    block
+                      ? undefined
+                      : {
+                          borderColor: zone.tone,
+                          color: over ? "#fff" : zone.tone,
+                          background: over ? zone.tone : zone.bg,
+                        }
+                  }
+                >
+                  {/* 안쪽 요소가 drag 이벤트를 받으면 dragleave 가 번갈아 터져 색이 깜박인다. */}
+                  <Glyph className="pointer-events-none h-5 w-5" name={zone.glyph} />
+                  <span className="pointer-events-none text-[13px] font-bold">{zone.label}</span>
+                  <span className="pointer-events-none text-[10px] opacity-80">{block ?? "Manager PIN · reason"}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+        </div>
         )}
       </div>
 
@@ -2110,6 +2321,18 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             </div>
           </div>
         </div>
+      ) : null}
+
+      {refundSale ? (
+        <SaleDetail
+          onClose={() => setRefundSale(null)}
+          onRefunded={(updated) => {
+            setRefundSale(null);
+            controller.pushToast("success", `Refunded ${updated.receipt_no}.`);
+            void controller.refresh();
+          }}
+          sale={refundSale}
+        />
       ) : null}
 
       {rainCheckFor ? (

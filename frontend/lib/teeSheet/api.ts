@@ -112,8 +112,8 @@ export const teeSheetApi = {
     patch: PatchPlayerInput,
   ): Promise<TeeBooking> => staffPlayerPatch(bookingId, playerId, patch),
 
-  removePlayer: (bookingId: string, playerId: string): Promise<TeeBooking> =>
-    staffPlayerRemove(bookingId, playerId),
+  removePlayer: (bookingId: string, playerId: string, reason?: string): Promise<TeeBooking> =>
+    staffPlayerRemove(bookingId, playerId, reason),
 
   // ===== Extras (0026) =====
   listExtras: (): Promise<TeeExtraItem[]> => staffTeeExtras(),
