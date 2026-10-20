@@ -141,3 +141,70 @@ export function duration(seconds: number | null): string {
   const s = Math.max(0, Math.round(seconds));
   return `${Math.floor(s / 60)}분 ${String(s % 60).padStart(2, "0")}초`;
 }
+
+// ===== 문자 (0058) =====================================================
+// `/sms/messages`·`/sms/opt-outs` 도 FastAPI 가 직원 확인 뒤 DB 에서 대신 읽는다(`backend/api/routes/sms.py`).
+
+export type SmsRow = {
+  id: string;
+  direction: "in" | "out";
+  /** 손님 번호(E.164). 보낸 문자는 받는 사람, 받은 문자는 보낸 사람. */
+  phone: string;
+  body: string;
+  template: string | null;
+  booking_ref: string | null;
+  media_url: string | null;
+  status: string | null;
+  error: string | null;
+  created_at: string;
+};
+
+export async function fetchSms(
+  options: { phone?: string | null; before?: string | null } = {},
+): Promise<{ messages: SmsRow[]; has_more: boolean; source: "db" | "memory" }> {
+  const query = new URLSearchParams({ limit: "100" });
+  if (options.phone) query.set("phone", options.phone);
+  if (options.before) query.set("before", options.before);
+  return (await request(`/sms/messages?${query}`)).json();
+}
+
+export async function fetchSmsOptOuts(): Promise<{
+  opt_outs: { phone: string; created_at: string | null }[];
+  source: "db" | "memory";
+}> {
+  return (await request("/sms/opt-outs")).json();
+}
+
+export const SMS_TEMPLATE_LABEL: Record<string, string> = {
+  confirm: "예약 확정",
+  cancel: "예약 취소",
+  reminder: "리마인더",
+  payment_approved: "결제 승인",
+  rain_check: "레인 체크",
+  waitlist_offer: "대기자 제안",
+  lost_item_found: "분실물 찾음",
+  marketing: "프로모션",
+  assistant: "문자 비서",
+  reply: "자동 답장",
+  info_directions: "안내 문자 (길안내)",
+  info_booking_link: "안내 문자 (예약 링크)",
+};
+
+export function smsTemplateLabel(row: SmsRow): string {
+  if (row.direction === "in") return "손님 문자";
+  if (!row.template) return "문자";
+  return SMS_TEMPLATE_LABEL[row.template] ?? (row.template.startsWith("info_") ? "안내 문자" : row.template);
+}
+
+/** +19058921234 → (905) 892-1234 */
+export function prettyPhone(e164: string): string {
+  const d = e164.replace(/\D/g, "");
+  const ten = d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+  return ten.length === 10 ? `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}` : e164;
+}
+
+export function isoClubDateTime(iso: string | null): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? "" : clubDateTime(t / 1000);
+}

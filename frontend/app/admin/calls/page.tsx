@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Calls & SMS — AI 전화 예약 통화 기록. 원본은 ElevenLabs(`lib/calls/api.ts`).
+ * Calls & SMS — 탭 셋: AI 전화 예약 통화 기록(ElevenLabs), 문자 기록(0058), 수신 거부(STOP) 번호.
+ * 통화 원본은 ElevenLabs(`lib/calls/api.ts`), 문자 탭은 `components/admin/SmsLog.tsx`.
  *
  * 줄을 누르면:
  *   - 티타임을 잡거나 바꾼 통화 → 티 시트에서 그 예약을 연다 (`/teesheet?date=…&booking=…`).
@@ -13,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
+import { SmsLog, SmsOptOuts } from "@/components/admin/SmsLog";
 import {
   type CallDetail,
   type CallRow,
@@ -36,6 +38,14 @@ const OUTCOME_TONE: Record<CallRow["outcome"], string> = {
   transferred: "bg-[#fff0e6] text-[#a4500f]",
   info: "bg-[#f0f1f3] text-[#4e5560]",
 };
+
+type Tab = "calls" | "sms" | "optouts";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "calls", label: "통화" },
+  { id: "sms", label: "문자" },
+  { id: "optouts", label: "수신 거부" },
+];
 
 /** 줄을 누르면 티 시트로 가는 결과. */
 const GOES_TO_TEE_SHEET = new Set<CallRow["outcome"]>(["booked", "modified"]);
@@ -74,6 +84,9 @@ export default function CallsPage() {
   const [error, setError] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("calls");
+  // 문자·수신 거부 탭은 각자 읽는다. Refresh 를 누르면 이 숫자가 바뀌어 다시 읽는다.
+  const [smsRefresh, setSmsRefresh] = useState(0);
 
   // 오늘(클럽 시간). 지표는 오늘 걸려 온 통화만 센다. 새로고침할 때 다시 구한다.
   const [today, setToday] = useState(() => clubDay(Date.now() / 1000));
@@ -142,11 +155,11 @@ export default function CallsPage() {
       actions={
         <button
           className="tap-target bg-[#4533ff] px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50"
-          disabled={loading}
-          onClick={() => load()}
+          disabled={tab === "calls" && loading}
+          onClick={() => (tab === "calls" ? load() : setSmsRefresh((n) => n + 1))}
           type="button"
         >
-          {loading ? "Loading…" : "Refresh"}
+          {tab === "calls" && loading ? "Loading…" : "Refresh"}
         </button>
       }
       title="Calls & SMS"
@@ -154,11 +167,38 @@ export default function CallsPage() {
       <section className="border-b border-[#d4d4d8] bg-white px-4 py-4">
         <p className="max-w-4xl text-sm leading-6 text-[#4e5560]">
           AI 전화 예약 통화 기록입니다 (ElevenLabs). 예약이 잡힌 통화를 누르면 티 시트에서 그 예약이 열리고,
-          나머지 통화는 요약·녹취·녹음을 볼 수 있습니다.
+          나머지 통화는 요약·녹취·녹음을 볼 수 있습니다. 문자 탭에는 손님에게 보낸 문자와 받은 문자가 모두 남습니다.
         </p>
+        <div className="mt-3 flex gap-1" role="tablist">
+          {TABS.map((t) => (
+            <button
+              aria-selected={tab === t.id}
+              className={`px-4 py-1.5 text-xs font-bold ${
+                tab === t.id ? "bg-[#1f2329] text-white" : "border border-[#cfd2d8] bg-white text-[#30353d]"
+              }`}
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              role="tab"
+              type="button"
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </section>
 
-      <section className="grid gap-4 p-4">
+      {tab === "sms" ? (
+        <section className="grid gap-4 p-4">
+          <SmsLog refreshKey={smsRefresh} />
+        </section>
+      ) : null}
+      {tab === "optouts" ? (
+        <section className="grid gap-4 p-4">
+          <SmsOptOuts refreshKey={smsRefresh} />
+        </section>
+      ) : null}
+
+      <section className={`grid gap-4 p-4 ${tab === "calls" ? "" : "hidden"}`}>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {metrics.map((metric) => (
             <article className="border border-[#d6d6dc] bg-white p-3" key={metric.label}>

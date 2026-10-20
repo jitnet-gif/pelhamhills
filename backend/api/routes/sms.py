@@ -3,7 +3,8 @@
   POST /sms/inbound   손님 문자 — STOP/START, "C <코드>" 로 취소(티타임·시뮬레이터), 대기자 제안에 YES/NO,
                       "book"/"reservation" 첫 문자에는 예약 양식, 그 밖은 문자 예약 비서
   POST /sms/status    Twilio 전달 상태 콜백
-  GET  /sms/messages  최근 발송·수신 기록 (Calls & SMS 화면용)
+  GET  /sms/messages  최근 발송·수신 기록 (Calls & SMS 화면용, 직원만 — 0058)
+  GET  /sms/opt-outs  STOP 으로 답한 번호 (같은 화면, 직원만 — 0047)
   GET  /sms/barcode/{code}.png  확정 문자(MMS)에 붙는 확인 번호 바코드
 
 확인 문자는 음성 예약이 확정될 때 `voice.py` 가 보낸다. 여기서는 그 뒤의 일을 한다.
@@ -24,9 +25,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 from xml.sax.saxutils import escape
 
-import os
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 
 from backend.api.routes import tee_sheet as ts
 from backend.api.routes import marketing, voice, voice_sim
@@ -34,10 +33,17 @@ from backend.core.config import settings
 from backend.services import sms_agent, waitlist_offers
 from backend.services.barcode_png import BARCODE_CODE_RE, barcode_url, code128_png
 from backend.services.tee_sheet_store import Scope
+from backend.services import supabase_rest
 from backend.services.twilio_sms import (
+    OPTOUT_TABLE,
+    SMS_TABLE,
     SmsMessage,
+    is_opted_out,
     normalize_phone,
     opted_out,
+    remember_inbound,
+    save_message,
+    save_status,
     send_sms,
     sms_messages,
     update_status,
@@ -154,44 +160,63 @@ async def inbound(request: Request, background: BackgroundTasks) -> Response:
     params = await _twilio_params(request)
     sender = normalize_phone(params.get("From")) or params.get("From", "")
     body = (params.get("Body") or "").strip()
-    sms_messages.insert(
-        0,
-        SmsMessage(
-            direction="in",
-            to_e164=params.get("To", ""),
-            from_e164=sender,
-            body=body,
-            status="received",
-            twilio_sid=params.get("MessageSid"),
-        ),
+    received = SmsMessage(
+        direction="in",
+        to_e164=params.get("To", ""),
+        from_e164=sender,
+        body=body,
+        status="received",
+        twilio_sid=params.get("MessageSid"),
     )
+    remember_inbound(received)
+    background.add_task(save_message, received)
+    reply = await _handle_inbound(sender, body, background)
+    # 바로 돌려주는 답장(TwiML)도 기록에 남긴다. Twilio 가 따로 sid 를 주지 않으므로 상태는 'sent'.
+    if reply.message:
+        background.add_task(save_message, SmsMessage(
+            direction="out", to_e164=sender, from_e164=params.get("To", ""), body=reply.message,
+            template="reply", media_url=reply.media_url, status="sent",
+        ))
+    return _twiml(reply.message, reply.media_url)
+
+
+class _Reply:
+    def __init__(self, message: str | None = None, media_url: str | None = None) -> None:
+        self.message = message
+        self.media_url = media_url
+
+
+async def _handle_inbound(sender: str, body: str, background: BackgroundTasks) -> _Reply:
+    from starlette.concurrency import run_in_threadpool
+
+    # 다른 머신이 받은 STOP/START 도 따르게 DB 에 묻는다 (`is_opted_out` 이 메모리도 맞춘다).
+    was_opted_out = await run_in_threadpool(is_opted_out, sender)
 
     keyword = _keyword(body)
     words = body.upper().split()
 
     if keyword in STOP_WORDS:
         opted_out.add(sender)
-        # 프로모션 수신거부는 DB 에도 남긴다 — 이 집합은 재시작하면 비지만 마케팅 명단은 그러면 안 된다.
-        background.add_task(marketing.record_sms_reply, sender, True)
-        return _twiml()
+        # 수신 거부의 진실은 DB(0047)다 — 이 집합은 재시작하면 비고, 머신마다 따로다.
+        # 응답 전에 남긴다: 바로 다음 문자(리마인더 등)가 다른 머신에서 나갈 수 있다.
+        await run_in_threadpool(marketing.record_sms_reply, sender, True)
+        return _Reply()
     # "YES" 는 수신 거부한 사람에게만 수신 재개다. 그 밖에는 비서에게 하는 대답이다.
-    if keyword in START_WORDS and (keyword != "YES" or sender in opted_out):
+    if keyword in START_WORDS and (keyword != "YES" or was_opted_out):
         opted_out.discard(sender)
-        background.add_task(marketing.record_sms_reply, sender, False)
-        return _twiml()
-    # 저장소 호출은 동기다. 이벤트 루프를 막지 않게 스레드로 넘긴다.
-    from starlette.concurrency import run_in_threadpool
+        await run_in_threadpool(marketing.record_sms_reply, sender, False)
+        return _Reply()
 
     if words and words[0] == "C" and len(words) == 2 and SIM_CODE_RE.fullmatch(words[1]):
         # 시뮬레이터는 Supabase 에 있다 — 발신번호와 코드가 둘 다 맞아야 한다 (`voice_sim`).
         reply = await run_in_threadpool(voice_sim.cancel_by_code, sender, words[1])
-        return _twiml(reply)
+        return _Reply(reply)
 
     if words and words[0] == "C" and (len(words) == 1 or (len(words) == 2 and CODE_RE.fullmatch(words[1]))):
         reply = await run_in_threadpool(cancel_by_reply, sender, "".join(words[1:]))
         # 자리가 비었으면 대기자에게 바로 건다 (1분 루프를 기다리지 않게).
         background.add_task(waitlist_offers.run)
-        return _twiml(reply)
+        return _Reply(reply)
 
     # 대기자 제안에 대한 YES/NO. 이 번호에 걸린 제안이 있을 때만 가로챈다 — 아니면
     # 문자 비서에게 "Yes" 라고 답한 손님의 대화를 뺏게 된다.
@@ -201,20 +226,20 @@ async def inbound(request: Request, background: BackgroundTasks) -> Response:
             background.add_task(waitlist_offers.run)  # NO 면 다음 사람에게 바로
             # YES 로 예약이 됐으면 답장이 곧 확정 문자다 — 다른 확정처럼 바코드를 붙인다.
             booked = BOOKED_CODE_RE.search(reply)
-            return _twiml(reply, barcode_url(booked.group(1)) if booked else None)
+            return _Reply(reply, barcode_url(booked.group(1)) if booked else None)
 
     # 수신 거부한 번호에는 비서를 돌리지 않는다. 예약은 되는데 확인 문자도 답장도
     # 못 받는 일이 생긴다.
-    if sms_agent.enabled() and body and sender not in opted_out:
+    if sms_agent.enabled() and body and not was_opted_out:
         # "book"·"reservation" 으로 처음 연락한 손님에게는 채워 보낼 양식을 준다.
         # 채운 답장은 아래 비서가 읽고 예약한다.
         if sms_agent.wants_booking_form(sender, body):
-            return _twiml(sms_agent.start_booking_form(sender, body))
+            return _Reply(sms_agent.start_booking_form(sender, body))
         # 답장은 응답이 나간 뒤 REST 로 보낸다 (`sms_agent.handle_text` 참고).
         background.add_task(sms_agent.handle_text, sender, body)
-        return _twiml()
+        return _Reply()
 
-    return _twiml(
+    return _Reply(
         f"Pelham Hills: reply C and your code to cancel. For anything else call {settings.PROSHOP_PHONE_NUMBER}."
     )
 
@@ -241,42 +266,106 @@ async def status(request: Request, background: BackgroundTasks) -> Response:
     if sid:
         state = params.get("MessageStatus") or params.get("SmsStatus") or "unknown"
         update_status(sid, state, params.get("ErrorCode"))
+        background.add_task(save_status, sid, state, params.get("ErrorCode"))
         # 프로모션 문자의 전달 결과는 캠페인 기록(0047)에. 끝난 상태만 — 중간 상태마다 DB 를 두드리지 않는다.
         if state in ("delivered", "failed", "undelivered"):
             background.add_task(marketing.record_sms_status, sid, state, params.get("ErrorCode"))
     return Response(status_code=204)
 
 
-def hide_on_public_surface() -> None:
-    """공개 배포(`PUBLIC_SURFACE=voice`)에서는 이 경로를 없는 것처럼 둔다.
+def _require_staff(request: Request) -> None:
+    """직원인가. `/calls` 와 같은 확인 — 요청의 Supabase 토큰으로 SQL 이 본다(단말기 0021).
 
-    이 목록에는 손님 전화번호와 문자 본문이 그대로 들어 있는데 인증이 없다.
-    Twilio 가 부르는 것은 `/sms/inbound` 와 `/sms/status` 둘뿐이고, 기록 조회는
-    어드민 화면(Calls & SMS) 용이다. 403 이 아니라 404 를 주는 이유는, 403 이면
-    "거기 뭔가 있다" 는 사실을 알려 주기 때문이다.
+    목록에는 손님 번호와 문자 본문이 그대로 있다. 예전에는 인증이 없어서 공개 배포에서 숨겼다.
     """
-    if os.getenv("PUBLIC_SURFACE", "all").strip().lower() == "voice":
-        raise HTTPException(status_code=404, detail="Not Found")
+    from backend.api.routes import terminal  # 순환 임포트를 피해 여기서
+
+    terminal._require_staff(request)
 
 
-@router.get("/sms/messages", dependencies=[Depends(hide_on_public_surface)])
-def list_messages(booking_ref: str | None = None, limit: int = 100) -> list[dict]:
-    rows = [m for m in sms_messages if not booking_ref or m.booking_ref == booking_ref]
-    return [
-        {
-            "id": m.id,
-            "direction": m.direction,
-            "to": m.to_e164,
-            "from": m.from_e164,
-            "body": m.body,
-            "template": m.template,
-            "booking_ref": m.booking_ref,
-            "status": m.status,
-            "error": m.error,
-            "created_at": m.created_at.isoformat(),
-        }
-        for m in rows[:limit]
-    ]
+def _message_json(m: SmsMessage) -> dict:
+    return {
+        "id": m.id,
+        "direction": m.direction,
+        "phone": m.to_e164 if m.direction == "out" else m.from_e164,
+        "to": m.to_e164,
+        "from": m.from_e164,
+        "body": m.body,
+        "template": m.template,
+        "booking_ref": m.booking_ref,
+        "media_url": m.media_url,
+        "status": m.status,
+        "error": m.error,
+        "created_at": m.created_at.isoformat(),
+    }
+
+
+def _row_json(r: dict) -> dict:
+    return {
+        "id": r.get("id"),
+        "direction": r.get("direction"),
+        "phone": r.get("phone") or "",
+        "to": r.get("to_phone") or "",
+        "from": r.get("from_phone") or "",
+        "body": r.get("body") or "",
+        "template": r.get("template"),
+        "booking_ref": r.get("booking_ref"),
+        "media_url": r.get("media_url"),
+        "status": r.get("status"),
+        "error": r.get("error"),
+        "created_at": r.get("created_at"),
+    }
+
+
+@router.get("/sms/messages")
+def list_messages(
+    request: Request,
+    phone: str | None = None,
+    booking_ref: str | None = None,
+    before: str | None = None,
+    limit: int = 100,
+) -> dict:
+    """최근 문자(새것부터). `phone` 이면 그 번호와 주고받은 것만, `before`(created_at)로 다음 쪽.
+
+    DB(0058)에서 읽는다. 0058 전이거나 Supabase 가 안 되면 이 프로세스의 기억으로 답하고 `source` 로 알린다.
+    """
+    _require_staff(request)
+    limit = max(1, min(limit, 200))
+    wanted = normalize_phone(phone) if phone else None
+    params = {"select": "*", "order": "created_at.desc", "limit": str(limit + 1)}
+    if wanted:
+        params["phone"] = f"eq.{wanted}"
+    if booking_ref:
+        params["booking_ref"] = f"eq.{booking_ref}"
+    if before:
+        params["created_at"] = f"lt.{before}"
+    try:
+        rows = supabase_rest.select(SMS_TABLE, params)
+        source = "db"
+        items = [_row_json(r) for r in rows]
+    except supabase_rest.SupabaseUnavailable:
+        source = "memory"
+        items = [
+            _message_json(m) for m in sms_messages
+            if (not wanted or wanted in (m.to_e164, m.from_e164))
+            and (not booking_ref or m.booking_ref == booking_ref)
+            and (not before or m.created_at.isoformat() < before)
+        ][: limit + 1]
+    return {"messages": items[:limit], "has_more": len(items) > limit, "source": source}
+
+
+@router.get("/sms/opt-outs")
+def list_opt_outs(request: Request) -> dict:
+    """STOP 으로 답한 번호 (0047, source='reply'). 이 번호들에는 어떤 문자도 나가지 않는다."""
+    _require_staff(request)
+    try:
+        rows = supabase_rest.select(OPTOUT_TABLE, {
+            "select": "phone,created_at", "channel": "eq.sms", "source": "eq.reply", "order": "created_at.desc",
+        })
+        return {"opt_outs": [{"phone": f"+1{r['phone']}", "created_at": r.get("created_at")} for r in rows],
+                "source": "db"}
+    except supabase_rest.SupabaseUnavailable:
+        return {"opt_outs": [{"phone": p, "created_at": None} for p in sorted(opted_out)], "source": "memory"}
 
 
 # ===== 리마인더 ========================================================

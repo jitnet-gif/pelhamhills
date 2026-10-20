@@ -3,8 +3,13 @@
 음성 예약(`backend/api/routes/voice.py`)이 확정·취소 문자를 보내고,
 `backend/api/routes/sms.py` 가 손님 답장(C 로 취소, STOP)과 전달 상태를 받는다.
 키가 없으면 보내지 않고 `skipped` 로만 기록한다 — 로컬 개발과 테스트가 이 경로를 탄다.
+
+기록은 Supabase `pelham_sms_messages`(0058)에 남는다 — 어드민 "Calls & SMS" 의 문자 탭이 읽는다.
+수신 거부의 진실은 0047 `pelham_marketing_optouts`(STOP 답장 줄)이다. 메모리의 `sms_messages`·`opted_out`
+은 DB 가 안 될 때의 대비와 테스트용으로 남는다.
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -19,6 +24,7 @@ from uuid import uuid4
 import httpx
 
 from backend.core.config import settings
+from backend.services import supabase_rest
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +77,80 @@ sms_messages: list[SmsMessage] = []
 opted_out: set[str] = set()
 
 
+SMS_TABLE = "pelham_sms_messages"
+OPTOUT_TABLE = "pelham_marketing_optouts"
+
+
+def _db_row(msg: SmsMessage) -> dict:
+    return {
+        "id": msg.id,
+        "direction": msg.direction,
+        "to_phone": msg.to_e164,
+        "from_phone": msg.from_e164,
+        "phone": msg.to_e164 if msg.direction == "out" else msg.from_e164,
+        "body": msg.body,
+        "template": msg.template,
+        "booking_ref": msg.booking_ref,
+        "media_url": msg.media_url,
+        "status": msg.status,
+        "twilio_sid": msg.twilio_sid,
+        "error": msg.error,
+        "created_at": msg.created_at.isoformat(),
+    }
+
+
+def save_message(msg: SmsMessage) -> None:
+    """한 통을 DB 에 남긴다. 실패해도 문자 흐름은 막지 않는다 (0058 전이거나 Supabase 가 잠시 꺼짐)."""
+    try:
+        supabase_rest.insert(SMS_TABLE, _db_row(msg))
+    except Exception as exc:
+        logger.warning("문자 기록 실패: %s", type(exc).__name__)
+
+
+def save_status(sid: str, status: str, error_code: str | None = None) -> None:
+    patch: dict = {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if error_code:
+        patch["error"] = error_code
+    try:
+        supabase_rest.update(SMS_TABLE, {"twilio_sid": f"eq.{sid}"}, patch)
+    except Exception as exc:
+        logger.warning("문자 상태 기록 실패: %s", type(exc).__name__)
+
+
+def remember_inbound(msg: SmsMessage) -> None:
+    sms_messages.insert(0, msg)
+    del sms_messages[1000:]
+
+
+def _ten_digits(e164: str) -> str | None:
+    digits = re.sub(r"\D", "", e164 or "")
+    if len(digits) == 11 and digits.startswith("1"):
+        return digits[1:]
+    return digits if len(digits) == 10 else None
+
+
+def is_opted_out(e164: str) -> bool:
+    """손님이 STOP 으로 답한 번호인가. DB(0047, source='reply')가 진실이고, 안 되면 이 프로세스의 기억.
+
+    직원이 마케팅 화면에서 넣은 수신 거부(source='staff')는 프로모션만 막는다 — 확정·결제 문자는 간다.
+    DB 가 답하면 메모리도 맞춘다: 다른 머신이 받은 STOP/START 를 이 머신의 비서·대기자 판단도 따른다.
+    """
+    phone = _ten_digits(e164)
+    if phone is None:
+        return e164 in opted_out
+    try:
+        rows = supabase_rest.select(OPTOUT_TABLE, {
+            "select": "phone", "phone": f"eq.{phone}", "channel": "eq.sms", "source": "eq.reply",
+        })
+    except Exception:
+        return e164 in opted_out
+    if rows:
+        opted_out.add(e164)
+        return True
+    opted_out.discard(e164)
+    return False
+
+
 def _by_sid(sid: str) -> SmsMessage | None:
     for msg in sms_messages:
         if msg.twilio_sid == sid:
@@ -98,16 +178,22 @@ async def send_sms(
     )
     sms_messages.insert(0, msg)
     del sms_messages[1000:]
+    await _deliver(msg)
+    await asyncio.to_thread(save_message, msg)
+    return msg
 
-    if to_e164 in opted_out:
+
+async def _deliver(msg: SmsMessage) -> None:
+    to_e164, body, media_url, template = msg.to_e164, msg.body, msg.media_url, msg.template
+    if await asyncio.to_thread(is_opted_out, to_e164):
         msg.status = "skipped"
         msg.error = "recipient opted out (STOP)"
-        return msg
+        return
     if not settings.TWILIO_ENABLED:
         msg.status = "skipped"
         msg.error = "Twilio not configured"
         logger.warning("Twilio 미설정 — SMS 미발송: %s %s", to_e164, template)
-        return msg
+        return
 
     data = {
         "To": to_e164,
@@ -137,7 +223,6 @@ async def send_sms(
         msg.status = "failed"
         msg.error = str(exc)
         logger.error("Twilio SMS 예외: %s", exc)
-    return msg
 
 
 def update_status(sid: str, status: str, error_code: str | None = None) -> None:
