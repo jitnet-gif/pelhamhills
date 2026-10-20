@@ -37,18 +37,27 @@ export const PUBLISHABLE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_oMJG_-xpWr6AI5o3KnrU_A_kJENaKSY";
 
 /**
- * 세션 저장 칸. 현금 리포트 사이트(`/cash`)는 칸이 따로다(2026-10-20 클럽 요청) — 같은 브라우저에서
+ * 세션 저장 칸. 현금 리포트 사이트(`/cash`)·마케팅 사이트(`/marketing`)는 칸이 따로다(2026-10-20 클럽 요청) — 같은 브라우저에서
  * 프로 샵 계정으로 티 시트를 쓰는 중에도 현금 리포트는 자기 계정으로 **따로** 로그인·로그아웃한다.
  * 이 파일을 부르는 모든 직원 호출(staffRpc·retail·rain check …)이 지금 주소의 칸을 따라간다.
  */
 export const CASH_SITE_PATH = "/cash";
+/** 고객 마케팅 사이트(0047). 현금 리포트와 같은 까닭으로 칸이 따로다. */
+export const MARKETING_SITE_PATH = "/marketing";
 const STAFF_STORAGE_KEY = "pelham.staff.session";
 const CASH_STORAGE_KEY = "pelham.cash.session";
+const MARKETING_STORAGE_KEY = "pelham.marketing.session";
+
+function onSite(path: string, site: string): boolean {
+  return path === site || path.startsWith(`${site}/`);
+}
 
 function storageKey(): string {
   if (typeof window === "undefined") return STAFF_STORAGE_KEY;
   const path = window.location.pathname;
-  return path === CASH_SITE_PATH || path.startsWith(`${CASH_SITE_PATH}/`) ? CASH_STORAGE_KEY : STAFF_STORAGE_KEY;
+  if (onSite(path, CASH_SITE_PATH)) return CASH_STORAGE_KEY;
+  if (onSite(path, MARKETING_SITE_PATH)) return MARKETING_STORAGE_KEY;
+  return STAFF_STORAGE_KEY;
 }
 
 /** 만료 이 시간 전부터는 미리 갱신한다. 요청 도중 토큰이 죽는 것을 막는 여유분. */

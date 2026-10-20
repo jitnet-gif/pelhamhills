@@ -1,0 +1,868 @@
+"use client";
+
+/**
+ * 고객 마케팅 화면 네 칸: 새 캠페인 · 캠페인 기록 · 동의 · 수신거부.
+ *
+ * 누구에게 보낼 수 있는지는 서버(0047)가 정한다 — 이 화면은 그 결과를 보여 주고 고를 뿐이다.
+ *   문자: 동의 표시가 있거나, 표시가 없으면 회원·라운드 기록이 있는 손님. 끝에 "Reply STOP to opt out."
+ *   AI 전화: 전화 동의(call_ok)를 받은 손님만. 자동 전화라 명시적 동의가 있어야 한다(CRTC).
+ */
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import {
+  type Audience,
+  type AudienceCustomer,
+  type Campaign,
+  type Channel,
+  type MarketingStatus,
+  type OptOut,
+  type Segment,
+  REASON_LABEL,
+  SEGMENT_LABEL,
+  SEND_STATUS_LABEL,
+  describeMarketingError,
+  formatPhone,
+  marketingApi,
+} from "@/lib/marketing/api";
+
+type Tab = "compose" | "campaigns" | "consent" | "optouts";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "compose", label: "New campaign" },
+  { key: "campaigns", label: "Campaigns" },
+  { key: "consent", label: "Consent" },
+  { key: "optouts", label: "Opt-outs" },
+];
+
+const CHANNEL_LABEL: Record<Channel, string> = { sms: "Text message", call: "AI phone call" };
+
+export default function MarketingApp() {
+  const [tab, setTab] = useState<Tab>("compose");
+  const [status, setStatus] = useState<MarketingStatus | null>(null);
+  const [statusError, setStatusError] = useState("");
+  const [openCampaign, setOpenCampaign] = useState<number | null>(null);
+
+  useEffect(() => {
+    marketingApi.status().then(setStatus, (cause) => setStatusError(describeMarketingError(cause)));
+  }, []);
+
+  const onCreated = useCallback((id: number) => {
+    setOpenCampaign(id);
+    setTab("campaigns");
+  }, []);
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-4">
+      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-[#d4d4d8]" aria-label="Marketing">
+        {TABS.map((item) => (
+          <button
+            className={`min-h-10 shrink-0 px-4 text-sm font-bold ${
+              tab === item.key ? "border-b-2 border-[#4533ff] text-[#4533ff]" : "text-[#4e5560]"
+            }`}
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            type="button"
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <ServerBanner status={status} error={statusError} />
+
+      {tab === "compose" ? <Compose status={status} onCreated={onCreated} /> : null}
+      {tab === "campaigns" ? <Campaigns initial={openCampaign} status={status} /> : null}
+      {tab === "consent" ? <Consent /> : null}
+      {tab === "optouts" ? <OptOuts /> : null}
+    </div>
+  );
+}
+
+function ServerBanner({ status, error }: { status: MarketingStatus | null; error: string }) {
+  if (error) {
+    return (
+      <p className="mb-4 border border-[#f0d58a] bg-[#fff8e1] p-3 text-xs text-[#6b4e00]">
+        The sending server did not answer ({error}). You can still build campaigns and manage consent.
+      </p>
+    );
+  }
+  if (!status) return null;
+  return (
+    <div className="mb-4 flex flex-wrap gap-2 text-xs">
+      <Pill ok={status.sms} label={status.sms ? "Texts ready (Twilio)" : "Texts not set up (Twilio)"} />
+      <Pill ok={status.call} label={status.call ? "AI calls ready (ElevenLabs)" : "AI calls not set up (ElevenLabs)"} />
+      <Pill
+        ok={status.window_open}
+        label={status.window_open ? "Sending hours: open now" : `Outside sending hours · ${status.window}`}
+      />
+    </div>
+  );
+}
+
+function Pill({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span className={`px-2.5 py-1 font-bold ${ok ? "bg-[#e3f5e8] text-[#16723a]" : "bg-[#f0f1f3] text-[#4e5560]"}`}>
+      {ok ? "● " : "○ "}
+      {label}
+    </span>
+  );
+}
+
+// ===== 새 캠페인 ==========================================================
+
+function useAudience(channel: Channel, segment: Segment, minRounds: number, search: string) {
+  const [audience, setAudience] = useState<Audience | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      marketingApi
+        .audience(channel, { segment, min_rounds: minRounds, search })
+        .then(
+          (value) => {
+            if (!cancelled) {
+              setAudience(value);
+              setError("");
+            }
+          },
+          (cause) => {
+            if (!cancelled) setError(describeMarketingError(cause));
+          },
+        )
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [channel, segment, minRounds, search, nonce]);
+
+  return { audience, error, loading, reload: () => setNonce((value) => value + 1) };
+}
+
+function Compose({ status, onCreated }: { status: MarketingStatus | null; onCreated: (id: number) => void }) {
+  const [channel, setChannel] = useState<Channel>("sms");
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [segment, setSegment] = useState<Segment>("all");
+  const [minRounds, setMinRounds] = useState(0);
+  const [search, setSearch] = useState("");
+  const [pickMode, setPickMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(false);
+
+  const { audience, error: audienceError, loading } = useAudience(channel, segment, minRounds, search);
+  const eligible = useMemo(() => (audience?.customers ?? []).filter((c) => c.ok), [audience]);
+
+  const recipients = useMemo(() => {
+    if (!pickMode) return audience?.phones ?? 0;
+    return new Set(eligible.filter((c) => picked.has(c.customer_ref)).map((c) => c.phone)).size;
+  }, [pickMode, audience, eligible, picked]);
+
+  const sender = status?.sms_sender ?? "Pelham Hills Golf";
+  const footer = status?.sms_footer ?? "Reply STOP to opt out.";
+  const smsPreview = message.trim()
+    ? `${message.trim().toLowerCase().startsWith("pelham hills") ? "" : `${sender}: `}${message.trim()} ${footer}`
+    : "";
+  const smsParts = smsPreview ? Math.ceil(smsPreview.length / 153) : 0;
+  const limit = channel === "sms" ? 320 : 1000;
+  const ready = name.trim() && message.trim() && message.length <= limit && recipients > 0;
+
+  const togglePick = (ref: string) =>
+    setPicked((current) => {
+      const next = new Set(current);
+      if (next.has(ref)) next.delete(ref);
+      else next.add(ref);
+      return next;
+    });
+
+  const create = async (sendNow: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      const campaign = await marketingApi.createCampaign({
+        channel,
+        name: name.trim(),
+        message: message.trim(),
+        audience: { segment, min_rounds: minRounds, search: search.trim() },
+        customer_refs: pickMode ? [...picked] : undefined,
+      });
+      if (sendNow) {
+        try {
+          await marketingApi.send(campaign.id);
+        } catch (cause) {
+          // 캠페인은 만들어졌다. 기록 칸에서 나중에 보낼 수 있다.
+          window.alert(`Campaign saved, but it did not start: ${describeMarketingError(cause)}`);
+        }
+      }
+      onCreated(campaign.id);
+    } catch (cause) {
+      setError(describeMarketingError(cause));
+      setBusy(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <section className="bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-bold">1. Channel and message</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {(["sms", "call"] as Channel[]).map((value) => (
+            <button
+              className={`min-h-14 border p-2 text-left text-sm ${
+                channel === value ? "border-[#4533ff] bg-[#f0eeff]" : "border-[#d4d4d8]"
+              }`}
+              key={value}
+              onClick={() => {
+                setChannel(value);
+                setPicked(new Set());
+              }}
+              type="button"
+            >
+              <span className="block font-bold">{CHANNEL_LABEL[value]}</span>
+              <span className="block text-xs text-[#6b7280]">{value === "sms" ? "via Twilio" : "via ElevenLabs agent"}</span>
+            </button>
+          ))}
+        </div>
+
+        <label className="mt-4 block text-xs font-bold" htmlFor="campaign-name">
+          Campaign name (staff only)
+        </label>
+        <input
+          className="mt-1 h-11 w-full border border-[#d4d4d8] px-3 text-base"
+          id="campaign-name"
+          onChange={(event) => setName(event.target.value)}
+          placeholder="e.g. Fall weekday twilight"
+          value={name}
+        />
+
+        <label className="mt-3 block text-xs font-bold" htmlFor="campaign-message">
+          {channel === "sms" ? "Text message" : "Offer the AI agent will explain on the call"}
+        </label>
+        <textarea
+          className="mt-1 min-h-32 w-full border border-[#d4d4d8] p-3 text-base"
+          id="campaign-message"
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder={
+            channel === "sms"
+              ? "Weekday twilight is $34.52 after 5 PM this week. Book at pelhamhills.ca/book or call 416-822-7609."
+              : "This week only, weekday 18 holes after 2 PM are $38.94. The agent can book a tee time on the call."
+          }
+          value={message}
+        />
+        <p className={`mt-1 text-right text-xs ${message.length > limit ? "text-[#a12a2a]" : "text-[#6b7280]"}`}>
+          {message.length}/{limit}
+        </p>
+
+        {channel === "sms" && smsPreview ? (
+          <div className="mt-2">
+            <p className="text-xs font-bold">What the customer sees</p>
+            <p className="mt-1 max-w-sm rounded-2xl bg-[#e9e9eb] px-3 py-2 text-sm whitespace-pre-wrap">{smsPreview}</p>
+            <p className="mt-1 text-xs text-[#6b7280]">
+              {smsPreview.length} characters · about {smsParts} text{smsParts === 1 ? "" : "s"} per person. The sender
+              name and opt-out line are added automatically (required by CASL).
+            </p>
+          </div>
+        ) : null}
+        {channel === "call" ? (
+          <p className="mt-2 border border-[#d9e3ff] bg-[#f3f6ff] p-3 text-xs leading-5 text-[#2449b3]">
+            The ElevenLabs agent calls each person, greets them by first name, says it is calling from Pelham Hills,
+            explains this offer, and can book a tee time. If they say not to call again, they are added to the
+            opt-out list. Only customers who agreed to calls (Consent tab) are called, during legal calling hours.
+          </p>
+        ) : null}
+      </section>
+
+      <section className="bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-bold">2. Who gets it</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <label className="text-xs font-bold">
+            Group
+            <select
+              className="mt-1 h-11 w-full border border-[#d4d4d8] px-2 text-sm font-normal"
+              onChange={(event) => setSegment(event.target.value as Segment)}
+              value={segment}
+            >
+              {(Object.keys(SEGMENT_LABEL) as Segment[]).map((value) => (
+                <option key={value} value={value}>
+                  {SEGMENT_LABEL[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-bold">
+            At least this many rounds
+            <input
+              className="mt-1 h-11 w-full border border-[#d4d4d8] px-2 text-sm font-normal"
+              min={0}
+              onChange={(event) => setMinRounds(Math.max(0, Number(event.target.value) || 0))}
+              type="number"
+              value={minRounds}
+            />
+          </label>
+        </div>
+        <input
+          className="mt-2 h-10 w-full border border-[#d4d4d8] px-3 text-sm"
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search name or phone"
+          value={search}
+        />
+
+        {audienceError ? (
+          <p className="mt-3 text-xs text-[#8c1d1d]" role="alert">
+            {audienceError}
+          </p>
+        ) : null}
+        {audience ? (
+          <div className={`mt-3 grid grid-cols-4 gap-2 text-center ${loading ? "opacity-60" : ""}`}>
+            <Stat label="Will receive" value={pickMode ? recipients : audience.phones} strong />
+            <Stat label="No consent" value={audience.no_consent} />
+            <Stat label="Opted out" value={audience.opted_out} />
+            <Stat label="No phone" value={audience.no_phone} />
+          </div>
+        ) : null}
+        {audience && audience.eligible !== audience.phones && !pickMode ? (
+          <p className="mt-1 text-xs text-[#6b7280]">
+            {audience.eligible} customers share {audience.phones} phone numbers — each number gets it once.
+          </p>
+        ) : null}
+
+        <label className="mt-3 flex items-center gap-2 text-sm">
+          <input checked={pickMode} onChange={(event) => setPickMode(event.target.checked)} type="checkbox" />
+          Pick people one by one instead of the whole group
+        </label>
+
+        <div className="mt-2 max-h-80 overflow-y-auto border border-[#ececf0]">
+          <table className="w-full text-left text-xs">
+            <tbody>
+              {(audience?.customers ?? []).slice(0, 300).map((customer) => (
+                <AudienceRow
+                  customer={customer}
+                  key={customer.customer_ref}
+                  onToggle={() => togglePick(customer.customer_ref)}
+                  pickMode={pickMode}
+                  picked={picked.has(customer.customer_ref)}
+                />
+              ))}
+            </tbody>
+          </table>
+          {audience && audience.customers.length > 300 ? (
+            <p className="p-2 text-center text-xs text-[#6b7280]">
+              Showing 300 of {audience.customers.length}. Search to narrow.
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="bg-white p-4 shadow-sm lg:col-span-2">
+        {error ? (
+          <p className="mb-3 border border-[#f0b4b4] bg-[#fdf1f1] p-2 text-xs text-[#8c1d1d]" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {confirming ? (
+          <div className="grid gap-3 sm:flex sm:items-center sm:justify-between">
+            <p className="text-sm">
+              Send <b>{CHANNEL_LABEL[channel].toLowerCase()}</b> &ldquo;{name.trim()}&rdquo; to{" "}
+              <b>{recipients}</b> phone number{recipients === 1 ? "" : "s"} now? Sent texts and calls cannot be taken
+              back.
+            </p>
+            <div className="flex gap-2">
+              <button className="h-11 border border-[#d4d4d8] px-4 text-sm font-bold" disabled={busy} onClick={() => setConfirming(false)} type="button">
+                Back
+              </button>
+              <button
+                className="h-11 bg-[#4533ff] px-5 text-sm font-bold text-white disabled:opacity-60"
+                disabled={busy}
+                onClick={() => void create(true)}
+                type="button"
+              >
+                {busy ? "Starting…" : "Yes, send now"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              className="h-11 border border-[#d4d4d8] px-4 text-sm font-bold disabled:opacity-50"
+              disabled={!ready || busy}
+              onClick={() => void create(false)}
+              type="button"
+            >
+              Save without sending
+            </button>
+            <button
+              className="h-11 bg-[#4533ff] px-5 text-sm font-bold text-white disabled:opacity-50"
+              disabled={!ready || busy}
+              onClick={() => setConfirming(true)}
+              type="button"
+            >
+              Send to {recipients} number{recipients === 1 ? "" : "s"}…
+            </button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Stat({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
+  return (
+    <div className={`p-2 ${strong ? "bg-[#f0eeff] text-[#4533ff]" : "bg-[#f6f6f8]"}`}>
+      <p className="text-lg font-bold">{value}</p>
+      <p className="text-[10px] leading-tight">{label}</p>
+    </div>
+  );
+}
+
+function AudienceRow({
+  customer,
+  pickMode,
+  picked,
+  onToggle,
+}: {
+  customer: AudienceCustomer;
+  pickMode: boolean;
+  picked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <tr className={`border-b border-[#f0f0f2] ${customer.ok ? "" : "text-[#9ca3af]"}`}>
+      {pickMode ? (
+        <td className="w-8 px-2">
+          <input checked={picked} disabled={!customer.ok} onChange={onToggle} type="checkbox" aria-label={customer.name} />
+        </td>
+      ) : null}
+      <td className="px-2 py-1.5 font-bold">
+        {customer.name}
+        {customer.is_member ? <span className="ml-1 bg-[#fff4dc] px-1 text-[10px] text-[#8a5a00]">Member</span> : null}
+      </td>
+      <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(customer.phone)}</td>
+      <td className="px-2 py-1.5 text-right whitespace-nowrap">{customer.rounds} rds</td>
+      <td className="px-2 py-1.5 text-right whitespace-nowrap">{customer.reason ? REASON_LABEL[customer.reason] : "✓"}</td>
+    </tr>
+  );
+}
+
+// ===== 캠페인 기록 =========================================================
+
+const STATUS_TONE: Record<Campaign["status"], string> = {
+  ready: "bg-[#fff4dc] text-[#8a5a00]",
+  sending: "bg-[#e6efff] text-[#2449b3]",
+  sent: "bg-[#e3f5e8] text-[#16723a]",
+  cancelled: "bg-[#f0f1f3] text-[#4e5560]",
+};
+
+function clubTime(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("en-CA", {
+    timeZone: "America/Toronto",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function Campaigns({ initial, status }: { initial: number | null; status: MarketingStatus | null }) {
+  const [list, setList] = useState<Campaign[] | null>(null);
+  const [selected, setSelected] = useState<number | null>(initial);
+  const [detail, setDetail] = useState<Campaign | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const loadList = useCallback(() => {
+    marketingApi.campaigns().then(
+      (value) => {
+        setList(value);
+        setSelected((current) => current ?? value[0]?.id ?? null);
+      },
+      (cause) => setError(describeMarketingError(cause)),
+    );
+  }, []);
+
+  const loadDetail = useCallback((id: number) => {
+    marketingApi.campaign(id).then(setDetail, (cause) => setError(describeMarketingError(cause)));
+  }, []);
+
+  useEffect(loadList, [loadList]);
+  useEffect(() => {
+    if (selected !== null) loadDetail(selected);
+  }, [selected, loadDetail]);
+
+  // 보내는 중이면 5초마다 새로.
+  useEffect(() => {
+    if (detail?.status !== "sending" || selected === null) return;
+    const timer = window.setInterval(() => {
+      loadDetail(selected);
+      loadList();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [detail?.status, selected, loadDetail, loadList]);
+
+  const act = async (what: "send" | "cancel") => {
+    if (!detail) return;
+    if (what === "cancel" && !window.confirm("Stop this campaign? People not reached yet will not get it.")) return;
+    setBusy(true);
+    setError("");
+    try {
+      if (what === "send") await marketingApi.send(detail.id);
+      else await marketingApi.cancel(detail.id);
+      loadDetail(detail.id);
+      loadList();
+    } catch (cause) {
+      setError(describeMarketingError(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const waiting = (detail?.counts.queued ?? 0) + (detail?.counts.sending ?? 0);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="bg-white shadow-sm">
+        {list === null ? <p className="p-4 text-sm text-[#6b7280]">Loading…</p> : null}
+        {list?.length === 0 ? <p className="p-4 text-sm text-[#6b7280]">No campaigns yet.</p> : null}
+        <ul>
+          {(list ?? []).map((campaign) => {
+            const total = Object.values(campaign.counts).reduce((sum, n) => sum + (n ?? 0), 0);
+            return (
+              <li key={campaign.id}>
+                <button
+                  className={`w-full border-b border-[#f0f0f2] p-3 text-left ${selected === campaign.id ? "bg-[#f0eeff]" : ""}`}
+                  onClick={() => setSelected(campaign.id)}
+                  type="button"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-bold">{campaign.name}</span>
+                    <span className={`shrink-0 px-1.5 py-0.5 text-[10px] font-bold ${STATUS_TONE[campaign.status]}`}>
+                      {campaign.status}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-[#6b7280]">
+                    {CHANNEL_LABEL[campaign.channel]} · {total} people · {clubTime(campaign.created_at)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section className="min-w-0 bg-white p-4 shadow-sm">
+        {error ? (
+          <p className="mb-3 border border-[#f0b4b4] bg-[#fdf1f1] p-2 text-xs text-[#8c1d1d]" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {!detail ? (
+          <p className="text-sm text-[#6b7280]">Pick a campaign.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold">{detail.name}</h2>
+                <p className="text-xs text-[#6b7280]">
+                  {CHANNEL_LABEL[detail.channel]} · created {clubTime(detail.created_at)}
+                  {detail.created_by ? ` by ${detail.created_by}` : ""}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {detail.status === "ready" || (detail.status === "sending" && waiting > 0) ? (
+                  <button
+                    className="h-10 bg-[#4533ff] px-4 text-sm font-bold text-white disabled:opacity-60"
+                    disabled={busy}
+                    onClick={() => void act("send")}
+                    type="button"
+                  >
+                    {detail.status === "ready" ? `Send to ${waiting}` : `Resume (${waiting} left)`}
+                  </button>
+                ) : null}
+                {detail.status === "ready" || detail.status === "sending" ? (
+                  <button
+                    className="h-10 border border-[#d4d4d8] px-4 text-sm font-bold disabled:opacity-60"
+                    disabled={busy}
+                    onClick={() => void act("cancel")}
+                    type="button"
+                  >
+                    Stop
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <p className="mt-3 border-l-4 border-[#4533ff] bg-[#f6f6f8] p-3 text-sm whitespace-pre-wrap">{detail.message}</p>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              {Object.entries(detail.counts).map(([key, value]) => (
+                <span className="bg-[#f0f1f3] px-2 py-1 font-bold" key={key}>
+                  {SEND_STATUS_LABEL[key as keyof typeof SEND_STATUS_LABEL] ?? key}: {value}
+                </span>
+              ))}
+            </div>
+            {detail.status === "sending" && waiting > 0 && status && !status.window_open ? (
+              <p className="mt-2 text-xs text-[#8a5a00]">
+                Paused outside sending hours ({status.window}). Press Resume when the window opens.
+              </p>
+            ) : null}
+
+            <div className="mt-3 max-h-[60vh] overflow-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b border-[#d4d4d8]">
+                    <th className="px-2 py-1.5">Name</th>
+                    <th className="px-2 py-1.5">Phone</th>
+                    <th className="px-2 py-1.5">Status</th>
+                    <th className="px-2 py-1.5">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(detail.sends ?? []).map((send) => (
+                    <tr className="border-b border-[#f0f0f2]" key={send.id}>
+                      <td className="px-2 py-1.5 font-bold">{send.name}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(send.phone)}</td>
+                      <td className="px-2 py-1.5">{SEND_STATUS_LABEL[send.status]}</td>
+                      <td className="max-w-[16rem] truncate px-2 py-1.5 text-[#6b7280]" title={send.error ?? ""}>
+                        {send.error ?? ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {detail.channel === "call" ? (
+              <p className="mt-2 text-xs text-[#6b7280]">
+                Call recordings and transcripts are in the admin Calls &amp; SMS page.
+              </p>
+            ) : null}
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// ===== 동의 ==============================================================
+
+function Consent() {
+  const [search, setSearch] = useState("");
+  const { audience, error, loading, reload } = useAudience("sms", "all", 0, search);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState("");
+
+  const save = async (customer: AudienceCustomer, prefs: { sms_ok?: boolean | null; call_ok?: boolean | null }) => {
+    setSaving(customer.customer_ref);
+    setSaveError("");
+    try {
+      await marketingApi.setPrefs(customer.customer_ref, prefs);
+      reload();
+    } catch (cause) {
+      setSaveError(describeMarketingError(cause));
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <section className="bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-bold">Marketing consent</h2>
+      <p className="mt-1 text-xs leading-5 text-[#6b7280]">
+        <b>Texts:</b> &ldquo;Auto&rdquo; texts members and anyone who has played here (existing customer). Set
+        &ldquo;No&rdquo; to never text them, &ldquo;Yes&rdquo; when they signed up for promotions.{" "}
+        <b>AI calls:</b> only customers marked &ldquo;Yes&rdquo; are called — mark it only when the customer said they
+        want promotional calls.
+      </p>
+      <input
+        className="mt-3 h-10 w-full max-w-md border border-[#d4d4d8] px-3 text-sm"
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Search name or phone"
+        value={search}
+      />
+      {error || saveError ? (
+        <p className="mt-2 text-xs text-[#8c1d1d]" role="alert">
+          {error || saveError}
+        </p>
+      ) : null}
+      <div className={`mt-3 overflow-x-auto ${loading ? "opacity-60" : ""}`}>
+        <table className="w-full min-w-[560px] text-left text-xs">
+          <thead>
+            <tr className="border-b border-[#d4d4d8]">
+              <th className="px-2 py-1.5">Name</th>
+              <th className="px-2 py-1.5">Phone</th>
+              <th className="px-2 py-1.5">Texts</th>
+              <th className="px-2 py-1.5">AI calls</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(audience?.customers ?? []).slice(0, 100).map((customer) => (
+              <tr className="border-b border-[#f0f0f2]" key={customer.customer_ref}>
+                <td className="px-2 py-1.5 font-bold">
+                  {customer.name}
+                  {customer.is_member ? <span className="ml-1 bg-[#fff4dc] px-1 text-[10px] text-[#8a5a00]">Member</span> : null}
+                </td>
+                <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(customer.phone) || "—"}</td>
+                <td className="px-2 py-1.5">
+                  <select
+                    className="h-8 border border-[#d4d4d8] px-1"
+                    disabled={saving === customer.customer_ref}
+                    onChange={(event) =>
+                      void save(customer, { sms_ok: event.target.value === "auto" ? null : event.target.value === "yes" })
+                    }
+                    value={customer.sms_ok === null ? "auto" : customer.sms_ok ? "yes" : "no"}
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </td>
+                <td className="px-2 py-1.5">
+                  <select
+                    className="h-8 border border-[#d4d4d8] px-1"
+                    disabled={saving === customer.customer_ref}
+                    onChange={(event) => void save(customer, { call_ok: event.target.value === "yes" })}
+                    value={customer.call_ok ? "yes" : "no"}
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {audience && audience.customers.length > 100 ? (
+          <p className="p-2 text-center text-xs text-[#6b7280]">
+            Showing 100 of {audience.customers.length}. Search to find someone.
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+// ===== 수신거부 ===========================================================
+
+function OptOuts() {
+  const [list, setList] = useState<OptOut[] | null>(null);
+  const [phone, setPhone] = useState("");
+  const [channel, setChannel] = useState<Channel>("sms");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    marketingApi.optOuts().then(setList, (cause) => setError(describeMarketingError(cause)));
+  }, []);
+  useEffect(load, [load]);
+
+  const change = async (number: string, which: Channel, optedOut: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      await marketingApi.setOptOut(number, which, optedOut);
+      if (optedOut) setPhone("");
+      load();
+    } catch (cause) {
+      setError(describeMarketingError(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-bold">Opt-outs</h2>
+      <p className="mt-1 text-xs leading-5 text-[#6b7280]">
+        People who replied STOP, told the AI agent not to call again, or asked the pro shop. They are skipped in every
+        campaign. Add someone here when they ask in person or by email.
+      </p>
+      <form
+        className="mt-3 flex flex-wrap gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void change(phone, channel, true);
+        }}
+      >
+        <input
+          className="h-10 w-48 border border-[#d4d4d8] px-3 text-sm"
+          inputMode="tel"
+          onChange={(event) => setPhone(event.target.value)}
+          placeholder="Phone number"
+          value={phone}
+        />
+        <select
+          className="h-10 border border-[#d4d4d8] px-2 text-sm"
+          onChange={(event) => setChannel(event.target.value as Channel)}
+          value={channel}
+        >
+          <option value="sms">No texts</option>
+          <option value="call">No calls</option>
+        </select>
+        <button className="h-10 bg-[#111315] px-4 text-sm font-bold text-white disabled:opacity-60" disabled={busy || !phone.trim()} type="submit">
+          Add
+        </button>
+      </form>
+      {error ? (
+        <p className="mt-2 text-xs text-[#8c1d1d]" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[520px] text-left text-xs">
+          <thead>
+            <tr className="border-b border-[#d4d4d8]">
+              <th className="px-2 py-1.5">Phone</th>
+              <th className="px-2 py-1.5">Customer</th>
+              <th className="px-2 py-1.5">Blocks</th>
+              <th className="px-2 py-1.5">How</th>
+              <th className="px-2 py-1.5">When</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {list?.length === 0 ? (
+              <tr>
+                <td className="px-2 py-3 text-[#6b7280]" colSpan={6}>
+                  Nobody has opted out.
+                </td>
+              </tr>
+            ) : null}
+            {(list ?? []).map((row) => (
+              <tr className="border-b border-[#f0f0f2]" key={`${row.phone}-${row.channel}`}>
+                <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(row.phone)}</td>
+                <td className="px-2 py-1.5">{row.name ?? "—"}</td>
+                <td className="px-2 py-1.5">{row.channel === "sms" ? "Texts" : "Calls"}</td>
+                <td className="px-2 py-1.5">{row.source === "reply" ? "Replied STOP" : row.source === "call" ? "On a call" : "Staff"}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap">{clubTime(row.created_at)}</td>
+                <td className="px-2 py-1.5 text-right">
+                  <button
+                    className="text-[#4533ff] underline disabled:opacity-60"
+                    disabled={busy}
+                    onClick={() => {
+                      if (window.confirm("Remove this opt-out? Only do this if the customer asked to receive promotions again.")) {
+                        void change(row.phone, row.channel, false);
+                      }
+                    }}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}

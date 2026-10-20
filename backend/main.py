@@ -77,6 +77,8 @@ include_route_module("backend.api.routes.reconcile", f"{settings.API_V1_STR}", [
 include_route_module("backend.api.routes.calls", f"{settings.API_V1_STR}", ["Calls"])
 # 레인체크 전표 문자(바코드 MMS). 직원 확인은 단말기와 같다(0011 의 `pelham_staff_rain_check`).
 include_route_module("backend.api.routes.rain_checks", f"{settings.API_V1_STR}", ["Rain Checks"])
+# 고객 마케팅(프로모션 문자·AI 전화). 명단 계정 확인은 SQL 이 한다(0047).
+include_route_module("backend.api.routes.marketing", f"{settings.API_V1_STR}", ["Marketing"])
 
 if VOICE_ONLY:
     logger.warning(

@@ -29,7 +29,7 @@ import os
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 
 from backend.api.routes import tee_sheet as ts
-from backend.api.routes import voice, voice_sim
+from backend.api.routes import marketing, voice, voice_sim
 from backend.core.config import settings
 from backend.services import sms_agent, waitlist_offers
 from backend.services.barcode_png import BARCODE_CODE_RE, barcode_url, code128_png
@@ -171,10 +171,13 @@ async def inbound(request: Request, background: BackgroundTasks) -> Response:
 
     if keyword in STOP_WORDS:
         opted_out.add(sender)
+        # 프로모션 수신거부는 DB 에도 남긴다 — 이 집합은 재시작하면 비지만 마케팅 명단은 그러면 안 된다.
+        background.add_task(marketing.record_sms_reply, sender, True)
         return _twiml()
     # "YES" 는 수신 거부한 사람에게만 수신 재개다. 그 밖에는 비서에게 하는 대답이다.
     if keyword in START_WORDS and (keyword != "YES" or sender in opted_out):
         opted_out.discard(sender)
+        background.add_task(marketing.record_sms_reply, sender, False)
         return _twiml()
     # 저장소 호출은 동기다. 이벤트 루프를 막지 않게 스레드로 넘긴다.
     from starlette.concurrency import run_in_threadpool
@@ -232,11 +235,15 @@ def barcode_png(code: str) -> Response:
 
 
 @router.post("/sms/status")
-async def status(request: Request) -> Response:
+async def status(request: Request, background: BackgroundTasks) -> Response:
     params = await _twilio_params(request)
     sid = params.get("MessageSid") or params.get("SmsSid")
     if sid:
-        update_status(sid, params.get("MessageStatus") or params.get("SmsStatus") or "unknown", params.get("ErrorCode"))
+        state = params.get("MessageStatus") or params.get("SmsStatus") or "unknown"
+        update_status(sid, state, params.get("ErrorCode"))
+        # 프로모션 문자의 전달 결과는 캠페인 기록(0047)에. 끝난 상태만 — 중간 상태마다 DB 를 두드리지 않는다.
+        if state in ("delivered", "failed", "undelivered"):
+            background.add_task(marketing.record_sms_status, sid, state, params.get("ErrorCode"))
     return Response(status_code=204)
 
 

@@ -206,3 +206,40 @@ async def conversation_audio(conversation_id: str) -> tuple[bytes, str]:
         )
     _raise_for_status(response, "get conversation audio")
     return response.content, response.headers.get("content-type", "audio/mpeg")
+
+
+# ===== 발신 전화 (마케팅) ==============================================
+# 고객 마케팅(`api/routes/marketing.py`)이 프로모션 전화를 건다. 에이전트의 Twilio 번호로
+# ElevenLabs 가 직접 걸고, 손님이 받으면 에이전트가 말한다.
+
+def marketing_agent_id() -> str:
+    """프로모션 전화를 거는 에이전트. 따로 없으면 예약 에이전트."""
+    return os.getenv("ELEVENLABS_MARKETING_AGENT_ID", "").strip() or agent_id()
+
+
+def outbound_phone_number_id() -> str:
+    """발신에 쓸 ElevenLabs 전화번호 id (`scripts/elevenlabs_sync_agent.py --phones` 로 확인)."""
+    return os.getenv("ELEVENLABS_PHONE_NUMBER_ID", "").strip()
+
+
+async def outbound_call(to_number: str, dynamic_variables: dict[str, Any]) -> dict[str, Any]:
+    """전화를 건다. `{conversation_id, callSid}` — 걸리기만 하면 성공이고, 받았는지는 통화 기록에 남는다.
+
+    `dynamic_variables` 는 에이전트 프롬프트의 `{{이름}}` 자리에 들어간다
+    (`ops/elevenlabs/marketing_agent_prompt.md`).
+    """
+    body = {
+        "agent_id": marketing_agent_id(),
+        "agent_phone_number_id": outbound_phone_number_id(),
+        "to_number": to_number,
+        "conversation_initiation_client_data": {"dynamic_variables": dynamic_variables},
+    }
+    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+        response = await client.post(
+            f"{API_ROOT}/convai/twilio/outbound-call", json=body, headers=_headers(),
+        )
+    _raise_for_status(response, "outbound call")
+    payload = response.json() if response.content else {}
+    if payload.get("success") is False:
+        raise VoiceAgentError(f"outbound call refused: {payload.get('message')}")
+    return payload
