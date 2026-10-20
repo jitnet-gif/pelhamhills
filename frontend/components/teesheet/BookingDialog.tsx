@@ -3,11 +3,20 @@
 // 새 예약 생성 다이얼로그. 쓰기는 전부 controller.createBooking을 통해서만 한다.
 // (fetch/teeSheetApi를 직접 호출하지 않는다.)
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import { greenFeeFor } from "@/lib/greenFee";
 import { money } from "@/lib/teeSheet/dates";
 import type { PlayerType, TeeSheetController } from "@/lib/teeSheet/types";
+
+import { MemberSuggestions, memberSummary, useMemberSearch, type MemberHit } from "./MemberSearch";
 
 export type BookingDialogProps = {
   open: boolean;
@@ -23,6 +32,12 @@ type PlayerDraft = {
   phone: string;
   type: PlayerType;
   ratePlan: string;
+  /** 자동검색으로 고른 사람이면 true. 이름을 다시 고치면 연결이 풀린다. */
+  linked: boolean;
+  customerRef: string;
+  memberNumber: string;
+  /** 연결 표시줄 문구, 예: "Full 2026 · #1234". */
+  memberLabel: string;
 };
 
 const PLAYER_TYPES: PlayerType[] = ["Existing Customer", "Guest"];
@@ -35,7 +50,18 @@ const FIELD =
 const LABEL = "block text-[11px] font-bold uppercase tracking-wide text-[#4e5560]";
 
 function emptyPlayer(): PlayerDraft {
-  return { firstName: "", lastName: "", email: "", phone: "", type: "Existing Customer", ratePlan: "" };
+  return {
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    type: "Existing Customer",
+    ratePlan: "",
+    linked: false,
+    customerRef: "",
+    memberNumber: "",
+    memberLabel: "",
+  };
 }
 
 /**
@@ -94,6 +120,23 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
   const [notes, setNotes] = useState("");
   const [players, setPlayers] = useState<PlayerDraft[]>([emptyPlayer()]);
 
+  // 회원 자동검색: 지금 이름 칸에 커서가 있는 줄 하나만 찾는다. 이미 고른 줄은 다시 찾지 않는다.
+  const [searchRow, setSearchRow] = useState<number | null>(null);
+  const [activeHit, setActiveHit] = useState(0);
+  const searchPlayer = searchRow === null ? null : (players[searchRow] ?? null);
+  const { hits, loading: searching } = useMemberSearch(
+    searchPlayer ? `${searchPlayer.firstName} ${searchPlayer.lastName}` : "",
+    searchPlayer !== null && !searchPlayer.linked,
+  );
+  const searchOpen = searchRow !== null && hits.length > 0;
+  // Escape 는 문서 단계에서 창을 닫으므로, 목록이 열려 있으면 목록만 닫게 ref 로 알려 준다.
+  const searchOpenRef = useRef(false);
+  useEffect(() => {
+    searchOpenRef.current = searchOpen;
+  });
+  // 결과가 줄어 커서가 목록 밖이면 첫 줄로.
+  const activeIndex = activeHit < hits.length ? activeHit : 0;
+
   const panelRef = useRef<HTMLDivElement | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const seededRef = useRef(false);
@@ -146,6 +189,10 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
+        if (searchOpenRef.current) {
+          setSearchRow(null);
+          return;
+        }
         onCloseRef.current();
         return;
       }
@@ -208,6 +255,55 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
 
   function removePlayer(index: number) {
     setPlayers((current) => (current.length <= 1 ? current : current.filter((_, i) => i !== index)));
+    setSearchRow(null);
+  }
+
+  /** 이름을 고친다. 회원을 골라 둔 줄이면 연결과 그 회원 요금제를 같이 푼다 — 다른 사람에게 회원가가 붙지 않게. */
+  function updateName(index: number, patch: Pick<Partial<PlayerDraft>, "firstName" | "lastName">) {
+    const player = players[index];
+    const unlink = player?.linked
+      ? { linked: false, customerRef: "", memberNumber: "", memberLabel: "", ratePlan: "" }
+      : {};
+    updatePlayer(index, { ...patch, ...unlink });
+    setSearchRow(index);
+    setActiveHit(0);
+  }
+
+  /** 자동검색에서 고른 사람으로 그 줄을 채운다. 회원권이 있으면 요금제도 회원 요금제로. */
+  function pickMember(index: number, hit: MemberHit) {
+    updatePlayer(index, {
+      firstName: hit.firstName || hit.name,
+      lastName: hit.lastName,
+      email: hit.email,
+      phone: hit.phone,
+      type: "Existing Customer",
+      ratePlan: hit.ratePlan,
+      linked: true,
+      customerRef: hit.customerRef ?? "",
+      memberNumber: hit.memberNumber,
+      memberLabel: memberSummary(hit) || "Customer",
+    });
+    setSearchRow(null);
+  }
+
+  function unlinkMember(index: number) {
+    updatePlayer(index, { linked: false, customerRef: "", memberNumber: "", memberLabel: "", ratePlan: "" });
+  }
+
+  /** 이름 칸의 ↑↓ Enter. Enter 는 목록이 열려 있으면 폼 제출 대신 고르기다. */
+  function handleNameKeyDown(index: number, event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (searchRow !== index || hits.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveHit((activeIndex + 1) % hits.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveHit((activeIndex - 1 + hits.length) % hits.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const hit = hits[activeIndex];
+      if (hit) pickMember(index, hit);
+    }
   }
 
   function handleDateChange(next: string) {
@@ -256,6 +352,8 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
         phone: player.phone.trim(),
         type: player.type,
         ratePlan: player.ratePlan.trim(),
+        ...(player.linked && player.customerRef ? { customerRef: player.customerRef } : {}),
+        ...(player.linked && player.memberNumber ? { memberNumber: player.memberNumber } : {}),
       })),
     });
 
@@ -437,20 +535,36 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
               </div>
 
               {players.map((player, index) => (
-                <div className="grid gap-2 rounded border border-[#ececf0] p-2 lg:grid-cols-6" key={index}>
+                <div className="relative grid gap-2 rounded border border-[#ececf0] p-2 lg:grid-cols-6" key={index}>
                   <input
+                    aria-autocomplete="list"
+                    aria-controls={`member-search-${index}`}
+                    aria-expanded={searchOpen && searchRow === index}
                     aria-label={`Player ${index + 1} first name`}
+                    autoComplete="off"
                     className={FIELD}
-                    onChange={(event) => updatePlayer(index, { firstName: event.target.value })}
-                    placeholder="First name"
+                    onBlur={() => setSearchRow(null)}
+                    onChange={(event) => updateName(index, { firstName: event.target.value })}
+                    onFocus={() => setSearchRow(index)}
+                    onKeyDown={(event) => handleNameKeyDown(index, event)}
+                    placeholder="First name — type to search members"
+                    role="combobox"
                     type="text"
                     value={player.firstName}
                   />
                   <input
+                    aria-autocomplete="list"
+                    aria-controls={`member-search-${index}`}
+                    aria-expanded={searchOpen && searchRow === index}
                     aria-label={`Player ${index + 1} last name`}
+                    autoComplete="off"
                     className={FIELD}
-                    onChange={(event) => updatePlayer(index, { lastName: event.target.value })}
+                    onBlur={() => setSearchRow(null)}
+                    onChange={(event) => updateName(index, { lastName: event.target.value })}
+                    onFocus={() => setSearchRow(index)}
+                    onKeyDown={(event) => handleNameKeyDown(index, event)}
                     placeholder="Last name"
+                    role="combobox"
                     type="text"
                     value={player.lastName}
                   />
@@ -503,6 +617,29 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
                       ×
                     </button>
                   </div>
+                  {player.linked ? (
+                    <div className="flex items-center gap-2 text-[11px] font-semibold text-[#2f7d4f] lg:col-span-6">
+                      <span>✓ Linked: {player.memberLabel}</span>
+                      {player.ratePlan ? <span className="text-[#4e5560]">· {player.ratePlan}</span> : null}
+                      <button
+                        className="ml-auto text-[#6b7280] underline hover:text-[#1f2328]"
+                        onClick={() => unlinkMember(index)}
+                        type="button"
+                      >
+                        Unlink
+                      </button>
+                    </div>
+                  ) : null}
+                  {searchRow === index ? (
+                    <MemberSuggestions
+                      active={activeIndex}
+                      hits={hits}
+                      id={`member-search-${index}`}
+                      loading={searching}
+                      onHover={setActiveHit}
+                      onPick={(hit) => pickMember(index, hit)}
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>

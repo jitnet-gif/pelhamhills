@@ -43,6 +43,10 @@ export type Player = {
   greenFee?: number;
   /** 결제로 표시된 시각(ISO). 서버만 찍는다. 이 필드가 생기기 전의 결제에는 없다. */
   paidAt: string | null;
+  /** 고객 명부(`pelham_customers.customer_ref`)와 연결된 선수(0053). 예약 창에서 회원을 골랐을 때만 있다. */
+  customerRef?: string;
+  /** 고른 회원의 회원번호(0053). 없으면 키가 없다. */
+  memberNumber?: string;
   /** 이 사람 몫에 붙은 추가 품목(풀카트·레인지 바스켓, 0026). 붙일 때의 값이 복사돼 있다. 없으면 키가 없다. */
   extras?: TeeExtra[];
 };
