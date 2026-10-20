@@ -11,6 +11,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { CLUB } from "@/lib/nav";
 import type { ReceiptBlock } from "@/lib/retail/receipt";
 import {
+  bluetoothPrinterStatus,
   bluetoothPrintingSupported,
   choosePrinter,
   hasChosenPrinter,
@@ -140,7 +141,7 @@ export function ReceiptPrinterSetup() {
               onClick={() =>
                 void run(async () => {
                   await printBluetooth([TEST_SHEET]);
-                  return "Test page sent.";
+                  return `Test page sent. ${await bluetoothPrinterStatus()}`;
                 })
               }
             >

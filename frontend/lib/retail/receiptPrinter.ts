@@ -99,6 +99,7 @@ function notify(): void {
 type SerialPortInfo = { usbVendorId?: number; usbProductId?: number; bluetoothServiceClassId?: string };
 type SerialPortLike = {
   readonly writable: WritableStream<Uint8Array> | null;
+  readonly readable: ReadableStream<Uint8Array> | null;
   open(options: { baudRate: number }): Promise<void>;
   close(): Promise<void>;
   forget?(): Promise<void>;
@@ -234,6 +235,58 @@ export function printBluetooth(
   queue = job.catch(() => undefined);
   return job;
 }
+
+/**
+ * 프린터에게 상태를 묻는다(`DLE EOT 1·2·4`). "보냈다" 는 Chrome 이 받았다는 뜻일 뿐이라,
+ * 종이가 안 나올 때 프린터가 정말 듣고 있는지, 덮개·용지 때문인지 여기서 가른다.
+ * 대답이 없으면 데이터가 프린터에 닿지 않는 것이다.
+ */
+export function bluetoothPrinterStatus(): Promise<string> {
+  const job = queue.then(async () => {
+    await writeBytes(Uint8Array.from([0x10, 0x04, 1, 0x10, 0x04, 2, 0x10, 0x04, 4]));
+    const readable = openPort?.readable;
+    if (!readable) return "The printer link cannot be read, so its status is unknown.";
+    const reader = readable.getReader();
+    const got: number[] = [];
+    try {
+      await withTimeout(
+        (async () => {
+          while (got.length < 3) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) got.push(...value);
+          }
+        })(),
+        STATUS_TIMEOUT_MS,
+        "silent",
+      ).catch(() => undefined);
+    } finally {
+      await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
+    if (got.length === 0) {
+      return (
+        "The printer did not reply, so the data is not reaching it over Bluetooth. " +
+        "Turn the printer off and on, remove it from any iPad or phone it is paired with, " +
+        "remove and re-pair it in this computer's Bluetooth settings, reload this page and choose it again."
+      );
+    }
+    const [status, offline = 0, paper = 0] = got;
+    const problems: string[] = [];
+    if (offline & 0x04) problems.push("the cover is open");
+    if (paper & 0x60 || offline & 0x20) problems.push("the paper roll is empty");
+    if (offline & 0x40) problems.push("the printer has an error (turn it off and on)");
+    if (offline & 0x08) problems.push("the feed button is held");
+    if (!problems.length && status & 0x08) problems.push("the printer is offline");
+    return problems.length
+      ? `The printer replied: ${problems.join(", ")}.`
+      : "The printer replied and is ready (cover closed, paper in).";
+  });
+  queue = job.catch(() => undefined);
+  return job;
+}
+
+const STATUS_TIMEOUT_MS = 3000;
 
 /**
  * 네트워크 프린터로 보낸다. 프린터가 다 찍고 응답할 때까지 기다리므로, 성공이면 종이가 나온 것이다.
