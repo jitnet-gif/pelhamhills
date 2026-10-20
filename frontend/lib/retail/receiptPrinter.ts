@@ -135,12 +135,14 @@ export async function hasChosenPrinter(): Promise<boolean> {
 export async function choosePrinter(): Promise<void> {
   const api = serial();
   if (!api) throw new Error("This browser cannot reach Bluetooth printers. Use Chrome or Edge on a Mac or PC.");
-  // 예전에 고른 포트는 놓아준다 — 계산대 하나에 프린터 하나.
+  // 새 포트를 고른 **뒤에** 예전 포트를 놓아준다 — 계산대 하나에 프린터 하나.
+  // 먼저 놓으면 고르기 창을 닫거나 실패했을 때 프린터가 하나도 안 남는다.
+  const chosen = await api.requestPort({ allowedBluetoothServiceClassIds: [SPP_UUID] });
   for (const old of await api.getPorts()) {
+    if (old === chosen) continue;
     if (old === openPort) await closePort();
     await old.forget?.().catch(() => undefined);
   }
-  await api.requestPort({ allowedBluetoothServiceClassIds: [SPP_UUID] });
   writeReceiptPrinterMode("bluetooth");
 }
 
