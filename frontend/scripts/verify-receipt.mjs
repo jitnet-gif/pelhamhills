@@ -491,3 +491,36 @@ test("ESC/POS logo is a GS v 0 raster; transparent pixels stay white", () => {
   // 로고 그림이 없으면 로고 블록은 아무것도 보내지 않는다
   assert.equal(countSeq(escposReceipt([[{ kind: "logo" }]]), [0x1d, 0x76, 0x30]), 0);
 });
+
+// ===== ePOS-Print (네트워크 TM-m30III 경로, `lib/retail/eposPrint.ts`) =====
+
+const { normalizePrinterHost, eposPrintUrl, eposPrintEnvelope, eposPrintResult } = await import("../lib/retail/eposPrint.ts");
+
+test("ePOS-Print host accepts pasted URLs and rejects anything else", () => {
+  assert.equal(normalizePrinterHost(" 192.168.0.50 "), "192.168.0.50");
+  assert.equal(normalizePrinterHost("https://192.168.0.50/"), "192.168.0.50");
+  assert.equal(normalizePrinterHost("HTTPS://Printer1.Example.com:8443/x?y"), "printer1.example.com:8443");
+  assert.equal(normalizePrinterHost("192.168.0.50 extra"), "");
+  assert.equal(normalizePrinterHost(""), "");
+  assert.equal(eposPrintUrl("192.168.0.50"), "https://192.168.0.50/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000");
+});
+
+test("ePOS-Print carries the ESC/POS bytes as hex in one <command>", () => {
+  const xml = eposPrintEnvelope(Uint8Array.from([0x1b, 0x40, 0x0a, 0xff]));
+  assert.match(xml, /<epos-print xmlns="http:\/\/www\.epson-pos\.com\/schemas\/2011\/03\/epos-print"><command>1b400aff<\/command><\/epos-print>/);
+  assert.match(xml, /^<\?xml[^>]*\?><s:Envelope xmlns:s="http:\/\/schemas\.xmlsoap\.org\/soap\/envelope\/"><s:Body>/);
+});
+
+test("ePOS-Print response: success flag and error code", () => {
+  const ok = '<?xml version="1.0"?><s:Envelope><s:Body><response success="true" code="" status="251658262" xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"/></s:Body></s:Envelope>';
+  assert.deepEqual(eposPrintResult(ok), { ok: true, code: "" });
+  const bad = '<s:Envelope><s:Body><response success="false" code="EPTR_REC_EMPTY" status="1"/></s:Body></s:Envelope>';
+  assert.deepEqual(eposPrintResult(bad), { ok: false, code: "EPTR_REC_EMPTY" });
+  assert.deepEqual(eposPrintResult("<html>404</html>"), { ok: false, code: "" });
+  // SDK(epos-2.27.0.js)처럼 success="1" 도 성공, 따옴표 안팎 공백은 무시한다
+  assert.deepEqual(eposPrintResult('<response success = " 1 " code="" status="2"/>'), { ok: true, code: "" });
+  assert.deepEqual(eposPrintResult('<response success="false" code="EX_ENPC_TIMEOUT"/>'), { ok: false, code: "EX_ENPC_TIMEOUT" });
+  // SDK 와 같이 success="1" 도 성공, 등호 주변 공백도 읽는다
+  assert.deepEqual(eposPrintResult('<response success = "1" code=""/>'), { ok: true, code: "" });
+  assert.deepEqual(eposPrintResult('<response success="false" code = "EX_ENPC_TIMEOUT"/>'), { ok: false, code: "EX_ENPC_TIMEOUT" });
+});

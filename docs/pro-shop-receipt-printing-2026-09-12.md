@@ -113,6 +113,38 @@
 - 연결·전송은 `frontend/lib/retail/receiptPrinter.ts`, 설정 화면은 `frontend/components/pos/ReceiptPrinterSetup.tsx`.
   ESC/POS 검사는 아래 `verify-receipt.mjs` 에 같이 있다.
 
+## 네트워크 프린터 (TM-m30III 이더넷·와이파이) — 2026-10-20
+
+드라이버 없이 **매장 네트워크의 TM-m30III** 에 영수증을 직접 보낸다. 블루투스 경로와 **같은 ESC/POS 바이트**를
+프린터 안의 ePOS-Print 웹 서비스(`https://프린터주소/cgi-bin/epos/service.cgi`)로 POST 한다. Epson 의
+`epos-*.js` SDK 는 쓰지 않는다 — SDK 가 하는 일이 이 POST 다. 로고·바코드·장마다 자르기·현금 결제에만
+현금함 열기가 블루투스와 같다. 프린터가 다 찍고 응답하므로 용지 없음·덮개 열림도 화면에 뜬다.
+
+- **되는 곳**: 프린터와 **같은 네트워크**의 Chrome·Edge(맥·윈도). 계산대가 Vercel(HTTPS)에 있으므로
+  프린터도 HTTPS 로만 부른다 — HTTP 는 Chrome 이 혼합 콘텐츠로 막는다.
+  iPad 는 프린터 인증서를 믿게 하기 어려워 권하지 않는다(iPad 는 인쇄 창/AirPrint).
+- **프린터 쪽 준비**
+  1. 이더넷 선을 꽂거나 와이파이에 붙인다. 주소는 전원을 켤 때 FEED 버튼을 누르고 있으면 찍히는
+     상태 시트에서 본다. **공유기에서 이 주소를 고정(DHCP 예약)** 한다 — 바뀌면 영수증이 안 나온다.
+  2. 브라우저로 `https://프린터주소` 의 웹 설정을 열어 **ePOS-Print 가 켜져 있는지** 본다(기본값은 켜짐,
+     장치 이름 `local_printer`).
+- **계산대 기기마다 (한 번)**
+  1. 계산대(`/admin/retail`) 첫 화면의 **Receipt Printer** → `Network — Epson TM-m30III …` 를 고른다.
+  2. 주소(예: `192.168.0.50`)를 넣고 **Save & open printer page**. 새 탭에서 인증서 경고가 뜨면
+     **고급 → 계속** 으로 허용하고 탭을 닫는다. 프린터 인증서가 자체 서명이라 이걸 안 하면 연결이 안 된다.
+  3. **Print test**. Chrome 이 "로컬 네트워크의 기기에 접근" 을 물으면 **허용**한다(공개 사이트가 사설
+     주소를 부르면 최근 Chrome 이 묻는다).
+- 설정은 **그 기기의 브라우저에만** 저장된다. 티 시트·매출 탭·레인체크 인쇄도 같은 설정을 따른다.
+- **안 나오면**(경고를 띄우고 인쇄 창으로 넘어간다): 프린터 전원·네트워크 → 주소가 바뀌지 않았는지 →
+  `https://프린터주소` 를 다시 열어 인증서를 허용(Chrome 업데이트·사이트 데이터 삭제 뒤 다시 필요할 수 있다) →
+  Chrome 사이트 설정에서 로컬 네트워크 접근이 차단돼 있지 않은지 순서로 본다. 브라우저는 이 셋을 구분해
+  알려 주지 않는다.
+- **인증서 경고를 없애려면**(선택): 클럽 도메인에 `printer1.<도메인>` 같은 이름을 만들어 프린터 사설
+  주소를 가리키게 하고, DNS-01 방식으로 받은 Let's Encrypt 인증서를 프린터 웹 설정에 넣은 뒤 그 이름을
+  주소 칸에 적는다. 인증서는 90일마다 갱신해야 한다.
+- 코드: 요청 모양은 `frontend/lib/retail/eposPrint.ts`(순수 함수, 아래 `verify-receipt.mjs` 에서 검사),
+  보내기는 `receiptPrinter.ts` 의 `printNetwork`, 설정 화면은 `ReceiptPrinterSetup.tsx`.
+
 ## 계산대에서
 
 - 판매가 끝나면 영수증 화면의 **Print receipt**.

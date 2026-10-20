@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 계산대의 영수증 프린터 설정(이 기기에만). 브라우저 인쇄 또는 블루투스 TM-m30.
+ * 계산대의 영수증 프린터 설정(이 기기에만). 브라우저 인쇄, 블루투스 TM-m30, 또는 네트워크 TM-m30III.
  * 계산대 첫 화면(`RegisterHome`)의 Receipt Printer 타일이 창 안에 연다.
  * 연결·전송은 `lib/retail/receiptPrinter.ts`, 설치 절차는 `docs/pro-shop-receipt-printing-2026-09-12.md`.
  */
@@ -15,17 +15,21 @@ import {
   choosePrinter,
   hasChosenPrinter,
   printBluetooth,
+  printNetwork,
+  readReceiptPrinterHost,
   readReceiptPrinterMode,
   subscribeReceiptPrinter,
+  writeReceiptPrinterHost,
   writeReceiptPrinterMode,
   type ReceiptPrinterMode,
 } from "@/lib/retail/receiptPrinter";
 
-import { Button, Field, Select } from "@/components/retail/ui";
+import { Button, Field, Select, TextInput } from "@/components/retail/ui";
 
 const MODE_LABELS: Record<ReceiptPrinterMode, string> = {
   browser: "Print dialog — printer installed on this computer or AirPrint",
   bluetooth: "Bluetooth — Epson TM-m30 paired with this computer",
+  network: "Network — Epson TM-m30III on the shop Wi-Fi or Ethernet",
 };
 
 const TEST_SHEET: ReceiptBlock[] = [
@@ -47,14 +51,21 @@ export function ReceiptPrinterSetup() {
     readReceiptPrinterMode,
     () => "browser" as const,
   );
+  const savedHost = useSyncExternalStore(
+    subscribeReceiptPrinter,
+    readReceiptPrinterHost,
+    () => "",
+  );
   const supported = useSyncExternalStore(
     noSubscribe,
     bluetoothPrintingSupported,
     () => false,
   );
   const [chosen, setChosen] = useState(false);
+  const [hostDraft, setHostDraft] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [working, setWorking] = useState(false);
+  const host = hostDraft ?? savedHost;
 
   useEffect(() => {
     void hasChosenPrinter().then(setChosen);
@@ -99,7 +110,7 @@ export function ReceiptPrinterSetup() {
           ))}
         </Select>
       </Field>
-      {!supported ? (
+      {!supported && mode !== "network" ? (
         <p className="text-xs text-[#6b7280]">
           This browser cannot reach Bluetooth printers. Use Chrome or Edge on a
           Mac or PC. On iPad, receipts go through the print dialog.
@@ -130,6 +141,54 @@ export function ReceiptPrinterSetup() {
                 void run(async () => {
                   await printBluetooth([TEST_SHEET]);
                   return "Test page sent.";
+                })
+              }
+            >
+              Print test
+            </Button>
+          </div>
+        </>
+      ) : null}
+      {mode === "network" ? (
+        <>
+          <Field
+            hint="Hold the printer's feed button at power-on to print it"
+            label="Printer IP address"
+          >
+            <TextInput
+              inputMode="url"
+              onChange={(event) => setHostDraft(event.target.value)}
+              placeholder="192.168.0.50"
+              value={host}
+            />
+          </Field>
+          <p className="text-xs text-[#6b7280]">
+            Once on each device: open the printer page below and accept the
+            certificate warning (Advanced → Proceed). Chrome may also ask to
+            allow access to devices on the local network — allow it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={working || !host.trim()}
+              onClick={() =>
+                void run(async () => {
+                  const saved = writeReceiptPrinterHost(host);
+                  setHostDraft(null);
+                  window.open(`https://${saved}/`, "_blank", "noopener");
+                  return "Accept the certificate in the new tab, close it, then print a test page.";
+                })
+              }
+            >
+              Save &amp; open printer page
+            </Button>
+            <Button
+              disabled={working || !host.trim()}
+              onClick={() =>
+                void run(async () => {
+                  writeReceiptPrinterHost(host);
+                  setHostDraft(null);
+                  await printNetwork([TEST_SHEET]);
+                  return "Test page printed.";
                 })
               }
             >

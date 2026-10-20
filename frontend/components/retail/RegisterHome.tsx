@@ -224,7 +224,13 @@ export default function RegisterHome({
           onClick={() => setDialog({ kind: "close" })}
         />
         <Tile
-          hint={printerMode === "bluetooth" ? "Bluetooth" : "Print dialog"}
+          hint={
+            printerMode === "bluetooth"
+              ? "Bluetooth"
+              : printerMode === "network"
+                ? "Network"
+                : "Print dialog"
+          }
           icon={<PrinterIcon />}
           label="Receipt Printer"
           onClick={() => setDialog({ kind: "printer" })}

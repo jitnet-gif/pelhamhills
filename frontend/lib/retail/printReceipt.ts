@@ -1,7 +1,9 @@
 /**
- * 영수증을 찍는다. 기기마다 두 경로 중 하나다(`receiptPrinter.ts`, 계산대의 Receipt printer 설정):
+ * 영수증을 찍는다. 기기마다 세 경로 중 하나다(`receiptPrinter.ts`, 계산대의 Receipt printer 설정):
  * - **브라우저 인쇄**: PC 에 Epson TM-m30III 드라이버가 깔려 있으면 그대로 감열 프린터로 나간다.
- * - **블루투스**: 페어링된 TM-m30 에 ESC/POS 를 직접 보낸다(Chrome·Edge). 실패하면 브라우저 인쇄로 넘어간다.
+ * - **블루투스**: 페어링된 TM-m30 에 ESC/POS 를 직접 보낸다(Chrome·Edge).
+ * - **네트워크**: 매장 네트워크의 TM-m30III 에 같은 ESC/POS 를 ePOS-Print 로 보낸다.
+ * 블루투스·네트워크가 실패하면 브라우저 인쇄로 넘어간다.
  * 설치 절차: `docs/pro-shop-receipt-printing-2026-09-12.md`.
  *
  * React 포털이 아니라 `body` 바로 아래의 **컨테이너 하나**를 직접 채운다. 계산대의
@@ -25,7 +27,7 @@ import {
   type ReceiptDoc,
   type ReceiptHeader,
 } from "./receipt";
-import { printBluetooth, readReceiptPrinterMode } from "./receiptPrinter";
+import { printBluetooth, printNetwork, readReceiptPrinterMode } from "./receiptPrinter";
 import type { Sale } from "./types";
 
 const ROOT_ID = "receipt-print-root";
@@ -103,11 +105,14 @@ export function printRainChecks(checks: readonly RainCheck[], options: { reprint
 
 function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: boolean } = {}): void {
   if (typeof window === "undefined") return;
-  if (readReceiptPrinterMode() !== "bluetooth") return printInBrowser(sheets);
-  printBluetooth(sheets, options).catch((error: unknown) => {
+  const mode = readReceiptPrinterMode();
+  if (mode === "browser") return printInBrowser(sheets);
+  const send = mode === "network" ? printNetwork : printBluetooth;
+  send(sheets, options).catch((error: unknown) => {
     // 종이가 안 나오면 직원이 알아야 한다. 인쇄 창으로 넘겨 다른 프린터라도 고를 수 있게 한다.
     const reason = error instanceof Error ? error.message : String(error);
-    window.alert(`Bluetooth receipt printer did not respond (${reason}). Opening the print dialog instead.`);
+    const label = mode === "network" ? "Network" : "Bluetooth";
+    window.alert(`${label} receipt printer did not print (${reason}) Opening the print dialog instead.`);
     printInBrowser(sheets);
   });
 }
