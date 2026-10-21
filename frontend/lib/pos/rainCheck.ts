@@ -68,7 +68,7 @@ export const rainCheckApi = {
     staffRpc<RainCheckQuote>("pelham_staff_rain_check_quote", { p_booking: booking, p_player: player }),
   issue: (fields: RainCheckIssue) => staffRpc<RainCheck>("pelham_staff_rain_check_issue", { p: fields }),
   forBooking: (booking: string) => staffRpc<RainCheck[]>("pelham_staff_rain_checks", { p_booking: booking }),
-  /** 티 시트 격자의 ☂(0063). 티타임 날짜 기준, 무효 제외. */
+  /** 티 시트 격자의 ☂(0064). 티타임 날짜 기준, 무효 제외. */
   between: (from: string, to: string) =>
     staffRpc<RainCheck[]>("pelham_staff_rain_checks_between", { p_from: from, p_to: to }),
   byCode: (code: string) => staffRpc<RainCheck>("pelham_staff_rain_check", { p_code: code }),

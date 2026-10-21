@@ -89,8 +89,8 @@ export function rainCheckTitle(check: RainCheck): string {
 // ===== 티 시트 격자: 보이는 날짜의 레인체크 =================================
 
 /**
- * 격자의 ☂(0063). 키는 `예약id:선수id`, 무효는 서버가 뺀다.
- * 0063 을 아직 안 돌렸거나 못 읽으면 빈 지도 — 격자는 ☂ 없이 그대로 쓴다.
+ * 격자의 ☂(0064). 키는 `예약id:선수id`, 무효는 서버가 뺀다.
+ * 0064 를 아직 안 돌렸거나 못 읽으면 빈 지도 — 격자는 ☂ 없이 그대로 쓴다.
  */
 export function useRainChecksBetween(from: string | null, to: string | null): Map<string, RainCheck> {
   const [state, setState] = useState<{ range: string; map: Map<string, RainCheck> }>({ range: "", map: new Map() });

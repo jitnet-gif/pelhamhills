@@ -7,12 +7,12 @@
 --   pelham_staff_rain_checks_between(p_from, p_to) — tee_date 가 기간 안인 레인체크(무효 제외).
 --     각 줄은 0011 `pelham_rc_json` 그대로다(status · expired 로 화면이 파랑/회색을 고른다).
 --
--- 기간은 최대 62일(주간 뷰는 7일). 전제: 0011. 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
+-- (0063 은 고객 회원권 파일이 먼저 썼다.) 기간은 최대 62일(주간 뷰는 7일). 전제: 0011. 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
 
 do $$
 begin
   if to_regclass('public.pelham_rain_checks') is null then
-    raise exception '0063 needs 0011 first (pelham_rain_checks is missing).';
+    raise exception '0064 needs 0011 first (pelham_rain_checks is missing).';
   end if;
 end;
 $$;

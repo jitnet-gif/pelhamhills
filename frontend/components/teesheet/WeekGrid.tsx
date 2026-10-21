@@ -212,7 +212,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
     [isDayView, focusedDate, weekKey],
   );
 
-  // 레인체크 받은 선수의 ☂ — 보이는 날짜 범위를 한 번에 읽는다(0063). 발행·무효 신호에 다시 읽는다.
+  // 레인체크 받은 선수의 ☂ — 보이는 날짜 범위를 한 번에 읽는다(0064). 발행·무효 신호에 다시 읽는다.
   const rainChecks = useRainChecksBetween(columns[0] ?? null, columns[columns.length - 1] ?? null);
 
   const colIndex = useMemo(() => {
