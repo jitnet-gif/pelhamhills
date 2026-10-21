@@ -1548,11 +1548,54 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   <span className="truncate text-[13px]">{player.type}</span>
                   {/* 레퍼런스의 머리 ⋮ — 선수 한 명에게 하는 드문 일(레인체크·환불·삭제)을 한곳에 모은다.
                       환불은 계산서 단위라 Reports → Daily close 의 그 영업일로 보낸다(0005). */}
-                  {/* 선수 빼기는 ⋮ 안에만 있으면 직원이 못 찾는다 — 카드마다 🗑 를 꺼내 둔다(⋮ → Delete 와 같은 길).
-                      마지막 한 명은 서버도 막으므로 흐리게 두고 이유를 툴팁으로 보인다. */}
+                  {/* 레인체크·환불·빼기는 ⋮ 안에만 있으면 직원이 못 찾는다 — 카드마다 아이콘으로 꺼내 둔다
+                      (⋮ 메뉴와 같은 길). 지금 못 하는 것은 흐리게 두고 이유를 툴팁으로 보인다. */}
+                  {useRainCheck ? (
+                    <button
+                      aria-label={`Rain check for ${player.name || "this player"}`}
+                      className="ml-auto flex items-center p-1 text-[#1d6fb8] hover:bg-[#eef5fc] disabled:text-[#c7c7cc] disabled:hover:bg-transparent"
+                      disabled={busy || !player.paid || Boolean(player.cancelled)}
+                      onClick={() => runDrop("raincheck", player)}
+                      title={
+                        player.paid && !player.cancelled
+                          ? "Give this player a rain check slip (barcode + expiry date), or reprint / void one (manager PIN)"
+                          : "Rain check — paid players only"
+                      }
+                      type="button"
+                    >
+                      <Glyph className="h-3.5 w-3.5" name="umbrella" />
+                    </button>
+                  ) : null}
+                  {player.paid && !paidBillOf(player.id) ? (
+                    <Link
+                      aria-label={`Refund ${player.name || "this player"}`}
+                      className={`flex items-center p-1 text-[#8a3f26] hover:bg-[#fff1ee] ${useRainCheck ? "" : "ml-auto"}`}
+                      href={`/admin/reports?date=${localBusinessDate(player.paidAt ? new Date(player.paidAt) : new Date())}`}
+                      title="Refund the bill this player was paid on — Reports → Daily close. Card and debit payments are refunded from that screen."
+                    >
+                      <Glyph className="h-3.5 w-3.5" name="refund" />
+                    </Link>
+                  ) : (
+                    <button
+                      aria-label={`Refund ${player.name || "this player"}`}
+                      className={`flex items-center p-1 text-[#8a3f26] hover:bg-[#fff1ee] disabled:text-[#c7c7cc] disabled:hover:bg-transparent ${
+                        useRainCheck ? "" : "ml-auto"
+                      }`}
+                      disabled={busy || !player.paid}
+                      onClick={() => runDrop("refund", player)}
+                      title={
+                        player.paid
+                          ? "Refund the bill this player was paid on (reason + manager PIN)"
+                          : "Refund — this player has not paid"
+                      }
+                      type="button"
+                    >
+                      <Glyph className="h-3.5 w-3.5" name="refund" />
+                    </button>
+                  )}
                   <button
                     aria-label={`Remove ${player.name || "this player"} from the reservation`}
-                    className="ml-auto flex items-center p-1 text-[#c0262d] hover:bg-[#fff1ee] disabled:text-[#c7c7cc] disabled:hover:bg-transparent"
+                    className="flex items-center p-1 text-[#c0262d] hover:bg-[#fff1ee] disabled:text-[#c7c7cc] disabled:hover:bg-transparent"
                     disabled={busy || players.length <= 1}
                     onClick={() => runDrop("delete", player)}
                     title={
