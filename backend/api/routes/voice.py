@@ -433,6 +433,8 @@ class FindTeeTimesRequest(_VoiceRequest):
     date: str = Field(..., description="ISO date (YYYY-MM-DD), or 'today' / 'tomorrow'.")
     party_size: int = Field(..., ge=1, le=ts.PLAYERS_PER_TEE_TIME)
     day_part: DayPart = "any"
+    #: 9 이면 그날 9홀을 칠 수 있는 시각만 돌려준다 (`ts.nine_holes_from`).
+    holes: Literal[9, 18] = 18
 
 
 class TeeTimeOption(BaseModel):
@@ -456,6 +458,7 @@ class HoldRequest(_VoiceRequest):
     date: str
     time: str = Field(..., description="Exactly one of the time labels find_tee_times returned.")
     party_size: int = Field(..., ge=1, le=ts.PLAYERS_PER_TEE_TIME)
+    holes: Literal[9, 18] = 18
 
 
 class HoldResponse(BaseModel):
@@ -788,6 +791,48 @@ def _require_open_slot(
     return slot
 
 
+def _no_nine_reason(iso_date: str, open_slots: list) -> str:
+    """그날 9홀 칸이 없는 이유 한 구절."""
+    start = ts.nine_holes_from(iso_date)
+    if start >= ts.NO_NINE:
+        return "nine holes are not sold that day"
+    last = max((slot.minutes for slot in open_slots), default=None)
+    if last is None:
+        return "there are no tee times that day"
+    return (
+        f"nine holes start at {ts.minutes_to_label(start)} that day, and the last tee time is "
+        f"{ts.minutes_to_label(last)}"
+    )
+
+
+def _next_nine_day(iso_date: str) -> str:
+    """예약 창 안에서 9홀을 칠 수 있는 다음 날과 그날 첫 9홀 시각을 문장으로.
+
+    해 길이(일출·일몰)와 요금표만 본다 — 직원 잠금과 예약은 보지 않으므로 '꼭 빈자리'
+    가 아니라 '9홀을 파는 날'이다. 그래서 그날을 다시 찾아보라고 한다.
+    """
+    furthest = club_now().date() + timedelta(days=BOOKING_WINDOW_DAYS)
+    day = date_cls.fromisoformat(iso_date) + timedelta(days=1)
+    while day <= furthest:
+        iso = day.isoformat()
+        start = ts.nine_holes_from(iso)
+        first, last = ts.tee_window(iso)
+        if start < ts.NO_NINE:
+            first_nine = next(
+                (m for m in ts.grid_minutes(iso) if m >= max(start, first) and m <= last), None
+            )
+            if first_nine is not None:
+                return (
+                    f"The next day nine holes can be booked is {spoken_date(iso)}, from "
+                    f"{ts.minutes_to_label(first_nine)}. Offer that day and search it with holes 9."
+                )
+        day += timedelta(days=1)
+    return (
+        f"No day in the next {BOOKING_WINDOW_DAYS} days has nine-hole tee times, because the "
+        "days are too short. Say so."
+    )
+
+
 # ===== 도구 1: 빈 티타임 찾기 ==========================================
 
 @tools_router.post("/voice/tools/find-tee-times", response_model=FindTeeTimesResponse)
@@ -803,9 +848,16 @@ def find_tee_times(body: FindTeeTimesRequest) -> FindTeeTimesResponse:
     bookings = ts.read_bookings(Scope(dates={iso_date}))
     blocked = _blocked_times(bookings, iso_date)
 
+    nine = body.holes == 9
+    nine_from = ts.nine_holes_from(iso_date) if nine else 0
+    nine_rate = ts.green_fee_for(iso_date, 9) if nine else 0.0
+    open_slots = ts.daylight_slots(iso_date)
+
     options: list[TeeTimeOption] = []
-    for slot in ts.daylight_slots(iso_date):
+    for slot in open_slots:
         if slot.time in blocked:
+            continue
+        if slot.minutes < nine_from:
             continue
 
         at = slot_datetime(iso_date, slot.time)
@@ -823,11 +875,46 @@ def find_tee_times(body: FindTeeTimesRequest) -> FindTeeTimesResponse:
             continue
 
         options.append(
-            TeeTimeOption(time=slot.time, day_part=part, seats_open=seats, rate=slot.rate)
+            TeeTimeOption(
+                time=slot.time, day_part=part, seats_open=seats,
+                rate=nine_rate if nine else slot.rate,
+            )
+        )
+
+    # 그날 9홀 칸이 아예 없다(9홀을 안 팔거나, 9홀 시작 전에 마지막 티가 끝남). 꽉 찬 것과
+    # 다르다 — 다른 시간대를 권해도 소용없으니, 안 된다고 말하고 언제부터 되는지 알려 준다.
+    if nine and not any(slot.minutes >= nine_from for slot in open_slots):
+        return FindTeeTimesResponse(
+            ok=False,
+            date=iso_date,
+            spoken_date=spoken_date(iso_date),
+            party_size=body.party_size,
+            total_open=0,
+            options=[],
+            message=(
+                f"Nine holes cannot be booked on {spoken_date(iso_date)}: "
+                f"{_no_nine_reason(iso_date, open_slots)}. Tell the caller that plainly — nine "
+                f"holes are not available that day. {_next_nine_day(iso_date)} Or offer eighteen "
+                f"holes on {spoken_date(iso_date)}."
+            ),
         )
 
     if not options:
         window = "" if body.day_part == "any" else f" in the {body.day_part}"
+        if nine:
+            return FindTeeTimesResponse(
+                ok=False,
+                date=iso_date,
+                spoken_date=spoken_date(iso_date),
+                party_size=body.party_size,
+                total_open=0,
+                options=[],
+                message=(
+                    f"Nothing is open for nine holes for {body.party_size} on "
+                    f"{spoken_date(iso_date)}{window}. {ts.nine_holes_rule(iso_date)}. Tell the "
+                    "caller that, then offer a different day or eighteen holes."
+                ),
+            )
         return FindTeeTimesResponse(
             ok=False,
             date=iso_date,
@@ -843,6 +930,20 @@ def find_tee_times(body: FindTeeTimesRequest) -> FindTeeTimesResponse:
 
     picked = _spread(options, MAX_OPTIONS)
     times = ", ".join(option.time for option in picked)
+    if nine:
+        return FindTeeTimesResponse(
+            ok=True,
+            date=iso_date,
+            spoken_date=spoken_date(iso_date),
+            party_size=body.party_size,
+            total_open=len(options),
+            options=picked,
+            message=(
+                f"{len(options)} tee times are open for nine holes for {body.party_size} on "
+                f"{spoken_date(iso_date)}. {ts.nine_holes_rule(iso_date)}. Read a few of these "
+                f"to the caller: {times}. The nine-hole rate is ${nine_rate:.2f} per player."
+            ),
+        )
     return FindTeeTimesResponse(
         ok=True,
         date=iso_date,
@@ -866,6 +967,22 @@ def hold_tee_time(body: HoldRequest) -> HoldResponse:
     iso_date = resolve_date(body.date)
     require_bookable_date(iso_date)
     time_label = body.time.strip()
+
+    # 9홀을 못 치는 시각이면 이름을 받기 전에 여기서 막는다 (확정에서 막히면 손님이 헛걸음한다).
+    nine_from = ts.nine_holes_from(iso_date)
+    if body.holes == 9 and (ts.label_to_minutes(time_label) or 0) < nine_from:
+        if nine_from >= ts.NO_NINE:
+            detail = (
+                f"Nine holes cannot be booked on {spoken_date(iso_date)}. Tell the caller that "
+                f"plainly. {_next_nine_day(iso_date)} Or offer eighteen holes at {time_label}."
+            )
+        else:
+            detail = (
+                f"{ts.nine_holes_rule(iso_date)}, so {time_label} is eighteen holes only. Tell the "
+                f"caller that plainly, then offer eighteen holes at {time_label} or search again "
+                "with holes 9 for a later time."
+            )
+        raise HTTPException(status_code=422, detail=detail)
 
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=ts.HOLD_TTL_SECONDS)
 

@@ -634,6 +634,70 @@ def test_confirm_books_nine_holes_from_the_nine_hole_start(client):
     assert done.json()["booking"]["rate"] == 34.52   # 정규 시즌 평일 9홀
 
 
+def find_nine(client, date=TOMORROW, party=2, day_part="any"):
+    return client.post(
+        f"{API}/voice/tools/find-tee-times",
+        json={"date": date, "party_size": party, "day_part": day_part, "holes": 9,
+              "conversation_id": "c-nine"},
+    )
+
+
+def test_find_nine_holes_returns_only_times_from_the_nine_hole_start(client):
+    body = find_nine(client).json()
+    assert body["ok"] is True
+    assert all(ts.label_to_minutes(o["time"]) >= 10 * 60 for o in body["options"])
+    assert all(o["rate"] == 34.52 for o in body["options"])   # 정규 시즌 평일 9홀
+    assert "10:00 AM" in body["message"]
+
+
+def test_find_nine_holes_in_the_morning_says_when_nine_holes_start(client):
+    body = find_nine(client, day_part="morning").json()
+    # 10:00~11:59 는 아침이라 남는다. 그 칸이 다 있어도 7~9시는 빠져야 한다.
+    assert all(ts.label_to_minutes(o["time"]) >= 10 * 60 for o in body["options"])
+
+
+def test_find_nine_holes_on_a_day_without_nine_says_no_and_names_the_next_day(client, monkeypatch):
+    real = ts.nine_holes_from
+    # 9/9 는 9홀 시작이 마지막 티 뒤라 9홀 칸이 없다고 가정한다(11월 주말과 같은 모양).
+    monkeypatch.setattr(ts, "nine_holes_from",
+                        lambda iso: 23 * 60 if iso == TOMORROW else real(iso))
+    body = find_nine(client).json()
+    assert body["ok"] is False
+    assert body["options"] == []
+    assert "Nine holes cannot be booked on" in body["message"]
+    assert "11:00 PM" in body["message"]                          # 그날 9홀 시작
+    assert "next day nine holes can be booked" in body["message"]
+    assert "Thursday, September 10, from 10:07 AM" in body["message"]  # 9분 격자의 첫 9홀 칸
+
+
+def test_find_nine_holes_when_no_day_in_the_window_has_nine(client, monkeypatch):
+    monkeypatch.setattr(ts, "nine_holes_from", lambda iso: ts.NO_NINE)
+    body = find_nine(client).json()
+    assert body["ok"] is False
+    assert "not sold that day" in body["message"]
+    assert "No day in the next 14 days" in body["message"]
+
+
+def test_hold_refuses_nine_holes_before_the_nine_hole_start(client):
+    refused = client.post(
+        f"{API}/voice/tools/hold-tee-time",
+        json={"date": TOMORROW, "time": "9:58 AM", "party_size": 2, "holes": 9,
+              "conversation_id": "c-test"},
+    )
+    assert tool_status(refused) == 422
+    assert "10:00 AM" in refused.json()["message"]
+    assert "eighteen holes only" in refused.json()["message"]
+
+
+def test_hold_takes_nine_holes_from_the_nine_hole_start(client):
+    held = client.post(
+        f"{API}/voice/tools/hold-tee-time",
+        json={"date": TOMORROW, "time": "10:07 AM", "party_size": 2, "holes": 9,
+              "conversation_id": "c-test"},
+    )
+    assert held.status_code == 200 and held.json()["ok"] is True, held.text
+
+
 def test_get_rates_charges_a_cart_per_rider(client):
     walking = rates(client, riders=0).json()["total"]
     riding = rates(client, riders=2).json()["total"]
