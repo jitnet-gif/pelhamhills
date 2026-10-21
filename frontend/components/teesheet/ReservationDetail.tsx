@@ -31,6 +31,7 @@ import { greenFeeOf } from "@/lib/greenFee";
 import { longDate, money } from "@/lib/teeSheet/dates";
 import { useSlotLocks } from "@/hooks/useSlotLocks";
 import { isSlotLocked, slotLockReason } from "@/lib/teeSheet/sun";
+import { copyBookingInput } from "@/lib/teeSheet/copy";
 import { clubDate, confirmationCode, paidBillFor, teeReceiptFor } from "@/lib/teeSheet/receipt";
 import { GUEST_NAME, reservationTitle } from "@/lib/teeSheet/tone";
 import type {
@@ -853,9 +854,9 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const cloneN = Math.min(cloneCount, cloneTargets.length);
 
   /**
-   * 복제는 이름·연락처·요금제·카트와 예약의 홀 수·요금·메모만 옮긴다. 도착·결제·노쇼는 새 라운드의
-   * 일이라 옮기지 않는다. 한 건씩 **차례로** 만든다 — 하나가 정원에 걸려 실패해도(다른 화면이 먼저
-   * 채운 경우) 앞의 것은 남고, 몇 건이 됐는지 정확히 알린다.
+   * 복제가 무엇을 옮기는지는 copyBookingInput(lib/teeSheet/copy.ts)이 정한다. 한 건씩 **차례로**
+   * 만든다 — 하나가 정원에 걸려 실패해도(다른 화면이 먼저 채운 경우) 앞의 것은 남고, 몇 건이
+   * 됐는지 정확히 알린다.
    */
   const cloneReservation = async () => {
     if (cloning || cloneN === 0) return;
@@ -865,28 +866,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
       if (dirty) await saveAll();
       const source = bookingRef.current ?? booking;
       for (const time of cloneTargets.slice(0, cloneN)) {
-        const created = await controller.createBooking({
-          date: source.date,
-          time,
-          title: source.title,
-          holes: source.holes,
-          rate: source.rate,
-          cartCount: source.cartCount,
-          color: source.color,
-          notes: source.notes ?? "",
-          players: source.players
-            .filter((player) => !player.cancelled)
-            .map((player) => ({
-              firstName: player.firstName ?? "",
-              lastName: player.lastName ?? "",
-              email: player.email ?? "",
-              phone: player.phone ?? "",
-              type: player.type,
-              ratePlan: player.ratePlan,
-              cart: player.cart === true,
-              cartFee: player.cart ? (player.cartFee ?? 0) : 0,
-            })),
-        });
+        const created = await controller.createBooking(copyBookingInput(source, source.date, time));
         if (!created) break;
         made += 1;
       }

@@ -20,7 +20,7 @@
 //     한 행에 예약이 둘일 수 있다 — 백엔드가 합계 4명 이하면 같은 티타임 공유를
 //     허용한다. 세그먼트는 좌→우로 깔리고 남는 칸은 기존 `+` 생성 버튼이 채운다.
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useState } from "react";
 import type { CSSProperties, DragEvent, MouseEvent as ReactMouseEvent } from "react";
 
 import {
@@ -48,6 +48,7 @@ import { useSlotLocks } from "@/hooks/useSlotLocks";
 import type { RainCheck } from "@/lib/pos/rainCheck";
 import { rainCheckTitle, rainCheckTone, useRainChecksBetween } from "./RainCheckDialog";
 import { isSlotLocked, slotLockKey, slotLockReason } from "@/lib/teeSheet/sun";
+import { copyBookingInput, copySeats } from "@/lib/teeSheet/copy";
 
 export type WeekGridProps = {
   controller: TeeSheetController;
@@ -178,6 +179,16 @@ function heldSeats(booking: TeeBooking): number {
 
 /** 드래그 중인 예약 id 를 싣는 dataTransfer 형식. 다른 앱에서 끌어온 글자와 구분한다. */
 const DRAG_MIME = "application/x-pelham-tee-booking";
+
+/**
+ * 지금 끌고 있는 예약과 그것을 끌기 시작한 격자. 티 시트를 두 장 나란히 띄우면(teesheet 페이지의
+ * SecondSheet) 다른 격자로 끌어 놓는 것은 **복사**다 — 같은 격자 안에서는 지금처럼 옮긴다.
+ *
+ * 격자마다 드래그 상태(dragId)를 따로 갖고 있어서 받는 쪽 격자는 무엇이 끌려오는지 모른다.
+ * dataTransfer 의 값은 drop 때에만 읽을 수 있어 dragover 에서 "놓을 수 있는 칸인가" 를 판단할 수
+ * 없으므로, 한 번에 하나뿐인 드래그를 모듈 변수로 둔다.
+ */
+let activeDrag: { booking: TeeBooking; gridId: string } | null = null;
 
 /** 드래그로 옮길 수 없는 예약. 취소·노쇼는 자리를 잡지 않으니 옮길 이유가 없다. */
 function isDraggable(booking: TeeBooking): boolean {
@@ -441,7 +452,8 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
   // CSS :hover 로는 "같은 행" 을 잡을 수 없다 — 셀마다 data-slot-time 을 달고
   // 격자 한 곳에서 위임으로 읽는다. 그 행의 Time 칸을 파란색으로 뒤집어 보인다.
   const [hoverTime, setHoverTime] = useState<string | null>(null);
-  const { moveBooking, pushToast, select } = controller;
+  const { createBooking, focusedDate: sheetDate, moveBooking, pushToast, select, setFocusedDate } = controller;
+  const gridId = useId();
 
   // ===== 칸 잠금: 자동(일출 전·일몰 2시간 전 이후) + 직원의 블록·릴리스(0051). PIN 없이 누구나. =====
   const { locks, setLock } = useSlotLocks(columns);
@@ -521,16 +533,51 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
     [draggedBooking, locks, seatsTakenAt],
   );
 
+  /** 다른 격자의 예약을 이 칸에 복사할 수 있는가 — 잠기지 않았고 좌석이 남았으면. 블록은 예약이 아니라 복사하지 않는다. */
+  const canCopyAt = useCallback(
+    (source: TeeBooking, date: string, time: string) =>
+      source.status !== "blocked" &&
+      !isSlotLocked(date, timeToMinutes(time), locks) && seatsTakenAt(date, time, "") + copySeats(source) <= DAY_SEATS,
+    [locks, seatsTakenAt],
+  );
+
   const endDrag = useCallback(() => {
     setDragId(null);
     setDropKey(null);
-  }, []);
+    if (activeDrag?.gridId === gridId) activeDrag = null;
+  }, [gridId]);
 
-  const startDrag = useCallback((event: DragEvent, booking: TeeBooking) => {
-    event.dataTransfer.setData(DRAG_MIME, booking.id);
-    event.dataTransfer.effectAllowed = "move";
-    setDragId(booking.id);
-  }, []);
+  const startDrag = useCallback(
+    (event: DragEvent, booking: TeeBooking) => {
+      event.dataTransfer.setData(DRAG_MIME, booking.id);
+      event.dataTransfer.effectAllowed = "copyMove";
+      activeDrag = { booking, gridId };
+      setDragId(booking.id);
+    },
+    [gridId],
+  );
+
+  /** 다른 격자에서 끌어온 예약을 이 칸에 복사본으로 만들고 연다. 원래 예약은 그대로다. */
+  const copyHere = useCallback(
+    async (source: TeeBooking, date: string, time: string) => {
+      setDropKey(null);
+      if (!canCopyAt(source, date, time)) {
+        pushToast(
+          "error",
+          `${time} on ${shortDate(date)} has ${Math.max(0, DAY_SEATS - seatsTakenAt(date, time, ""))} open spot(s) — ${source.title} has ${copySeats(source)} players.`,
+        );
+        return;
+      }
+      // 상세 패널의 티 타임 목록은 시트의 날짜 것이다 — 주간 뷰에서 다른 날에 놓았으면 시트를 그 날로 옮긴다.
+      if (date !== sheetDate) setFocusedDate(date);
+      const created = await createBooking(copyBookingInput(source, date, time));
+      if (created) {
+        select(created.id);
+        pushToast("success", `Copied ${source.title} to ${time} on ${shortDate(date)}.`);
+      }
+    },
+    [canCopyAt, createBooking, pushToast, seatsTakenAt, select, setFocusedDate, sheetDate],
+  );
 
   const dropBooking = useCallback(
     (date: string, time: string) => {
@@ -559,9 +606,17 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
     const key = `${date}|${time}`;
     return {
       onDragOver: (event: DragEvent) => {
-        if (!dragId || !canDropAt(date, time)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
+        if (dragId) {
+          if (!canDropAt(date, time)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        } else {
+          // 다른 격자에서 끌려온 예약 — 복사. 커서에 + 가 붙는다.
+          const source = activeDrag && activeDrag.gridId !== gridId ? activeDrag.booking : null;
+          if (!source || !canCopyAt(source, date, time)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }
         if (dropKey !== key) setDropKey(key);
       },
       onDragLeave: () => {
@@ -569,7 +624,12 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
       },
       onDrop: (event: DragEvent) => {
         event.preventDefault();
-        dropBooking(date, time);
+        if (dragId) {
+          dropBooking(date, time);
+          return;
+        }
+        const source = activeDrag && activeDrag.gridId !== gridId ? activeDrag.booking : null;
+        if (source) void copyHere(source, date, time);
       },
     };
   };
