@@ -1548,7 +1548,23 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   <span className="truncate text-[13px]">{player.type}</span>
                   {/* 레퍼런스의 머리 ⋮ — 선수 한 명에게 하는 드문 일(레인체크·환불·삭제)을 한곳에 모은다.
                       환불은 계산서 단위라 Reports → Daily close 의 그 영업일로 보낸다(0005). */}
-                  <div className="relative ml-auto" data-player-menu>
+                  {/* 선수 빼기는 ⋮ 안에만 있으면 직원이 못 찾는다 — 카드마다 🗑 를 꺼내 둔다(⋮ → Delete 와 같은 길).
+                      마지막 한 명은 서버도 막으므로 흐리게 두고 이유를 툴팁으로 보인다. */}
+                  <button
+                    aria-label={`Remove ${player.name || "this player"} from the reservation`}
+                    className="ml-auto flex items-center p-1 text-[#c0262d] hover:bg-[#fff1ee] disabled:text-[#c7c7cc] disabled:hover:bg-transparent"
+                    disabled={busy || players.length <= 1}
+                    onClick={() => runDrop("delete", player)}
+                    title={
+                      players.length <= 1
+                        ? "Last player — cancel or delete the whole reservation from the rail instead"
+                        : "Remove only this player — the rest of the group stays booked (reason + manager PIN)"
+                    }
+                    type="button"
+                  >
+                    <Glyph className="h-3.5 w-3.5" name="trash" />
+                  </button>
+                  <div className="relative" data-player-menu>
                     <button
                       aria-expanded={menuFor === `${player.id}:card`}
                       aria-haspopup="menu"
