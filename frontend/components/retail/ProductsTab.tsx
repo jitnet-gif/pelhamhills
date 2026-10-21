@@ -16,6 +16,7 @@ import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 
 import retailApi, { toRetailError } from "@/lib/retail/api";
 import { code128Svg, houseBarcode, isHouseBarcode } from "@/lib/retail/barcode";
+import { LABEL_LAYOUTS, printBarcodeLabels, type LabelLayout } from "@/lib/retail/barcodeLabels";
 import { menuGroupSuggestions } from "@/lib/retail/menuGroups";
 import {
   LOW_STOCK_RED_BELOW,
@@ -86,6 +87,7 @@ export default function ProductsTab({
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [printingLabels, setPrintingLabels] = useState(false);
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -231,8 +233,8 @@ export default function ProductsTab({
             </Button>
           ) : null}
           {houseCoded.length > 0 ? (
-            <Button onClick={() => printBarcodeSheet(houseCoded)}>
-              Print barcode list ({houseCoded.length})
+            <Button onClick={() => setPrintingLabels(true)}>
+              Print barcode stickers ({houseCoded.length})
             </Button>
           ) : null}
           <Button disabled={demo} onClick={() => setEditing("new")} tone="primary">
@@ -374,6 +376,10 @@ export default function ProductsTab({
         </>
       )}
 
+      {printingLabels ? (
+        <LabelDialog items={houseCoded} onClose={() => setPrintingLabels(false)} />
+      ) : null}
+
       {editing ? (
         <ProductDialog
           // 겹치는 상품을 열면 같은 창이 그 상품으로 바뀐다. 폼은 처음 한 번만 채우므로 새로 만든다.
@@ -410,45 +416,110 @@ function PriceBarcode({ product }: { product: Product }) {
   );
 }
 
-function escapeHtml(text: string) {
-  return text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
-}
-
 /**
- * 바코드 없는 상품 리스트를 종이로. 상품명·가격·바코드 한 줄씩 — 스낵바 카운터에 붙여 두고 쏜다.
- * 새 창에 그려 인쇄 창을 연다(계산대 영수증 인쇄 경로와 섞지 않는다).
+ * 바코드 스티커 인쇄 창. 어떤 종이에(시트·롤·리스트), 몇 장씩, 어느 상품을 찍을지 고른다.
+ * 기본은 전부 한 장씩 — 처음 붙일 때 쓰고, 다시 찍을 때는 그 상품만 남긴다.
  */
-function printBarcodeSheet(items: Product[]) {
-  const rows = [...items]
-    .sort((a, b) => (a.menu_group ?? "").localeCompare(b.menu_group ?? "") || a.name.localeCompare(b.name))
-    .map((item) => {
-      const code = item.barcode!.trim();
-      return (
-        `<div class="row"><div class="name">${escapeHtml(item.name)}` +
-        `<small>${escapeHtml(item.menu_group || item.category)}</small></div>` +
-        `<div class="price">${escapeHtml(formatMoney(item.price))}</div>` +
-        `<div class="code">${code128Svg(code)}<p>${escapeHtml(code)}</p></div></div>`
-      );
-    })
-    .join("");
-  const win = window.open("", "_blank", "width=800,height=900");
-  if (!win) {
-    window.alert("Allow pop-ups for this site to print the barcode list.");
-    return;
+function LabelDialog({ items, onClose }: { items: Product[]; onClose: () => void }) {
+  const [layout, setLayout] = useState<LabelLayout>("avery5160");
+  const [copies, setCopies] = useState("1");
+  const [skip, setSkip] = useState("0");
+  const [showPrice, setShowPrice] = useState(false);
+  const [picked, setPicked] = useState<Set<number>>(() => new Set(items.map((item) => item.id)));
+  const [error, setError] = useState("");
+
+  const chosen = items.filter((item) => picked.has(item.id));
+  const copyCount = Math.min(Math.max(Number.parseInt(copies, 10) || 1, 1), 100);
+  const skipCount = layout === "avery5160" ? Math.min(Math.max(Number.parseInt(skip, 10) || 0, 0), 29) : 0;
+  const total = layout === "list" ? chosen.length : chosen.length * copyCount;
+
+  function toggle(id: number) {
+    setPicked((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Barcode list</title><style>
-    body{font-family:system-ui,sans-serif;margin:24px;color:#111}
-    h1{font-size:18px;margin:0 0 12px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
-    .row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-bottom:1px solid #ccc;break-inside:avoid}
-    .name{font-weight:700;font-size:14px}.name small{display:block;font-weight:400;color:#666;font-size:11px}
-    .price{font-weight:700;font-size:16px;text-align:right}
-    .code{grid-column:1/-1}.code svg{display:block;width:100%;height:44px}
-    .code p{margin:2px 0 0;text-align:center;font:11px monospace;letter-spacing:1px}
-    @media print{body{margin:10mm}}
-  </style></head><body><h1>Items without a maker barcode — scan here</h1><div class="grid">${rows}</div>
-  <script>window.onload=function(){window.print()}</script></body></html>`);
-  win.document.close();
+
+  function print() {
+    setError("");
+    const opened = printBarcodeLabels(chosen, { layout, copies: copyCount, skip: skipCount, showPrice });
+    if (!opened) setError("Allow pop-ups for this site, then press Print again.");
+  }
+
+  return (
+    <Modal onClose={onClose} title="Print barcode stickers">
+      <div className="grid gap-3">
+        <Field hint={LABEL_LAYOUTS.find((option) => option.value === layout)?.hint} label="Paper">
+          <Select onChange={(event) => setLayout(event.target.value as LabelLayout)} value={layout}>
+            {LABEL_LAYOUTS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {layout !== "list" ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Copies of each">
+              <TextInput inputMode="numeric" min={1} max={100} onChange={(event) => setCopies(event.target.value)} type="number" value={copies} />
+            </Field>
+            {layout === "avery5160" ? (
+              <Field hint="Labels already used on the sheet" label="Skip first">
+                <TextInput inputMode="numeric" min={0} max={29} onChange={(event) => setSkip(event.target.value)} type="number" value={skip} />
+              </Field>
+            ) : null}
+          </div>
+        ) : null}
+        {layout !== "list" ? (
+          <label className="flex items-center gap-2 text-sm">
+            <input checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} type="checkbox" />
+            Show the price on the sticker
+          </label>
+        ) : null}
+
+        <div className="grid gap-1">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-bold text-[#3f434a]">
+              Products ({chosen.length} of {items.length})
+            </span>
+            <span className="flex gap-3 text-xs">
+              <button className="underline" onClick={() => setPicked(new Set(items.map((item) => item.id)))} type="button">
+                All
+              </button>
+              <button className="underline" onClick={() => setPicked(new Set())} type="button">
+                None
+              </button>
+            </span>
+          </div>
+          <ul className="max-h-60 overflow-y-auto border border-[#d4d4d8]">
+            {items.map((item) => (
+              <li className="border-b border-[#e4e4e8] last:border-b-0" key={item.id}>
+                <label className="flex items-center gap-2 px-2.5 py-1.5 text-sm">
+                  <input checked={picked.has(item.id)} onChange={() => toggle(item.id)} type="checkbox" />
+                  <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                  <span className="font-mono text-xs text-[#6b7280]">{item.barcode}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="text-xs text-[#6b7280]">
+          In the print window choose <b>Scale 100% / Actual size</b> and <b>Margins: None</b> so the barcodes line up
+          with the stickers. Print one test page on plain paper first and hold it behind a sticker sheet.
+        </p>
+        {error ? <ErrorNote>{error}</ErrorNote> : null}
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button disabled={chosen.length === 0} onClick={print} tone="primary">
+            {layout === "list" ? `Print list (${total})` : `Print ${total} sticker(s)`}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
 }
 
 /** 렌탈은 `stock: null` — 재고 개념이 없다. 0 과 같이 보이면 품절로 오해한다. */
