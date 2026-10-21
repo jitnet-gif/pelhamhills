@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { REGISTER_CLOSE_GUIDE } from "@/lib/nav";
 import retailApi, { toRetailError } from "@/lib/retail/api";
-import { PAYMENT_LABELS } from "@/lib/retail/receipt";
+import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import {
   CASH_DENOMINATIONS,
   formatMoney,
@@ -186,8 +186,17 @@ function CloseForm({
   return (
     <div className="grid min-w-0 gap-4">
       <h3 className="text-lg font-bold text-[#2b2f36]">
-        Register - &quot;{registerName}&quot; Closing Totals
+        Register - &quot;{report.stations && report.stations.length > 1 ? stationLabel(report.station) : registerName}&quot;
+        Closing Totals
       </h3>
+
+      {/* 0062: 서랍이 하나라 어느 화면에서 열어도 같은 마감이다. 무엇이 들어 있는지 적어 둔다. */}
+      {report.stations && report.stations.length > 1 ? (
+        <p className="bg-[#f2f2f4] px-3 py-2 text-sm text-[#3f434a]">
+          One drawer for the whole club — includes every sale from {report.stations.map(stationLabel).join(", ")}.
+          Online booking payments are not in the drawer or on the terminal slip.
+        </p>
+      ) : null}
 
       {report.open_bills > 0 ? (
         <p className="bg-[#fff8e1] px-3 py-2 text-sm text-[#5b4708]">

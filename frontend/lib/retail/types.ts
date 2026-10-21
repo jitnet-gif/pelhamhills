@@ -270,8 +270,10 @@ export type RegisterCloseRow = {
 export type RegisterCloseReport = {
   business_date: string;
   station: string;
-  /** 이 계산대에 아직 결제 안 된 계산서 수(오늘만). */
+  /** 이 계산대에 아직 결제 안 된 계산서 수(오늘만). 0062 부터는 서랍에 든 화면 전부. */
   open_bills: number;
+  /** 이 서랍에 결제가 들어가는 화면들(0062). 2026-10-21 부터 네 화면 모두 — 마감 하나에 클럽 전체 매출. */
+  stations?: string[];
   rows: RegisterCloseRow[];
   close: {
     opening_float: Cents;
