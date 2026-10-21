@@ -5,10 +5,18 @@
  * 손님 화면(`components/site/SiteNoticePopup.tsx`)은 공개 키로 `pelham_site_notices_now` 만 부르고,
  * 직원 화면(`/admin/notices`)은 로그인 토큰으로 `pelham_staff_site_notice*` 를 부른다.
  * 닫은 기록은 손님 브라우저에만 남긴다 — 서버는 누가 무엇을 닫았는지 모른다.
+ *
+ * ## 언제 다시 뜨는가(2026-10-21 클럽 결정)
+ * 그냥 닫으면(× · Close) **다음 장을 열 때 또 뜬다.** 손님이 창 안의 "Don't show …" 칸에 체크하고
+ * 닫았을 때만 기억한다. 무엇을 기억할지는 공지의 `repeat` 가 정한다:
+ *   once        — "Don't show this again": 그 공지가 고쳐질 때까지 안 뜬다.
+ *   daily       — "Don't show again today": 오늘만 안 뜬다.
+ *   every_visit — 체크 칸이 없다. 늘 뜬다(휴장 같은 꼭 봐야 하는 안내).
  */
 
 import { bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
+import { PUBLISHABLE_KEY, SUPABASE_URL, accessToken } from "@/lib/teeSheet/session";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
 export type NoticeKind = "notice" | "alert" | "promotion";
@@ -63,10 +71,18 @@ export const SURFACE_LABEL: Record<NoticeSurface, string> = {
   book: "Booking pages only",
 };
 
+/** 직원 편집기의 "Don't show again" 선택지. */
 export const REPEAT_LABEL: Record<NoticeRepeat, string> = {
-  once: "Once (until the pop-up is edited)",
-  daily: "Once a day",
-  every_visit: "Every visit",
+  once: "Box: “Don't show this again”",
+  daily: "Box: “Don't show again today”",
+  every_visit: "No box — always shows",
+};
+
+/** 손님 창의 체크 칸 문구. 없으면 칸을 그리지 않는다. */
+export const DONT_SHOW_LABEL: Record<NoticeRepeat, string | null> = {
+  once: "Don't show this again",
+  daily: "Don't show again today",
+  every_visit: null,
 };
 
 export type NoticeState = "live" | "scheduled" | "ended" | "off";
@@ -87,15 +103,9 @@ function today(): string {
   return new Date().toLocaleDateString("en-CA");
 }
 
-/** 이 손님이 이 공지를 이미 닫았는가. 저장소가 막힌 브라우저(사생활 모드 등)에서는 늘 "아니오". */
+/** 이 손님이 "다시 보지 않기" 를 체크하고 닫았는가. 저장소가 막힌 브라우저(사생활 모드 등)에서는 늘 "아니오". */
 export function wasDismissed(notice: PublicNotice): boolean {
-  if (notice.repeat === "every_visit") {
-    try {
-      return sessionStorage.getItem(DISMISS_PREFIX + notice.id) === String(notice.version);
-    } catch {
-      return false;
-    }
-  }
+  if (!DONT_SHOW_LABEL[notice.repeat]) return false;
   try {
     const saved = localStorage.getItem(DISMISS_PREFIX + notice.id);
     if (!saved) return false;
@@ -107,14 +117,11 @@ export function wasDismissed(notice: PublicNotice): boolean {
   }
 }
 
+/** 체크 칸을 누르고 닫았을 때만 부른다. */
 export function rememberDismissed(notice: PublicNotice): void {
+  if (!DONT_SHOW_LABEL[notice.repeat]) return;
   try {
-    if (notice.repeat === "every_visit") {
-      // 창(탭)을 새로 열 때까지만 — 같은 방문 안에서 장을 넘길 때마다 뜨면 쓸 수가 없다.
-      sessionStorage.setItem(DISMISS_PREFIX + notice.id, String(notice.version));
-    } else {
-      localStorage.setItem(DISMISS_PREFIX + notice.id, `${notice.version}|${today()}`);
-    }
+    localStorage.setItem(DISMISS_PREFIX + notice.id, `${notice.version}|${today()}`);
   } catch {
     // 저장소가 막혀 있으면 다음 장에서 다시 뜬다. 막을 방법이 없다.
   }
@@ -142,6 +149,74 @@ export function todayAt(hours: number, minutes = 0): string {
   const d = new Date();
   d.setHours(hours, minutes, 0, 0);
   return toLocalInput(d.toISOString());
+}
+
+// ===== 이미지 올리기(0061) ================================================
+
+const IMAGE_BUCKET = "site-images";
+/** 팝업 폭은 최대 448px 이라 레티나에서도 이 정도면 충분하다. 휴대폰 원본(4000px·5MB)을 그대로 올리면 손님이 기다린다. */
+const IMAGE_MAX_PX = 1600;
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** 큰 사진을 줄인다. GIF 는 움직임이 사라지므로 그대로 둔다. */
+async function shrink(file: File): Promise<Blob> {
+  if (file.type === "image/gif") return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, IMAGE_MAX_PX / Math.max(bitmap.width, bitmap.height));
+  if (scale === 1 && file.size <= 1.5 * 1024 * 1024) {
+    bitmap.close();
+    return file;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
+  return blob ?? file;
+}
+
+/** 직원이 고른 그림을 올리고 손님이 읽을 공개 주소를 돌려준다. */
+export async function uploadSiteImage(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new ApiError(422, "Choose a picture file (JPG, PNG, WebP or GIF).");
+  const token = await accessToken();
+  if (!token) throw new ApiError(401, "Sign in again to upload pictures.");
+
+  const blob = await shrink(file);
+  if (blob.size > IMAGE_MAX_BYTES) throw new ApiError(413, "That picture is over 5 MB. Choose a smaller one.");
+  const ext = blob.type === "image/webp" ? "webp" : (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `notices/${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID()}.${ext}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${SUPABASE_URL}/storage/v1/object/${IMAGE_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        apikey: PUBLISHABLE_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": blob.type || file.type,
+      },
+      body: blob,
+    });
+  } catch {
+    throw new ApiError(0, "Network error");
+  }
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`.trim();
+    try {
+      const body = (await response.json()) as { message?: unknown; error?: unknown };
+      if (typeof body?.message === "string" && body.message) message = body.message;
+    } catch {
+      // 본문이 JSON 이 아니면 상태 줄 그대로.
+    }
+    if (/bucket not found/i.test(message)) {
+      message = "The picture store is missing — run migration 0061 in the Supabase SQL Editor.";
+    } else if (/row-level security|unauthorized|403/i.test(message)) {
+      message = "This account can't upload pictures. Sign in with a pro shop account (and check migration 0061).";
+    }
+    throw new ApiError(response.status, message);
+  }
+  return `${SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`;
 }
 
 export function describeNoticeError(error: unknown): string {

@@ -4,8 +4,8 @@
  * 손님 화면의 팝업 공지(0060). 공개 사이트는 `SiteHeader`, 예약 화면은 `BookingShell` 이 띄운다 —
  * 두 껍데기가 모든 장에 붙어 있어서 장마다 따로 넣을 필요가 없다.
  *
- * 공지가 여럿이면 한 창에서 넘겨 본다(코스 상황이 먼저 — 서버가 정렬한다). 닫으면 그 창에 뜬
- * 공지를 전부 "봤다" 로 적는다. 다시 뜨는 규칙은 공지마다 직원이 정한다(`lib/siteNotices.ts`).
+ * 공지가 여럿이면 한 창에서 넘겨 본다(코스 상황이 먼저 — 서버가 정렬한다). 그냥 닫으면 다음 장에서
+ * 또 뜬다. 공지마다 있는 "Don't show …" 칸에 체크한 것만 기억한다(`lib/siteNotices.ts` 머리 주석).
  *
  * 서버가 안 되면 **조용히 아무것도 띄우지 않는다.** 팝업 때문에 예약 화면이 깨지면 안 된다.
  */
@@ -15,6 +15,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
+  DONT_SHOW_LABEL,
   KIND_LABEL,
   rememberDismissed,
   siteNoticesApi,
@@ -30,6 +31,8 @@ export default function SiteNoticePopup({ surface }: { surface: "site" | "book" 
   const pathname = usePathname();
   const [notices, setNotices] = useState<PublicNotice[]>([]);
   const [index, setIndex] = useState(0);
+  /** "다시 보지 않기" 에 체크한 공지 id. 닫을 때 이것만 기억한다. */
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
 
   const quiet = QUIET_PATHS.some((path) => pathname?.startsWith(path));
 
@@ -54,7 +57,7 @@ export default function SiteNoticePopup({ surface }: { surface: "site" | "book" 
   const open = notices.length > 0 && !quiet;
 
   const close = () => {
-    notices.forEach(rememberDismissed);
+    notices.filter((row) => checked.has(row.id)).forEach(rememberDismissed);
     setNotices([]);
   };
 
@@ -70,9 +73,9 @@ export default function SiteNoticePopup({ surface }: { surface: "site" | "book" 
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previous;
     };
-    // close 는 notices 를 읽는다 — 공지가 바뀌면 다시 건다.
+    // close 는 notices·checked 를 읽는다 — 바뀌면 다시 건다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, notices]);
+  }, [open, notices, checked]);
 
   if (!open) return null;
   const notice = notices[Math.min(index, notices.length - 1)];
@@ -86,7 +89,22 @@ export default function SiteNoticePopup({ surface }: { surface: "site" | "book" 
     >
       <button aria-label="Close" className="absolute inset-0 bg-[#10170f]/60" onClick={close} type="button" />
       <div className="relative w-full max-w-md">
-        <NoticeCard notice={notice} onClose={close} onLink={close} titleId="site-notice-title">
+        <NoticeCard
+          dontShow={{
+            checked: checked.has(notice.id),
+            onChange: (on) =>
+              setChecked((current) => {
+                const next = new Set(current);
+                if (on) next.add(notice.id);
+                else next.delete(notice.id);
+                return next;
+              }),
+          }}
+          notice={notice}
+          onClose={close}
+          onLink={close}
+          titleId="site-notice-title"
+        >
           {notices.length > 1 ? (
             <div className="flex items-center justify-between border-t border-[#e6e0d2] px-5 py-3 text-sm">
               <button
@@ -130,25 +148,30 @@ export function NoticeCard({
   notice,
   onClose,
   onLink,
+  dontShow,
   titleId,
   children,
 }: {
-  notice: Pick<PublicNotice, "kind" | "title" | "body" | "image_url" | "link_url" | "link_label">;
+  notice: Pick<PublicNotice, "kind" | "title" | "body" | "image_url" | "link_url" | "link_label" | "repeat">;
   onClose?: () => void;
+  /** 체크 칸. 공지의 repeat 가 every_visit 면 문구가 없어서 그리지 않는다. */
+  dontShow?: { checked: boolean; onChange: (checked: boolean) => void };
   onLink?: () => void;
   titleId?: string;
   children?: React.ReactNode;
 }) {
   const accent = ACCENT[notice.kind];
   const internal = notice.link_url?.startsWith("/");
+  const dontShowLabel = DONT_SHOW_LABEL[notice.repeat];
 
   return (
     <div className="max-h-[90dvh] overflow-y-auto bg-[#fbf9f4] text-[#182118] shadow-2xl sm:rounded-sm">
       <div className={`h-1.5 ${accent.band}`} />
       {notice.image_url ? (
         // 직원이 붙인 임의 주소라 next/image 의 도메인 목록에 넣을 수 없다.
+        // 포스터는 글자가 잘리면 안 되므로 자르지 않고(contain) 화면 높이의 절반까지.
         // eslint-disable-next-line @next/next/no-img-element
-        <img alt="" className="max-h-56 w-full object-cover" src={notice.image_url} />
+        <img alt="" className="max-h-[45dvh] w-full bg-[#efeadf] object-contain" src={notice.image_url} />
       ) : null}
       <div className="relative px-5 pb-5 pt-4">
         {onClose ? (
@@ -198,10 +221,21 @@ export function NoticeCard({
               onClick={onClose}
               type="button"
             >
-              Got it
+              Close
             </button>
           ) : null}
         </div>
+        {dontShow && dontShowLabel ? (
+          <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-[#3c463b]">
+            <input
+              checked={dontShow.checked}
+              className="h-5 w-5 accent-[#214d2f]"
+              onChange={(event) => dontShow.onChange(event.target.checked)}
+              type="checkbox"
+            />
+            {dontShowLabel}
+          </label>
+        ) : null}
       </div>
       {children}
     </div>

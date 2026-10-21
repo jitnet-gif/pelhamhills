@@ -9,7 +9,7 @@
  * 편집기 오른쪽 미리 보기는 손님 창과 같은 컴포넌트(`NoticeCard`)다.
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
 import { Button, Chip, EmptyNote, ErrorNote, Field, Modal, Select, SkeletonRows, TextArea, TextInput } from "@/components/retail/ui";
@@ -25,6 +25,7 @@ import {
   siteNoticesApi,
   toLocalInput,
   todayAt,
+  uploadSiteImage,
   type NoticeKind,
   type NoticeRepeat,
   type NoticeState,
@@ -350,7 +351,7 @@ function NoticeRow({
         <dd>{windowLine(row)}</dd>
         <dt className="text-[#6b7280]">Where</dt>
         <dd>{SURFACE_LABEL[row.surfaces]}</dd>
-        <dt className="text-[#6b7280]">Repeat</dt>
+        <dt className="text-[#6b7280]">Box</dt>
         <dd>{REPEAT_LABEL[row.repeat]}</dd>
         <dt className="text-[#6b7280]">Updated</dt>
         <dd className="break-words">
@@ -450,7 +451,10 @@ function EditorModal({
             onChange={(value) => setDraft((current) => ({ ...current, ends_at: value }))}
             value={draft.ends_at}
           />
-          <Field hint="After a visitor closes it, when it shows again. Editing the pop-up shows it to everyone again." label="Show again">
+          <Field
+            hint="Closing without ticking the box shows the pop-up again on the next page. Editing the pop-up shows it to everyone again."
+            label="Don't-show-again box"
+          >
             <Select onChange={set("repeat")} value={draft.repeat}>
               {(Object.keys(REPEAT_LABEL) as NoticeRepeat[]).map((key) => (
                 <option key={key} value={key}>
@@ -467,9 +471,10 @@ function EditorModal({
               <TextInput onChange={set("link_label")} placeholder="Book a tee time" value={draft.link_label} />
             </Field>
           </div>
-          <Field hint="Optional. An https:// picture address, or /pelham-hills/hero-course.png" label="Image">
-            <TextInput onChange={set("image_url")} placeholder="https://…" value={draft.image_url} />
-          </Field>
+          <ImageField
+            onChange={(value) => setDraft((current) => ({ ...current, image_url: value }))}
+            value={draft.image_url}
+          />
           <label className="flex min-h-11 items-center gap-2 text-sm font-bold text-[#3f434a]">
             <input
               checked={draft.active}
@@ -492,6 +497,7 @@ function EditorModal({
                 link_url: draft.link_url.trim() || null,
                 link_label: draft.link_label.trim() || null,
               }}
+              dontShow={{ checked: false, onChange: () => undefined }}
               onClose={() => undefined}
             />
           </div>
@@ -594,6 +600,69 @@ function WhenPicker({
           ))}
         </Select>
       </Field>
+    </div>
+  );
+}
+
+// ===== 이미지 ==============================================================
+// 파일을 고르면 바로 올리고(0061) 그 공개 주소를 공지에 적는다. 주소를 아는 사람은 붙여 넣어도 된다.
+
+function ImageField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showAddress, setShowAddress] = useState(false);
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      onChange(await uploadSiteImage(file));
+    } catch (err) {
+      setError(describeNoticeError(err));
+    } finally {
+      setUploading(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+
+  return (
+    <div className="grid min-w-0 gap-1 text-sm">
+      <span className="font-bold text-[#3f434a]">Image</span>
+      {value ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img alt="" className="max-h-40 w-full border border-[#d4d4d8] bg-[#f2f2f4] object-contain" src={value} />
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={uploading} onClick={() => input.current?.click()}>
+          {uploading ? "Uploading…" : value ? "Change image" : "Upload image"}
+        </Button>
+        {value ? (
+          <Button disabled={uploading} onClick={() => onChange("")} tone="danger">
+            Remove
+          </Button>
+        ) : null}
+        <button
+          className="min-h-11 px-1 text-xs font-bold text-[#4533ff] underline"
+          onClick={() => setShowAddress((on) => !on)}
+          type="button"
+        >
+          {showAddress ? "Hide address" : "Paste an address instead"}
+        </button>
+      </div>
+      <input
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={(event) => void pick(event.target.files?.[0])}
+        ref={input}
+        type="file"
+      />
+      {showAddress ? (
+        <TextInput onChange={(event) => onChange(event.target.value)} placeholder="https://…" value={value} />
+      ) : null}
+      <span className="text-xs text-[#6b7280]">Optional. JPG, PNG, WebP or GIF — large photos are resized automatically.</span>
+      {error ? <ErrorNote>{error}</ErrorNote> : null}
     </div>
   );
 }
