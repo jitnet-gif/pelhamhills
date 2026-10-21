@@ -29,6 +29,7 @@ import {
   type Product,
   type ProductCreate,
   type ProductUpdate,
+  type RegisterCloseHistory,
   type RegisterCloseReport,
   type RegisterCloseSave,
   type RefundRequest,
@@ -112,6 +113,9 @@ async function registerCloseCall<T>(fn: string, args: Record<string, unknown>): 
 
 export const CASH_RECONCILE_MISSING_MESSAGE =
   "대사표가 아직 켜지지 않았습니다. Supabase SQL Editor 에서 0061_cash_reconcile.sql 을 실행해 주세요.";
+
+export const REGISTER_CLOSE_HISTORY_MISSING_MESSAGE =
+  "마감 기록 리포트가 아직 켜지지 않았습니다. Supabase SQL Editor 에서 0065_register_close_history.sql 을 실행해 주세요.";
 
 /** 매장 현지 날짜 `YYYY-MM-DD`. `toISOString()` 은 UTC 라 저녁에 하루가 밀린다. */
 export function localBusinessDate(date: Date = new Date()): string {
@@ -212,6 +216,16 @@ export const retailApi = {
       p_station: station,
       p: body,
     }),
+
+  /** 기간 안의 마감 기록(0065) — (영업일, 서랍)마다 한 줄. 현금 리포트 계정이 아니면 현금 줄이 없다. */
+  getRegisterCloseHistory: async (from: string, to: string): Promise<RegisterCloseHistory> => {
+    try {
+      return await staffRpc<RegisterCloseHistory>("pelham_staff_register_close_history", { p_from: from, p_to: to });
+    } catch (cause) {
+      if (isMissingMigration(cause)) throw new RetailApiError("http", 404, REGISTER_CLOSE_HISTORY_MISSING_MESSAGE);
+      throw toRetailError(cause);
+    }
+  },
 };
 
 export default retailApi;
