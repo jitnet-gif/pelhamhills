@@ -41,7 +41,7 @@ from backend.services.twilio_sms import send_sms
 logger = logging.getLogger(__name__)
 
 # 시크릿 검사는 `voice.tools_router` 와 같다. 라우터 레벨에 걸어 도구를 더해도 빠지지 않게.
-router = APIRouter(dependencies=[Depends(voice.require_tool_secret)])
+router = APIRouter(dependencies=[Depends(voice.require_tool_secret)], route_class=voice.ToolRoute)
 
 MAX_PLAYERS = 4
 MAX_HOURS = 5

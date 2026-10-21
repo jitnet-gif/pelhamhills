@@ -25,18 +25,22 @@ import secrets
 import threading
 from datetime import date as date_cls, datetime, timedelta, timezone
 from time import monotonic
-from typing import Any, Literal, Optional
+from typing import Any, Callable, Coroutine, Literal, Optional
 from zoneinfo import ZoneInfo
 
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, Response
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, Field
 
 from backend.api.routes import tee_sheet as ts
 # HST 는 리테일이 이미 상수로 갖고 있다. 여기에 13% 를 또 적으면 언젠가 한쪽만 바뀐다.
 from backend.api.routes.retail import TAX_RATE
 from backend.services import (
+    callbacks,
     customer_lookup,
     lost_items,
     supabase_rest,
@@ -91,6 +95,11 @@ SITE_URL = os.getenv("PUBLIC_SITE_URL", "https://pelhamhills-golf.vercel.app").r
 #: 보내는 것을 막는다.
 MAX_INFO_SMS_PER_CALL = 2
 
+#: 직원이 전화를 받는 시간(클럽 현지, 매일). 이 밖에서는 프로 샵으로 연결하지 않고 콜백을 받아 둔다
+#: (`request_callback` → `pelham_callback_requests`, Reports 의 Phone callbacks 탭).
+#: 기본값 8:00–18:00 은 클럽 확인 전 값이다. Fly secret `PRO_SHOP_HOURS="08:00-18:00"` 로 바꾼다.
+PRO_SHOP_HOURS = os.getenv("PRO_SHOP_HOURS", "08:00-18:00")
+
 DayPart = Literal["morning", "afternoon", "evening", "any"]
 
 
@@ -126,7 +135,52 @@ def require_tool_secret(x_voice_tool_secret: Optional[str] = Header(None)) -> No
 #
 # 도구는 tools_router 에만 단다. 검사를 라우터 레벨에 걸어 두면 나중에 도구를
 # 추가하면서 인증을 빠뜨릴 수 없다.
-tools_router = APIRouter(dependencies=[Depends(require_tool_secret)])
+#
+# 거절은 HTTP 오류가 아니라 200 + `{ok: false, status, message}` 로 돌려준다(`ToolRoute`).
+# 2026-10-20 통화: "14일 밖" 거절이 422 의 `detail` 에 담겨 나갔고, ElevenLabs 는 그것을 도구 실패로만
+# 받아 에이전트가 이유를 모른 채 "시스템 문제" 라고 말하며 재시도했다. 프롬프트는 `message` 를 읽으라고 한다.
+# 시크릿 검사(401)만 그대로 오류다 — 그건 에이전트가 손님에게 읽을 문장이 아니다.
+
+TOOL_SAVE_FAILED = (
+    "The booking system could not save that just now. Apologise briefly and try once more. If it fails "
+    "again, do not keep retrying: offer to have a staff member call the caller back (request_callback), "
+    "or transfer them if staff are on duty."
+)
+
+
+def _validation_message(exc: RequestValidationError) -> str:
+    fields = sorted({str(err.get("loc", ["", "?"])[-1]) for err in exc.errors()})
+    return (
+        f"Some details were missing or not understood ({', '.join(fields)}). "
+        "Ask the caller for them again, then call the tool once more."
+    )
+
+
+class ToolRoute(APIRoute):
+    """도구 엔드포인트의 거절을 에이전트가 읽을 수 있는 200 응답으로 바꾼다."""
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+        handler = super().get_route_handler()
+
+        async def route(request: Request) -> Response:
+            try:
+                return await handler(request)
+            except HTTPException as exc:
+                if exc.status_code == 401:
+                    raise
+                status, message = exc.status_code, str(exc.detail)
+            except RequestValidationError as exc:
+                status, message = 422, _validation_message(exc)
+            except RuntimeError:
+                # 저장소 오류(SupabaseStoreError·SupabaseUnavailable 등). 손님에게 읽을 원인이 아니다.
+                logger.exception("voice tool %s failed", request.url.path)
+                status, message = 503, TOOL_SAVE_FAILED
+            return JSONResponse({"ok": False, "status": status, "message": message})
+
+        return route
+
+
+tools_router = APIRouter(dependencies=[Depends(require_tool_secret)], route_class=ToolRoute)
 router = APIRouter()
 
 
@@ -264,6 +318,48 @@ def resolve_date(value: str) -> str:
     return text
 
 
+def staff_hours() -> tuple[int, int]:
+    """`PRO_SHOP_HOURS` → (여는 분, 닫는 분). 잘못 적혀 있으면 기본값 8:00–18:00."""
+    match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*", PRO_SHOP_HOURS or "")
+    if match:
+        open_h, open_m, close_h, close_m = (int(part) for part in match.groups())
+        start, end = open_h * 60 + open_m, close_h * 60 + close_m
+        if 0 <= start < end <= 24 * 60:
+            return start, end
+    logger.warning("PRO_SHOP_HOURS=%r is not HH:MM-HH:MM; using 08:00-18:00", PRO_SHOP_HOURS)
+    return 8 * 60, 18 * 60
+
+
+def staff_hours_spoken() -> str:
+    """"8 AM to 6 PM" 꼴. 에이전트가 손님에게 그대로 읽는다."""
+    def say(minutes: int) -> str:
+        hour, minute = divmod(minutes % (24 * 60), 60)
+        suffix = "AM" if hour < 12 else "PM"
+        hour12 = hour % 12 or 12
+        return f"{hour12} {suffix}" if minute == 0 else f"{hour12}:{minute:02d} {suffix}"
+
+    start, end = staff_hours()
+    return f"{say(start)} to {say(end)}"
+
+
+def staff_on_duty(now: datetime | None = None) -> bool:
+    """지금 프로 샵에 전화를 받을 직원이 있는가."""
+    now = now or club_now()
+    start, end = staff_hours()
+    return start <= now.hour * 60 + now.minute < end
+
+
+def duty_note() -> str:
+    """도구 응답 끝에 붙이는, 지금 연결해도 되는지에 대한 한 문장."""
+    if staff_on_duty():
+        return f"Staff are on duty now ({staff_hours_spoken()}), so a transfer to the pro shop is possible."
+    return (
+        f"The pro shop is closed right now; staff answer the phone {staff_hours_spoken()}. Do not transfer. "
+        "If the caller needs a person, tell them a staff member will call them back during business hours "
+        "and take the request with request_callback."
+    )
+
+
 def spoken_date(iso_date: str) -> str:
     """2026-09-10 -> "Thursday, September 10". 에이전트가 그대로 읽는다."""
     day = date_cls.fromisoformat(iso_date)
@@ -282,8 +378,10 @@ def require_bookable_date(iso_date: str) -> None:
         raise HTTPException(
             status_code=422,
             detail=(
-                f"We only take bookings {BOOKING_WINDOW_DAYS} days out. The furthest date "
-                f"available is {spoken_date(furthest.isoformat())}."
+                f"We only take bookings {BOOKING_WINDOW_DAYS} days out — up to two weeks ahead. The "
+                f"furthest date available is {spoken_date(furthest.isoformat())}. Tell the caller that "
+                "plainly, and offer a day on or before then. Do not offer any later day: it will be "
+                "refused the same way. Do not call this a system problem."
             ),
         )
 
@@ -464,6 +562,8 @@ class IdentifyCallerResponse(BaseModel):
     greeting_name: str
     is_member: bool
     upcoming: int
+    #: 지금 프로 샵에 전화를 받을 직원이 있는가(`PRO_SHOP_HOURS`). 없으면 연결 대신 콜백.
+    staff_available: bool = True
     message: str
 
 
@@ -534,6 +634,26 @@ class LostItemRequest(_VoiceRequest):
 class LostItemResponse(BaseModel):
     ok: bool
     ticket: str
+    message: str
+
+
+class CallbackRequest(_VoiceRequest):
+    first_name: str = Field(..., min_length=1, max_length=60)
+    last_name: str = Field(default="", max_length=60)
+    reason: str = Field(..., min_length=2, max_length=300, description="What the caller needs, in a sentence.")
+    phone: str = Field(
+        default="",
+        max_length=40,
+        description="Only if the caller gives a different number than the one they are calling from.",
+    )
+    preferred_time: str = Field(default="", max_length=80, description="When they would like the call, if they said.")
+    caller_number: str = Field(default="", max_length=40)
+
+
+class CallbackResponse(BaseModel):
+    ok: bool
+    ticket: str
+    staff_available: bool
     message: str
 
 
@@ -1186,7 +1306,11 @@ def identify_caller(body: IdentifyCallerRequest) -> IdentifyCallerResponse:
             greeting_name="",
             is_member=False,
             upcoming=0,
-            message="The caller's number did not come through. Greet them warmly without a name.",
+            staff_available=staff_on_duty(),
+            message=(
+                "The caller's number did not come through. Greet them warmly without a name. "
+                + duty_note()
+            ),
         )
 
     today = today_iso()
@@ -1220,7 +1344,8 @@ def identify_caller(body: IdentifyCallerRequest) -> IdentifyCallerResponse:
             greeting_name="",
             is_member=False,
             upcoming=upcoming,
-            message=f"{reason} Greet the caller warmly without a name. {guard}",
+            staff_available=staff_on_duty(),
+            message=f"{reason} Greet the caller warmly without a name. {guard} {duty_note()}",
         )
 
     name = caller.first_name or caller.display
@@ -1235,8 +1360,10 @@ def identify_caller(body: IdentifyCallerRequest) -> IdentifyCallerResponse:
         greeting_name=name,
         is_member=caller.is_member,
         upcoming=upcoming,
+        staff_available=staff_on_duty(),
         message=(
-            f"This is {caller.display}, {standing}. Greet them by first name ({name}).{tail} {guard}"
+            f"This is {caller.display}, {standing}. Greet them by first name ({name}).{tail} {guard} "
+            f"{duty_note()}"
         ),
     )
 
@@ -1553,6 +1680,64 @@ def report_lost_item(body: LostItemRequest) -> LostItemResponse:
         message=(
             f"Logged. Read the reference back one character at a time: {ticket}. Tell them staff "
             "will text if they find it. Never say it has been found — you do not know that."
+        ),
+    )
+
+
+# ===== 도구 11-b: 직원 콜백 요청 ========================================
+
+@tools_router.post("/voice/tools/request-callback", response_model=CallbackResponse)
+def request_callback(body: CallbackRequest) -> CallbackResponse:
+    """사람과 얘기해야 하는데 연결할 수 없을 때(업무시간 밖, 연결 실패) 콜백을 받아 둔다.
+
+    직원은 Reports → Phone callbacks 에서 이 명단을 보고 업무시간에 전화한다. 번호는
+    `confirm_booking` 과 같이 발신번호가 기본이고, 손님이 다른 번호를 불러 줬을 때만 그것을 쓴다.
+    """
+    _touch_session(body.conversation_id)
+
+    spoken = body.phone.strip()
+    phone = spoken if normalize_phone(spoken) else body.caller_number.strip()
+    if not normalize_phone(phone):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No usable phone number for the callback. Ask the caller to say the number digit by "
+                "digit and send just the digits — never a placeholder word."
+            ),
+        )
+
+    try:
+        row = callbacks.request(
+            first_name=body.first_name,
+            last_name=body.last_name,
+            phone=phone,
+            reason=body.reason,
+            preferred_time=body.preferred_time,
+            caller_number=body.caller_number,
+            conversation_id=body.conversation_id or "",
+        )
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The callback list is not reachable. Apologise and ask the caller to call back "
+                f"during business hours ({staff_hours_spoken()})."
+            ),
+        ) from None
+
+    ticket = str(row.get("ticket") or "")
+    on_duty = staff_on_duty()
+    when = (
+        "shortly" if on_duty
+        else f"during business hours, {staff_hours_spoken()}"
+    )
+    return CallbackResponse(
+        ok=True,
+        ticket=ticket,
+        staff_available=on_duty,
+        message=(
+            f"Saved. Tell the caller a staff member will call them back {when} at the number ending "
+            f"{normalize_phone(phone)[-4:]}. Do not promise an exact time. Do not transfer the call."
         ),
     )
 

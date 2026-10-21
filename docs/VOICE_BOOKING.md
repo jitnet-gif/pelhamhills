@@ -321,3 +321,18 @@ Docker 의 Postgres 16 에 0001~0016 을 차례로 적용해 확인했다 (2026-
   정책이 아직 없다.
 - `backend/api/routes/tts.py` 는 `main.py` 에 **등록돼 있지 않다** (이 작업 전부터
   그랬다). Agents Platform 이 그 역할을 대신하므로 지울지 살릴지 결정이 필요하다.
+
+## 업무시간 · 콜백 · 거절 응답 (2026-10-20)
+
+- **거절은 200 으로.** 전화 도구(`/voice/tools/*`)는 거절도 `200 {ok: false, status, message}` 로 돌려준다
+  (`voice.ToolRoute`). 예전에는 422·409 의 `detail` 로 나가 에이전트가 이유를 읽지 못했다. 시크릿 오류(401)만 그대로다.
+- **2주 규칙.** 예약은 오늘부터 14일까지(`BOOKING_WINDOW_DAYS`). 밖이면 message 가 마지막 날을 알려 주고, 프롬프트는
+  "두 주까지만 예약된다" 고 말하게 한다.
+- **hold 가 하루 전체를 다시 쓰지 않는다.** `bookings_tx` 는 블록이 바꾸지 않은 예약을 읽은 그대로 돌려준다
+  (`tee_sheet._written_doc`). 예전에는 모델이 모르는 칸(confirmationCode 등) 때문에 전부 다시 쓰였고, 그 upsert 가
+  0048·0051 일출·일몰 트리거에 새 예약처럼 걸려 hold 가 PT422 로 실패했다.
+- **업무시간.** `PRO_SHOP_HOURS`(Fly secret, 기본 `08:00-18:00`, 클럽 현지·매일). `identify_caller` 가
+  `staff_available` 와 문장을 돌려주고, 업무시간 밖이면 에이전트는 연결하지 않고 `request_callback` 으로 받아 둔다.
+- **콜백 명단.** `pelham_callback_requests`(0059). 직원은 Reports → Phone callbacks 에서 보고 전화한 뒤 Called 로 바꾼다.
+- **실제 에이전트에 반영.** 대시보드 에이전트는 `python scripts/attach_voice_tools.py --apply --replace-transfer` 로
+  규칙 블록·도구·직원 연결 설정·턴 설정(`turn_eagerness: patient`)을 넣는다. convai 쓰기 권한이 있는 키가 필요하다.

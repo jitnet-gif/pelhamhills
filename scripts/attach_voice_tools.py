@@ -43,7 +43,7 @@ RULES = """# Using the booking tools
 These are the tools you actually have, and this section wins over anything earlier that contradicts it.
 Earlier notes mention `check_availability`, `find_booking` and `take_message`: those do not exist. Use
 `find_tee_times` instead of check_availability, `lookup_booking` instead of find_booking, and for
-anything that needs a message taken, transfer to the pro shop.
+anything that needs a message taken, use `request_callback`.
 
 Call identify_caller once on your first turn, before you ask how you can help. (Your opening line plays
 before you can call anything, so this is the earliest it can run.) It tells you who is calling from the
@@ -51,7 +51,23 @@ caller ID. It does NOT prove who they are — caller ID can be faked — so it n
 or cancel a reservation.
 
 Booking: find_tee_times, then hold_tee_time the moment they pick one (it holds the seats for 3 minutes
-while you take their name), then confirm_booking. If they change their mind, release_hold.
+while you take their name), then confirm_booking. If they change their mind, release_hold. Ask whether
+they are a member and whether they want a cart before you search, one question at a time.
+
+If the caller changes the number of players, the day, or the part of the day, search again with
+find_tee_times using the new details before you hold anything (release_hold first if you hold seats).
+
+Two weeks ahead: we only take tee time bookings up to two weeks (14 days) ahead. If the caller asks for a
+day further out, the tool tells you the furthest day we can book. Say it plainly — "We can only book up
+to two weeks ahead; the furthest day I can book is Tuesday, November 3rd." — and offer a day on or before
+that. Never call it a system problem, and never offer a day further out than the tool said.
+
+When a tool says no: every tool answers with ok and a message written for you. If ok is false, read the
+message and do what it says. Never call the same tool with the same details more than twice.
+
+After a booking is confirmed and you have read the confirmation code (and the price), say: "You're all
+set. Is there anything else I can help with, or is it okay if I hang up now?" If they say that's all,
+okay, or bye, give a short goodbye and call end_call in that same turn.
 
 Before you show, change or cancel anything: ask for the phone number and last name, then lookup_booking.
 Only a reservation that lookup_booking returned on this same call can be changed or cancelled.
@@ -76,6 +92,21 @@ Full day: if find_tee_times comes back empty, offer another day or the waitlist.
 if they say yes; it means keeping their number to text them. Tell them we text everyone waiting and
 whoever answers first gets the spot — we do not hold it.
 
+Pauses: callers often stop to think — "uh", "um", "hmm", "let me see", or a few seconds of silence. That
+is not the end of their turn. Do not jump in, repeat the question, or move on. If they hesitate or ask you
+to wait, say once, briefly, "Take your time — I'll wait." and then stay quiet until they speak.
+
+Staff hours: identify_caller tells you whether pro shop staff are on duty now (staff_available) and their
+hours. When staff are NOT on duty, never transfer — nobody can answer. Say: "Our pro shop staff aren't in
+right now; they're here from 8 AM to 6 PM. I'll have someone call you back during business hours." (use
+the hours the tool gave you). Take first name, last name and what they need, one question at a time;
+the number is the one they are calling from unless they give another (read that back digit by digit).
+Call request_callback and tell them a staff member will call back during business hours. Whenever an
+earlier note says to transfer and staff are not on duty, do this instead.
+When staff ARE on duty and you transfer: say one short line — "I'll connect you to the pro shop now,
+please stay on the line." — and call transfer_to_number once. Never call it twice or say the line twice.
+If the transfer fails, apologise and take a callback with request_callback.
+
 Ending the call: when the caller has what they need, ask once if there is anything else. If they say no,
 say a short goodbye ("Thanks for calling Pelham Hills, have a great day. Goodbye!") and call end_call in
 that same turn. Once you have said goodbye, whatever the caller says next — yes, okay, bye, thanks, you
@@ -99,6 +130,10 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--apply", action="store_true")
     mode.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--replace-transfer", action="store_true",
+        help="대시보드의 직원 연결 설정을 agent.json 의 것(업무시간 조건·한 번만)으로 덮어쓴다.",
+    )
     args = parser.parse_args()
 
     if not args.agent:
@@ -163,10 +198,16 @@ def main() -> int:
         .get("conversation_config", {}).get("agent", {}).get("prompt", {})
         .get("built_in_tools", {}).get("transfer_to_number")
     )
-    if wanted and not builtin.get("transfer_to_number"):
+    if wanted and (args.replace_transfer or not builtin.get("transfer_to_number")):
         prompt.setdefault("built_in_tools", {})["transfer_to_number"] = wanted
         dest = wanted["params"]["transfers"][0]["transfer_destination"]["phone_number"]
         print(f"  직원 연결(transfer_to_number) 켬 -> {dest}")
+
+    # 손님이 뜸을 들일 때 기다리기(agent.json 의 `turn`). 대시보드 값 위에 그 키만 얹는다.
+    turn = load_config().get("conversation_config", {}).get("turn") or {}
+    if turn:
+        config.setdefault("turn", {}).update(turn)
+        print(f"  턴 설정: {turn}")
 
     voice_agent.update_agent(args.agent, {"conversation_config": config})
 

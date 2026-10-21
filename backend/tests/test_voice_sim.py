@@ -22,6 +22,15 @@ from backend.tests.test_voice_booking import API, client  # noqa: F401
 SAT = "2026-09-12"  # FIXED_NOW(화 2026-09-08) 기준 예약 창 안의 토요일
 CALLER = "+19058921234"
 
+def tool_status(response):
+    """도구는 거절도 200 + {ok: false, status, message} 로 돌려준다(voice.ToolRoute). 그 status, 아니면 HTTP 코드."""
+    if response.status_code == 200:
+        body = response.json()
+        if isinstance(body, dict) and body.get("ok") is False and "status" in body:
+            return body["status"]
+    return response.status_code
+
+
 
 class FakeSim:
     """0016 함수의 꼴만 흉내 낸다. 호출을 기록해 인자를 검사한다."""
@@ -119,7 +128,7 @@ def test_find_reads_times_like_tee_times_and_quotes_the_bay_price_with_tax(clien
 
 def test_find_refuses_dates_past_the_booking_window(client, sim):
     res = post(client, "find-sim-times", date="2026-12-01", duration_hours=1)
-    assert res.status_code == 422
+    assert tool_status(res) == 422
     assert sim.calls == []
 
 
@@ -143,7 +152,7 @@ def test_booking_uses_the_caller_id_and_texts_the_code(client, sim):
 def test_booking_without_a_usable_number_is_refused(client, sim):
     res = post(client, "book-sim-bay", date=SAT, time="6:30 PM", first_name="Ana", last_name="Nakamura",
                phone="caller_number", caller_number="")
-    assert res.status_code == 422
+    assert tool_status(res) == 422
     assert not any(f == "pelham_sim_phone_reserve" for f, _ in sim.calls)
 
 
@@ -151,16 +160,16 @@ def test_a_taken_slot_comes_back_as_409_with_the_sql_sentence(client, sim):
     sim.refuse["pelham_sim_phone_reserve"] = supabase_rest.RpcRefused(409, "Every bay is booked for that time.")
     res = post(client, "book-sim-bay", date=SAT, time="6:30 PM", first_name="Ana", last_name="Nakamura",
                caller_number=CALLER)
-    assert res.status_code == 409
-    assert res.json()["detail"] == "Every bay is booked for that time."
+    assert tool_status(res) == 409
+    assert res.json()["message"] == "Every bay is booked for that time."
     assert texts("confirm") == []
 
 
 def test_supabase_down_is_a_503_that_says_transfer(client, sim):
     sim.refuse["pelham_sim_phone_availability"] = supabase_rest.SupabaseUnavailable("down")
     res = post(client, "find-sim-times", date=SAT, duration_hours=1)
-    assert res.status_code == 503
-    assert "pro shop" in res.json()["detail"]
+    assert tool_status(res) == 503
+    assert "pro shop" in res.json()["message"]
 
 
 # ===== 조회 · 취소 =====================================================
@@ -168,7 +177,7 @@ def test_supabase_down_is_a_503_that_says_transfer(client, sim):
 def test_cancel_without_lookup_on_this_call_is_refused(client, sim):
     row = sim.row()
     res = post(client, "cancel-sim-booking", reservation_id=str(row["id"]), last_name="Nakamura")
-    assert res.status_code == 403
+    assert tool_status(res) == 403
     assert sim.rows[row["id"]]["status"] == "confirmed"
 
 
@@ -196,7 +205,7 @@ def test_lookup_in_one_call_does_not_unlock_another_call(client, sim):
     post(client, "lookup-sim-booking", phone="9058921234", last_name="Nakamura", conversation_id="c-one")
     res = post(client, "cancel-sim-booking", reservation_id=str(row["id"]), last_name="Nakamura",
                conversation_id="c-two")
-    assert res.status_code == 403
+    assert tool_status(res) == 403
 
 
 def test_tee_lookup_does_not_unlock_a_sim_booking_with_the_same_id(client, sim):
@@ -204,7 +213,7 @@ def test_tee_lookup_does_not_unlock_a_sim_booking_with_the_same_id(client, sim):
     session = voice._touch_session("c-sim")
     session.revealed.add(str(row["id"]))  # 티타임 쪽 id 가 우연히 같아도
     res = post(client, "cancel-sim-booking", reservation_id=str(row["id"]), last_name="Nakamura")
-    assert res.status_code == 403
+    assert tool_status(res) == 403
 
 
 def test_too_late_to_cancel_says_transfer(client, sim):
@@ -213,8 +222,8 @@ def test_too_late_to_cancel_says_transfer(client, sim):
     sim.refuse["pelham_sim_phone_cancel"] = supabase_rest.RpcRefused(
         409, "This booking can't be cancelled by phone or text because it starts in less than 24 hours.")
     res = post(client, "cancel-sim-booking", reservation_id=str(row["id"]), last_name="Nakamura")
-    assert res.status_code == 409
-    assert "less than 24 hours" in res.json()["detail"] and "pro shop" in res.json()["detail"]
+    assert tool_status(res) == 409
+    assert "less than 24 hours" in res.json()["message"] and "pro shop" in res.json()["message"]
 
 
 # ===== 문자 "C <코드>" =================================================

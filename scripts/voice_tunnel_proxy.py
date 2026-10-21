@@ -39,6 +39,7 @@ ALLOW = {
     "/api/v1/voice/tools/identify-caller",
     "/api/v1/voice/tools/send-info-sms",
     "/api/v1/voice/tools/report-lost-item",
+    "/api/v1/voice/tools/request-callback",
     "/api/v1/voice/tools/join-waitlist",
     "/api/v1/voice/tools/get-rates",
     "/api/v1/voice/tools/modify-booking",

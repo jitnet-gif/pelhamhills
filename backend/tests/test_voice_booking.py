@@ -28,6 +28,15 @@ from backend.services import tee_sheet_store as store  # noqa: E402
 
 API = "/api/v1"
 
+def tool_status(response):
+    """도구는 거절도 200 + {ok: false, status, message} 로 돌려준다(voice.ToolRoute). 그 status, 아니면 HTTP 코드."""
+    if response.status_code == 200:
+        body = response.json()
+        if isinstance(body, dict) and body.get("ok") is False and "status" in body:
+            return body["status"]
+    return response.status_code
+
+
 TODAY = "2026-09-08"      # 시드 데이터가 들어 있는 화요일
 TOMORROW = "2026-09-09"   # 예약이 하나도 없는 날
 FIXED_NOW = datetime(2026, 9, 8, 6, 0, tzinfo=voice.CLUB_TIMEZONE)
@@ -162,31 +171,31 @@ def test_find_offers_nothing_before_sunrise(client):
 
 def test_a_hold_before_sunrise_is_refused(client):
     response = hold(client, time="6:40 AM")
-    assert response.status_code == 409
-    assert "before sunrise" in response.json()["detail"]
+    assert tool_status(response) == 409
+    assert "before sunrise" in response.json()["message"]
 
 
 def test_a_hold_too_close_to_sunset_is_refused(client):
     """9월 9일 일몰 7:41 PM → 마지막 티 5:41 PM. 6:04 PM 은 격자 위지만 팔지 않는다."""
     response = hold(client, time="6:04 PM")
-    assert response.status_code == 409
-    assert "too close to sunset" in response.json()["detail"]
+    assert tool_status(response) == 409
+    assert "too close to sunset" in response.json()["message"]
 
 
 def test_find_respects_the_booking_window(client):
     far = (FIXED_NOW.date() + timedelta(days=voice.BOOKING_WINDOW_DAYS + 1)).isoformat()
     response = find(client, date=far)
 
-    assert response.status_code == 422
-    assert "14 days out" in response.json()["detail"]
+    assert tool_status(response) == 422
+    assert "14 days out" in response.json()["message"]
 
 
 def test_find_rejects_natural_language_dates(client):
     """"next Tuesday" 를 서버가 추측하면 손님이 엉뚱한 날에 온다. 되물어야 한다."""
     response = find(client, date="next Tuesday")
 
-    assert response.status_code == 422
-    assert TODAY in response.json()["detail"]
+    assert tool_status(response) == 422
+    assert TODAY in response.json()["message"]
 
 
 def test_find_accepts_today_and_tomorrow(client):
@@ -197,8 +206,8 @@ def test_find_accepts_today_and_tomorrow(client):
 def test_a_full_tee_time_is_not_sold_again(client):
     """7:16 AM 은 시드에서 이미 4명이 다 찼다."""
     response = hold(client, date=TODAY, time="7:16 AM", party=1)
-    assert response.status_code == 409
-    assert "4 are already taken" in response.json()["detail"]
+    assert tool_status(response) == 409
+    assert "4 are already taken" in response.json()["message"]
 
 
 # ===== 홀드 ============================================================
@@ -222,7 +231,7 @@ def test_a_hold_blocks_the_website_too(client):
         json={"date": TOMORROW, "time": "8:01 AM", "title": "Web, Walk-in",
               "players": [{"name": f"Web Walkin{i}"} for i in range(5)]},
     )
-    assert web.status_code == 409
+    assert tool_status(web) == 409
 
 
 def test_an_expired_hold_gives_the_seats_back_immediately(client, monkeypatch):
@@ -239,8 +248,8 @@ def test_holding_more_than_the_tee_time_holds_fails(client):
     assert hold(client, time="8:01 AM", party=3).status_code == 200
 
     second = hold(client, time="8:01 AM", party=3)
-    assert second.status_code == 409
-    assert "4 players" in second.json()["detail"]
+    assert tool_status(second) == 409
+    assert "4 players" in second.json()["message"]
 
 
 def test_release_hold_puts_the_seats_back(client):
@@ -259,8 +268,8 @@ def test_release_hold_puts_the_seats_back(client):
 def test_a_hold_cannot_be_placed_on_a_time_that_passed(client):
     """오늘 06:00 기준으로 6:40 이전 슬롯은 없지만, 어제 날짜는 아예 막힌다."""
     response = hold(client, date="2026-09-07", time="8:01 AM")
-    assert response.status_code == 422
-    assert "in the past" in response.json()["detail"]
+    assert tool_status(response) == 422
+    assert "in the past" in response.json()["message"]
 
 
 # ===== 확정 ============================================================
@@ -312,8 +321,8 @@ def test_confirm_without_riders_books_walkers(client):
 
 def test_confirm_refuses_more_riders_than_players(client):
     refused = _confirm_with(client, party=2, riders=3)
-    assert refused.status_code == 422
-    assert "riders" in refused.json()["detail"]
+    assert tool_status(refused) == 422
+    assert "riders" in refused.json()["message"]
 
 
 def test_a_caller_who_says_member_is_noted_not_repriced(client):
@@ -336,8 +345,8 @@ def test_confirming_an_expired_hold_fails_and_cleans_up(client, monkeypatch):
                 booking.holdExpiresAt = datetime.now(timezone.utc) - timedelta(seconds=1)
 
     response = confirm(client, held["hold_id"])
-    assert response.status_code == 409
-    assert "expired" in response.json()["detail"]
+    assert tool_status(response) == 409
+    assert "expired" in response.json()["message"]
 
     # 유령 레코드가 남으면 안 된다.
     assert all(b["id"] != held["hold_id"] for b in client.get(f"{API}/tee-sheet/bookings").json())
@@ -346,7 +355,7 @@ def test_confirming_an_expired_hold_fails_and_cleans_up(client, monkeypatch):
 def test_confirm_rejects_an_unusable_phone_number(client):
     held = hold(client, time="8:01 AM", party=1).json()
     response = confirm(client, held["hold_id"], phone="not a phone")
-    assert response.status_code == 422
+    assert tool_status(response) == 422
 
 
 # ===== 조회 ============================================================
@@ -406,8 +415,8 @@ def test_cancel_needs_a_lookup_on_the_same_call(client):
 
     # 조회를 거치지 않은 다른 통화에서는 취소할 수 없다.
     denied = cancel(client, booking["booking_id"], conversation="c-stranger")
-    assert denied.status_code == 403
-    assert "Look the reservation up first" in denied.json()["detail"]
+    assert tool_status(denied) == 403
+    assert "Look the reservation up first" in denied.json()["message"]
 
     lookup_first(client, "c-stranger")
     assert cancel(client, booking["booking_id"], conversation="c-stranger").status_code == 200
@@ -426,8 +435,8 @@ def test_cancel_without_a_conversation_is_refused(client):
         f"{API}/voice/tools/cancel-booking",
         json={"booking_id": booking["booking_id"], "last_name": "Nakamura"},
     )
-    assert denied.status_code == 403
-    assert "Look the reservation up first" in denied.json()["detail"]
+    assert tool_status(denied) == 403
+    assert "Look the reservation up first" in denied.json()["message"]
 
 
 def test_cancel_rejects_a_last_name_that_does_not_match(client):
@@ -435,8 +444,8 @@ def test_cancel_rejects_a_last_name_that_does_not_match(client):
     lookup_first(client, "c-a")
 
     denied = cancel(client, booking["booking_id"], last="Somebody", conversation="c-a")
-    assert denied.status_code == 403
-    assert "does not match" in denied.json()["detail"]
+    assert tool_status(denied) == 403
+    assert "does not match" in denied.json()["message"]
 
 
 def test_cancel_gives_the_seats_back(client):
@@ -468,8 +477,8 @@ def test_cancel_within_two_hours_goes_to_the_pro_shop(client):
     lookup_first(client, "c-d")
 
     denied = cancel(client, booking["booking_id"], conversation="c-d")
-    assert denied.status_code == 409
-    assert "pro shop" in denied.json()["detail"]
+    assert tool_status(denied) == 409
+    assert "pro shop" in denied.json()["message"]
 
 
 def test_cancel_outside_the_cutoff_is_allowed(client):
@@ -495,7 +504,7 @@ def test_cancelling_twice_is_harmless(client):
 def test_the_tool_secret_is_enforced_when_it_is_set(client, monkeypatch):
     monkeypatch.setenv("VOICE_TOOL_SECRET", "shhh")
 
-    assert find(client).status_code == 401
+    assert tool_status(find(client)) == 401
 
     allowed = client.post(
         f"{API}/voice/tools/find-tee-times",
@@ -516,7 +525,7 @@ def test_the_browser_endpoints_are_not_behind_the_tool_secret(client, monkeypatc
 
     # 에이전트가 설정돼 있지 않아 503 이 맞다. 중요한 것은 **401 이 아니라는** 것.
     session = client.post(f"{API}/voice/session")
-    assert session.status_code == 503, session.text
+    assert tool_status(session) == 503, session.text
 
     webhook = client.post(f"{API}/voice/post-call", json={"data": {"conversation_id": "x"}})
     assert webhook.status_code == 200
@@ -526,9 +535,9 @@ def test_voice_sessions_are_rate_limited(client):
     """이 엔드포인트는 시크릿 없이 열려 있고, 한 번 부를 때마다 대화 크레딧을
     태울 수 있는 티켓이 나온다. 통화별 상한은 여기에 닿지 않는다."""
     for _ in range(voice.SESSION_RATE_LIMIT):
-        assert client.post(f"{API}/voice/session").status_code == 503
+        assert tool_status(client.post(f"{API}/voice/session")) == 503
 
-    assert client.post(f"{API}/voice/session").status_code == 429
+    assert tool_status(client.post(f"{API}/voice/session")) == 429
 
 
 # ===== 도구 7: 발신번호로 손님 알아보기 =================================
@@ -545,7 +554,7 @@ def test_identify_caller_does_not_unlock_cancelling(client):
     booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
     assert identify(client, conversation="c-spoof").status_code == 200
     refused = cancel(client, booking["booking_id"], conversation="c-spoof")
-    assert refused.status_code == 403
+    assert tool_status(refused) == 403
 
 
 def test_identify_caller_counts_upcoming_without_reading_them_out(client):
@@ -609,8 +618,8 @@ def test_confirm_refuses_nine_holes_before_the_nine_hole_start(client):
         json={"hold_id": held.json()["hold_id"], "first_name": "Jin", "last_name": "Nakamura",
               "phone": "905-892-1234", "holes": 9, "conversation_id": "c-test"},
     )
-    assert refused.status_code == 422
-    assert "10:00 AM" in refused.json()["detail"]
+    assert tool_status(refused) == 422
+    assert "10:00 AM" in refused.json()["message"]
 
 
 def test_confirm_books_nine_holes_from_the_nine_hole_start(client):
@@ -641,14 +650,14 @@ def modify(client, booking_id, conversation, last="Nakamura", **fields):
 
 def test_modify_needs_a_lookup_on_the_same_call(client):
     booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
-    assert modify(client, booking["booking_id"], "c-other", party_size=3).status_code == 403
+    assert tool_status(modify(client, booking["booking_id"], "c-other", party_size=3)) == 403
 
 
 def test_modify_rejects_a_last_name_that_does_not_match(client):
     booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
     lookup_first(client, "c-mod")
     refused = modify(client, booking["booking_id"], "c-mod", last="Wrong", party_size=3)
-    assert refused.status_code == 403
+    assert tool_status(refused) == 403
 
 
 def test_modify_shrinks_a_party_and_gives_the_seat_back(client):
@@ -666,7 +675,7 @@ def test_modify_cannot_overfill_a_tee_time(client):
     book(client, time="8:01 AM", party=1, conversation="c-b")
     lookup_first(client, "c-mod")
     refused = modify(client, first["booking_id"], "c-mod", party_size=4)
-    assert refused.status_code == 409
+    assert tool_status(refused) == 409
 
 
 def test_modify_changes_the_number_of_holes(client):
@@ -683,8 +692,8 @@ def test_modify_keeps_an_early_tee_time_at_eighteen_holes(client):
     booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
     lookup_first(client, "c-mod")
     refused = modify(client, booking["booking_id"], "c-mod", holes=9)
-    assert refused.status_code == 409
-    assert "10:00 AM" in refused.json()["detail"]
+    assert tool_status(refused) == 409
+    assert "10:00 AM" in refused.json()["message"]
 
 
 def test_modify_cannot_move_the_tee_time(client):
@@ -692,7 +701,7 @@ def test_modify_cannot_move_the_tee_time(client):
     booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
     lookup_first(client, "c-mod")
     nothing = modify(client, booking["booking_id"], "c-mod")
-    assert nothing.status_code == 422
+    assert tool_status(nothing) == 422
 
 
 # ===== 취소 미리보기 ===================================================
@@ -716,7 +725,7 @@ def test_cancel_preview_leaves_the_booking_alone(client):
 
 def test_cancel_preview_still_needs_a_lookup(client):
     booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
-    assert preview_cancel(client, booking["booking_id"], "c-nope").status_code == 403
+    assert tool_status(preview_cancel(client, booking["booking_id"], "c-nope")) == 403
 
 
 # ===== 도구 10: 안내 문자 =============================================
@@ -731,18 +740,18 @@ def info_sms(client, topic="directions", number="905-892-1234", conversation="c-
 def test_info_sms_has_no_path_to_a_number_the_caller_said(client):
     """받는 번호는 발신번호에서만 온다. 없으면 보내지 않고 읽어 주라고 답한다."""
     refused = info_sms(client, number="")
-    assert refused.status_code == 422
+    assert tool_status(refused) == 422
 
 
 def test_info_sms_is_capped_per_call(client):
     assert info_sms(client).status_code == 200
     assert info_sms(client).status_code == 200
-    assert info_sms(client).status_code == 429
+    assert tool_status(info_sms(client)) == 429
 
 
 def test_info_sms_rejects_a_topic_we_have_not_confirmed(client):
     """영업시간처럼 확인 안 된 사실은 보낼 통로 자체가 없어야 한다."""
-    assert info_sms(client, topic="hours").status_code == 422
+    assert tool_status(info_sms(client, topic="hours")) == 422
 
 
 def test_info_sms_sends_the_clubs_real_address(client):
@@ -788,7 +797,7 @@ def test_lost_item_without_the_list_promises_nothing(client, monkeypatch):
         raise voice.supabase_rest.SupabaseUnavailable("down")
 
     monkeypatch.setattr(voice.lost_items, "report", boom)
-    assert lost(client).status_code == 503
+    assert tool_status(lost(client)) == 503
 
 
 def test_lost_item_does_not_guess_a_date_it_cannot_parse(client, monkeypatch):
@@ -813,7 +822,7 @@ def waitlist(client, conversation="c-wait", **fields):
 
 
 def test_waitlist_needs_a_number_to_text(client):
-    assert waitlist(client, caller_number="").status_code == 422
+    assert tool_status(waitlist(client, caller_number="")) == 422
 
 
 def test_waitlist_does_not_add_the_same_caller_twice(client, monkeypatch):
@@ -836,7 +845,7 @@ def test_waitlist_without_the_list_promises_nothing(client, monkeypatch):
         raise voice.supabase_rest.SupabaseUnavailable("down")
 
     monkeypatch.setattr(voice.tee_waitlist, "already_waiting", boom)
-    assert waitlist(client).status_code == 503
+    assert tool_status(waitlist(client)) == 503
 
 
 # 취소된 자리를 대기자에게 다시 거는 흐름은 `test_waitlist_offers.py` 에 있다.
@@ -844,7 +853,7 @@ def test_waitlist_without_the_list_promises_nothing(client, monkeypatch):
 
 def test_waitlist_rejects_a_time_it_cannot_parse(client):
     """"9am" 을 그대로 저장하면 조건이 조용히 무시되고 새벽 문자를 받게 된다."""
-    assert waitlist(client, earliest="9am").status_code == 422
+    assert tool_status(waitlist(client, earliest="9am")) == 422
 
 
 def test_confirm_falls_back_to_the_caller_id(client):
@@ -869,5 +878,172 @@ def test_confirm_without_any_number_is_refused(client):
         json={"hold_id": held.json()["hold_id"], "first_name": "Kenneth", "last_name": "Tanath",
               "conversation_id": "c-nonum"},
     )
-    assert refused.status_code == 422
-    assert "placeholder" in refused.json()["detail"]
+    assert tool_status(refused) == 422
+    assert "placeholder" in refused.json()["message"]
+
+
+# ===== 2026-10-20 통화에서 드러난 것들 ====================================
+
+def _raw_docs(date):
+    with store.mutate(voice.Scope(dates={date})) as raw:
+        return [dict(doc) for doc in raw]
+
+
+def test_a_hold_does_not_rewrite_the_other_bookings_of_that_day(client):
+    """DB 가 붙인 칸(confirmationCode 등)을 모델이 몰라도, hold 는 다른 예약을 다시 쓰지 않는다.
+
+    예전에는 그날 예약 전체가 "바뀜" 으로 보여 다시 쓰였고, 그 upsert 가 일출·일몰 트리거에
+    새 예약처럼 걸려 hold 가 PT422 로 실패했다.
+    """
+    booked = book(client)
+    with store.mutate(voice.Scope(dates={TOMORROW})) as raw:
+        for doc in raw:
+            if doc["id"] == booked["booking_id"]:
+                doc["confirmationCode"] = "TDB123456"
+                doc["players"][0]["greenFee"] = 40.71
+    before = next(d for d in _raw_docs(TOMORROW) if d["id"] == booked["booking_id"])
+
+    assert hold(client, time="10:16 AM", conversation="c-other").json()["ok"] is True
+
+    after = next(d for d in _raw_docs(TOMORROW) if d["id"] == booked["booking_id"])
+    assert after == before
+
+
+def test_a_changed_booking_keeps_fields_the_model_does_not_know(client):
+    with ts.bookings_tx(voice.Scope(dates={TOMORROW})) as bookings:
+        pass  # 빈 날 — 아래에서 예약을 만든다
+    booked = book(client)
+    with store.mutate(voice.Scope(dates={TOMORROW})) as raw:
+        for doc in raw:
+            if doc["id"] == booked["booking_id"]:
+                doc["confirmationCode"] = "TDB123456"
+    with ts.bookings_tx(voice.Scope(dates={TOMORROW})) as bookings:
+        target = next(b for b in bookings if b.id == booked["booking_id"])
+        target.notes = "changed"
+
+    doc = next(d for d in _raw_docs(TOMORROW) if d["id"] == booked["booking_id"])
+    assert doc["notes"] == "changed"
+    assert doc["confirmationCode"] == "TDB123456"
+
+
+def test_a_refusal_comes_back_as_a_readable_message_not_an_http_error(client):
+    response = find(client, date="2026-10-20")  # 시드 오늘(9/8)에서 42일 뒤
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False and body["status"] == 422
+    assert "two weeks" in body["message"]
+    assert "Tuesday, September 22" in body["message"]
+    assert "system problem" in body["message"]  # "Do not call this a system problem."
+
+
+def test_missing_fields_come_back_as_a_message(client):
+    response = client.post(f"{API}/voice/tools/hold-tee-time", json={"date": TOMORROW})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False and body["status"] == 422
+    assert "time" in body["message"] and "party_size" in body["message"]
+
+
+def test_a_storage_failure_is_a_message_not_a_500(client, monkeypatch):
+    def broken(*args, **kwargs):
+        raise RuntimeError("POST pelham_tee_bookings failed: HTTP 422 (code PT422)")
+
+    monkeypatch.setattr(voice.ts, "bookings_tx", broken)
+    body = hold(client).json()
+
+    assert body["ok"] is False and body["status"] == 503
+    assert "request_callback" in body["message"]
+    assert "PT422" not in body["message"]
+
+
+def test_a_bad_tool_secret_is_still_an_http_401(client, monkeypatch):
+    monkeypatch.setenv("VOICE_TOOL_SECRET", "s3cret")
+    assert find(client).status_code == 401
+
+
+# ===== 업무시간 · 콜백 =================================================
+
+def identify_now(client, number="+19058921234"):
+    return client.post(f"{API}/voice/tools/identify-caller",
+                       json={"caller_number": number, "conversation_id": "c-id"})
+
+
+def callback(client, **fields):
+    payload = {"first_name": "Jin", "last_name": "Nakamura", "reason": "Wants a tee time for six players",
+               "caller_number": "+19058921234", "conversation_id": "c-cb"}
+    payload.update(fields)
+    return client.post(f"{API}/voice/tools/request-callback", json=payload)
+
+
+def test_staff_hours_parse_and_speak(monkeypatch):
+    monkeypatch.setattr(voice, "PRO_SHOP_HOURS", "07:30-17:00")
+    assert voice.staff_hours() == (450, 1020)
+    assert voice.staff_hours_spoken() == "7:30 AM to 5 PM"
+    assert voice.staff_on_duty(datetime(2026, 10, 20, 7, 29, tzinfo=voice.CLUB_TIMEZONE)) is False
+    assert voice.staff_on_duty(datetime(2026, 10, 20, 7, 30, tzinfo=voice.CLUB_TIMEZONE)) is True
+    assert voice.staff_on_duty(datetime(2026, 10, 20, 17, 0, tzinfo=voice.CLUB_TIMEZONE)) is False
+
+    monkeypatch.setattr(voice, "PRO_SHOP_HOURS", "nonsense")
+    assert voice.staff_hours() == (480, 1080)
+
+
+def test_identify_caller_says_the_shop_is_closed_after_hours(client, monkeypatch):
+    monkeypatch.setattr(voice.customer_lookup, "find_by_phone", lambda phone: None)
+    body = identify_now(client).json()  # FIXED_NOW 는 아침 6시 — 문 열기 전
+
+    assert body["staff_available"] is False
+    assert "Do not transfer" in body["message"]
+    assert "request_callback" in body["message"]
+
+
+def test_identify_caller_allows_a_transfer_during_hours(client, monkeypatch):
+    monkeypatch.setattr(voice.customer_lookup, "find_by_phone", lambda phone: None)
+    monkeypatch.setattr(voice, "club_now", lambda: FIXED_NOW.replace(hour=10))
+    body = identify_now(client).json()
+
+    assert body["staff_available"] is True
+    assert "transfer to the pro shop is possible" in body["message"]
+
+
+def test_callback_after_hours_promises_a_call_in_business_hours(client, monkeypatch):
+    seen = {}
+
+    def fake_request(**kwargs):
+        seen.update(kwargs)
+        return {"ticket": "CB-0101"}
+
+    monkeypatch.setattr(voice.callbacks, "request", fake_request)
+    body = callback(client).json()
+
+    assert body["ok"] is True and body["ticket"] == "CB-0101"
+    assert body["staff_available"] is False
+    assert "during business hours, 8 AM to 6 PM" in body["message"]
+    assert "1234" in body["message"]
+    assert seen["phone"] == "+19058921234"
+    assert seen["reason"] == "Wants a tee time for six players"
+    assert seen["conversation_id"] == "c-cb"
+
+
+def test_callback_uses_a_spoken_number_when_given(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(voice.callbacks, "request", lambda **kw: seen.update(kw) or {"ticket": "CB-0102"})
+    callback(client, phone="905 555 0142")
+    assert seen["phone"] == "905 555 0142"
+
+
+def test_callback_needs_a_real_number(client, monkeypatch):
+    monkeypatch.setattr(voice.callbacks, "request", lambda **kw: {"ticket": "x"})
+    body = callback(client, caller_number="", phone="caller_number").json()
+    assert body["ok"] is False and body["status"] == 422
+
+
+def test_callback_list_down_is_a_message(client, monkeypatch):
+    def boom(**kwargs):
+        raise voice.supabase_rest.SupabaseUnavailable("down")
+
+    monkeypatch.setattr(voice.callbacks, "request", boom)
+    body = callback(client).json()
+    assert body["ok"] is False and body["status"] == 503
+    assert "business hours" in body["message"]

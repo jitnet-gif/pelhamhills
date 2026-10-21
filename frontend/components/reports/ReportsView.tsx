@@ -9,7 +9,8 @@
  * 탭: Daily close(하루 마감·영수증·환불), Accounting(기간 회계 보고서, 엑셀 모양 + .xlsx 내려받기 —
  * `AccountingWorkbook.tsx`), Stripe check(Stripe 가 받은 카드 돈과 우리 기록 대조 — `StripeReconcile.tsx`),
  * Bookings(웹사이트·전화로 들어온 티 타임·베이 예약 — `BookingsReport.tsx`), Change log(모든 변경의 전·후, 지운 것까지 —
- * 따로 정한 비밀번호로만 열린다, `ChangeLog.tsx`·0057). `?view=stripe`·`?view=bookings`·`?view=changes` 로 바로 열 수 있다.
+ * 따로 정한 비밀번호로만 열린다, `ChangeLog.tsx`·0057), Phone callbacks(업무시간 밖 전화에서 직원 전화를 기다리는 손님 —
+ * `PhoneCallbacks.tsx`·0059). `?view=stripe`·`?view=bookings`·`?view=callbacks`·`?view=changes` 로 바로 열 수 있다.
  */
 
 import { useState, type ReactNode } from "react";
@@ -17,6 +18,7 @@ import { useState, type ReactNode } from "react";
 import AccountingWorkbook from "@/components/reports/AccountingWorkbook";
 import BookingsReport from "@/components/reports/BookingsReport";
 import ChangeLog from "@/components/reports/ChangeLog";
+import PhoneCallbacks from "@/components/reports/PhoneCallbacks";
 import SalesReport from "@/components/reports/SalesReport";
 import StripeReconcile from "@/components/reports/StripeReconcile";
 import { Chip } from "@/components/retail/ui";
@@ -26,6 +28,7 @@ const VIEWS = [
   { key: "accounting", label: "Accounting (Excel)" },
   { key: "stripe", label: "Stripe check" },
   { key: "bookings", label: "Bookings (web + phone)" },
+  { key: "callbacks", label: "Phone callbacks" },
   { key: "changes", label: "🔒 Change log" },
 ] as const;
 
@@ -56,6 +59,8 @@ export default function ReportsView({ cash, aside }: { cash: boolean; aside?: Re
         <StripeReconcile />
       ) : view === "changes" ? (
         <ChangeLog />
+      ) : view === "callbacks" ? (
+        <PhoneCallbacks />
       ) : (
         <BookingsReport />
       )}
