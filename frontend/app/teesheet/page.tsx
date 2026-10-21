@@ -7,6 +7,7 @@
 // 티 시트를 열면 다른 어드민 화면으로 갈 방법이 뒤로 가기밖에 없었다.
 // 이 페이지는 `fill` 모드를 쓴다 — 페이지 자체는 스크롤하지 않고 격자/상세만 스크롤한다.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import AdminShell from "../../components/admin/AdminShell";
 import BillDrawer from "../../components/pos/BillDrawer";
@@ -26,6 +27,7 @@ import { formatMoney } from "@/lib/retail/types";
 import { confirmationCode } from "@/lib/teeSheet/receipt";
 import { isSlotLocked } from "@/lib/teeSheet/sun";
 import { GUEST_NAME, TONE_CLASS, TONE_LABEL, type PlayerTone } from "@/lib/teeSheet/tone";
+import type { TeeSheetController } from "@/lib/teeSheet/types";
 
 /** 티 시트 영수증 바코드: `ABCD-1234`(확인 코드), 뒤에 `-플레이어4자` 또는 `-ALL`. */
 const TEE_TICKET = /^([A-Z0-9]{4}-[A-Z0-9]{4})(?:-([A-Z0-9]{4}|ALL))?$/;
@@ -35,7 +37,7 @@ export default function TeeSheetPage() {
   // 컨트롤러 객체는 useMemo 지만 bookings·busy·toasts 에 딸려 있어 변경 한 번마다
   // 새로 만들어진다. 아래 콜백이 통째로 그 객체에 의존하면 격자(셀 버튼 수백 개)가
   // 그때마다 다시 그려지므로, 쓰는 것만 꺼내 쓴다 — 이 넷은 useCallback 으로 고정이다.
-  const { bookings, createBooking, focusedDate, pushToast, select, setFocusedDate, slots } = controller;
+  const { bookings, focusedDate, pushToast, select, setFocusedDate, slots } = controller;
   // `/teesheet?date=YYYY-MM-DD&booking=<id>` — 다른 화면(Calls & SMS 의 예약 통화)에서 그 예약을 연 채로 온다.
   // 처음 한 번만 읽는다. 예약이 아직 안 읽혔어도 선택은 id 로 걸어 두면 읽히는 대로 상세가 열린다.
   // 그 예약 칸은 격자에 그려지는 대로 화면 가운데로 굴리고 몇 번 깜빡여서 어디 있는지 보인다.
@@ -71,6 +73,10 @@ export default function TeeSheetPage() {
   // 상품을 스캔해 담았을 때 서랍의 결제 칸으로 스크롤시키는 값(BillPanel 참고).
   const [revealPayments, setRevealPayments] = useState(0);
   const billState = useCurrentBill();
+  // 티 시트 두 장 나란히 보기(Chronogolf 의 "Add Tee Sheet"). 오른쪽 시트는 SecondSheet 참고.
+  const [split, setSplit] = useState(false);
+  const [detailHost, setDetailHost] = useState<HTMLDivElement | null>(null);
+  const clearSelection = useCallback(() => select(null), [select]);
   // 예전에는 빈 칸이 넘겨주는 날짜·시각을 ref 에 담아 뒀는데, 그 ref 를 렌더 중에
   // 읽는 바람에 react-hooks/refs 가 걸렸다. 지금 시드는 "보고 있는 날짜" 하나뿐이라
   // 그냥 계산하면 된다.
@@ -89,44 +95,7 @@ export default function TeeSheetPage() {
   // 0.7초마다 patchPlayer 를 날리며 같은 busy 를 켜므로, 이름을 치다가 다른 칸을
   // 누르면 아무 일도 일어나지 않는 "눌렀는데 안 나오는" 상태가 된다. 그건 지금
   // 고치려는 바로 그 증상이다. 막아야 할 건 이 칸의 더블클릭뿐이다.
-  const creatingRef = useRef(false);
-  const createAt = useCallback(
-    async (date: string, time: string) => {
-      if (creatingRef.current) return;
-      creatingRef.current = true;
-
-      try {
-        // 상세 패널의 티 타임 드롭다운은 controller.slots(= focusedDate 의 슬롯)에서
-        // 나온다. 주간 뷰에서 다른 날 칸을 눌렀다면 시트를 그 날로 옮겨야 방금 만든
-        // 예약과 슬롯 목록이 같은 날을 가리킨다 (다이얼로그도 같은 일을 했다).
-        if (date !== focusedDate) setFocusedDate(date);
-
-        // 이름 없는 자리는 "Guest" 다. title 은 서버 필수값이고 주간 뷰 막대에 찍히는
-        // 이름이라 비워 둘 수 없는데, 서버도 빈 이름의 플레이어를 "Guest" 로 채우므로
-        // (`pelham_tee_name`) 둘을 같은 말로 맞춘다. 상세 패널에서 이름을 적으면
-        // 플레이어와 title 이 같이 바뀐다 (ReservationDetail 의 commitPlayer 참고).
-        //
-        // 빈 플레이어 한 명을 같이 만든다: 0명짜리 예약은 좌석을 잡지 않아서
-        // 누른 칸이 그대로 `+` 로 남고, 격자 대신 off-grid 줄에 떨어진다.
-        //
-        // `type` 은 "Existing Customer" 로 넘긴다 — 이 자리는 익명 손님이 아니라 직원이
-        // 이름을 채울 빈 자리다. 셀 색은 요금제(서버 기본 "Public" → 노랑)로 정해지고
-        // (playerTone), 이름 없는 자리를 Guest 로 부르는 일은 playerLabel 의 폴백이 한다.
-        const created = await createBooking({
-          date,
-          time,
-          title: GUEST_NAME,
-          players: [{ firstName: "", lastName: "", type: "Existing Customer" }],
-        });
-
-        // 실패하면 controller 가 이미 토스트를 띄웠다. 여기서는 아무것도 열지 않는다.
-        if (created) select(created.id);
-      } finally {
-        creatingRef.current = false;
-      }
-    },
-    [createBooking, focusedDate, select, setFocusedDate],
-  );
+  const createAt = useCreateAt(controller);
 
   // 잠긴 칸(일출 전·일몰 2시간 전 이후·직원 블록)은 Add 가 고르지 않는다.
   const { locks: slotLocks } = useSlotLocks([focusedDate]);
@@ -249,6 +218,17 @@ export default function TeeSheetPage() {
         // 자기 헤더 줄을 하나 더 그려서 거기 달았는데, 그래서 화면 머리가 세 겹이었다.
         <span className="flex items-center gap-1.5">
         <ToneLegend />
+        <button
+          aria-pressed={split}
+          className={`hidden items-center border px-2 py-1.5 lg:inline-flex ${
+            split ? "border-[#4533ff] bg-[#eef0ff] text-[#4533ff]" : "border-[#c7c7cc] bg-white text-[#3f4650]"
+          }`}
+          onClick={() => setSplit((on) => !on)}
+          title={split ? "Close the second tee sheet" : "Add Tee Sheet — compare two dates side by side"}
+          type="button"
+        >
+          <SplitIcon />
+        </button>
         {billState.missing ? null : (
           <button
             className="inline-flex min-h-11 items-center gap-1 border border-[#4533ff] bg-white px-3 text-xs font-bold text-[#4533ff] lg:min-h-0 lg:py-1.5"
@@ -279,24 +259,39 @@ export default function TeeSheetPage() {
       title="Tee Sheet"
     >
         {/* 암시적 컬럼 트랙도 minmax(0,1fr) 로 못박는다 (위와 같은 이유).
-            행: 헤더(auto) / 티 시트(남는 높이 전부) / 상세(auto).
+            행: 티 시트(남는 높이 전부) / 상세(auto). 티 시트 칸 안이 다시 헤더(auto) / 격자(1fr) 이고,
+            나눠 보면(split) 그 칸이 좌우 두 장이 된다.
             minmax(0,1fr) 이어야 티 시트 칸이 내용 높이만큼 부풀지 않고 내부 스크롤한다. */}
         {/* 하단은 언제나 `auto` — 상세 패널이 **자기 내용 높이**만 가져간다.
             예전에는 예약을 고르면 티 시트와 상세가 1fr 씩 반반으로 나눠 가졌는데,
             그러면 카드 넉 장이 400px 이 안 되는데도 늘 화면 절반을 먹어서 Discount ·
             Payment 줄과 노란 메모가 접힌 아래로 내려갔다. 상세가 커지면 티 시트 칸이
             그만큼 줄고 티 시트 안에서 스크롤한다 (아래 `max-h-[85dvh]` 주석 참고). */}
-        <section className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]">
-          {/* DateNav 은 Fragment 로 header + 툴바 + 토스트를 반환한다. 감싸지 않으면
-              각각이 별도 grid 아이템이 되어 행 배정이 밀리고, minmax(0,1fr) 트랙에
-              걸린 툴바가 0 높이로 눌려 사라진다. */}
-          <div className="min-w-0">
-            <DateNav controller={controller} />
-          </div>
+        <section className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto]">
+          <div className={`grid min-h-0 min-w-0 ${split ? "grid-cols-2" : "grid-cols-[minmax(0,1fr)]"}`}>
+            <section className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)]">
+              {/* DateNav 은 Fragment 로 header + 툴바 + 토스트를 반환한다. 감싸지 않으면
+                  각각이 별도 grid 아이템이 되어 행 배정이 밀리고, minmax(0,1fr) 트랙에
+                  걸린 툴바가 0 높이로 눌려 사라진다. */}
+              <div className="min-w-0">
+                <DateNav controller={controller} />
+              </div>
 
-          <section className="min-h-0 min-w-0 overflow-hidden">
-            <WeekGrid controller={controller} onCreateAt={createAt} />
-          </section>
+              <section className="min-h-0 min-w-0 overflow-hidden">
+                <WeekGrid controller={controller} onCreateAt={createAt} />
+              </section>
+            </section>
+
+            {split ? (
+              <SecondSheet
+                detailHost={detailHost}
+                initialDate={focusedDate}
+                onClose={() => setSplit(false)}
+                onSelected={clearSelection}
+                otherSelectedId={controller.selectedId}
+              />
+            ) : null}
+          </div>
 
           {/* 상세 패널은 하단 영역 안에서만 스크롤한다. 이 상한이 티 시트의 최소 높이를
               보장하므로, 예약을 선택해도 위의 티 시트는 항상 보인다.
@@ -310,8 +305,10 @@ export default function TeeSheetPage() {
               움직이지 않기를 원한다. 그래서 상세는 자기 높이를 다 갖고, 줄어드는 쪽은 티 시트다.
               85dvh 는 상세가 비정상적으로 길 때도 위 티 시트 몇 줄을 남기는 안전장치일 뿐이다.
               `max-h-[85%]` 를 쓰면 안 된다 — 이 칸은 `auto` 트랙이라 백분율 상한이 화면이 아니라
-              **자기 콘텐츠 높이**를 기준으로 풀린다. */}
-          <div className="max-h-[85dvh] min-h-0 overflow-y-auto">
+              **자기 콘텐츠 높이**를 기준으로 풀린다.
+
+              오른쪽 비교 시트에서 고른 예약의 상세도 이 칸에 포털로 들어온다(SecondSheet 참고). */}
+          <div className="max-h-[85dvh] min-h-0 overflow-y-auto" ref={setDetailHost}>
             {controller.selected ? <ReservationDetail controller={controller} /> : null}
           </div>
         </section>
@@ -355,5 +352,130 @@ function ToneLegend() {
         ))}
       </ul>
     </details>
+  );
+}
+
+/**
+ * 빈 칸(`+`)·Add 가 예약 한 건을 바로 만들고 선택하는 동작 (위 TeeSheetPage 의 주석 참고).
+ * 왼쪽 시트와 오른쪽 비교 시트가 같은 규칙을 써야 해서 훅으로 뺐다 — 각 시트는 자기
+ * 컨트롤러에 만들고 자기 상세 패널을 연다.
+ */
+function useCreateAt({
+  createBooking,
+  focusedDate,
+  select,
+  setFocusedDate,
+}: Pick<TeeSheetController, "createBooking" | "focusedDate" | "select" | "setFocusedDate">) {
+  const creatingRef = useRef(false);
+  return useCallback(
+    async (date: string, time: string) => {
+      if (creatingRef.current) return;
+      creatingRef.current = true;
+
+      try {
+        // 상세 패널의 티 타임 드롭다운은 controller.slots(= focusedDate 의 슬롯)에서
+        // 나온다. 주간 뷰에서 다른 날 칸을 눌렀다면 시트를 그 날로 옮겨야 방금 만든
+        // 예약과 슬롯 목록이 같은 날을 가리킨다 (다이얼로그도 같은 일을 했다).
+        if (date !== focusedDate) setFocusedDate(date);
+
+        // 이름 없는 자리는 "Guest" 다. title 은 서버 필수값이고 주간 뷰 막대에 찍히는
+        // 이름이라 비워 둘 수 없는데, 서버도 빈 이름의 플레이어를 "Guest" 로 채우므로
+        // (`pelham_tee_name`) 둘을 같은 말로 맞춘다. 상세 패널에서 이름을 적으면
+        // 플레이어와 title 이 같이 바뀐다 (ReservationDetail 의 commitPlayer 참고).
+        //
+        // 빈 플레이어 한 명을 같이 만든다: 0명짜리 예약은 좌석을 잡지 않아서
+        // 누른 칸이 그대로 `+` 로 남고, 격자 대신 off-grid 줄에 떨어진다.
+        //
+        // `type` 은 "Existing Customer" 로 넘긴다 — 이 자리는 익명 손님이 아니라 직원이
+        // 이름을 채울 빈 자리다. 셀 색은 요금제(서버 기본 "Public" → 노랑)로 정해지고
+        // (playerTone), 이름 없는 자리를 Guest 로 부르는 일은 playerLabel 의 폴백이 한다.
+        const created = await createBooking({
+          date,
+          time,
+          title: GUEST_NAME,
+          players: [{ firstName: "", lastName: "", type: "Existing Customer" }],
+        });
+
+        // 실패하면 controller 가 이미 토스트를 띄웠다. 여기서는 아무것도 열지 않는다.
+        if (created) select(created.id);
+      } finally {
+        creatingRef.current = false;
+      }
+    },
+    [createBooking, focusedDate, select, setFocusedDate],
+  );
+}
+
+/**
+ * 오른쪽 비교 시트 — Chronogolf 의 "Add Tee Sheet" 와 같다(2026-10-21 요청). 두 날짜(또는 같은
+ * 날짜)를 나란히 놓고 본다. 자기 컨트롤러(`useTeeSheet`)를 따로 가져서 날짜·선택이 왼쪽과
+ * 따로 움직이고, 5초 폴링으로 왼쪽에서 바꾼 예약도 곧 여기 보인다.
+ *
+ * 페이지가 아니라 이 컴포넌트가 훅을 부르는 이유: 닫혀 있을 때는 마운트하지 않아서 두 번째
+ * 폴링·주간 읽기가 아예 돌지 않는다.
+ *
+ * 상세 패널은 하나만 연다. 화면 아래 상세 자리는 왼쪽 시트 것이라, 여기서 고른 예약의 상세는
+ * 그 자리(`detailHost`)에 포털로 그린다. 한쪽에서 예약을 고르면 다른 쪽 선택은 풀린다 —
+ * 두 상세가 겹쳐 쌓이면 어느 예약을 고치는지 헷갈린다.
+ */
+function SecondSheet({
+  detailHost,
+  initialDate,
+  onClose,
+  onSelected,
+  otherSelectedId,
+}: {
+  detailHost: HTMLElement | null;
+  initialDate: string;
+  onClose: () => void;
+  onSelected: () => void;
+  otherSelectedId: string | null;
+}) {
+  const controller = useTeeSheet({ live: true });
+  const { select, selectedId, setFocusedDate } = controller;
+  const createAt = useCreateAt(controller);
+
+  // 처음 열 때는 왼쪽과 같은 날로 시작한다(레퍼런스도 같은 날을 복제해 연다). 그 뒤로는 따로 움직인다.
+  const startRef = useRef(initialDate);
+  useEffect(() => {
+    setFocusedDate(startRef.current);
+  }, [setFocusedDate]);
+
+  useEffect(() => {
+    if (otherSelectedId) select(null);
+  }, [otherSelectedId, select]);
+  useEffect(() => {
+    if (selectedId) onSelected();
+  }, [onSelected, selectedId]);
+
+  return (
+    <section className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] border-l-4 border-[#d4d4d8]">
+      <div className="relative min-w-0">
+        <DateNav controller={controller} />
+        <button
+          aria-label="Close this tee sheet"
+          className="absolute right-2 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#e53935] text-sm font-bold leading-none text-white hover:bg-[#c62828]"
+          onClick={onClose}
+          title="Close this tee sheet"
+          type="button"
+        >
+          ×
+        </button>
+      </div>
+      <section className="min-h-0 min-w-0 overflow-hidden">
+        <WeekGrid controller={controller} onCreateAt={createAt} />
+      </section>
+      {detailHost && controller.selected ? createPortal(<ReservationDetail controller={controller} />, detailHost) : null}
+    </section>
+  );
+}
+
+/** 상단바의 시트 나누기 버튼 글리프 — 레퍼런스의 "Add Tee Sheet" 아이콘(세로로 나뉜 창). */
+function SplitIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 16 16">
+      <rect height="12" rx="1" width="13" x="1.5" y="2" />
+      <path d="M8 2v12" />
+    </svg>
   );
 }
