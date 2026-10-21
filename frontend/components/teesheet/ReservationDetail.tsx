@@ -32,7 +32,7 @@ import { longDate, money } from "@/lib/teeSheet/dates";
 import { useSlotLocks } from "@/hooks/useSlotLocks";
 import { isSlotLocked, slotLockReason } from "@/lib/teeSheet/sun";
 import { clubDate, confirmationCode, paidBillFor, teeReceiptFor } from "@/lib/teeSheet/receipt";
-import { reservationTitle } from "@/lib/teeSheet/tone";
+import { GUEST_NAME, reservationTitle } from "@/lib/teeSheet/tone";
 import type {
   AuditEntry,
   PatchBookingInput,
@@ -119,6 +119,18 @@ function playerDraftOf(player: Player): PlayerDraft {
     phone: player.phone ?? "",
     email: player.email ?? "",
   };
+}
+
+/** 이름 없는 자리는 서버가 이름을 "Guest" 로 채워 둔다(0003·0004). 그 칸에 타이핑하면
+ *  "Guest" 를 지우고 새로 친 글자만 남긴다 — 일일이 지우고 다시 쓰지 않게.
+ *  지우기만 했으면(글자가 줄었으면) 그대로 둔다. */
+function replaceGuestOnType(prev: string, next: string): string {
+  if (prev !== GUEST_NAME || next.length <= prev.length) return next;
+  let head = 0;
+  while (head < prev.length && next[head] === prev[head]) head += 1;
+  let tail = 0;
+  while (tail < prev.length - head && next[next.length - 1 - tail] === prev[prev.length - 1 - tail]) tail += 1;
+  return next.slice(head, next.length - tail);
 }
 
 function bookingDraftOf(booking: TeeBooking): BookingDraft {
@@ -589,7 +601,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const setPlayerField = useCallback((player: Player, field: keyof PlayerDraft, value: string) => {
     setPlayerDrafts((prev) => {
       const base = prev[player.id] ?? playerDraftOf(player);
-      return { ...prev, [player.id]: { ...base, [field]: value } };
+      return { ...prev, [player.id]: { ...base, [field]: replaceGuestOnType(base[field], value) } };
     });
   }, []);
 
