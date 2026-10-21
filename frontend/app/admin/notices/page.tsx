@@ -50,7 +50,7 @@ function matches(filter: FilterKey, state: NoticeState): boolean {
   return state === filter;
 }
 
-/** 편집기 입력. 시각은 `datetime-local` 값 그대로 들고 있다가 저장할 때 ISO 로 바꾼다. */
+/** 편집기 입력. 시각은 `YYYY-MM-DDTHH:mm`(기기 현지) 그대로 들고 있다가 저장할 때 ISO 로 바꾼다. */
 type Draft = {
   id?: string;
   kind: NoticeKind;
@@ -438,14 +438,18 @@ function EditorModal({
           <Field hint="Line breaks show as typed." label="Message">
             <TextArea className="min-h-[140px]" onChange={set("body")} value={draft.body} />
           </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field hint="Empty = right away" label="Start">
-              <TextInput onChange={set("starts_at")} type="datetime-local" value={draft.starts_at} />
-            </Field>
-            <Field hint="Empty = until turned off" label="End">
-              <TextInput onChange={set("ends_at")} type="datetime-local" value={draft.ends_at} />
-            </Field>
-          </div>
+          <WhenPicker
+            empty="Right away"
+            label="Start"
+            onChange={(value) => setDraft((current) => ({ ...current, starts_at: value }))}
+            value={draft.starts_at}
+          />
+          <WhenPicker
+            empty="Until turned off"
+            label="End"
+            onChange={(value) => setDraft((current) => ({ ...current, ends_at: value }))}
+            value={draft.ends_at}
+          />
           <Field hint="After a visitor closes it, when it shows again. Editing the pop-up shows it to everyone again." label="Show again">
             <Select onChange={set("repeat")} value={draft.repeat}>
               {(Object.keys(REPEAT_LABEL) as NoticeRepeat[]).map((key) => (
@@ -501,5 +505,95 @@ function EditorModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+// ===== 날짜·시각 고르기 ====================================================
+// `<input type="datetime-local">` 은 기기 언어로 그려진다(한국어 기기면 "연도. 월. 일. 오후"). 페이지가
+// 영어로 바꿀 방법이 없어서 날짜·시각을 영어 목록 두 개로 고르게 한다. 값은 `YYYY-MM-DDTHH:mm` 그대로.
+
+const DAYS_AHEAD = 60;
+const TIME_STEP_MIN = 15;
+
+function isoDay(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function dayLabel(day: string, todayIso: string, tomorrowIso: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const text = new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  if (day === todayIso) return `Today · ${text}`;
+  if (day === tomorrowIso) return `Tomorrow · ${text}`;
+  return text;
+}
+
+function timeLabel(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+const TIMES: string[] = Array.from({ length: (24 * 60) / TIME_STEP_MIN }, (_, i) => {
+  const minutes = i * TIME_STEP_MIN;
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}).concat("23:59");
+
+function WhenPicker({
+  label,
+  empty,
+  value,
+  onChange,
+}: {
+  label: string;
+  empty: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [day, time] = value ? value.split("T") : ["", ""];
+
+  const now = new Date();
+  const todayIso = isoDay(now);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const tomorrowIso = isoDay(tomorrow);
+
+  const days = Array.from({ length: DAYS_AHEAD }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    return isoDay(d);
+  });
+  // 지난 날짜로 저장된 공지를 고칠 때도 그 날짜가 목록에 있어야 한다.
+  if (day && !days.includes(day)) days.unshift(day);
+  const times = time && !TIMES.includes(time) ? [...TIMES, time].sort() : TIMES;
+
+  return (
+    <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2">
+      <Field label={label}>
+        <Select
+          onChange={(event) => {
+            const next = event.target.value;
+            onChange(next ? `${next}T${time || (label === "End" ? "23:59" : "08:00")}` : "");
+          }}
+          value={day}
+        >
+          <option value="">{empty}</option>
+          {days.map((option) => (
+            <option key={option} value={option}>
+              {dayLabel(option, todayIso, tomorrowIso)}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Time">
+        <Select disabled={!day} onChange={(event) => onChange(`${day}T${event.target.value}`)} value={time}>
+          {!day ? <option value="">—</option> : null}
+          {times.map((option) => (
+            <option key={option} value={option}>
+              {timeLabel(option)}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </div>
   );
 }
