@@ -15,8 +15,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { rememberedCashier, rememberCashier } from "@/lib/pos/currentBill";
 import {
+  announceRainChecksChanged,
   describeRainCheckError,
   isRainCheckMissing,
+  onRainChecksChanged,
   rainCheckApi,
   type RainCheck,
   type RainCheckQuote,
@@ -67,10 +69,64 @@ export function useRainChecks(bookingId: string | null): RainCheckList {
   }, [bookingId, nonce]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+  // 다른 탭·다른 컴퓨터에서 같은 예약의 레인체크를 내줬을 수도 있다.
+  useEffect(() => onRainChecksChanged(reload), [reload]);
   // 다른 예약의 목록이 잠깐 보이지 않게, 지금 예약 것만 돌려준다.
   const current = state.bookingId === bookingId;
   return { checks: current ? state.checks : [], missing: current && state.missing, reload };
 }
+
+/** ☂ 색: 쓸 수 있으면 "live", 썼거나 지났으면 "spent". */
+export function rainCheckTone(check: RainCheck): "live" | "spent" {
+  return check.status === "issued" && !check.expired ? "live" : "spent";
+}
+
+export function rainCheckTitle(check: RainCheck): string {
+  const state = check.status === "redeemed" ? "used" : check.expired ? "expired" : `good until ${usDate(check.expires_on)}`;
+  return `Rain check ${check.code} · ${formatMoney(check.amount)} · ${state}`;
+}
+
+// ===== 티 시트 격자: 보이는 날짜의 레인체크 =================================
+
+/**
+ * 격자의 ☂(0063). 키는 `예약id:선수id`, 무효는 서버가 뺀다.
+ * 0063 을 아직 안 돌렸거나 못 읽으면 빈 지도 — 격자는 ☂ 없이 그대로 쓴다.
+ */
+export function useRainChecksBetween(from: string | null, to: string | null): Map<string, RainCheck> {
+  const [state, setState] = useState<{ range: string; map: Map<string, RainCheck> }>({ range: "", map: new Map() });
+  const [nonce, setNonce] = useState(0);
+  const range = from && to ? `${from}..${to}` : "";
+
+  useEffect(() => onRainChecksChanged(() => setNonce((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (!from || !to) return;
+    let live = true;
+    rainCheckApi
+      .between(from, to)
+      .then((checks) => {
+        if (!live) return;
+        const map = new Map<string, RainCheck>();
+        for (const check of checks) {
+          if (check.status === "void") continue;
+          const key = `${check.booking_id}:${check.player_id}`;
+          // 같은 사람에게 무효 뒤 다시 낸 경우 — 나중 것(살아 있는 것)이 이긴다.
+          if (!map.has(key) || check.status === "issued") map.set(key, check);
+        }
+        setState({ range: `${from}..${to}`, map });
+      })
+      .catch(() => {
+        if (live) setState({ range: `${from}..${to}`, map: new Map() });
+      });
+    return () => {
+      live = false;
+    };
+  }, [from, to, nonce]);
+
+  return state.range === range ? state.map : EMPTY_RAIN_CHECKS;
+}
+
+const EMPTY_RAIN_CHECKS = new Map<string, RainCheck>();
 
 // ===== 문자로 보내기 ====================================================
 
@@ -251,6 +307,7 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
     setWorking(false);
     if (made.length > 0) {
       onChanged();
+      announceRainChecksChanged();
       // 인쇄는 다음 틱으로 — 화면이 "발행됨"으로 바뀐 뒤에 인쇄 창이 뜨게.
       window.setTimeout(() => printRainChecks(made), 0);
     }
@@ -264,6 +321,7 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
       setIssued((current) => current.filter((check) => check.code !== voiding.code));
       setVoiding(null);
       onChanged();
+      announceRainChecksChanged();
     } catch (error) {
       setLoadError(describeRainCheckError(error));
     } finally {

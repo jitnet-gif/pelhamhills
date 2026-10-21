@@ -45,6 +45,8 @@ import type {
   TeeSlot,
 } from "@/lib/teeSheet/types";
 import { useSlotLocks } from "@/hooks/useSlotLocks";
+import type { RainCheck } from "@/lib/pos/rainCheck";
+import { rainCheckTitle, rainCheckTone, useRainChecksBetween } from "./RainCheckDialog";
 import { isSlotLocked, slotLockKey, slotLockReason } from "@/lib/teeSheet/sun";
 
 export type WeekGridProps = {
@@ -209,6 +211,9 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
     () => (isDayView ? [focusedDate] : weekKey.split(",")),
     [isDayView, focusedDate, weekKey],
   );
+
+  // 레인체크 받은 선수의 ☂ — 보이는 날짜 범위를 한 번에 읽는다(0063). 발행·무효 신호에 다시 읽는다.
+  const rainChecks = useRainChecksBetween(columns[0] ?? null, columns[columns.length - 1] ?? null);
 
   const colIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -805,6 +810,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                       key={booking.id}
                       {...dragProps(booking)}
                       booking={booking}
+                      rainChecks={rainChecks}
                       selected={booking.id === selectedId}
                       onSelect={controller.select}
                     />
@@ -909,6 +915,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                           selected={booking.id === selectedId}
                           onSelect={controller.select}
                           onPlayerMenu={openPlayerMenu}
+                          rainChecks={rainChecks}
                           rule={rule}
                           slotTime={slot.time}
                           style={{
@@ -1143,6 +1150,14 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
 
 // ===================== 하위 컴포넌트 =====================
 
+// 레인체크 ☂: 파랑 = 쓸 수 있음, 회색 = 썼거나 지남. 칸 바탕이 요금제마다 달라 흰 테두리를 두른다.
+const RAIN_MARK_BASE =
+  "flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full text-[9px] leading-none text-white ring-1 ring-white";
+const RAIN_MARK_CLASS = {
+  live: `${RAIN_MARK_BASE} bg-[#1d6fb8]`,
+  spent: `${RAIN_MARK_BASE} bg-[#9aa0a6]`,
+} as const;
+
 type BookingButtonProps = {
   booking: TeeBooking;
   selected: boolean;
@@ -1155,9 +1170,21 @@ type BookingButtonProps = {
 };
 
 /** 주간 뷰의 압축 막대. */
-function BookingBar({ booking, selected, onSelect, dragging, onDragStart, onDragEnd }: BookingButtonProps) {
+function BookingBar({
+  booking,
+  selected,
+  onSelect,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  rainChecks,
+}: BookingButtonProps & { rainChecks: Map<string, RainCheck> }) {
   const blocked = booking.status === "blocked";
   const cancelled = isDead(booking);
+  // 주간 막대는 선수 칸이 없어서 예약 단위로 센다. 쓸 수 있는 것만 ☂ 로 센다.
+  const liveChecks = booking.players
+    .map((player) => rainChecks.get(`${booking.id}:${player.id}`))
+    .filter((check): check is RainCheck => check !== undefined && rainCheckTone(check) === "live");
   return (
     <button
       type="button"
@@ -1167,7 +1194,10 @@ function BookingBar({ booking, selected, onSelect, dragging, onDragStart, onDrag
       onClick={() => onSelect(booking.id)}
       aria-pressed={selected}
       data-booking-id={booking.id}
-      title={`${booking.title} · ${booking.time} · ${STATUS_LABEL[booking.status]}`}
+      title={[
+        `${booking.title} · ${booking.time} · ${STATUS_LABEL[booking.status]}`,
+        ...liveChecks.map((check) => `${check.player_name}: ${rainCheckTitle(check)}`),
+      ].join("\n")}
       style={blocked ? HATCH_STYLE : undefined}
       className={`flex h-[19px] min-w-0 flex-1 items-center gap-1 overflow-hidden rounded-sm px-1.5 text-left text-[11px] leading-none font-bold shadow-sm ${FOCUS_RING} ${
         blocked ? "text-[#4e5560]" : COLOR_CLASS[booking.color]
@@ -1176,6 +1206,11 @@ function BookingBar({ booking, selected, onSelect, dragging, onDragStart, onDrag
       } ${dragging ? "opacity-40" : ""}`}
     >
       <span className="truncate">{blocked ? "Blocked" : booking.title}</span>
+      {!blocked && liveChecks.length > 0 ? (
+        <span aria-label={`${liveChecks.length} rain check${liveChecks.length === 1 ? "" : "s"}`} className={RAIN_MARK_CLASS.live}>
+          ☂
+        </span>
+      ) : null}
       {!blocked && (
         <span className="ml-auto shrink-0 rounded-sm bg-black/15 px-1 text-[10px] font-bold">
           {booking.players.length}/{bookingCapacity(booking)}
@@ -1205,7 +1240,9 @@ function DaySegmentCard({
   onDragStart,
   onDragEnd,
   onPlayerMenu,
+  rainChecks,
 }: BookingButtonProps & {
+  rainChecks: Map<string, RainCheck>;
   rule: string;
   style: CSSProperties;
   slotTime: string;
@@ -1296,12 +1333,18 @@ function DaySegmentCard({
           // 상세에서 Arrived 를 켠 선수는 빈 동그라미 대신 초록 체크 — 시트만 보고 누가 왔는지 안다.
           // 칸 바탕색이 요금제마다 달라 체크는 고정 초록에 흰 테두리로 그린다.
           const arrived = player.arrived && !player.no_show && !dead;
+          const rainCheck = rainChecks.get(`${booking.id}:${player.id}`) ?? null;
           return (
             <span
               key={player.id}
               onContextMenu={onPlayerMenu ? (event) => onPlayerMenu(booking, player, event) : undefined}
               title={
-                [playerLabel(player), arrived ? "arrived" : null, onPlayerMenu ? "right-click to remove just this player" : null]
+                [
+                  playerLabel(player),
+                  arrived ? "arrived" : null,
+                  rainCheck ? rainCheckTitle(rainCheck) : null,
+                  onPlayerMenu ? "right-click to remove just this player" : null,
+                ]
                   .filter(Boolean)
                   .join(" — ") || undefined
               }
@@ -1322,6 +1365,11 @@ function DaySegmentCard({
                   className="h-[10px] w-[10px] shrink-0 rounded-full border-[1.5px] border-current opacity-80"
                 />
               )}
+              {rainCheck ? (
+                <span aria-label={rainCheckTitle(rainCheck)} className={RAIN_MARK_CLASS[rainCheckTone(rainCheck)]}>
+                  ☂
+                </span>
+              ) : null}
               <span className="truncate">
                 {/* type 이 아니라 이름으로 가른다. 온라인 예약(0003 `pelham_tee_book`)은
                     예약한 본인까지 type "Guest" 로 저장하므로, type 을 보면 대표자 이름이

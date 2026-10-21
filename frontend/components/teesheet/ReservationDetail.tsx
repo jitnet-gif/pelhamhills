@@ -46,7 +46,7 @@ import type {
 import BillPanel from "../pos/BillPanel";
 import SaleDetail from "../reports/SaleDetail";
 import { SEATS_PER_TEE_TIME } from "./BookingDialog";
-import RainCheckDialog, { activeRainCheck, useRainChecks } from "./RainCheckDialog";
+import RainCheckDialog, { activeRainCheck, rainCheckTitle, rainCheckTone, useRainChecks } from "./RainCheckDialog";
 
 export type ReservationDetailProps = { controller: TeeSheetController };
 
@@ -1550,22 +1550,39 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                       환불은 계산서 단위라 Reports → Daily close 의 그 영업일로 보낸다(0005). */}
                   {/* 레인체크·환불·빼기는 ⋮ 안에만 있으면 직원이 못 찾는다 — 카드마다 아이콘으로 꺼내 둔다
                       (⋮ 메뉴와 같은 길). 지금 못 하는 것은 흐리게 두고 이유를 툴팁으로 보인다. */}
-                  {useRainCheck ? (
-                    <button
-                      aria-label={`Rain check for ${player.name || "this player"}`}
-                      className="ml-auto flex items-center p-1 text-[#1d6fb8] hover:bg-[#eef5fc] disabled:text-[#c7c7cc] disabled:hover:bg-transparent"
-                      disabled={busy || !player.paid || Boolean(player.cancelled)}
-                      onClick={() => runDrop("raincheck", player)}
-                      title={
-                        player.paid && !player.cancelled
-                          ? "Give this player a rain check slip (barcode + expiry date), or reprint / void one (manager PIN)"
-                          : "Rain check — paid players only"
-                      }
-                      type="button"
-                    >
-                      <Glyph className="h-3.5 w-3.5" name="umbrella" />
-                    </button>
-                  ) : null}
+                  {useRainCheck
+                    ? (() => {
+                        // 이미 내준 사람은 ☂ 를 채운다(파랑 = 쓸 수 있음, 회색 = 썼거나 지남). 눌러도 다시
+                        // 발행하지 않고 같은 창에서 재인쇄·문자·무효만 한다(RainCheckDialog).
+                        const check = activeRainCheck(rainChecks.checks, player.id);
+                        const tone = check ? rainCheckTone(check) : null;
+                        return (
+                          <button
+                            aria-label={check ? rainCheckTitle(check) : `Rain check for ${player.name || "this player"}`}
+                            aria-pressed={Boolean(check)}
+                            className={`ml-auto flex items-center p-1 disabled:text-[#c7c7cc] disabled:hover:bg-transparent ${
+                              tone === "live"
+                                ? "bg-[#1d6fb8] text-white hover:bg-[#175c99]"
+                                : tone === "spent"
+                                  ? "bg-[#9aa0a6] text-white hover:bg-[#80868b]"
+                                  : "text-[#1d6fb8] hover:bg-[#eef5fc]"
+                            }`}
+                            disabled={busy || (!check && (!player.paid || Boolean(player.cancelled)))}
+                            onClick={() => (check ? setRainCheckFor([player]) : runDrop("raincheck", player))}
+                            title={
+                              check
+                                ? `${rainCheckTitle(check)} — reprint, text or void`
+                                : player.paid && !player.cancelled
+                                  ? "Give this player a rain check slip (barcode + expiry date) (manager PIN)"
+                                  : "Rain check — paid players only"
+                            }
+                            type="button"
+                          >
+                            <Glyph className="h-3.5 w-3.5" name="umbrella" />
+                          </button>
+                        );
+                      })()
+                    : null}
                   {player.paid && !paidBillOf(player.id) ? (
                     <Link
                       aria-label={`Refund ${player.name || "this player"}`}

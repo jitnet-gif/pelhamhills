@@ -68,6 +68,9 @@ export const rainCheckApi = {
     staffRpc<RainCheckQuote>("pelham_staff_rain_check_quote", { p_booking: booking, p_player: player }),
   issue: (fields: RainCheckIssue) => staffRpc<RainCheck>("pelham_staff_rain_check_issue", { p: fields }),
   forBooking: (booking: string) => staffRpc<RainCheck[]>("pelham_staff_rain_checks", { p_booking: booking }),
+  /** 티 시트 격자의 ☂(0063). 티타임 날짜 기준, 무효 제외. */
+  between: (from: string, to: string) =>
+    staffRpc<RainCheck[]>("pelham_staff_rain_checks_between", { p_from: from, p_to: to }),
   byCode: (code: string) => staffRpc<RainCheck>("pelham_staff_rain_check", { p_code: code }),
   void: (code: string, reason: string) =>
     staffRpc<RainCheck>("pelham_staff_rain_check_void", { p_code: code, p_reason: reason }),
@@ -117,6 +120,48 @@ async function textRainCheck(code: string, phone: string): Promise<{ to: string 
     throw new ApiError(response.status, detail);
   }
   return { to: body?.to ?? phone };
+}
+
+// ===== 바뀌었다는 신호 ==================================================
+// 발행·무효 뒤 같은 탭(격자)과 같은 브라우저의 다른 탭(Reports → Rain checks)이 다시 읽게 한다.
+// BroadcastChannel 은 보낸 탭 자신에게는 오지 않으므로 같은 탭은 window 이벤트로 따로 알린다.
+// 다른 컴퓨터에서 낸 것은 신호가 오지 않으니 탭으로 돌아올 때(visibilitychange) 다시 읽는다.
+
+const CHANGED_CHANNEL = "pelham-rain-checks";
+const CHANGED_EVENT = "pelham:rain-checks-changed";
+
+export function announceRainChecksChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(CHANGED_EVENT));
+  try {
+    const channel = new BroadcastChannel(CHANGED_CHANNEL);
+    channel.postMessage("changed");
+    channel.close();
+  } catch {
+    // BroadcastChannel 이 없는 브라우저 — 다른 탭은 돌아올 때 다시 읽는다.
+  }
+}
+
+/** 레인체크가 바뀌었을 수 있을 때마다 `listener`. 돌려준 함수로 끊는다. */
+export function onRainChecksChanged(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onVisible = () => {
+    if (document.visibilityState === "visible") listener();
+  };
+  window.addEventListener(CHANGED_EVENT, listener);
+  document.addEventListener("visibilitychange", onVisible);
+  let channel: BroadcastChannel | null = null;
+  try {
+    channel = new BroadcastChannel(CHANGED_CHANNEL);
+    channel.onmessage = listener;
+  } catch {
+    channel = null;
+  }
+  return () => {
+    window.removeEventListener(CHANGED_EVENT, listener);
+    document.removeEventListener("visibilitychange", onVisible);
+    channel?.close();
+  };
 }
 
 /** 전표 코드. 스캐너가 소문자로 보내도 받는다. 티 시트 영수증 번호(`XXXX-XXXX`)와 겹치지 않는다. */

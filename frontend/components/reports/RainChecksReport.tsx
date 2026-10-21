@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   describeRainCheckError,
+  onRainChecksChanged,
   rainCheckApi,
   type RainCheckReport,
   type RainCheckReportRow,
@@ -74,6 +75,10 @@ export default function RainChecksReport() {
   const range = `${from}..${to}`;
   const rangeError = from && to && from > to ? "From must be on or before To." : "";
   const loading = loaded?.range !== range;
+  // 티 시트에서 발행·무효하면(같은 브라우저의 다른 탭 포함) 또는 이 탭으로 돌아오면 다시 읽는다.
+  // 범위가 같으니 "불러오는 중"으로 비우지 않고 숫자만 바꾼다.
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => onRainChecksChanged(() => setNonce((n) => n + 1)), []);
 
   useEffect(() => {
     if (rangeError || !from || !to) return;
@@ -89,7 +94,7 @@ export default function RainChecksReport() {
     return () => {
       cancelled = true;
     };
-  }, [from, to, range, rangeError]);
+  }, [from, to, range, rangeError, nonce]);
 
   const report = loaded && !loading ? loaded.report : null;
   const rows = useMemo(() => report?.rows ?? [], [report]);
