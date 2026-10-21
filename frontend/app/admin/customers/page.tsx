@@ -5,11 +5,19 @@ import { useEffect, useMemo, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
 import {
+  CART_PACKAGES,
+  MEMBERSHIP_TYPES,
   STATUS_LABEL,
+  draftFromRatePlan,
+  listPrice,
+  money,
   typeInfo,
+  type CartPackage,
+  type MembershipPlan,
   type MembershipStatus,
   type MembershipType,
 } from "@/lib/memberships";
+import { CLUB_TIME_ZONE } from "@/lib/retail/receipt";
 import { ADMIN_HOME } from "@/lib/nav";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
@@ -38,11 +46,23 @@ type Customer = {
   needs_review: boolean;
   review_reasons: string[];
   possible_duplicate_of: string[];
+  /** 가장 최근 시즌 회원권(취소 제외). id 부터는 0063 이 더한 칸 — 0063 전에는 없다. */
   membership: {
     season: number;
     membership_type: MembershipType;
-    plan: "single" | "spousal";
+    plan: MembershipPlan;
     status: MembershipStatus;
+    id?: string;
+    cart_package?: CartPackage | null;
+    member_name?: string | null;
+    member_number?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    postal_code?: string | null;
+    amount_due?: number;
+    amount_paid?: number;
+    rate_plan?: string | null;
   } | null;
 };
 
@@ -85,16 +105,81 @@ const FIELDS: {
   { key: "member_number", label: "Member number" },
 ];
 
+/** 폼의 회원권 칸. `pelham_staff_customer_save`(0063) 의 p.membership 과 같다. 종류 "" 는 회원권 없음. */
+type MembershipInput = {
+  season: number;
+  membership_type: MembershipType | "";
+  plan: MembershipPlan;
+  cart_package: CartPackage | "";
+  status: "pending" | "active";
+};
+
+/** 클럽 현지 연도. */
+function clubYear(): number {
+  return Number(
+    new Date()
+      .toLocaleDateString("en-CA", { timeZone: CLUB_TIME_ZONE })
+      .slice(0, 4),
+  );
+}
+
+/** 이름이 display_name 한 칸에만 있는 옛 명부 줄은 첫 단어 / 나머지로 나눠 채운다. */
+function splitName(name: string | null | undefined): [string, string] {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return [words[0] ?? "", words.slice(1).join(" ")];
+}
+
 function inputFrom(c: Customer): CustomerInput {
+  const m = c.membership;
+  let first = c.first_name?.trim() ?? "";
+  let last = c.last_name?.trim() ?? "";
+  if (!first && !last) {
+    [first, last] = splitName(c.name || m?.member_name);
+  }
+  const hasAddress = !!(c.address_line1?.trim() || c.city?.trim());
   return {
-    first_name: c.first_name ?? "",
-    last_name: c.last_name ?? "",
-    phone: formatPhone(c.phone),
-    email: c.email ?? "",
-    address_line1: c.address_line1 ?? "",
+    first_name: first,
+    last_name: last,
+    phone: formatPhone(c.phone || m?.phone || null),
+    email: c.email || m?.email || "",
+    address_line1: hasAddress ? (c.address_line1 ?? "") : (m?.address ?? ""),
     city: c.city ?? "",
-    postal_code: c.postal_code ?? "",
-    member_number: c.member_number ?? "",
+    postal_code: c.postal_code || m?.postal_code || "",
+    member_number: c.member_number || m?.member_number || "",
+  };
+}
+
+/**
+ * 폼을 열 때의 회원권. 회원권 줄이 있으면 그것, 없는데 옛 명부가 회원이면 지난 요금제 이름으로 초안을 만든다.
+ * `dirty` 가 참이면 저장할 때 회원권도 보낸다 — 초안은 처음부터 참(저장하면 회원권 줄이 생긴다).
+ */
+function membershipFrom(c: Customer | null): {
+  input: MembershipInput;
+  dirty: boolean;
+} {
+  const m = c?.membership;
+  if (m) {
+    return {
+      input: {
+        season: m.season,
+        membership_type: m.membership_type,
+        plan: m.plan,
+        cart_package: m.cart_package ?? "",
+        status: m.status === "active" ? "active" : "pending",
+      },
+      dirty: false,
+    };
+  }
+  const draft = c?.is_member ? draftFromRatePlan(c.player_type) : null;
+  return {
+    input: {
+      season: clubYear(),
+      membership_type: draft?.membership_type ?? "",
+      plan: draft?.plan ?? "single",
+      cart_package: draft?.cart_package ?? "",
+      status: "active",
+    },
+    dirty: !!draft?.membership_type,
   };
 }
 
@@ -167,6 +252,10 @@ export default function CustomersPage() {
   const [editing, setEditing] = useState<{
     ref: string | null;
     input: CustomerInput;
+    membership: MembershipInput;
+    /** 원래 회원권. 금액 안내에 쓴다. */
+    current: Customer["membership"];
+    membershipDirty: boolean;
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -187,9 +276,27 @@ export default function CustomersPage() {
     };
   }, []);
 
-  function openForm(ref: string | null, input: CustomerInput) {
-    setEditing({ ref, input });
+  function openForm(c: Customer | null) {
+    const m = membershipFrom(c);
+    setEditing({
+      ref: c?.customer_ref ?? null,
+      input: c ? inputFrom(c) : EMPTY_INPUT,
+      membership: m.input,
+      current: c?.membership ?? null,
+      membershipDirty: m.dirty,
+    });
     setSaveError(null);
+  }
+
+  function setMembership(patch: Partial<MembershipInput>) {
+    setEditing(
+      (cur) =>
+        cur && {
+          ...cur,
+          membership: { ...cur.membership, ...patch },
+          membershipDirty: true,
+        },
+    );
   }
 
   // 매니저 PIN 은 서버가 요구한다(0054) — staffRpc 가 PIN 창을 띄우고 승인 뒤 다시 보낸다.
@@ -202,7 +309,9 @@ export default function CustomersPage() {
         "pelham_staff_customer_save",
         {
           p_ref: editing.ref,
-          p: editing.input,
+          p: editing.membershipDirty
+            ? { ...editing.input, membership: editing.membership }
+            : editing.input,
         },
       );
       const rows = await staffRpc<Customer[]>("pelham_staff_customers");
@@ -251,7 +360,7 @@ export default function CustomersPage() {
         <>
           <button
             className="tap-target mr-2 border border-[#4533ff] bg-white px-4 py-1.5 text-xs font-bold text-[#4533ff]"
-            onClick={() => openForm(null, EMPTY_INPUT)}
+            onClick={() => openForm(null)}
             type="button"
           >
             + New customer
@@ -404,9 +513,7 @@ export default function CustomersPage() {
                   </span>
                   <button
                     className="inline-flex min-h-11 items-center border border-[#cfd2d8] bg-white px-3 text-xs font-bold hover:border-[#4533ff] lg:min-h-0 lg:py-1.5"
-                    onClick={() =>
-                      openForm(selected.customer_ref, inputFrom(selected))
-                    }
+                    onClick={() => openForm(selected)}
                     type="button"
                   >
                     Edit
@@ -493,7 +600,7 @@ export default function CustomersPage() {
       {editing && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <form
-            className="w-full max-w-lg border border-[#d4d4d8] bg-white p-5 shadow-xl"
+            className="max-h-full w-full max-w-lg overflow-y-auto border border-[#d4d4d8] bg-white p-5 shadow-xl"
             onSubmit={(event) => {
               event.preventDefault();
               void save();
@@ -533,6 +640,11 @@ export default function CustomersPage() {
                 </label>
               ))}
             </div>
+            <MembershipFields
+              current={editing.current}
+              onChange={setMembership}
+              value={editing.membership}
+            />
             <p className="mt-3 text-[11px] text-[#5d6673]">
               A manager PIN is needed to save.
             </p>
@@ -564,5 +676,151 @@ export default function CustomersPage() {
         </div>
       )}
     </AdminShell>
+  );
+}
+
+const SELECT_CLASS =
+  "border border-[#cfd2d8] bg-white px-3 py-2 text-sm font-normal text-[#111315] outline-none focus:border-[#4533ff]";
+
+/** 편집 폼의 회원권 칸. 티시트는 이 회원권으로 회원 요금제를 고른다(0053). */
+function MembershipFields({
+  value,
+  current,
+  onChange,
+}: {
+  value: MembershipInput;
+  current: Customer["membership"];
+  onChange: (patch: Partial<MembershipInput>) => void;
+}) {
+  const year = clubYear();
+  const seasons = Array.from(
+    new Set([year, year + 1, ...(current ? [current.season] : [])]),
+  ).sort();
+  const type = value.membership_type ? typeInfo(value.membership_type) : null;
+  const price = value.membership_type
+    ? listPrice({
+        membership_type: value.membership_type,
+        plan: value.plan,
+        cart_package: value.cart_package || null,
+        range_pass: false,
+      })
+    : null;
+  const sameRow =
+    current && current.season === value.season && current.id !== undefined;
+
+  return (
+    <fieldset className="mt-4 border-t border-[#e2e4e8] pt-4">
+      <legend className="sr-only">Membership</legend>
+      <p className="mb-2 text-xs font-bold text-[#111315]">Membership</p>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+          Type
+          <select
+            className={SELECT_CLASS}
+            onChange={(event) => {
+              const next = event.target.value as MembershipType | "";
+              const info = next ? typeInfo(next) : null;
+              onChange({
+                membership_type: next,
+                ...(info && !info.spousal ? { plan: "single" as const } : {}),
+              });
+            }}
+            value={value.membership_type}
+          >
+            <option value="">Not a member (public)</option>
+            {MEMBERSHIP_TYPES.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label} — {t.access}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+          Season
+          <select
+            className={SELECT_CLASS}
+            onChange={(event) =>
+              onChange({ season: Number(event.target.value) })
+            }
+            value={value.season}
+          >
+            {seasons.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        {value.membership_type && (
+          <>
+            <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+              Plan
+              <select
+                className={SELECT_CLASS}
+                disabled={!type?.spousal}
+                onChange={(event) =>
+                  onChange({ plan: event.target.value as MembershipPlan })
+                }
+                value={value.plan}
+              >
+                <option value="single">Single</option>
+                {type?.spousal && <option value="spousal">Spousal</option>}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+              Cart package
+              <select
+                className={SELECT_CLASS}
+                onChange={(event) =>
+                  onChange({
+                    cart_package: event.target.value as CartPackage | "",
+                  })
+                }
+                value={value.cart_package}
+              >
+                <option value="">No cart package</option>
+                {CART_PACKAGES.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+              Status
+              <select
+                className={SELECT_CLASS}
+                onChange={(event) =>
+                  onChange({
+                    status: event.target.value as MembershipInput["status"],
+                  })
+                }
+                value={value.status}
+              >
+                <option value="active">Active — member rates</option>
+                <option value="pending">Pending — not paid yet</option>
+              </select>
+            </label>
+          </>
+        )}
+      </div>
+      <p className="mt-2 text-[11px] text-[#5d6673]">
+        {value.membership_type
+          ? sameRow && current?.amount_due !== undefined
+            ? `Paid ${money(current.amount_paid ?? 0)} of ${money(current.amount_due)}. `
+            : `List price ${money(price ?? 0)} (HST incl.). `
+          : current && current.season === value.season
+            ? `Saving cancels the ${value.season} ${typeInfo(current.membership_type).label} membership. `
+            : "Tee sheet charges public rates. "}
+        {value.membership_type &&
+          "The tee sheet uses this to charge member rates. Record payments on "}
+        {value.membership_type && (
+          <Link className="font-bold text-[#4533ff]" href="/admin/memberships">
+            Memberships
+          </Link>
+        )}
+        {value.membership_type && "."}
+      </p>
+    </fieldset>
   );
 }
