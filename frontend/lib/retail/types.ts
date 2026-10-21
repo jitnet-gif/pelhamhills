@@ -291,6 +291,34 @@ export type RegisterCloseReport = {
   cash_blind?: boolean;
 };
 
+/** 대사표(0061) — 매출 리포트 · 계산대 마감 · 담당자 마감을 한 영업일로 맞춘 결과. 차이는 서버가 센다. */
+export type CashReconcileLine = {
+  method: "cash" | "card" | "debit";
+  /** 매출 리포트의 그 수단 금액(팁 제외)과 그 수단의 팁. total = amount + tip. */
+  report: { amount: Cents; tip: Cents; total: Cents };
+  /** 온라인 결제(station online, amount + tip). 마감할 계산대가 없다. */
+  online: Cents;
+  /** counted = 닫은 계산대의 센 금액 합(현금은 시작 잔돈 뺀 값). diff = counted + online − report.total. */
+  registers: { counted: Cents; diff: Cents; complete: boolean };
+  /** 현금만. diff = counted + unassigned − report.total. */
+  staff: { counted: Cents; unassigned: Cents; diff: Cents; complete: boolean } | null;
+};
+
+export type CashReconcile = {
+  business_date: string;
+  registers: {
+    station: string;
+    has_sales: boolean;
+    closed: boolean;
+    stale: boolean;
+    cash: { expected: Cents; counted: Cents | null };
+    card: { expected: Cents; counted: Cents | null };
+    debit: { expected: Cents; counted: Cents | null };
+  }[];
+  staff: { closed: number; unassigned_cash: Cents; missing: string[]; stale: string[] };
+  lines: CashReconcileLine[];
+};
+
 export type RegisterCloseSave = {
   counted: { cash: Cents; card: Cents; debit: Cents };
   cash_counts: CashCounts;

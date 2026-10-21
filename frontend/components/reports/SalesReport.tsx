@@ -19,6 +19,7 @@ import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
 import { formatMoney, type RetailDailyReport, type Sale } from "@/lib/retail/types";
 
+import CashReconcile from "@/components/reports/CashReconcile";
 import PriceReview from "@/components/reports/PriceReview";
 import SaleDetail from "@/components/reports/SaleDetail";
 import SalesDrilldown, { type Drill } from "@/components/reports/SalesDrilldown";
@@ -55,6 +56,8 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
   const [drill, setDrill] = useState<Drill | null>(null);
   // 환불하면 담당자별 마감 숫자도 바뀐다. 마감 패널에 다시 읽으라고 알린다.
   const [closeoutKey, setCloseoutKey] = useState(0);
+  // 담당자 마감을 저장하면 대사표만 다시 읽는다(마감 패널은 저장 결과를 이미 받았다).
+  const [savedKey, setSavedKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -310,7 +313,11 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
         </>
       ) : null}
 
-      {cash ? <StaffCloseout date={date} refreshKey={closeoutKey} /> : null}
+      {cash ? <CashReconcile date={date} refreshKey={closeoutKey + savedKey} /> : null}
+
+      {cash ? (
+        <StaffCloseout date={date} onSaved={() => setSavedKey((key) => key + 1)} refreshKey={closeoutKey} />
+      ) : null}
 
       <Panel title={`Receipts — ${date}`}>
         {loading ? (

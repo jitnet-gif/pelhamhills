@@ -21,6 +21,7 @@ import { MISSING_MIGRATION_MESSAGE, isMissingMigration } from "@/lib/pos/api";
 
 import {
   computeTax,
+  type CashReconcile,
   type Cents,
   type CloseoutReport,
   type CloseoutSave,
@@ -109,6 +110,9 @@ async function registerCloseCall<T>(fn: string, args: Record<string, unknown>): 
   }
 }
 
+export const CASH_RECONCILE_MISSING_MESSAGE =
+  "대사표가 아직 켜지지 않았습니다. Supabase SQL Editor 에서 0061_cash_reconcile.sql 을 실행해 주세요.";
+
 /** 매장 현지 날짜 `YYYY-MM-DD`. `toISOString()` 은 UTC 라 저녁에 하루가 밀린다. */
 export function localBusinessDate(date: Date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -183,6 +187,16 @@ export const retailApi = {
 
   reopenCloseout: (businessDate: string, staffKey: string) =>
     closeoutCall<CloseoutReport>("pelham_staff_closeout_reopen", { p_date: businessDate, p_staff_key: staffKey }),
+
+  // ===== 대사표 (0061) — 현금 리포트 계정만 =====
+  getCashReconcile: async (businessDate: string): Promise<CashReconcile> => {
+    try {
+      return await staffRpc<CashReconcile>("pelham_staff_cash_reconcile", { p_date: businessDate });
+    } catch (cause) {
+      if (isMissingMigration(cause)) throw new RetailApiError("http", 404, CASH_RECONCILE_MISSING_MESSAGE);
+      throw toRetailError(cause);
+    }
+  },
 
   // ===== 계산대 마감 (0023) =====
   getRegisterClose: (businessDate: string, station: string) =>

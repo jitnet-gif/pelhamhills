@@ -27,14 +27,26 @@ import {
 
 import { Button, EmptyNote, ErrorNote, Field, Panel, SkeletonRows, TextInput } from "@/components/retail/ui";
 
-export default function StaffCloseout({ date, refreshKey = 0 }: { date: string; refreshKey?: number }) {
+export default function StaffCloseout({
+  date,
+  refreshKey = 0,
+  onSaved,
+}: {
+  date: string;
+  refreshKey?: number;
+  /** 마감·다시 열기 뒤에 부른다 — 대사표(`CashReconcile`)가 다시 읽는다. */
+  onSaved?: () => void;
+}) {
   const requestKey = `${date}#${refreshKey}`;
   const [loaded, setLoaded] = useState<{ key: string; report: CloseoutReport | null; error: string } | null>(null);
   // 날짜가 바뀌었거나 다시 읽으라는 신호가 오면, 응답이 올 때까지 이전 값은 보여 주지 않는다.
   const loading = loaded?.key !== requestKey;
   const report = loading ? null : loaded.report;
   const error = loading ? "" : loaded.error;
-  const setReport = (value: CloseoutReport) => setLoaded({ key: requestKey, report: value, error: "" });
+  const setReport = (value: CloseoutReport) => {
+    setLoaded({ key: requestKey, report: value, error: "" });
+    onSaved?.();
+  };
 
   useEffect(() => {
     let cancelled = false;
