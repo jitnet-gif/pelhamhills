@@ -67,6 +67,12 @@ def client(tmp_path, monkeypatch):
     store._cache_path = None
 
 
+@pytest.fixture()
+def nine_by_phone(monkeypatch):
+    """전화 9홀은 지금 꺼져 있다(PHONE_NINE_HOLES). 9홀 시각 검사를 시험하는 테스트는 켜고 돈다."""
+    monkeypatch.setattr(voice, "PHONE_NINE_HOLES", True)
+
+
 # ===== 헬퍼 ============================================================
 
 def find(client, date=TOMORROW, party=2, day_part="any", conversation="c-test"):
@@ -590,7 +596,7 @@ def test_get_rates_uses_the_tee_sheets_own_numbers(client):
     assert body["total"] == round(subtotal + round(subtotal * voice.TAX_RATE, 2), 2)
 
 
-def test_get_rates_quotes_the_nine_hole_rate_and_when_it_starts(client):
+def test_get_rates_quotes_the_nine_hole_rate_and_when_it_starts(nine_by_phone, client):
     """9홀은 요금표마다 한 가격(DB 0045 와 같은 값). 날짜만 받으므로 몇 시부터인지도 알려 준다."""
     body = rates(client, holes=9).json()
     assert body["green_fee_per_player"] == 34.52   # 정규 시즌 평일
@@ -611,7 +617,7 @@ def test_nine_hole_rates_follow_the_club_rate_card():
     assert "4:00 PM" in ts.nine_holes_rule("2026-10-24")
 
 
-def test_confirm_refuses_nine_holes_before_the_nine_hole_start(client):
+def test_confirm_refuses_nine_holes_before_the_nine_hole_start(nine_by_phone, client):
     held = hold(client, time="9:58 AM")
     refused = client.post(
         f"{API}/voice/tools/confirm-booking",
@@ -622,7 +628,7 @@ def test_confirm_refuses_nine_holes_before_the_nine_hole_start(client):
     assert "10:00 AM" in refused.json()["message"]
 
 
-def test_confirm_books_nine_holes_from_the_nine_hole_start(client):
+def test_confirm_books_nine_holes_from_the_nine_hole_start(nine_by_phone, client):
     held = hold(client, time="10:07 AM")
     done = client.post(
         f"{API}/voice/tools/confirm-booking",
@@ -642,7 +648,7 @@ def find_nine(client, date=TOMORROW, party=2, day_part="any"):
     )
 
 
-def test_find_nine_holes_returns_only_times_from_the_nine_hole_start(client):
+def test_find_nine_holes_returns_only_times_from_the_nine_hole_start(nine_by_phone, client):
     body = find_nine(client).json()
     assert body["ok"] is True
     assert all(ts.label_to_minutes(o["time"]) >= 10 * 60 for o in body["options"])
@@ -650,13 +656,13 @@ def test_find_nine_holes_returns_only_times_from_the_nine_hole_start(client):
     assert "10:00 AM" in body["message"]
 
 
-def test_find_nine_holes_in_the_morning_says_when_nine_holes_start(client):
+def test_find_nine_holes_in_the_morning_says_when_nine_holes_start(nine_by_phone, client):
     body = find_nine(client, day_part="morning").json()
     # 10:00~11:59 는 아침이라 남는다. 그 칸이 다 있어도 7~9시는 빠져야 한다.
     assert all(ts.label_to_minutes(o["time"]) >= 10 * 60 for o in body["options"])
 
 
-def test_find_nine_holes_on_a_day_without_nine_says_no_and_names_the_next_day(client, monkeypatch):
+def test_find_nine_holes_on_a_day_without_nine_says_no_and_names_the_next_day(nine_by_phone, client, monkeypatch):
     real = ts.nine_holes_from
     # 9/9 는 9홀 시작이 마지막 티 뒤라 9홀 칸이 없다고 가정한다(11월 주말과 같은 모양).
     monkeypatch.setattr(ts, "nine_holes_from",
@@ -670,7 +676,7 @@ def test_find_nine_holes_on_a_day_without_nine_says_no_and_names_the_next_day(cl
     assert "Thursday, September 10, from 10:07 AM" in body["message"]  # 9분 격자의 첫 9홀 칸
 
 
-def test_find_nine_holes_when_no_day_in_the_window_has_nine(client, monkeypatch):
+def test_find_nine_holes_when_no_day_in_the_window_has_nine(nine_by_phone, client, monkeypatch):
     monkeypatch.setattr(ts, "nine_holes_from", lambda iso: ts.NO_NINE)
     body = find_nine(client).json()
     assert body["ok"] is False
@@ -678,7 +684,7 @@ def test_find_nine_holes_when_no_day_in_the_window_has_nine(client, monkeypatch)
     assert "No day in the next 14 days" in body["message"]
 
 
-def test_hold_refuses_nine_holes_before_the_nine_hole_start(client):
+def test_hold_refuses_nine_holes_before_the_nine_hole_start(nine_by_phone, client):
     refused = client.post(
         f"{API}/voice/tools/hold-tee-time",
         json={"date": TOMORROW, "time": "9:58 AM", "party_size": 2, "holes": 9,
@@ -689,13 +695,44 @@ def test_hold_refuses_nine_holes_before_the_nine_hole_start(client):
     assert "eighteen holes only" in refused.json()["message"]
 
 
-def test_hold_takes_nine_holes_from_the_nine_hole_start(client):
+def test_hold_takes_nine_holes_from_the_nine_hole_start(nine_by_phone, client):
     held = client.post(
         f"{API}/voice/tools/hold-tee-time",
         json={"date": TOMORROW, "time": "10:07 AM", "party_size": 2, "holes": 9,
               "conversation_id": "c-test"},
     )
     assert held.status_code == 200 and held.json()["ok"] is True, held.text
+
+
+@pytest.mark.parametrize("tool,payload", [
+    ("find-tee-times", {"date": TOMORROW, "party_size": 2}),
+    ("hold-tee-time", {"date": TOMORROW, "time": "10:07 AM", "party_size": 2}),
+    ("get-rates", {"date": TOMORROW, "players": 2}),
+    ("join-waitlist", {"date": TOMORROW, "party_size": 2, "last_name": "Nakamura"}),
+])
+def test_phone_takes_no_nine_holes_on_any_day(client, tool, payload):
+    """2026-10-20 클럽 결정: 전화로는 주중·주말 모두 9홀을 받지 않는다. 손님에게 읽을 한 줄을 준다."""
+    refused = client.post(f"{API}/voice/tools/{tool}",
+                          json={**payload, "holes": 9, "conversation_id": "c-no-nine"})
+    assert tool_status(refused) == 422
+    message = refused.json()["message"]
+    assert "Sorry, we can't book nine holes over the phone." in message
+    assert "eighteen holes" in message
+
+
+def test_phone_refuses_to_confirm_or_change_to_nine_holes(client):
+    held = hold(client, time="10:07 AM")
+    refused = client.post(
+        f"{API}/voice/tools/confirm-booking",
+        json={"hold_id": held.json()["hold_id"], "first_name": "Jin", "last_name": "Nakamura",
+              "phone": "905-892-1234", "holes": 9, "conversation_id": "c-test"},
+    )
+    assert tool_status(refused) == 422
+    assert "over the phone" in refused.json()["message"]
+    booking = confirm(client, held.json()["hold_id"]).json()["booking"]
+    changed = modify(client, booking["booking_id"], "c-test", holes=9)
+    assert tool_status(changed) == 422
+    assert "over the phone" in changed.json()["message"]
 
 
 def test_get_rates_charges_a_cart_per_rider(client):
@@ -742,7 +779,7 @@ def test_modify_cannot_overfill_a_tee_time(client):
     assert tool_status(refused) == 409
 
 
-def test_modify_changes_the_number_of_holes(client):
+def test_modify_changes_the_number_of_holes(nine_by_phone, client):
     booking = book(client, time="10:07 AM", party=2, conversation="c-booked")
     lookup_first(client, "c-mod")
     done = modify(client, booking["booking_id"], "c-mod", holes=9)
@@ -752,7 +789,7 @@ def test_modify_changes_the_number_of_holes(client):
     assert done.json()["booking"]["rate"] == ts.green_fee_for(TOMORROW, 9)
 
 
-def test_modify_keeps_an_early_tee_time_at_eighteen_holes(client):
+def test_modify_keeps_an_early_tee_time_at_eighteen_holes(nine_by_phone, client):
     booking = book(client, time="8:01 AM", party=2, conversation="c-booked")
     lookup_first(client, "c-mod")
     refused = modify(client, booking["booking_id"], "c-mod", holes=9)

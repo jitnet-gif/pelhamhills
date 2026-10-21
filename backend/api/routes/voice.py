@@ -62,6 +62,22 @@ logger = logging.getLogger(__name__)
 #: 손님이 예약할 수 있는 범위. 고객 웹(`/book/tee-time` 의 `DAYS_AHEAD`)과 같은 값.
 BOOKING_WINDOW_DAYS = 14
 
+#: 전화로 9홀을 받는가. 2026-10-20 클럽 결정: 주중·주말 모두 받지 않는다(웹 예약은 그대로).
+#: False 면 9홀을 찾기·잡기·확정·바꾸기·대기 어디서도 받지 않고, 에이전트에게 읽을 한 줄을 준다.
+#: 다시 받으려면 True — 9홀 시각 검사(`ts.nine_holes_from`)는 그대로 살아 있다.
+PHONE_NINE_HOLES = False
+
+NO_NINE_BY_PHONE = (
+    "We do not take nine-hole bookings by phone, on any day. Tell the caller plainly: "
+    "\"Sorry, we can't book nine holes over the phone.\" Then offer eighteen holes instead. "
+    "Do not search, hold or book nine holes, and do not transfer the call just for this."
+)
+
+
+def _refuse_nine(holes: Optional[int]) -> None:
+    if holes == 9 and not PHONE_NINE_HOLES:
+        raise HTTPException(status_code=422, detail=NO_NINE_BY_PHONE)
+
 #: 티오프까지 이보다 적게 남았으면 에이전트는 취소하지 못하고 프로 샵으로 넘긴다.
 #: 카트 배정과 환불이 걸려 있어 사람이 판단할 구간이다.
 CANCEL_CUTOFF_MINUTES = 120
@@ -838,6 +854,7 @@ def _next_nine_day(iso_date: str) -> str:
 @tools_router.post("/voice/tools/find-tee-times", response_model=FindTeeTimesResponse)
 def find_tee_times(body: FindTeeTimesRequest) -> FindTeeTimesResponse:
     _touch_session(body.conversation_id)
+    _refuse_nine(body.holes)
     iso_date = resolve_date(body.date)
     require_bookable_date(iso_date)
 
@@ -964,6 +981,7 @@ def find_tee_times(body: FindTeeTimesRequest) -> FindTeeTimesResponse:
 @tools_router.post("/voice/tools/hold-tee-time", response_model=HoldResponse)
 def hold_tee_time(body: HoldRequest) -> HoldResponse:
     session = _touch_session(body.conversation_id)
+    _refuse_nine(body.holes)
     iso_date = resolve_date(body.date)
     require_bookable_date(iso_date)
     time_label = body.time.strip()
@@ -1067,6 +1085,7 @@ def release_hold(body: ReleaseHoldRequest) -> ReleaseHoldResponse:
 @tools_router.post("/voice/tools/confirm-booking", response_model=ConfirmResponse)
 def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> ConfirmResponse:
     session = _touch_session(body.conversation_id)
+    _refuse_nine(body.holes)
 
     first = body.first_name.strip()
     last = body.last_name.strip()
@@ -1497,6 +1516,7 @@ def get_rates(body: RatesRequest) -> RatesResponse:
     날짜만 받으므로 첫 가격대를 말하고, 오후 가격대와 그 날 9홀이 몇 시부터인지 같이 알려 준다.
     """
     _touch_session(body.conversation_id)
+    _refuse_nine(body.holes)
     iso_date = resolve_date(body.date)
 
     green = ts.green_fee_for(iso_date, body.holes)
@@ -1558,6 +1578,7 @@ def modify_booking(body: ModifyRequest) -> ModifyResponse:
     초과 예약된다.
     """
     session = _touch_session(body.conversation_id)
+    _refuse_nine(body.holes)
     if session is None or body.booking_id not in session.revealed:
         raise HTTPException(
             status_code=403,
@@ -1870,6 +1891,7 @@ def join_waitlist(body: WaitlistRequest) -> WaitlistResponse:
     그 시각을 남긴다.
     """
     _touch_session(body.conversation_id)
+    _refuse_nine(body.holes)
     iso_date = resolve_date(body.date)
     require_bookable_date(iso_date)
 
