@@ -75,3 +75,17 @@ export function code128Svg(text: string): string {
     `shape-rendering="crispEdges" aria-hidden="true">${bars.join("")}</svg>`
   );
 }
+
+/**
+ * 제조사 바코드가 없는 상품(스낵바 음식·렌탈·로고 상품)에 클럽이 붙이는 바코드: `PH` + 상품 번호 6자리.
+ * 상품 번호는 바뀌지 않고 겹치지 않으므로 이 값도 겹치지 않는다. 숫자만 쓰는 UPC/EAN 과도 겹칠 수 없다.
+ * 2026-10-21: 스낵바에서 바코드 없는 것을 계산대 화면의 가격 옆 바코드를 쏘아 팔고 싶다고 했다.
+ */
+export function houseBarcode(productId: number): string {
+  return `PH${String(productId).padStart(6, "0")}`;
+}
+
+/** 클럽이 만든 바코드인가. 이런 상품은 포장에 바코드가 없으니 화면·인쇄 시트에 그려 준다. */
+export function isHouseBarcode(code: string | null | undefined): boolean {
+  return /^PH\d{6,}$/i.test((code ?? "").trim());
+}

@@ -15,6 +15,7 @@ import CameraScanner, { type ScanOutcome } from "@/components/pos/CameraScanner"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 
 import retailApi, { toRetailError } from "@/lib/retail/api";
+import { code128Svg, houseBarcode, isHouseBarcode } from "@/lib/retail/barcode";
 import { menuGroupSuggestions } from "@/lib/retail/menuGroups";
 import {
   LOW_STOCK_RED_BELOW,
@@ -84,6 +85,7 @@ export default function ProductsTab({
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [generating, setGenerating] = useState(false);
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -108,6 +110,53 @@ export default function ProductsTab({
     const withCode = shown.filter(hasBarcode).length;
     return { all: shown.length, with: withCode, without: shown.length - withCode };
   }, [products, showInactive]);
+
+  // 바코드를 만들어 줄 상품: 지금 화면 분류의 **활성** 상품 중 바코드 칸이 빈 것.
+  const missingBarcode = useMemo(
+    () => products.filter((item) => item.is_active && !hasBarcode(item)),
+    [products],
+  );
+  // 인쇄 시트: 클럽이 만든 바코드(포장에 바코드가 없는 것)를 단 활성 상품.
+  const houseCoded = useMemo(
+    () => products.filter((item) => item.is_active && isHouseBarcode(item.barcode)),
+    [products],
+  );
+
+  async function generateBarcodes() {
+    if (demo || missingBarcode.length === 0) return;
+    if (
+      !window.confirm(
+        `Give ${missingBarcode.length} product(s) without a barcode a club barcode (PH + product number)? ` +
+          "The barcode then shows next to the price so the register can scan it.",
+      )
+    ) {
+      return;
+    }
+    // 다른 분류의 SKU·바코드와도 겹치지 않게 전체 목록으로 본다. 겹치면 그 상품은 건너뛴다.
+    const taken = new Set(
+      (catalog ?? products).flatMap((item) => [item.sku, item.barcode ?? ""]).map((code) => code.trim().toLowerCase()),
+    );
+    setGenerating(true);
+    setError("");
+    const skipped: string[] = [];
+    try {
+      for (const product of missingBarcode) {
+        const code = houseBarcode(product.id);
+        if (taken.has(code.toLowerCase())) {
+          skipped.push(product.name);
+          continue;
+        }
+        await retailApi.updateProduct(product.id, { barcode: code });
+        taken.add(code.toLowerCase());
+      }
+      if (skipped.length) setError(`Skipped (code already used): ${skipped.join(", ")}`);
+    } catch (cause) {
+      setError(toRetailError(cause).message);
+    } finally {
+      setGenerating(false);
+      onChanged();
+    }
+  }
 
   async function deactivate(product: Product) {
     if (demo) return;
@@ -176,6 +225,16 @@ export default function ProductsTab({
           <Chip active={showInactive} onClick={() => setShowInactive((value) => !value)}>
             {showInactive ? "Showing inactive" : "Hiding inactive"}
           </Chip>
+          {missingBarcode.length > 0 ? (
+            <Button disabled={demo || generating} onClick={generateBarcodes}>
+              {generating ? "Generating…" : `Generate barcodes (${missingBarcode.length})`}
+            </Button>
+          ) : null}
+          {houseCoded.length > 0 ? (
+            <Button onClick={() => printBarcodeSheet(houseCoded)}>
+              Print barcode list ({houseCoded.length})
+            </Button>
+          ) : null}
           <Button disabled={demo} onClick={() => setEditing("new")} tone="primary">
             + Add product
           </Button>
@@ -202,9 +261,10 @@ export default function ProductsTab({
                       {product.menu_group ? ` › ${product.menu_group}` : ""}
                     </p>
                   </div>
-                  <p className="shrink-0 text-base font-bold tabular-nums">
-                    {formatMoney(product.price)}
-                  </p>
+                  <div className="shrink-0 text-right">
+                    <p className="text-base font-bold tabular-nums">{formatMoney(product.price)}</p>
+                    <PriceBarcode product={product} />
+                  </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6b7280]">
                   <StockText product={product} />
@@ -266,7 +326,10 @@ export default function ProductsTab({
                     <Td className="font-bold">{product.name}</Td>
                     <Td className="text-[#6b7280]">{product.category}</Td>
                     <Td className="text-[#6b7280]">{product.menu_group || "—"}</Td>
-                    <Td align="right">{formatMoney(product.price)}</Td>
+                    <Td align="right">
+                      <span className="font-bold tabular-nums">{formatMoney(product.price)}</span>
+                      <PriceBarcode product={product} />
+                    </Td>
                     <Td align="right">
                       <StockText product={product} />
                     </Td>
@@ -329,6 +392,63 @@ export default function ProductsTab({
       ) : null}
     </div>
   );
+}
+
+/**
+ * 가격 바로 밑의 바코드. 클럽이 만든 바코드만 그린다 — 제조사 바코드는 포장에 이미 있다.
+ * 계산대 스캐너(DS2208)는 화면의 바코드도 읽으므로, 이 줄을 그대로 쏘면 담긴다.
+ */
+function PriceBarcode({ product }: { product: Product }) {
+  if (!isHouseBarcode(product.barcode)) return null;
+  const code = product.barcode!.trim();
+  return (
+    <span className="mt-1 ml-auto block w-[150px] bg-white text-center">
+      {/* code128Svg 는 막대(rect)만 그린 SVG 다. 사람이 입력한 글자는 들어가지 않는다. */}
+      <span className="block h-9 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: code128Svg(code) }} />
+      <span className="block font-mono text-[10px] tracking-wider text-[#3f434a]">{code}</span>
+    </span>
+  );
+}
+
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+}
+
+/**
+ * 바코드 없는 상품 리스트를 종이로. 상품명·가격·바코드 한 줄씩 — 스낵바 카운터에 붙여 두고 쏜다.
+ * 새 창에 그려 인쇄 창을 연다(계산대 영수증 인쇄 경로와 섞지 않는다).
+ */
+function printBarcodeSheet(items: Product[]) {
+  const rows = [...items]
+    .sort((a, b) => (a.menu_group ?? "").localeCompare(b.menu_group ?? "") || a.name.localeCompare(b.name))
+    .map((item) => {
+      const code = item.barcode!.trim();
+      return (
+        `<div class="row"><div class="name">${escapeHtml(item.name)}` +
+        `<small>${escapeHtml(item.menu_group || item.category)}</small></div>` +
+        `<div class="price">${escapeHtml(formatMoney(item.price))}</div>` +
+        `<div class="code">${code128Svg(code)}<p>${escapeHtml(code)}</p></div></div>`
+      );
+    })
+    .join("");
+  const win = window.open("", "_blank", "width=800,height=900");
+  if (!win) {
+    window.alert("Allow pop-ups for this site to print the barcode list.");
+    return;
+  }
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Barcode list</title><style>
+    body{font-family:system-ui,sans-serif;margin:24px;color:#111}
+    h1{font-size:18px;margin:0 0 12px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+    .row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-bottom:1px solid #ccc;break-inside:avoid}
+    .name{font-weight:700;font-size:14px}.name small{display:block;font-weight:400;color:#666;font-size:11px}
+    .price{font-weight:700;font-size:16px;text-align:right}
+    .code{grid-column:1/-1}.code svg{display:block;width:100%;height:44px}
+    .code p{margin:2px 0 0;text-align:center;font:11px monospace;letter-spacing:1px}
+    @media print{body{margin:10mm}}
+  </style></head><body><h1>Items without a maker barcode — scan here</h1><div class="grid">${rows}</div>
+  <script>window.onload=function(){window.print()}</script></body></html>`);
+  win.document.close();
 }
 
 /** 렌탈은 `stock: null` — 재고 개념이 없다. 0 과 같이 보이면 품절로 오해한다. */
