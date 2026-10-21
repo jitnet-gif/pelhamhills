@@ -10,15 +10,18 @@
 -- 만료 기본값: 0044 와 같은 정의(발행일 + 180일)를 여기서도 한 번 더 건다. 0044 를 빠뜨린 프로젝트에서도
 -- 이 파일 하나로 180일이 되게. 이미 발행한 레인체크의 만료일은 그대로다.
 --
--- 전제: 0011(레인체크)·0058(문자 기록). 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
+-- 0058(문자 기록)이 없는 프로젝트에서도 돌아간다 — 그때는 문자 열이 비어 있고, 0058 을 실행하면 그때부터 채워진다.
+--
+-- 전제: 0011(레인체크). 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
 
 do $$
 begin
   if to_regclass('public.pelham_rain_checks') is null then
     raise exception '0062 needs 0011 first (pelham_rain_checks is missing).';
   end if;
-  if to_regclass('public.pelham_sms_messages') is null then
-    raise exception '0062 needs 0058 first (pelham_sms_messages is missing).';
+  if to_regclass('public.pelham_sms_messages') is not null then
+    create index if not exists pelham_sms_messages_ref_idx
+      on public.pelham_sms_messages (booking_ref, created_at desc) where template = 'rain_check';
   end if;
 end;
 $$;
@@ -33,8 +36,6 @@ as $$
 $$;
 
 create index if not exists pelham_rain_checks_issued_on_idx on public.pelham_rain_checks (issued_on);
-create index if not exists pelham_sms_messages_ref_idx
-  on public.pelham_sms_messages (booking_ref, created_at desc) where template = 'rain_check';
 
 create or replace function public.pelham_staff_rain_check_report(p_from date, p_to date)
 returns jsonb
@@ -55,23 +56,31 @@ begin
     perform public.pelham_fail('422', 'Pick 400 days or fewer.');
   end if;
 
-  select coalesce(jsonb_agg(
-           public.pelham_rc_json(r) || jsonb_build_object(
-             'texted_to', s.to_phone,
-             'texted_at', public.pelham_iso(s.created_at),
-             'text_status', s.status,
-             'text_count', coalesce(s.sent, 0)
-           ) order by r.issued_at desc, r.id desc), '[]'::jsonb)
-    into v_rows
-    from public.pelham_rain_checks r
-    left join lateral (
+  -- 문자 기록 표(0058)는 없을 수도 있다. 있으면 붙이고, 없으면 문자 열은 비운다(동적 SQL — 함수를 만들 때
+  -- 표가 없어도 되게).
+  execute format($q$
+    select coalesce(jsonb_agg(
+             public.pelham_rc_json(r) || jsonb_build_object(
+               'texted_to', s.to_phone,
+               'texted_at', public.pelham_iso(s.created_at),
+               'text_status', s.status,
+               'text_count', coalesce(s.sent, 0)
+             ) order by r.issued_at desc, r.id desc), '[]'::jsonb)
+      from public.pelham_rain_checks r
+      left join lateral (%s) s on true
+     where r.issued_on between $1 and $2
+  $q$,
+    case when to_regclass('public.pelham_sms_messages') is not null then $l$
       select m.to_phone, m.created_at, m.status, count(*) over () as sent
         from public.pelham_sms_messages m
        where m.template = 'rain_check' and m.direction = 'out' and m.booking_ref = r.code
        order by m.created_at desc
        limit 1
-    ) s on true
-   where r.issued_on between p_from and p_to;
+    $l$ else $l$
+      select null::text as to_phone, null::timestamptz as created_at, null::text as status, 0::bigint as sent
+    $l$ end)
+    into v_rows
+    using p_from, p_to;
 
   return jsonb_build_object(
     'from', to_char(p_from, 'YYYY-MM-DD'),
