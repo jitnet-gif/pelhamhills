@@ -24,7 +24,7 @@ from backend.services.twilio_sms import SmsMessage  # noqa: E402
 API = "/api/v1"
 CODE = "RC-0A1B2C3D4E"
 CHECK = {"code": CODE, "status": "issued", "expired": False, "player_name": "Kim, Daniel",
-         "amount": 6215, "expires_on": "2027-04-17"}
+         "amount": 6215, "issued_on": "2026-10-19", "expires_on": "2027-04-17"}
 
 
 @pytest.fixture()
@@ -61,6 +61,7 @@ def test_sends_barcode_mms(env):
     sent = state["sent"][0]
     assert sent["media_url"] == f"https://api.example.com/api/v1/sms/barcode/{CODE}.png"
     assert CODE in sent["body"] and "$62.15" in sent["body"] and "Apr 17, 2027" in sent["body"]
+    assert "valid for 180 days" in sent["body"]
 
 
 def test_barcode_png_serves_rain_check_code(env):

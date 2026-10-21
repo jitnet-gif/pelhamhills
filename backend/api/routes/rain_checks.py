@@ -4,7 +4,7 @@ POST /rain-checks/{code}/text   {phone}   발행 창에서 직원이 번호를 �
 
 티 시트는 정적 사이트라 Twilio 키를 들 수 없어서 이 서버가 대신 보낸다. 직원 확인은 단말기와
 같다 — 요청의 Supabase 토큰으로 `pelham_staff_rain_check`(0011)를 불러 코드도 같이 확인한다.
-보내는 것은 코드·금액·만료일과 바코드(`/sms/barcode/RC-….png`)뿐이다. 다음에 오면 계산서 결제
+보내는 것은 코드·금액·유효 기간(180일, 만료일)과 바코드(`/sms/barcode/RC-….png`)뿐이다. 다음에 오면 계산서 결제
 칸에서 손님 휴대폰 화면의 바코드를 쏘면 종이 전표를 쏜 것과 같다.
 
 무효·사용된 전표는 보내지 않는다(손님에게 쓸 수 없는 크레딧을 주게 된다). 만료된 것도 마찬가지.
@@ -43,10 +43,20 @@ def _us_date(iso: str) -> str:
         return iso
 
 
+def _valid_for(check: dict[str, Any]) -> str:
+    """"valid for 180 days, through Apr 19, 2027" — 날수는 발행일에서 만료일까지(기본 180일, 0044)."""
+    through = f"through {_us_date(str(check.get('expires_on')))}"
+    try:
+        days = (date.fromisoformat(str(check.get("expires_on"))) - date.fromisoformat(str(check.get("issued_on")))).days
+    except ValueError:
+        return f"valid {through}"
+    return f"valid for {days} days, {through}" if days > 0 else f"valid {through}"
+
+
 def rain_check_text(check: dict[str, Any]) -> str:
     return (
         f"Pelham Hills rain check {check['code']} for {check.get('player_name') or 'you'}: "
-        f"{_money(check.get('amount'))} credit, valid through {_us_date(str(check.get('expires_on')))}. "
+        f"{_money(check.get('amount'))} credit, {_valid_for(check)}. "
         f"Show this barcode at the pro shop. One use, not redeemable for cash. "
         f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}."
     )

@@ -11,7 +11,7 @@
  * 이미 레인체크가 있는 사람은 다시 발행하지 않고 재인쇄·무효만 한다(코드가 하나여야 한 번만 쓴다).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { rememberedCashier, rememberCashier } from "@/lib/pos/currentBill";
 import {
@@ -77,25 +77,33 @@ export function useRainChecks(bookingId: string | null): RainCheckList {
 /**
  * 전표를 손님 휴대폰으로(바코드 MMS). 번호는 예약의 그 사람 번호로 채워 두고 직원이 고칠 수 있다.
  * 종이 대신이 아니라 종이와 함께다 — 다음에 오면 휴대폰 화면의 바코드를 쏘면 된다.
+ * `autoSend`: 이 창에서 방금 발행한 전표는 번호가 있으면 바로 보낸다(2026-10-21). 못 가면 버튼으로 다시.
  */
-function TextSlip({ check, defaultPhone }: { check: RainCheck; defaultPhone: string }) {
+function TextSlip({ check, defaultPhone, autoSend }: { check: RainCheck; defaultPhone: string; autoSend?: boolean }) {
   const [phone, setPhone] = useState(defaultPhone ?? "");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const autoSent = useRef(false);
 
-  async function send() {
-    if (sending || !phone.trim()) return;
+  const send = useCallback(async (to: string) => {
+    if (!to.trim()) return;
     setSending(true);
     setResult(null);
     try {
-      const { to } = await rainCheckApi.text(check.code, phone.trim());
-      setResult({ ok: true, message: `Texted to ${to}.` });
+      const { to: sentTo } = await rainCheckApi.text(check.code, to.trim());
+      setResult({ ok: true, message: `Texted to ${sentTo}.` });
     } catch (error) {
       setResult({ ok: false, message: describeRainCheckError(error) });
     } finally {
       setSending(false);
     }
-  }
+  }, [check.code]);
+
+  useEffect(() => {
+    if (!autoSend || autoSent.current || !(defaultPhone ?? "").trim()) return;
+    autoSent.current = true;
+    void send(defaultPhone);
+  }, [autoSend, defaultPhone, send]);
 
   return (
     <div className="grid gap-1">
@@ -108,7 +116,7 @@ function TextSlip({ check, defaultPhone }: { check: RainCheck; defaultPhone: str
             setResult(null);
           }}
           onKeyDown={(event) => {
-            if (event.key === "Enter") void send();
+            if (event.key === "Enter" && !sending) void send(phone);
           }}
           placeholder="Mobile number"
           type="tel"
@@ -117,7 +125,7 @@ function TextSlip({ check, defaultPhone }: { check: RainCheck; defaultPhone: str
         <button
           className="shrink-0 border border-[#c7c7cc] px-2 py-1 font-bold hover:border-[#4533ff] disabled:opacity-40"
           disabled={sending || !phone.trim()}
-          onClick={() => void send()}
+          onClick={() => void send(phone)}
           type="button"
         >
           {sending ? "Sending…" : result?.ok ? "Text again" : "Text barcode"}
@@ -336,7 +344,11 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
                       ) : null}
                     </div>
                     {check.status === "issued" && !check.expired && voiding?.code !== check.code ? (
-                      <TextSlip check={check} defaultPhone={row.player.phone} />
+                      <TextSlip
+                        autoSend={issued.includes(check)}
+                        check={check}
+                        defaultPhone={row.player.phone}
+                      />
                     ) : null}
                     {voiding?.code === check.code ? (
                       <div className="grid gap-1 border border-[#c47a63] bg-[#fbeae5] p-2">
@@ -480,7 +492,7 @@ export default function RainCheckDialog({ booking, players, existing, onClose, o
             onClick={() => void issueAll()}
             type="button"
           >
-            {working ? "Issuing…" : `Issue ${toIssue.length} & print`}
+            {working ? "Issuing…" : `Issue ${toIssue.length}, print & text`}
           </button>
         </div>
       </div>

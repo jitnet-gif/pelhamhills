@@ -72,6 +72,26 @@ export const rainCheckApi = {
   void: (code: string, reason: string) =>
     staffRpc<RainCheck>("pelham_staff_rain_check_void", { p_code: code, p_reason: reason }),
   text: textRainCheck,
+  /** Reports 의 Rain checks 탭(0062). 발행일 기준. */
+  report: (from: string, to: string) =>
+    staffRpc<RainCheckReport>("pelham_staff_rain_check_report", { p_from: from, p_to: to }),
+};
+
+/** 리포트 한 줄 — 전표 + 마지막으로 보낸 문자(0058 기록). */
+export type RainCheckReportRow = RainCheck & {
+  texted_to: string | null;
+  texted_at: string | null;
+  text_status: string | null;
+  text_count: number;
+};
+
+export type RainCheckReport = {
+  from: string;
+  to: string;
+  today: string;
+  rows: RainCheckReportRow[];
+  /** 기간과 상관없이 지금 쓸 수 있는 크레딧 전체. */
+  outstanding: { count: number; amount: Cents };
 };
 
 /**
