@@ -526,6 +526,8 @@ class BookingSummary(BaseModel):
     rate: float
     name: str
     status: str
+    #: 카트 자리 수(사람별 `cart`). 손님·문자에 "카트 포함" 을 말해 주려고 — 전에는 카트가 들어가도 아무 데도 안 보였다.
+    riders: int = 0
 
 
 class ConfirmResponse(BaseModel):
@@ -717,8 +719,11 @@ def confirmation_text(summary: BookingSummary) -> str:
     """티타임 확정 문자. 전화·문자 예약과 대기자 YES 가 같은 문장을 보낸다."""
     players_word = "player" if summary.party_size == 1 else "players"
     code = summary.confirmation_code
+    cart = ""
+    if summary.riders:
+        cart = f", {summary.riders} with a power cart" if summary.riders < summary.party_size else ", with power cart"
     return (
-        f"{CLUB_NAME}: booked {summary.party_size} {players_word}, {summary.spoken_date} at "
+        f"{CLUB_NAME}: booked {summary.party_size} {players_word}{cart}, {summary.spoken_date} at "
         f"{summary.time}. Confirmation #{code}. "
         f"To cancel, reply C {code} (up to {CANCEL_CUTOFF_MINUTES // 60} hours before your tee time) "
         f"or call {settings.PROSHOP_PHONE_NUMBER}. Show this barcode at the pro shop when you check in."
@@ -749,6 +754,7 @@ def _summary(booking: ts.TeeBooking) -> BookingSummary:
         rate=booking.rate,
         name=active[0].name if active else booking.title,
         status=booking.status.value,
+        riders=sum(1 for p in active if p.cart),
     )
 
 
@@ -1199,6 +1205,15 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
         session.revealed.add(summary.booking_id)
 
     players_word = "player" if summary.party_size == 1 else "players"
+    # 카트를 읽어 주게 한다. 0 인데 손님이 카트를 원했다면 riders 를 빠뜨린 것 — 그 자리에서 바로잡게 한다.
+    if summary.riders:
+        seats = "seat is" if summary.riders == 1 else "seats are"
+        cart_note = f" {summary.riders} power cart {seats} on the booking — tell them."
+    else:
+        cart_note = (
+            " No power cart is on this booking (riders was 0). If the caller asked for a cart, tell them "
+            "it is not on the booking and offer to put them through to the pro shop."
+        )
     # 확인 문자 + 바코드(MMS). 응답이 나간 뒤에 보낸다 — Twilio 가 느려도 에이전트가 기다리지 않게.
     # 취소 답장에 코드를 요구하는 이유는 `routes/sms.py` 참고.
     background.add_task(
@@ -1217,6 +1232,7 @@ def confirm_booking(body: ConfirmRequest, background: BackgroundTasks) -> Confir
             f"{summary.spoken_date}. Read back the confirmation code "
             f"{summary.confirmation_code} one digit at a time, and tell them the text with the "
             "confirmation number, how to cancel, and a barcode for check-in is on its way."
+            f"{cart_note}"
         ),
     )
 

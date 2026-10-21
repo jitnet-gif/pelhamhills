@@ -54,6 +54,12 @@ Booking: find_tee_times, then hold_tee_time the moment they pick one (it holds t
 while you take their name), then confirm_booking. If they change their mind, release_hold. Ask whether
 they are a member and whether they want a cart before you search, one question at a time.
 
+Power carts: always ask "Will you be taking a cart?" before you search. If they all ride, riders is the
+number of players; if some walk, ask how many want a cart seat. Pass that number as riders to
+confirm_booking and to get_rates every time — riders 0 means walking, and the cart is then NOT on their
+bill. The confirm_booking message tells you how many cart seats were booked; read that back with the
+code. If it says no cart but the caller asked for one, say so and offer to put them through to the pro shop.
+
 Nine holes: we do not take nine-hole bookings by phone — not on weekdays, not on weekends. If the caller
 asks for nine holes or a nine-hole price, say exactly: "Sorry, we can't book nine holes over the phone."
 Then offer eighteen holes: "I can book you eighteen holes instead — would that work?" Never pass holes 9
@@ -71,9 +77,11 @@ When a tool says no: every tool answers with ok and a message written for you. I
 message and do what it says. Never call the same tool with the same details more than twice.
 
 After a booking is confirmed and you have read the confirmation code (and the price), say: "You're all
-set. Is it okay if I hang up now?" Do not ask "anything else" first. If they say yes, okay, sure, that's
-all or bye, say only "Thanks for calling Pelham Hills. Goodbye!" and call end_call in that same turn —
-right away, with nothing more. If they say no or ask something else, help them, then ask again.
+set. Is it okay if I hang up now?" Do not ask "anything else" first, and never offer or suggest another
+booking, another tee time or another service — this wins over any earlier note or step that says to ask
+if there is anything else. If they say yes, okay, sure, that's all, thanks or bye, say only "Thanks for
+calling Pelham Hills. Goodbye!" and call end_call in that same turn — right away, with nothing more.
+Only if the caller themselves asks for something else, help them, then ask the same hang-up question again.
 
 Before you show, change or cancel anything: ask for the phone number and last name, then lookup_booking.
 Only a reservation that lookup_booking returned on this same call can be changed or cancelled.
@@ -130,6 +138,48 @@ def merged_prompt(existing: str) -> str:
     return f"{existing.rstrip()}\n\n{block}\n"
 
 
+#: 대시보드 워크플로 노드에 덧붙이는 말. 노드 지시는 메인 프롬프트보다 뒤에 붙어 모델이 더 따른다 —
+#: "Tee Time Booking" 노드는 카트를 묻지 않고, "General Inquiry" 노드는 "anything else" 로 끝맺게 되어 있어
+#: 예약 직후 끊지 않고 다른 예약을 권했다(2026-10-21). 표시가 있어 다시 돌려도 덧붙지 않고 교체된다.
+NODE_START = "<!-- pelham-node: start -->"
+NODE_END = "<!-- pelham-node: end -->"
+NODE_RULES = {
+    "Tee Time Booking": (
+        "Before you search, ask whether they want a power cart and pass the number of riders to "
+        "confirm_booking. After the booking is confirmed and you have read the code, the cart and the "
+        "price, ask only \"You're all set. Is it okay if I hang up now?\" Never offer another booking. "
+        "If they agree, say \"Thanks for calling Pelham Hills. Goodbye!\" and call end_call."
+    ),
+    "General Inquiry": (
+        "If a booking was just confirmed on this call, do not ask if there is anything else and do not "
+        "offer another booking: ask \"Is it okay if I hang up now?\" and call end_call when they agree. "
+        "After any goodbye, call end_call right away."
+    ),
+}
+
+
+def merged_node_prompt(existing: str, rule: str) -> str:
+    block = f"{NODE_START}\n{rule}\n{NODE_END}"
+    if NODE_START in existing and NODE_END in existing:
+        head, rest = existing.split(NODE_START, 1)
+        _, tail = rest.split(NODE_END, 1)
+        return f"{head}{block}{tail}"
+    return f"{existing.rstrip()}\n\n{block}" if existing.strip() else block
+
+
+def patched_workflow(workflow: dict) -> tuple[dict, list[str]]:
+    """노드 이름이 맞는 노드의 `additional_prompt` 에만 규칙을 넣는다. 나머지(연결·조건)는 그대로."""
+    wf = copy.deepcopy(workflow)
+    touched: list[str] = []
+    for node in (wf.get("nodes") or {}).values():
+        rule = NODE_RULES.get((node.get("label") or "").strip())
+        if rule is None or "additional_prompt" not in node:
+            continue
+        node["additional_prompt"] = merged_node_prompt(node.get("additional_prompt") or "", rule)
+        touched.append(node["label"])
+    return wf, touched
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent", default=os.getenv("ELEVENLABS_AGENT_ID", "").strip())
@@ -159,6 +209,9 @@ def main() -> int:
     print(f"  기존 tool_ids: {prompt.get('tool_ids') or '없음'}")
     print(f"  지식베이스: {[d.get('name') for d in (prompt.get('knowledge_base') or [])] or '없음'}")
     print(f"  목소리: {config.get('tts', {}).get('voice_id')}  (건드리지 않는다)")
+    workflow = agent.get("workflow") or {}
+    new_workflow, touched = patched_workflow(workflow) if workflow.get("nodes") else (workflow, [])
+    print(f"  워크플로 노드 규칙: {touched or '맞는 노드 없음'}")
 
     if not args.apply:
         print("\ndry-run 이다. 실제로 붙이려면 --apply 를 붙인다.")
@@ -215,7 +268,10 @@ def main() -> int:
         config.setdefault("turn", {}).update(turn)
         print(f"  턴 설정: {turn}")
 
-    voice_agent.update_agent(args.agent, {"conversation_config": config})
+    body: dict = {"conversation_config": config}
+    if touched:
+        body["workflow"] = new_workflow
+    voice_agent.update_agent(args.agent, body)
 
     check = voice_agent.get_agent(args.agent)
     got = check.get("conversation_config", {}).get("agent", {}).get("prompt", {})
@@ -224,6 +280,9 @@ def main() -> int:
     print("  프롬프트 길이:", len(got.get("prompt") or ""))
     print("  지식베이스:", [d.get("name") for d in (got.get("knowledge_base") or [])] or "없음")
     print("  첫 인사:", (check.get("conversation_config", {}).get("agent", {}).get("first_message") or "")[:60])
+    for node in ((check.get("workflow") or {}).get("nodes") or {}).values():
+        if NODE_START in (node.get("additional_prompt") or ""):
+            print("  노드 규칙 들어감:", node.get("label"))
     return 0
 
 

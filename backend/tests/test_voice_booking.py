@@ -316,6 +316,10 @@ def test_confirm_puts_the_cart_on_the_riders_bill(client):
     assert [p["cart"] for p in stored["players"]] == [True, True, False]
     assert [p["cartFee"] for p in stored["players"]] == [ts.CART_FEE, ts.CART_FEE, 0.0]
     assert stored["cartCount"] == 1
+    # 2026-10-21: 카트가 들어가도 에이전트·문자 어디에도 안 보였다. 이제 읽어 주고 문자에도 적는다.
+    assert done.json()["booking"]["riders"] == 2
+    assert "2 power cart seats are on the booking" in done.json()["message"]
+    assert ", 2 with a power cart," in voice.confirmation_text(voice.BookingSummary(**done.json()["booking"]))
 
 
 def test_confirm_without_riders_books_walkers(client):
@@ -323,6 +327,7 @@ def test_confirm_without_riders_books_walkers(client):
     stored = client.get(f"{API}/tee-sheet/bookings/{done.json()['booking']['booking_id']}").json()
     assert not any(p["cart"] for p in stored["players"])
     assert stored["cartCount"] == 0
+    assert "No power cart is on this booking" in done.json()["message"]
 
 
 def test_confirm_refuses_more_riders_than_players(client):
