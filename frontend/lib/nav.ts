@@ -115,6 +115,8 @@ export const adminNav: NavItem[] = [
   { label: "Memberships", href: "/admin/memberships", glyph: "★" },
   { label: "Tour Operators", href: "/admin/tour-operators", glyph: "✈" },
   { label: "Promotions", href: "/admin/promotions", glyph: "▶" },
+  // 공개 사이트·예약 화면에 뜨는 팝업 공지(서리 지연·프로모션 등, 0060).
+  { label: "Website Pop-ups", href: "/admin/notices", glyph: "📣" },
   { label: "Calls & SMS", href: "/admin/calls", glyph: "☏" },
   { label: "Lost & Found", href: "/admin/lost-items", glyph: "?" },
   { label: "Reports", href: ADMIN_REPORTS, glyph: "▥" },

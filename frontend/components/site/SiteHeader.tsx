@@ -29,6 +29,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 
+import SiteNoticePopup from "@/components/site/SiteNoticePopup";
 import { BOOK_INDOOR, BOOK_TEE_TIME, CLUB, SITE_HOME, siteNav } from "@/lib/nav";
 
 /** 헤더의 "Book Now" 는 티타임 예약으로 보낸다. 실내 골프는 히어로 아래 CTA 밴드와 푸터에 있다. */
@@ -91,6 +92,8 @@ export default function SiteHeader() {
     // 걸린 요소는 fixed 자손의 containing block 이 되어 버려서, 헤더 안에 두면
     // `fixed inset-0` 이 뷰포트가 아니라 56px 짜리 헤더 상자에 갇힌다.
     <>
+      {/* 직원이 `/admin/notices` 에 올린 공지·프로모션 창(0060). */}
+      <SiteNoticePopup surface="site" />
       <header className="sticky top-0 z-30 border-b border-[#d8d1c3] bg-[#f7f4ed]/92 backdrop-blur">
         <nav
           aria-label="Main"
