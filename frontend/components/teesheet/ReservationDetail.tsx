@@ -952,6 +952,18 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
     // 저장 안 된 편집(카트 요금 등)을 먼저 보낸다. 계산서는 서버의 예약 값으로 금액을 매긴다.
     for (const person of people ?? unpaidPlayers) await feeCommitsRef.current.get(person.id);
     if (dirty) await saveAll();
+    // 이 브라우저의 "지금 계산서" 에 다른 예약의 그린피가 남아 있으면(앞 팀을 결제 안 하고 나왔다)
+    // 그대로 담으면 두 팀이 한 번에 긁힌다. 같이 낼 게 아니면 새 계산서로 연다.
+    const current = getBillState().bill;
+    const other = current?.lines.find((line) => line.kind === "tee_player" && line.booking_id !== booking.id);
+    if (current && other) {
+      const together = window.confirm(
+        `Bill #${current.id} already has ${other.name}${other.tee_time ? ` (${other.tee_time})` : ""} — ` +
+          `${formatMoney(current.total)} so far.\n\nOK = add this group to the same bill (one person pays for both).\n` +
+          "Cancel = start a new bill for this group.",
+      );
+      if (!together) billActions.park();
+    }
     const added = await billActions.addTee(booking.id, people?.map((person) => person.id));
     if (added) {
       setPayStep("summary");
@@ -3036,7 +3048,8 @@ function TakePaymentSummary({
   }
   const paidBy = bill.label?.trim() || payers[0] || "";
   const options = paidBy && !payers.includes(paidBy) ? [paidBy, ...payers] : payers;
-  const due = bill.subtotal - bill.discount;
+  // 세금까지 넣은 금액이 받을 돈이다. 세전 금액만 크게 보이면 그 숫자를 받게 된다.
+  const due = bill.total;
   const tile = "flex h-14 items-center justify-center border bg-white disabled:opacity-40";
 
   return (
@@ -3126,11 +3139,14 @@ function TakePaymentSummary({
       </ul>
 
       <div className="mt-auto pt-5">
-        <div className="flex justify-between border-t border-[#ececf0] pt-3 text-[14px] font-bold">
-          <span>Subtotal Due</span>
+        <div className="flex justify-between border-t border-[#ececf0] pt-3 text-[12px] text-[#4e5560]">
+          <span>HST (13%)</span>
+          <span className="tabular-nums">{formatMoney(bill.tax)}</span>
+        </div>
+        <div className="mt-1 flex justify-between text-[14px] font-bold">
+          <span>Total Due</span>
           <span className="tabular-nums">{formatMoney(due)}</span>
         </div>
-        <p className="mt-0.5 text-right text-[11px] text-[#9aa0a6]">+ HST at checkout</p>
         <button
           className="mt-3 w-full bg-[#4533ff] py-2.5 font-bold text-white hover:bg-[#3a2ae0] disabled:cursor-not-allowed disabled:bg-[#b1a8ff]"
           disabled={busy}

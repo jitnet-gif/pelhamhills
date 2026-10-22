@@ -24,6 +24,8 @@ export type Bill = Omit<Sale, "lines" | "status" | "receipt_no"> & {
   /** 열린 계산서에는 아직 없다. */
   receipt_no: string;
   lines: BillLine[];
+  /** 직원이 친 할인(0080). `discount` 는 여기에 프로모션 몫을 더한 값이다. 0080 전에는 없다. */
+  manual_discount?: Cents;
 };
 
 export type BillLine = Sale["lines"][number] & {

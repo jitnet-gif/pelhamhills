@@ -417,8 +417,8 @@ export default function BillPanel({
       {bill && lines.length > 0 ? (
         <>
           <MoneyField
-            key={`discount-${bill.id}-${bill.discount}`}
-            initial={bill.discount}
+            key={`discount-${bill.id}-${bill.manual_discount ?? bill.discount}`}
+            initial={bill.manual_discount ?? bill.discount}
             label="Bill discount"
             onCommit={(cents) => billActions.update({ discount: cents }, station)}
           />
@@ -609,8 +609,8 @@ function SalesLayout({
                 <div className="w-48">
                   <MoneyField
                     compact
-                    initial={bill.discount}
-                    key={`discount-${bill.id}-${bill.discount}`}
+                    initial={bill.manual_discount ?? bill.discount}
+                    key={`discount-${bill.id}-${bill.manual_discount ?? bill.discount}`}
                     label="Bill discount"
                     onCommit={(cents) => billActions.update({ discount: cents }, station)}
                   />
@@ -1263,19 +1263,21 @@ function PaymentsEditor({
       setPreparing(false);
       if (!fresh) return;
       const freshRemaining = Math.max(fresh.total - payments.reduce((sum, p) => sum + p.amount, 0), 0);
-      if (typed > freshRemaining) {
+      // 금액을 치지 않았으면 다시 읽은 합계의 남은 금액을 보낸다. 화면에 있던 `remaining` 은 낡았을 수 있다.
+      const amount = amountInput.trim() ? typed : freshRemaining;
+      if (amount > freshRemaining) {
         setFormError(`Only ${formatMoney(freshRemaining)} is left on the bill. Check the amount on the terminal.`);
         return;
       }
       if (integrated) {
-        if (typed <= 0) {
+        if (amount <= 0) {
           setFormError("Enter an amount above $0.00.");
           return;
         }
         setRunning(true);
         setTerminalStatus("Sending to the reader…");
         try {
-          const record = await terminal.sale(terminalSettings, billId, typed, {
+          const record = await terminal.sale(terminalSettings, billId, amount, {
             onStatus: setTerminalStatus,
             onStarted: (started) => setInFlight(started.id),
             receiptPhone,
