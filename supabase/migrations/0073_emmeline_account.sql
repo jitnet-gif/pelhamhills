@@ -12,7 +12,7 @@
 -- 그대로 실행하면 막는다.
 --
 -- 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
--- 4. 직원 명단(scorecard_admins — pelham_is_staff 가 읽는다)에 넣는다. 그래야 어드민이 열린다.
+-- 직원 명단(scorecard_admins — pelham_is_staff 가 읽는다)은 이 파일이 건드리지 않는다. 직원으로 넣는 것은 따로 실행한다.
 
 do $$
 declare
