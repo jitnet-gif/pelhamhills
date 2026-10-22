@@ -22,6 +22,21 @@ const KIND_LABEL: Record<PriceReviewRow["kind"], string> = {
   cart: "Cart fee",
 };
 
+/**
+ * 예약이 들어온 경로(0066 `channel`). GolfNow·Chronogolf 예약은 요금표와 달라도 대개 정상이라 따로 표시한다.
+ * 0066 을 아직 실행하지 않은 DB 에서도 보이도록 요금제 이름·예약 id 로 한 번 더 짐작한다.
+ */
+function channelOf(row: PriceReviewRow): "golfnow" | "chronogolf" | "" {
+  if (row.channel !== undefined) return row.channel;
+  if (/golf ?now/i.test(row.ratePlan)) return "golfnow";
+  return row.bookingId.startsWith("chronogolf-") ? "chronogolf" : "";
+}
+
+const CHANNEL_BADGE = {
+  golfnow: { label: "GolfNow", className: "bg-[#0b2a7a] text-white" },
+  chronogolf: { label: "Chronogolf", className: "bg-[#e8f1ff] text-[#1d4ed8]" },
+} as const;
+
 function money(value: number): string {
   const sign = value < 0 ? "−" : "";
   return `${sign}$${Math.abs(value).toFixed(2)}`;
@@ -100,6 +115,21 @@ export default function PriceReview({ date }: { date: string }) {
                   </td>
                   <td className="px-2 py-1.5">
                     {row.player}
+                    {(() => {
+                      const channel = channelOf(row);
+                      if (!channel) return null;
+                      const badge = CHANNEL_BADGE[channel];
+                      const detail = row.channelDetail && row.channelDetail !== badge.label ? row.channelDetail : "";
+                      return (
+                        <span
+                          className={`ml-1.5 px-1 py-0.5 text-[10px] font-semibold ${badge.className}`}
+                          title={detail ? `Reservation source: ${detail}` : undefined}
+                        >
+                          {badge.label}
+                          {detail ? ` · ${detail}` : ""}
+                        </span>
+                      );
+                    })()}
                     <span className="block text-[11px] text-[#6b7280]">
                       {row.ratePlan || "Public"}
                       {row.paid ? " · paid" : ""}

@@ -78,6 +78,10 @@ export type PriceReviewRow = {
   reason: string;
   manager: string;
   approvedAt: string | null;
+  /** 0066: 예약이 들어온 경로. golfnow = GolfNow, chronogolf = Chronogolf 에서 옮겨 온 예약, "" = 우리 시스템. */
+  channel?: "golfnow" | "chronogolf" | "";
+  /** 0066: Chronogolf 가져오기 기록의 Reservation Source(있으면). */
+  channelDetail?: string;
 };
 
 /** 선수에게 붙은 추가 품목 한 줄. price 는 세전 달러(`rate`·`cartFee` 와 같다). */
