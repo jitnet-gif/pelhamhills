@@ -11,8 +11,9 @@
  *    카드를 대면 승인번호·끝 4자리·팁이 저절로 결제 줄이 된다. 승인은 Charge 전에 이미 서버에 남는다(0021) —
  *    화면을 닫았다 열어도 결제 줄이 되살아난다. 결제 줄을 지우면 환불한다(신용카드는 카드 없이, Interac 은
  *    손님이 카드를 다시 댄다). 연동이 꺼진 기기("keyed"): 직원이 단말기에 금액을 치고 승인번호를 여기 적는다.
- * 3. 남은 금액이 0 이 되면 Charge. 서버는 한 트랜잭션에서 재고·티 시트 paid·영수증 번호를 처리한다.
- *    단말기 승인으로 남은 금액이 0 이 되면 Charge 를 누르지 않아도 저절로 마무리하고, "결제 완료 ·
+ * 3. 남은 금액이 0 이 되면 Charge. 담당자 번호 창이 떠서 pelham-shift 직원 ID 를 받은 뒤에 결제한다
+ *    (2026-10-22). 서버는 한 트랜잭션에서 재고·티 시트 paid·영수증 번호를 처리한다.
+ *    단말기 승인으로 남은 금액이 0 이 되면 Charge 를 누르지 않아도 번호 창이 뜨고, 결제 뒤에는 "결제 완료 ·
  *    영수증을 뽑을까요?" 만 묻는다(2026-10-18).
  *
  * 현금은 받은 돈을 적으면 거스름돈을 보여 주고, 서버에는 **계산서에 들어간 몫**만 보낸다
@@ -35,7 +36,7 @@ import {
   type PaymentInput,
 } from "@/lib/pos/api";
 import { cashierForCode, isShiftCode } from "@/lib/pos/cashierCode";
-import { billActions, getBillState, recentCashiers, rememberCashier, rememberedCashier, useCurrentBill } from "@/lib/pos/currentBill";
+import { billActions, getBillState, rememberCashier, useCurrentBill } from "@/lib/pos/currentBill";
 import {
   describeTerminalResult,
   terminal,
@@ -236,43 +237,9 @@ export default function BillPanel({
     };
   }, [billId, useTerminal, demo]);
 
-  // 담당자 이름. 담당자별 마감과 팁 나누기가 이 이름으로 묶인다(0010). 계산서에 없으면 이 기기가
-  // 마지막으로 쓴 이름을 미리 넣는다 — 서버에는 칸을 떠날 때나 Charge 직전에 보낸다.
-  const [cashier, setCashier] = useState("");
-  const [cashierFor, setCashierFor] = useState<number | null>(null);
-  const [cashierError, setCashierError] = useState("");
-  if (cashierFor !== billId) {
-    setCashierFor(billId);
-    setCashier(bill?.cashier ?? (billId ? rememberedCashier() : ""));
-    setCashierError("");
-  }
-
-  // pelham-shift 직원 ID(숫자)를 치면 그 직원 이름으로 바꿔 담는다. 번호 자체는 어디에도 남기지 않는다.
-  const [cashierLookup, setCashierLookup] = useState(false);
-
-  async function commitCashier(): Promise<boolean> {
-    let name = cashier.trim().replace(/\s+/g, " ");
-    if (!name) return false;
-    if (isShiftCode(name)) {
-      setCashierLookup(true);
-      try {
-        name = await cashierForCode(name);
-      } catch (lookupError) {
-        setCashier("");
-        setCashierError(lookupError instanceof Error ? lookupError.message : "That staff ID didn't work.");
-        return false;
-      } finally {
-        setCashierLookup(false);
-      }
-      setCashier(name);
-    }
-    rememberCashier(name);
-    if (bill && name !== (bill.cashier ?? "")) {
-      const updated = await billActions.update({ cashier: name }, station);
-      if (!updated) return false;
-    }
-    return true;
-  }
+  // 담당자. Charge 를 누르면 번호 창이 뜨고, pelham-shift 직원 ID 를 치면 그 직원 이름으로 결제한다
+  // (2026-10-22). 담당자별 마감과 팁 나누기가 이 이름으로 묶인다(0010). 번호 자체는 어디에도 남기지 않는다.
+  const [askCashier, setAskCashier] = useState<{ fromTerminal: boolean } | null>(null);
 
   const paymentsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -290,28 +257,53 @@ export default function BillPanel({
   const noCharge = Boolean(bill) && lines.length > 0 && total === 0;
   const canCharge = remaining === 0 && (payments.length > 0 || noCharge);
 
-  async function charge(fromTerminal = false) {
+  function charge(fromTerminal = false) {
     if (!bill || !canCharge || charging) return;
-    if (!cashier.trim()) {
-      setCashierError("Enter your Pelham Shift ID (or name). Close-outs and tips go by it.");
-      return;
+    setAskCashier({ fromTerminal });
+  }
+
+  /** 번호 창에서 받은 ID(또는 이름)로 담당자를 정하고 결제한다. 안 되면 창에 보일 문장을 돌려준다. */
+  async function chargeAs(entry: string, fromTerminal: boolean): Promise<string> {
+    let name = entry.trim().replace(/\s+/g, " ");
+    if (!name) return "Enter your Pelham Shift ID.";
+    if (isShiftCode(name)) {
+      try {
+        name = await cashierForCode(name);
+      } catch (lookupError) {
+        return lookupError instanceof Error ? lookupError.message : "That staff ID didn't work.";
+      }
     }
+    if (!bill || !canCharge) return "The bill changed. Close this and check the payments.";
     setCharging(true);
-    if (!(await commitCashier())) {
-      setCharging(false);
-      return;
+    rememberCashier(name);
+    if (name !== (bill.cashier ?? "")) {
+      const updated = await billActions.update({ cashier: name }, station);
+      if (!updated) {
+        setCharging(false);
+        return getBillState().error || "Couldn't save the cashier. Try again.";
+      }
     }
     if (!checkoutRef.current) checkoutRef.current = newCheckoutId();
     const paid = await billActions.pay(checkoutRef.current, payments.map(toPaymentInput));
     setCharging(false);
-    if (!paid) return;
+    if (!paid) return getBillState().error || "The payment didn't go through. Try again.";
+    setAskCashier(null);
     setReceipt(paid);
     setPayments([]);
     onPaid?.(paid);
     // 카드를 대고 끝난 결제는 영수증을 뽑을지 화면이 묻는다. 그때는 자동 인쇄를 하지 않는다.
     // 인쇄는 다음 틱으로. `window.print()` 가 스크립트를 멈추면 비워진 화면이 인쇄 뒤에야 그려진다.
     if (autoPrint && !fromTerminal) window.setTimeout(() => printReceipt(paid), 0);
+    return "";
   }
+
+  const cashierPrompt = askCashier ? (
+    <CashierPrompt
+      amount={noCharge ? "Close bill — no charge" : `Charge ${formatMoney(total)}`}
+      onCancel={() => setAskCashier(null)}
+      onSubmit={(entry) => chargeAs(entry, askCashier.fromTerminal)}
+    />
+  ) : null;
 
   // 카드를 대서 계산서가 다 찼으면 바로 마무리한다. 현금 등 다른 줄이 남았으면 평소처럼 Charge 를 누른다.
   useEffect(() => {
@@ -338,92 +330,69 @@ export default function BillPanel({
 
   if (layout === "sales") {
     return (
-      <SalesLayout
-        bill={bill}
-        busy={busy}
-        cashierField={
-          <>
-            <Field hint={cashierLookup ? "Looking up the staff ID…" : "Your Pelham Shift ID — close-outs and tips go by it"} label="Cashier">
-              <TextInput
-                autoComplete="off"
-                readOnly={cashierLookup}
-                list="pelham-cashiers"
-                onBlur={() => void commitCashier()}
-                onChange={(event) => {
-                  setCashier(event.target.value);
-                  setCashierError("");
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void commitCashier();
-                }}
-                placeholder="Pelham Shift ID (e.g. 1001) or name"
-                value={cashier}
-              />
-            </Field>
-            <datalist id="pelham-cashiers">
-              {recentCashiers().map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-            {cashierError ? <ErrorNote>{cashierError}</ErrorNote> : null}
-          </>
-        }
-        chargeButton={
-          <>
-            <label className="flex min-h-9 items-center gap-2 text-xs">
-              <input
-                checked={autoPrint}
-                className="h-4 w-4 accent-[#4533ff]"
-                onChange={(event) => writeAutoPrint(event.target.checked)}
-                type="checkbox"
-              />
-              Print receipt after charge
-            </label>
-            <TerminalSetup settings={terminalSettings} />
-            <button
-              className="min-h-14 w-full bg-[#5cb85c] text-base font-bold text-white hover:bg-[#4cae4c] disabled:cursor-not-allowed disabled:bg-[#a8d8a8]"
-              disabled={demo || charging || busy || !canCharge}
-              onClick={() => void charge()}
-              type="button"
-            >
-              {charging
-                ? "Charging…"
-                : noCharge
-                  ? "Close bill — no charge"
-                  : canCharge
-                    ? `Charge ${formatMoney(total)}`
-                    : `Add payments — ${formatMoney(remaining)} left`}
-            </button>
-          </>
-        }
-        customer={customer}
-        demo={demo}
-        describeLine={describeLine}
-        error={error}
-        paymentsEditor={
-          bill ? (
-            <div ref={paymentsRef}>
-              {terminalNote ? <p className="bg-[#eef6f0] px-2 py-2 text-xs text-[#1f6b3a]">{terminalNote}</p> : null}
-              <PaymentsEditor
-                billId={bill.id}
-                initialMethod={initialMethod}
-                payments={payments}
-                remaining={remaining}
-                takesTip={billTakesTip(bill)}
-                onTerminalApproved={() => (autoChargeRef.current = true)}
-                setPayments={setPayments}
-                terminalSettings={terminalSettings}
-              />
-            </div>
-          ) : null
-        }
-        station={station}
-      />
+      <>
+        {cashierPrompt}
+        <SalesLayout
+          bill={bill}
+          busy={busy}
+          chargeButton={
+            <>
+              <label className="flex min-h-9 items-center gap-2 text-xs">
+                <input
+                  checked={autoPrint}
+                  className="h-4 w-4 accent-[#4533ff]"
+                  onChange={(event) => writeAutoPrint(event.target.checked)}
+                  type="checkbox"
+                />
+                Print receipt after charge
+              </label>
+              <TerminalSetup settings={terminalSettings} />
+              <button
+                className="min-h-14 w-full bg-[#5cb85c] text-base font-bold text-white hover:bg-[#4cae4c] disabled:cursor-not-allowed disabled:bg-[#a8d8a8]"
+                disabled={demo || charging || busy || !canCharge}
+                onClick={() => void charge()}
+                type="button"
+              >
+                {charging
+                  ? "Charging…"
+                  : noCharge
+                    ? "Close bill — no charge"
+                    : canCharge
+                      ? `Charge ${formatMoney(total)}`
+                      : `Add payments — ${formatMoney(remaining)} left`}
+              </button>
+            </>
+          }
+          customer={customer}
+          demo={demo}
+          describeLine={describeLine}
+          error={error}
+          paymentsEditor={
+            bill ? (
+              <div ref={paymentsRef}>
+                {terminalNote ? <p className="bg-[#eef6f0] px-2 py-2 text-xs text-[#1f6b3a]">{terminalNote}</p> : null}
+                <PaymentsEditor
+                  billId={bill.id}
+                  initialMethod={initialMethod}
+                  payments={payments}
+                  remaining={remaining}
+                  takesTip={billTakesTip(bill)}
+                  onTerminalApproved={() => (autoChargeRef.current = true)}
+                  setPayments={setPayments}
+                  terminalSettings={terminalSettings}
+                />
+              </div>
+            ) : null
+          }
+          station={station}
+        />
+      </>
     );
   }
 
   return (
     <div className="grid gap-3 p-3">
+      {cashierPrompt}
       <BillHeader bill={bill} busy={busy} demo={demo} openBills={openBills} />
 
       {missing ? <ErrorNote>{error}</ErrorNote> : null}
@@ -477,29 +446,6 @@ export default function BillPanel({
             />
           </div>
 
-          <Field hint={cashierLookup ? "Looking up the staff ID…" : "Your Pelham Shift ID — close-outs and tips go by it"} label="Cashier">
-            <TextInput
-              autoComplete="off"
-              readOnly={cashierLookup}
-              list="pelham-cashiers"
-              onBlur={() => void commitCashier()}
-              onChange={(event) => {
-                setCashier(event.target.value);
-                setCashierError("");
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void commitCashier();
-              }}
-              placeholder="Pelham Shift ID (e.g. 1001) or name"
-              value={cashier}
-            />
-          </Field>
-          <datalist id="pelham-cashiers">
-            {recentCashiers().map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-          {cashierError ? <ErrorNote>{cashierError}</ErrorNote> : null}
         </>
       ) : null}
 
@@ -559,7 +505,6 @@ const QUICK_CATEGORIES: { category: RetailCategory; label: string; color: string
 function SalesLayout({
   bill,
   busy,
-  cashierField,
   chargeButton,
   customer,
   demo,
@@ -570,7 +515,6 @@ function SalesLayout({
 }: {
   bill: Bill | null;
   busy: boolean;
-  cashierField: React.ReactNode;
   chargeButton: React.ReactNode;
   customer?: string;
   demo: boolean;
@@ -699,7 +643,6 @@ function SalesLayout({
         {bill && lines.length > 0 ? (
           <>
             {paymentsEditor}
-            {cashierField}
             {chargeButton}
           </>
         ) : null}
@@ -1816,6 +1759,174 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between gap-2">
       <dt className="text-[#6b7280]">{label}</dt>
       <dd className="tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+// ===== 담당자 번호 창 ====================================================
+
+const MAX_SHIFT_ID = 8;
+
+/**
+ * Charge 를 누르면 뜨는 창. 담당자가 pelham-shift 직원 ID 를 치면 그 이름으로 결제한다.
+ * 번호는 pelham-shift 로그인 비밀번호이기도 해서 점으로만 보인다. pelham-shift 가 안 닿을 때를 위해
+ * 이름으로 치는 길도 남긴다. 숫자 패드는 터치 계산대용 — 키보드 숫자·Backspace·Enter·Esc 도 받는다.
+ */
+function CashierPrompt({
+  amount,
+  onCancel,
+  onSubmit,
+}: {
+  amount: string;
+  onCancel: () => void;
+  onSubmit: (entry: string) => Promise<string>;
+}) {
+  const [code, setCode] = useState("");
+  const [byName, setByName] = useState(false);
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
+
+  const entry = byName ? name.trim() : code;
+  const ready = byName ? entry.length > 0 : isShiftCode(code);
+
+  const submit = useCallback(async () => {
+    if (working || !ready) return;
+    setWorking(true);
+    setError("");
+    const problem = await onSubmit(entry);
+    // 결제가 끝나면 부모가 창을 닫는다. 남아 있으면 안 된 것이다.
+    setWorking(false);
+    if (problem) {
+      setError(problem);
+      setCode("");
+    }
+  }, [entry, onSubmit, ready, working]);
+
+  const press = useCallback(
+    (key: string) => {
+      if (working) return;
+      setError("");
+      if (key === "back") setCode((value) => value.slice(0, -1));
+      else if (key === "clear") setCode("");
+      else setCode((value) => (value.length < MAX_SHIFT_ID ? value + key : value));
+    },
+    [working],
+  );
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      // 결제 중에 매니저 PIN 창이 위에 뜰 수 있다 — 그때 누른 숫자는 이 창 것이 아니다.
+      if (working) return;
+      if (event.key === "Escape") onCancel();
+      else if (event.key === "Enter") void submit();
+      else if (byName) return;
+      else if (/^[0-9]$/.test(event.key)) press(event.key);
+      else if (event.key === "Backspace") press("back");
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [byName, onCancel, press, submit, working]);
+
+  return (
+    <div
+      aria-labelledby="cashier-prompt-title"
+      aria-modal="true"
+      className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+    >
+      <div className="w-full max-w-[300px] border border-[#c7c7cc] bg-[#f2f2f4] text-xs text-[#1f2328] shadow-xl">
+        <div className="border-b border-[#c7c7cc] bg-white px-4 py-3">
+          <h2 className="text-sm font-bold" id="cashier-prompt-title">
+            Cashier
+          </h2>
+          <p className="mt-1 text-[#4e5560]">{byName ? "Type your name to pay." : "Enter your Pelham Shift ID to pay."}</p>
+          <p className="mt-1 text-sm font-bold tabular-nums">{amount}</p>
+        </div>
+
+        <div className="p-4">
+          {byName ? (
+            <TextInput
+              autoComplete="off"
+              autoFocus
+              disabled={working}
+              onChange={(event) => {
+                setName(event.target.value);
+                setError("");
+              }}
+              placeholder="Your name"
+              value={name}
+            />
+          ) : (
+            <div
+              aria-label={`${code.length} digits entered`}
+              className={`flex h-10 items-center justify-center gap-2 border bg-white ${
+                error ? "border-[#c0262d]" : "border-[#c7c7cc]"
+              }`}
+            >
+              {code.length === 0 ? (
+                <span className="text-[#9aa0a6]">Pelham Shift ID</span>
+              ) : (
+                Array.from({ length: code.length }, (_, index) => (
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#1f2328]" key={index} />
+                ))
+              )}
+            </div>
+          )}
+          <p className="mt-1 min-h-[16px] text-[11px] text-[#c0262d]" role="alert">
+            {working ? <span className="text-[#4e5560]">Charging…</span> : error}
+          </p>
+
+          {byName ? null : (
+            <div className="mt-1 grid grid-cols-3 gap-1.5">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "clear", "0", "back"].map((key) => (
+                <button
+                  className="h-11 border border-[#c7c7cc] bg-white text-base font-bold hover:bg-[#ececf0] disabled:opacity-40"
+                  disabled={working}
+                  key={key}
+                  onClick={() => press(key)}
+                  type="button"
+                >
+                  {key === "back" ? "⌫" : key === "clear" ? <span className="text-xs">Clear</span> : key}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 grid grid-cols-2 gap-1.5">
+            <button
+              className="border border-[#c7c7cc] bg-white px-2 py-2 font-bold disabled:opacity-40"
+              disabled={working}
+              onClick={onCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="border border-[#5cb85c] bg-[#5cb85c] px-2 py-2 font-bold text-white disabled:opacity-40"
+              disabled={working || !ready}
+              onClick={() => void submit()}
+              type="button"
+            >
+              Pay
+            </button>
+          </div>
+
+          <button
+            className="mt-3 w-full text-center text-[11px] text-[#4533ff] underline disabled:opacity-40"
+            disabled={working}
+            onClick={() => {
+              setByName((value) => !value);
+              setError("");
+            }}
+            type="button"
+          >
+            {byName ? "Use my Pelham Shift ID" : "Can't use your ID? Type your name"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
