@@ -96,6 +96,10 @@ export const ADMIN_HOME = "/admin";
 /** 클럽 종합 매출 보고서. 리테일 작업 화면의 "Sales report" 링크도 여기를 가리킨다. */
 export const ADMIN_REPORTS = "/admin/reports";
 
+/** 고객 마케팅 사이트(0047). 마케팅 명단 계정(지금은 admin@pelhamhills.ca)에게만 메뉴에 뜬다
+ * (`lib/marketing/access.ts`). 로그인이 따로인 사이트라 새 탭으로 연다. */
+export const ADMIN_MARKETING = "/marketing";
+
 /** 로그인 계정 관리(0074). 계정 관리자에게만 메뉴에 뜬다(`lib/accounts.ts`). */
 export const ADMIN_ACCOUNTS = "/admin/accounts";
 
@@ -121,6 +125,7 @@ export const adminNav: NavItem[] = [
   // 공개 사이트·예약 화면에 뜨는 팝업 공지(서리 지연·프로모션 등, 0060).
   { label: "Website Pop-ups", href: "/admin/notices", glyph: "📣" },
   { label: "Calls & SMS", href: "/admin/calls", glyph: "☏" },
+  { label: "Marketing", href: ADMIN_MARKETING, glyph: "✉" },
   { label: "Lost & Found", href: "/admin/lost-items", glyph: "?" },
   { label: "Reports", href: ADMIN_REPORTS, glyph: "▥" },
   { label: "Business Intelligence", href: "/admin/business-intelligence", glyph: "◧" },

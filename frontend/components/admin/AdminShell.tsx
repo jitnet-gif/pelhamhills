@@ -39,6 +39,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import {
   ADMIN_ACCOUNTS,
   ADMIN_HOME,
+  ADMIN_MARKETING,
   ADMIN_REPORTS,
   CLUB,
   SITE_HOME,
@@ -50,6 +51,7 @@ import {
 } from "@/lib/nav";
 import InstallAppHint from "@/components/admin/InstallAppHint";
 import { useAccountsAccess } from "@/lib/accounts";
+import { useMarketingAccess } from "@/lib/marketing/access";
 import { useReportsAccess } from "@/lib/reports/access";
 import { ApiError } from "@/lib/teeSheet/api";
 import { todayIso } from "@/lib/teeSheet/dates";
@@ -182,15 +184,19 @@ function AdminFrame({
   const reportsAllowed = useReportsAccess(email) === true;
   // Account Setup 도 계정 관리자(0074)에게만 보인다(`lib/accounts.ts`).
   const accountsAllowed = useAccountsAccess(email) === true;
+  // Marketing 도 마케팅 명단(0047) 계정에만 보인다(`lib/marketing/access.ts`).
+  const marketingAllowed = useMarketingAccess(email) === true;
   const shownDivision = useMemo(
     () => ({
       ...division,
       links: division.links.filter(
         (item) =>
-          (reportsAllowed || item.href !== ADMIN_REPORTS) && (accountsAllowed || item.href !== ADMIN_ACCOUNTS),
+          (reportsAllowed || item.href !== ADMIN_REPORTS) &&
+          (accountsAllowed || item.href !== ADMIN_ACCOUNTS) &&
+          (marketingAllowed || item.href !== ADMIN_MARKETING),
       ),
     }),
-    [division, reportsAllowed, accountsAllowed],
+    [division, reportsAllowed, accountsAllowed, marketingAllowed],
   );
 
   // 화면을 옮기면 서랍은 닫힌다. 닫지 않으면 새 화면 위에 이전 메뉴가 그대로
@@ -462,6 +468,20 @@ function NavLink({
   );
   // `public/` 의 정적 페이지(사용법 프레젠테이션)는 앱 라우트가 아니다. Link 로 두면
   // 클라이언트 이동을 시도하다 실패하므로 평범한 링크로 연다.
+  // 마케팅 사이트는 로그인이 따로라(같은 계정으로 한 번 더 로그인) 어드민을 두고 새 탭으로 연다.
+  if (item.href === ADMIN_MARKETING) {
+    return (
+      <a
+        className="flex items-center gap-2 px-3 py-2 font-semibold hover:bg-white/10"
+        href={item.href}
+        onClick={onClick}
+        rel="noopener"
+        target="_blank"
+      >
+        {body}
+      </a>
+    );
+  }
   if (item.href.endsWith(".html")) {
     return (
       <a className="flex items-center gap-2 px-3 py-2 font-semibold hover:bg-white/10" href={item.href} onClick={onClick}>
