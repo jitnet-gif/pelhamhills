@@ -373,7 +373,7 @@ function CallPanel({ id, onClose }: { id: string; onClose: () => void }) {
                       <span>
                         <strong>{b.kind === "sim" ? "Simulator" : "Tee time"} · {OUTCOME_LABEL[b.action]}</strong>
                         <span className="block text-[#5d6673]">
-                          {[b.date, b.time, b.name, b.party_size ? `${b.party_size} players` : "", b.confirmation_code]
+                          {[b.date, b.time, b.name, b.party_size ? `${b.party_size} player${b.party_size === 1 ? "" : "s"}` : "", b.confirmation_code]
                             .filter(Boolean)
                             .join(" · ")}
                         </span>
