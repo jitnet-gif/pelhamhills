@@ -377,38 +377,53 @@ function RefundLookup({
         (sale) =>
           !needle ||
           sale.receipt_no.toLowerCase().includes(needle) ||
+          isShortHit(sale, needle) ||
           (sale.cashier ?? "").toLowerCase().includes(needle) ||
           formatMoney(sale.total).includes(needle),
       ),
     [needle, sales],
   );
 
-  /** 고른 날 목록에 없는 영수증(다른 날 것)은 서버에서 번호로 찾는다. */
+  /**
+   * 고른 날 목록에서 먼저 찾는다 — 영수증 번호 전체, 끝 번호(77 → …-0077), 카드 뒷 4자리.
+   * 하나면 바로 열고, 여럿이면 목록을 그것만 남겨 고르게 한다.
+   * 목록에 없는 영수증 번호(다른 날 것)는 서버에서 번호로 찾는다.
+   */
   const lookUp = useCallback(
     async (code: string, list: Sale[] | null = sales) => {
       const wanted = code.trim();
       if (!wanted) return;
-      const local = list?.find(
-        (sale) => sale.receipt_no.toLowerCase() === wanted.toLowerCase(),
+      const full = fullReceiptNo(wanted);
+      const hits = (list ?? []).filter(
+        (sale) =>
+          sale.receipt_no.toUpperCase() === full ||
+          isShortHit(sale, wanted),
       );
-      if (local) {
-        onPick(local);
+      if (hits.length === 1) {
+        onPick(hits[0]);
+        return;
+      }
+      setError("");
+      if (hits.length > 1) return;
+      if (SHORT_NUMBER.test(wanted)) {
+        setError(
+          `Nothing ${day === date ? "today" : `on ${day}`} with receipt #${wanted} or a card ending ${wanted}. Pick the day of the sale above.`,
+        );
         return;
       }
       setBusy(true);
-      setError("");
       try {
-        const found = await posApi.byReceipt(wanted);
+        const found = await posApi.byReceipt(full);
         onPick(await retailApi.getSale(found.id));
       } catch {
         setError(
-          `No receipt "${wanted}". Check the number on the paper receipt.`,
+          `No receipt "${wanted}". Check the number on the paper receipt, or type the card's last 4 digits.`,
         );
       } finally {
         setBusy(false);
       }
     },
-    [onPick, sales],
+    [date, day, onPick, sales],
   );
 
   // 창이 열릴 때와 날짜를 바꿀 때 읽는다. 홈에서 영수증을 쏘고 열렸으면 첫 목록이 오는 대로 그 영수증으로 간다.
@@ -449,10 +464,10 @@ function RefundLookup({
         >
           <div className="min-w-0 flex-1">
             <TextInput
-              aria-label="Receipt number"
+              aria-label="Receipt number or card last 4"
               autoFocus
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Scan the receipt, or type PH-…"
+              placeholder="Scan, receipt # (77), or card last 4"
               type="search"
               value={query}
             />
@@ -517,6 +532,30 @@ function RefundLookup({
       </div>
     </Modal>
   );
+}
+
+/** 숫자 1~4자리 = 영수증 끝 번호이거나 카드 뒷 4자리. */
+const SHORT_NUMBER = /^\d{1,4}$/;
+
+/** 끝 번호(77 → PH-…-0077)나 카드 뒷 4자리가 맞는가. */
+function isShortHit(sale: Sale, wanted: string): boolean {
+  if (!SHORT_NUMBER.test(wanted)) return false;
+  const seq = sale.receipt_no.match(/-(\d+)$/)?.[1];
+  if (seq && Number(seq) === Number(wanted)) return true;
+  return (
+    wanted.length === 4 &&
+    (sale.payments ?? []).some((payment) => payment.card_last4 === wanted)
+  );
+}
+
+/** `20261021-77`, `ph20261021-0077` 처럼 친 것을 `PH-20261021-0077` 로. 모양이 다르면 그대로(대문자). */
+function fullReceiptNo(wanted: string): string {
+  const parts = wanted
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .match(/^(?:PH-?)?(\d{8})-?(\d{1,4})$/);
+  if (!parts) return wanted.toUpperCase();
+  return `PH-${parts[1]}-${parts[2].padStart(4, "0")}`;
 }
 
 // ===== 조각 ============================================================
