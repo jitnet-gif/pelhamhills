@@ -1,8 +1,7 @@
 /**
  * Change log — 모든 변경의 전·후 장부(0057 `pelham_staff_change_log`). 지운 줄도 "지우기 전" 이 남는다.
  *
- * 비밀번호는 매번 같이 보낸다(서버가 확인한다). 화면은 메모리(state)에만 들고 저장소에는 넣지 않는다 —
- * 탭을 닫거나 새로 열면 다시 묻는다. 틀린 비밀번호는 오류가 아니라 `{ok:false}` 로 온다.
+ * 비밀번호는 없다(0075) — Reports 명단 계정만 열 수 있고, 서버도 같은 명단으로 막는다.
  */
 
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
@@ -22,12 +21,9 @@ export type ChangeRow = {
   actor: string;
 };
 
-export type ChangeLogResult =
-  | { ok: true; rows: ChangeRow[]; more: boolean }
-  | { ok: false; message: string; locked?: boolean; triesLeft?: number };
+export type ChangeLogResult = { ok: true; rows: ChangeRow[]; more: boolean };
 
 export function fetchChangeLog(input: {
-  password: string;
   from: string;
   to: string;
   table?: string;
@@ -35,7 +31,6 @@ export function fetchChangeLog(input: {
   beforeId?: number;
 }): Promise<ChangeLogResult> {
   return staffRpc<ChangeLogResult>("pelham_staff_change_log", {
-    p_password: input.password,
     p_from: input.from,
     p_to: input.to,
     p_table: input.table || null,

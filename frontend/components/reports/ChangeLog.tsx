@@ -3,12 +3,11 @@
 /**
  * Change log — 무엇이 언제, 누구 계정으로, 어떻게 바뀌었는지 전·후로(0057). Reports 의 자물쇠 탭.
  *
- * 예약·선수·계산서를 지워도 "지우기 전" 이 남는다. 매니저와 Emmeline 만 본다: 로그인한 계정과 별도로
- * **변경 기록 비밀번호**를 넣어야 열린다. 막는 것은 서버다 — 비밀번호가 틀리면 장부를 한 줄도 주지 않고,
- * 15분 안에 5번 틀리면 15분 잠근다. 비밀번호는 이 화면의 state 에만 있다(저장소에 넣지 않는다).
+ * 예약·선수·계산서를 지워도 "지우기 전" 이 남는다. Reports 명단 계정만 본다 — 따로 비밀번호는 없다(0075).
+ * 막는 것은 서버다: 명단에 없는 계정이 부르면 장부를 한 줄도 주지 않는다.
  */
 
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   diffRows,
@@ -44,8 +43,6 @@ function errorText(cause: unknown, fallback: string): string {
 }
 
 export default function ChangeLog() {
-  const [password, setPassword] = useState<string | null>(null);
-  const [typed, setTyped] = useState("");
   const [from, setFrom] = useState(() => isoDay(-6));
   const [to, setTo] = useState(() => isoDay());
   const [table, setTable] = useState("");
@@ -56,22 +53,11 @@ export default function ChangeLog() {
   const [error, setError] = useState("");
 
   const load = useCallback(
-    async (pass: string, append?: { beforeId: number }) => {
+    async (append?: { beforeId: number }) => {
       setBusy(true);
       setError("");
       try {
-        const result = await fetchChangeLog({ password: pass, from, to, table, search, beforeId: append?.beforeId });
-        if (!result.ok) {
-          setPassword(null);
-          setRows(null);
-          setError(
-            result.triesLeft !== undefined && result.triesLeft < 4
-              ? `${result.message} ${result.triesLeft} tries left before a 15-minute lock.`
-              : result.message,
-          );
-          return;
-        }
-        setPassword(pass);
+        const result = await fetchChangeLog({ from, to, table, search, beforeId: append?.beforeId });
         setRows((current) => (append && current ? [...current, ...result.rows] : result.rows));
         setMore(result.more);
       } catch (cause) {
@@ -83,67 +69,32 @@ export default function ChangeLog() {
     [from, to, table, search],
   );
 
-  const unlock = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!busy && typed) void load(typed);
-  };
-
-  const lock = () => {
-    setPassword(null);
-    setTyped("");
-    setRows(null);
-    setError("");
-  };
-
-  if (password === null) {
-    return (
-      <div className="mx-auto grid w-full max-w-md gap-3">
-        <form className="border border-[#d4d4d8] bg-white p-5" onSubmit={unlock}>
-          <p className="text-[11px] font-bold tracking-[0.12em] text-[#6b7280] uppercase">Managers · Emmeline</p>
-          <h2 className="mt-1 text-base font-bold">🔒 Change log</h2>
-          <p className="mt-1 text-xs leading-5 text-[#6b7280]">
-            Every change, with what it was before and after — including deleted bookings, players and bills. Enter the
-            change log password (not your sign-in password or manager PIN).
-          </p>
-          <label className="mt-4 block text-xs font-bold" htmlFor="change-log-password">
-            Change log password
-          </label>
-          <input
-            autoComplete="off"
-            className="mt-1 h-11 w-full border border-[#d4d4d8] px-3 text-base"
-            id="change-log-password"
-            onChange={(event) => setTyped(event.target.value)}
-            type="password"
-            value={typed}
-          />
-          {error ? (
-            <div className="mt-3">
-              <ErrorNote>{error}</ErrorNote>
-            </div>
-          ) : null}
-          <Button className="mt-4" disabled={busy || !typed} full tone="primary" type="submit">
-            {busy ? "Checking…" : "Open change log"}
-          </Button>
-        </form>
-      </div>
-    );
-  }
+  // 열면 바로 지난 7일을 보여 준다. 필터를 바꾼 뒤에는 Show 로 다시 읽는다.
+  useEffect(() => {
+    let cancelled = false;
+    fetchChangeLog({ from: isoDay(-6), to: isoDay() })
+      .then((result) => {
+        if (cancelled) return;
+        setRows(result.rows);
+        setMore(result.more);
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(errorText(cause, "Could not load the change log."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="grid min-w-0 gap-3">
-      <Panel
-        actions={
-          <Button onClick={lock} type="button">
-            🔒 Lock
-          </Button>
-        }
-        title="Change log — before and after"
+      <Panel title="Change log — before and after"
       >
         <form
           className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
           onSubmit={(event) => {
             event.preventDefault();
-            void load(password);
+            void load();
           }}
         >
           <Field label="From">
@@ -180,7 +131,7 @@ export default function ChangeLog() {
       {error ? <ErrorNote>{error}</ErrorNote> : null}
 
       {rows === null ? (
-        <SkeletonRows count={4} />
+        error ? null : <SkeletonRows count={4} />
       ) : rows.length === 0 ? (
         <EmptyNote>No changes in these days.</EmptyNote>
       ) : (
@@ -189,7 +140,7 @@ export default function ChangeLog() {
             <ChangeCard key={row.id} row={row} />
           ))}
           {more ? (
-            <Button disabled={busy} onClick={() => void load(password, { beforeId: rows[rows.length - 1].id })}>
+            <Button disabled={busy} onClick={() => void load({ beforeId: rows[rows.length - 1].id })}>
               {busy ? "Loading…" : "Show older changes"}
             </Button>
           ) : null}
