@@ -352,7 +352,7 @@ export default function RegisterHome({
 
 // ===== Refund: 영수증 찾기 ==============================================
 
-/** 영수증을 쏘거나 번호를 치면 찾고, 아니면 오늘 영수증 목록에서 고른다. */
+/** 영수증을 쏘거나 번호를 치면 찾고, 아니면 그 날 영수증 목록에서 고른다(기본은 오늘, 지난 날도 고른다). */
 function RefundLookup({
   date,
   initialCode,
@@ -365,6 +365,7 @@ function RefundLookup({
   onPick: (sale: Sale) => void;
 }) {
   const [query, setQuery] = useState(initialCode);
+  const [day, setDay] = useState(date);
   const [sales, setSales] = useState<Sale[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -382,7 +383,7 @@ function RefundLookup({
     [needle, sales],
   );
 
-  /** 오늘 목록에 없는 영수증(어제 것 등)은 서버에서 번호로 찾는다. */
+  /** 고른 날 목록에 없는 영수증(다른 날 것)은 서버에서 번호로 찾는다. */
   const lookUp = useCallback(
     async (code: string, list: Sale[] | null = sales) => {
       const wanted = code.trim();
@@ -410,12 +411,12 @@ function RefundLookup({
     [onPick, sales],
   );
 
-  // 창이 열릴 때 한 번 읽는다. 홈에서 영수증을 쏘고 열렸으면 목록이 오는 대로 그 영수증으로 간다.
+  // 창이 열릴 때와 날짜를 바꿀 때 읽는다. 홈에서 영수증을 쏘고 열렸으면 첫 목록이 오는 대로 그 영수증으로 간다.
   const firstLookUp = useRef({ code: initialCode, lookUp });
   useEffect(() => {
     let cancelled = false;
     retailApi
-      .listSales(date)
+      .listSales(day)
       .then((list) => {
         if (cancelled) return;
         const sorted = [...list].sort((a, b) =>
@@ -423,6 +424,7 @@ function RefundLookup({
         );
         setSales(sorted);
         const { code, lookUp: find } = firstLookUp.current;
+        firstLookUp.current.code = "";
         if (code) void find(code, sorted);
       })
       .catch((cause) => {
@@ -431,7 +433,9 @@ function RefundLookup({
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [day]);
+
+  const isToday = day === date;
 
   return (
     <Modal onClose={onClose} title="Refund — find the receipt">
@@ -465,16 +469,33 @@ function RefundLookup({
         {error ? <ErrorNote>{error}</ErrorNote> : null}
 
         <div className="grid gap-1.5">
-          <p className="text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">
-            Today · all registers
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">
+              {isToday ? "Today" : day} · all registers
+            </p>
+            <div className="w-40 shrink-0">
+              <TextInput
+                aria-label="Sale date"
+                max={date}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  if (!next || next === day) return;
+                  setSales(null);
+                  setError("");
+                  setDay(next);
+                }}
+                type="date"
+                value={day}
+              />
+            </div>
+          </div>
           {sales === null && !error ? (
             <SkeletonRows count={3} />
           ) : shown.length === 0 ? (
             <EmptyNote>
               {needle
-                ? "Nothing today matches — press Find to look it up."
-                : "No sales today."}
+                ? `Nothing ${isToday ? "today" : "that day"} matches — press Find to look it up.`
+                : `No sales ${isToday ? "today" : "that day"}.`}
             </EmptyNote>
           ) : (
             <ul className="grid border border-[#d4d4d8]">
