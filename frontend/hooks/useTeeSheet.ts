@@ -48,8 +48,10 @@ import type {
 
 // ===== Constants =====
 
-/** 서버 가드와 동일한 클라이언트 가드 (mirrors the backend rule). */
+/** 손님이 살 수 있는 정원. 폴백 슬롯의 카트 수로만 쓴다. */
 const MAX_PLAYERS_PER_TEE_TIME = 4;
+/** 직원 시트의 한 예약 최대 인원(4 + 워크인 4). 서버 0052 · STAFF_PLAYERS_PER_TEE_TIME 과 같은 값. */
+const STAFF_PLAYERS_PER_TEE_TIME = 8;
 const MIN_PLAYERS_PER_BOOKING = 1;
 const TOAST_TTL_MS = 5000;
 // 오프라인이면 쓰기를 막으므로 복구를 오래 기다리게 하지 않는다.
@@ -889,9 +891,9 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
   const createBooking = useCallback(
     async (input: CreateBookingInput): Promise<TeeBooking | null> => {
       const requested = input.players ?? [];
-      if (requested.length > MAX_PLAYERS_PER_TEE_TIME) {
-        pushToast("error", `한 티 타임에는 최대 ${MAX_PLAYERS_PER_TEE_TIME}명까지 — max ${MAX_PLAYERS_PER_TEE_TIME} players per tee time.`);
-        setMessage(`A tee time can hold at most ${MAX_PLAYERS_PER_TEE_TIME} players.`);
+      if (requested.length > STAFF_PLAYERS_PER_TEE_TIME) {
+        pushToast("error", `한 티 타임에는 최대 ${STAFF_PLAYERS_PER_TEE_TIME}명까지 — max ${STAFF_PLAYERS_PER_TEE_TIME} players per tee time.`);
+        setMessage(`A tee time can hold at most ${STAFF_PLAYERS_PER_TEE_TIME} players.`);
         return null;
       }
       if (!input.date || !input.time) {
@@ -1039,9 +1041,9 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
         setMessage("Reservation not found — it may have been removed.");
         return Promise.resolve(null);
       }
-      if (booking.players.length >= MAX_PLAYERS_PER_TEE_TIME) {
-        pushToast("error", `한 티 타임에는 최대 ${MAX_PLAYERS_PER_TEE_TIME}명까지 — this tee time is already full.`);
-        setMessage(`A tee time can hold at most ${MAX_PLAYERS_PER_TEE_TIME} players.`);
+      if (booking.players.length >= STAFF_PLAYERS_PER_TEE_TIME) {
+        pushToast("error", `한 티 타임에는 최대 ${STAFF_PLAYERS_PER_TEE_TIME}명까지 — this tee time is already full.`);
+        setMessage(`A tee time can hold at most ${STAFF_PLAYERS_PER_TEE_TIME} players.`);
         return Promise.resolve(null);
       }
 
