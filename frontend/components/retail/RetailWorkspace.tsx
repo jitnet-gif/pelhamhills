@@ -57,6 +57,15 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
    * 곧장 판매로 연다. 판매 화면은 홈에서도 마운트된 채라 스캔·장바구니가 그대로다.
    */
   const [view, setView] = useState<"home" | "sale">(startWithCamera ? "sale" : "home");
+  // 고객 파일의 Sell membership 이 계산서에 줄을 담고 `?view=sale` 로 보낸다. 판매 화면으로 곧장 연다.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") !== "sale") return;
+    setView("sale");
+    params.delete("view");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, []);
   const [refundRequest, setRefundRequest] = useState<{ code: string; at: number } | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);

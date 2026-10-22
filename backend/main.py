@@ -79,6 +79,8 @@ include_route_module("backend.api.routes.calls", f"{settings.API_V1_STR}", ["Cal
 include_route_module("backend.api.routes.rain_checks", f"{settings.API_V1_STR}", ["Rain Checks"])
 # 고객 마케팅(프로모션 문자·AI 전화). 명단 계정 확인은 SQL 이 한다(0047).
 include_route_module("backend.api.routes.marketing", f"{settings.API_V1_STR}", ["Marketing"])
+# 계산대 카메라 사진으로 상품 찾기(0068). 직원 확인은 단말기와 같다(`pelham_staff_pos_products`).
+include_route_module("backend.api.routes.product_photo", f"{settings.API_V1_STR}", ["Retail"])
 
 if VOICE_ONLY:
     logger.warning(

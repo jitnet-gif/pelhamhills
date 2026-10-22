@@ -14,13 +14,30 @@
  *
  * 카메라는 HTTPS(또는 localhost)에서만 켜진다. 배포 주소는 HTTPS 다.
  *
+ * 바코드가 없는 물건은 셔터(📸)를 눌러 **사진으로** 찾는다(`onPhoto`, 0068). 서버가 상품 사진들과 비교해
+ * 확실하면 바로 담고, 헷갈리면 후보를 화면에 띄워 직원이 누른다.
+ *
  * 전면/후면은 헤더의 ⇄ 버튼으로 바꾼다. 거치대에 세운 아이패드는 화면이 손님 쪽을 보므로
  * 전면 카메라에 물건을 대는 편이 편하다. 고른 쪽은 기기에 기억해 두고 다음에도 그쪽으로 연다.
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { snapshotVideo } from "@/lib/retail/productPhoto";
+
 export type ScanOutcome = { ok: boolean; message: string };
+
+/** 사진으로 찾았을 때 직원이 고를 후보 하나. */
+export type PhotoChoice = {
+  key: string;
+  label: string;
+  detail?: string;
+  imageUrl?: string | null;
+  pick: () => Promise<ScanOutcome>;
+};
+
+/** 사진 결과. `choices` 가 있으면 후보 판을 띄운다. */
+export type PhotoOutcome = ScanOutcome & { choices?: PhotoChoice[] };
 
 type Props = {
   /** 읽은 코드. 담았으면 ok, 모르는 코드면 ok:false 와 이유. */
@@ -35,6 +52,8 @@ type Props = {
   canPay: boolean;
   /** 아래 버튼 글자. 계산대는 Pay, 상품 등록 창처럼 하나만 읽는 곳은 Cancel. */
   doneLabel?: string;
+  /** 셔터. 지금 프레임(JPEG base64)을 받아 상품을 찾는다. 없으면 셔터를 그리지 않는다. */
+  onPhoto?: (imageBase64: string) => Promise<PhotoOutcome>;
 };
 
 /**
@@ -53,6 +72,11 @@ type Facing = "environment" | "user";
 
 const FACING_KEY = "pelham.cameraScan.facing";
 
+/** 결과 문구의 key. 버튼 처리기에서만 부른다(렌더 중이 아니다 — 린트가 그 구분을 못 해 밖으로 뺐다). */
+function flashStamp(): number {
+  return Date.now();
+}
+
 function readFacing(): Facing {
   try {
     return window.localStorage.getItem(FACING_KEY) === "user" ? "user" : "environment";
@@ -66,8 +90,12 @@ function currentDeviceId(video: HTMLVideoElement): string {
   return stream?.getVideoTracks()[0]?.getSettings().deviceId ?? "";
 }
 
-export default function CameraScanner({ onCode, onDone, onClose, summary, canPay, doneLabel = "Pay" }: Props) {
+export default function CameraScanner({ onCode, onDone, onClose, summary, canPay, doneLabel = "Pay", onPhoto }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** 사진을 서버에 묻는 중. 두 번 누르지 않게. */
+  const [looking, setLooking] = useState(false);
+  const [choices, setChoices] = useState<PhotoChoice[] | null>(null);
+
   const [status, setStatus] = useState<"starting" | "live" | "error">("starting");
   const [problem, setProblem] = useState("");
   const [flash, setFlash] = useState<Flash | null>(null);
@@ -129,6 +157,36 @@ export default function CameraScanner({ onCode, onDone, onClose, summary, canPay
     }
     // 안드로이드만. 아이폰 Safari 에는 진동 API 가 없다.
     navigator.vibrate?.(ok ? 40 : [80, 60, 80]);
+  }
+
+  async function takePhoto() {
+    const video = videoRef.current;
+    if (!onPhoto || !video || looking) return;
+    unlockAudio();
+    setLooking(true);
+    setChoices(null);
+    setFlash(null);
+    try {
+      const outcome = await onPhoto(await snapshotVideo(video));
+      if (outcome.choices?.length) {
+        setChoices(outcome.choices);
+      } else {
+        beep(outcome.ok);
+        setFlash({ ok: outcome.ok, message: outcome.message, at: flashStamp() });
+      }
+    } catch (cause) {
+      beep(false);
+      setFlash({ ok: false, message: (cause as Error)?.message || "Photo search failed.", at: flashStamp() });
+    } finally {
+      setLooking(false);
+    }
+  }
+
+  async function pickChoice(choice: PhotoChoice) {
+    setChoices(null);
+    const outcome = await choice.pick();
+    beep(outcome.ok);
+    setFlash({ ...outcome, at: flashStamp() });
   }
 
   // 소리는 카메라를 바꿔도 이어 쓴다. 화면이 닫힐 때만 놓는다.
@@ -284,10 +342,18 @@ export default function CameraScanner({ onCode, onDone, onClose, summary, canPay
     return () => window.clearTimeout(timer);
   }, [flash]);
 
+  // 후보 판이 떠 있으면 Esc 는 판만 닫는다.
+  const choicesRef = useRef<PhotoChoice[] | null>(null);
+  useEffect(() => {
+    choicesRef.current = choices;
+  }, [choices]);
+
   // Esc 로 닫기(블루투스 키보드를 붙인 아이패드).
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (choicesRef.current) setChoices(null);
+      else onClose();
     }
     window.addEventListener("keydown", onKey);
     const { overflow } = document.body.style;
@@ -363,10 +429,52 @@ export default function CameraScanner({ onCode, onDone, onClose, summary, canPay
             <p className="mt-1 text-[#d4d4d8]">{problem}</p>
           </div>
         ) : null}
-        {status === "live" && !flash ? (
+        {status === "live" && !flash && !looking && !choices ? (
           <p className="absolute inset-x-[8%] bottom-[calc(4%+0.75rem)] bg-black/45 px-3 py-1.5 text-center text-sm text-white/90">
-            Fill the screen with the barcode. Same item again? Move it away, then back.
+            {onPhoto
+              ? "Fill the screen with the barcode. No barcode? Press 📸 Photo."
+              : "Fill the screen with the barcode. Same item again? Move it away, then back."}
           </p>
+        ) : null}
+
+        {looking ? (
+          <p
+            aria-live="polite"
+            className="absolute inset-x-[6%] bottom-[calc(4%+0.75rem)] bg-black/70 px-3 py-2.5 text-center text-sm font-bold"
+          >
+            Looking for the product…
+          </p>
+        ) : null}
+
+        {choices ? (
+          <div className="absolute inset-x-3 bottom-3 max-h-[70%] overflow-y-auto bg-white p-3 text-[#111]" role="dialog" aria-label="Which product is it?">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-bold">Which one is it?</p>
+              <button className="min-h-11 px-2 text-sm font-bold text-[#4533ff]" onClick={() => setChoices(null)} type="button">
+                None of these
+              </button>
+            </div>
+            <ul className="grid gap-2">
+              {choices.map((choice) => (
+                <li key={choice.key}>
+                  <button
+                    className="flex min-h-14 w-full items-center gap-3 border border-[#d4d4d8] p-2 text-left hover:border-[#4533ff] active:bg-[#f2f2f4]"
+                    onClick={() => void pickChoice(choice)}
+                    type="button"
+                  >
+                    {choice.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- Storage 공개 주소, 최적화 대상 아님
+                      <img alt="" className="size-12 shrink-0 object-cover" src={choice.imageUrl} />
+                    ) : null}
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold">{choice.label}</span>
+                      {choice.detail ? <span className="block text-xs text-[#6b7280]">{choice.detail}</span> : null}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         {flash ? (
@@ -384,7 +492,19 @@ export default function CameraScanner({ onCode, onDone, onClose, summary, canPay
       </div>
 
       <footer className="flex items-center justify-between gap-3 bg-white px-4 pt-2.5 pb-[max(env(safe-area-inset-bottom),0.625rem)] text-[#111]">
-        <div className="min-w-0">{summary}</div>
+        <div className="min-w-0 flex-1">{summary}</div>
+        {onPhoto ? (
+          <button
+            aria-label="Find the product from a photo"
+            className="inline-flex min-h-12 shrink-0 items-center gap-1.5 border border-[#d4d4d8] px-4 text-sm font-bold disabled:opacity-40"
+            disabled={status !== "live" || looking}
+            onClick={() => void takePhoto()}
+            type="button"
+          >
+            <span aria-hidden>📸</span>
+            {looking ? "…" : "Photo"}
+          </button>
+        ) : null}
         <button
           className="min-h-12 shrink-0 bg-[#4533ff] px-5 text-sm font-bold text-white disabled:opacity-40"
           disabled={!canPay}

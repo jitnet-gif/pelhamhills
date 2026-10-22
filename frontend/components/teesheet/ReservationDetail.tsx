@@ -17,7 +17,15 @@
 //
 // 모든 서버 호출은 controller 를 통해서만 한다. 이 파일에서 fetch 를 직접 부르지 않는다.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import Link from "next/link";
 
@@ -47,6 +55,7 @@ import type {
 import BillPanel from "../pos/BillPanel";
 import SaleDetail from "../reports/SaleDetail";
 import { SEATS_PER_TEE_TIME } from "./BookingDialog";
+import { MemberSuggestions, memberSummary, useMemberSearch, type MemberHit } from "./MemberSearch";
 import RainCheckDialog, { activeRainCheck, rainCheckTitle, rainCheckTone, useRainChecks } from "./RainCheckDialog";
 
 export type ReservationDetailProps = { controller: TeeSheetController };
@@ -332,6 +341,14 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   // 카드 드래그 앤 드롭: 끌고 있는 선수와 그 아래 놓일 곳. 놓으면 Rain check · Refund · Delete 창이 뜬다.
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropOver, setDropOver] = useState<DropAction | null>(null);
+  // 고객 검색 칸에서 끄는 사람과, 그 사람이 올라가 있는 곳(선수 id, 또는 "new" = + 칸).
+  const [lookup, setLookup] = useState("");
+  const { hits: lookupHits, loading: lookingUp } = useMemberSearch(lookup, Boolean(booking));
+  const [dragHit, setDragHit] = useState<MemberHit | null>(null);
+  const [hitOver, setHitOver] = useState<string | null>(null);
+  // 카드 이름 칸의 자동검색: 지금 이름을 치고 있는 선수 한 명만 찾는다.
+  const [nameSearchFor, setNameSearchFor] = useState<string | null>(null);
+  const [activeHit, setActiveHit] = useState(0);
   // Delete 에 놓았을 때(또는 ⋮ → Delete) 묻는 사유(적요). 사유와 승인 매니저가 History 에 남는다(0056).
   const [removeAsk, setRemoveAsk] = useState<{ playerId: string; reason: string } | null>(null);
   // Refund 에 놓았을 때 여는 계산서 — Reports 의 환불 창과 같은 것(사유 필수 · 카드는 리더에서 먼저).
@@ -339,6 +356,12 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
 
   const [bookingDraft, setBookingDraft] = useState<BookingDraft | null>(null);
   const [playerDrafts, setPlayerDrafts] = useState<Record<string, PlayerDraft>>({});
+  const nameSearchDraft = nameSearchFor ? playerDrafts[nameSearchFor] : undefined;
+  const { hits: nameHits, loading: nameSearching } = useMemberSearch(
+    nameSearchDraft ? `${nameSearchDraft.firstName} ${nameSearchDraft.lastName}` : "",
+    nameSearchDraft !== undefined,
+  );
+  const activeNameHit = activeHit < nameHits.length ? activeHit : 0;
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle", nonce: 0 });
   const [mode, setMode] = useState<PanelMode>("none");
   const [cancelReason, setCancelReason] = useState("");
@@ -718,6 +741,65 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const bookingDirty = Object.keys(pendingBookingPatch).length > 0;
   const dirty = bookingDirty || dirtyPlayerIds.length > 0;
 
+  /**
+   * 고객 검색에서 고른 사람을 이 선수 자리에 넣는다(카드에 끌어 놓기·이름 칸 자동검색).
+   * 이름·연락처는 바로 저장한다 — 끌어 놓고 Save 를 또 누르게 하지 않으려고. 회원이면 요금제도 회원 것으로,
+   * 회원이 아닌 사람을 회원 요금제 자리에 넣으면 Public 으로 돌린다(다른 사람에게 회원가가 붙지 않게).
+   * 명부 연결(customerRef)은 새 선수(+ 칸)로 넣을 때만 남는다 — 선수 고치기는 그 칸을 받지 않는다.
+   */
+  const applyCustomer = useCallback(
+    async (playerId: string, hit: MemberHit) => {
+      const current = bookingRef.current;
+      const player = current?.players.find((p) => p.id === playerId);
+      if (!current || !player) return;
+      const patch: PatchPlayerInput = {
+        firstName: hit.firstName || hit.name,
+        lastName: hit.lastName,
+        phone: hit.phone,
+        email: hit.email,
+        type: "Existing Customer",
+      };
+      const plan = hit.ratePlan || (/member/i.test(player.ratePlan ?? "") ? "Public" : "");
+      if (plan) patch.ratePlan = plan;
+      setPlayerDrafts((prev) => {
+        if (!(playerId in prev)) return prev;
+        const next = { ...prev };
+        delete next[playerId];
+        return next;
+      });
+      // 제목이 아직 첫 사람 이름을 따라가고 있으면 같이 바꾼다(commitPlayer 와 같은 규칙).
+      const titleWasTracking =
+        current.players[0]?.id === playerId && current.title === reservationTitle(current.players);
+      const updated = await controller.patchPlayer(current.id, playerId, patch);
+      if (updated && titleWasTracking) {
+        const nextTitle = reservationTitle(updated.players);
+        if (nextTitle !== updated.title) await controller.patchBooking(updated.id, { title: nextTitle });
+      }
+    },
+    [controller],
+  );
+
+  /** 고객을 새 선수로 더한다(+ 칸에 놓기·검색 결과의 +). 이 길은 명부 연결과 회원번호까지 남는다(0053). */
+  const addCustomer = useCallback(
+    (hit: MemberHit) => {
+      const current = bookingRef.current;
+      if (!current) return;
+      const first = hit.firstName || hit.name;
+      void controller.addPlayer(current.id, {
+        name: [first, hit.lastName].filter(Boolean).join(" "),
+        firstName: first,
+        lastName: hit.lastName,
+        phone: hit.phone,
+        email: hit.email,
+        type: "Existing Customer",
+        ...(hit.ratePlan ? { ratePlan: hit.ratePlan } : {}),
+        ...(hit.customerRef ? { customerRef: hit.customerRef } : {}),
+        ...(hit.memberNumber ? { memberNumber: hit.memberNumber } : {}),
+      });
+    },
+    [controller],
+  );
+
   /** 남은 draft 를 전부 보낸다. 하나라도 서버가 거절하면 false — 그 draft 는 칸에 남는다. */
   const saveAll = useCallback(async (): Promise<boolean> => {
     const current = bookingRef.current;
@@ -778,6 +860,52 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
   const players = booking.players;
   const busy = controller.busy;
   const audit: AuditEntry[] = [...(booking.audit ?? [])].reverse();
+
+  /** 이 예약에 이미 들어 있는 고객인가(명부 번호로). */
+  const hitInBooking = (hit: MemberHit) =>
+    Boolean(hit.customerRef) && players.some((player) => !player.cancelled && player.customerRef === hit.customerRef);
+  /** 끌어 온 고객을 받을 수 있는 곳에 붙이는 핸들러. target 은 선수 id(그 자리를 바꾼다), 또는 "new"(+ 칸, 더한다). */
+  const hitDropProps = (target: string) => ({
+    onDragOver: (event: DragEvent) => {
+      if (!dragHit) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      if (hitOver !== target) setHitOver(target);
+    },
+    onDragLeave: (event: DragEvent) => {
+      // 안쪽 칸으로 옮겨 갈 때도 dragleave 가 터지므로 정말 나갔을 때만 지운다.
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      setHitOver((current) => (current === target ? null : current));
+    },
+    onDrop: (event: DragEvent) => {
+      if (!dragHit) return;
+      event.preventDefault();
+      if (target === "new") addCustomer(dragHit);
+      else void applyCustomer(target, dragHit);
+      setDragHit(null);
+      setHitOver(null);
+    },
+  });
+  /** 카드 이름 칸의 ↑↓ Enter Esc. 목록이 열려 있을 때만 가로챈다. */
+  const nameKeyDown = (player: Player, event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (nameSearchFor !== player.id || nameHits.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveHit((activeNameHit + 1) % nameHits.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveHit((activeNameHit - 1 + nameHits.length) % nameHits.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const hit = nameHits[activeNameHit];
+      if (hit) void applyCustomer(player.id, hit);
+      setNameSearchFor(null);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setNameSearchFor(null);
+    }
+  };
 
   /** 카트를 쓰는 사람의 카트 요금, 아니면 0. */
   const cartPart = (player: Player) => (player.cart ? (player.cartFee ?? 0) : 0);
@@ -1518,6 +1646,8 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             const plan = player.ratePlan?.trim() || "Public";
             const planOptions = RATE_PLANS.includes(plan) ? RATE_PLANS : [plan, ...RATE_PLANS];
             const cartOn = player.cart === true;
+            // 결제했거나 빠진 사람 자리는 다른 고객으로 바꾸지 않는다.
+            const takesHit = !busy && !player.paid && !player.cancelled;
             // 이 선수의 라운드가 열린 계산서에 담겼나(= 레퍼런스의 Select 된 상태).
             const onBill = useBills ? billOf(player.id) : null;
             const selected = !player.paid && Boolean(onBill);
@@ -1534,9 +1664,16 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             return (
               <article
                 className={`flex w-[264px] shrink-0 flex-col border bg-white p-1.5 ${
-                  dragging === player.id ? "border-dashed border-[#4533ff] opacity-50" : "border-[#c7c7cc]"
+                  dragging === player.id
+                    ? "border-dashed border-[#4533ff] opacity-50"
+                    : dragHit && takesHit
+                      ? hitOver === player.id
+                        ? "border-dashed border-[#4533ff] bg-[#eeecff]"
+                        : "border-dashed border-[#b8b2ff]"
+                      : "border-[#c7c7cc]"
                 }`}
                 key={player.id}
+                {...(takesHit ? hitDropProps(player.id) : {})}
               >
                 {/* 머리 줄이 드래그 손잡이다 — 카드 전체를 끌게 하면 이름·전화 칸에서 글자를 고를 수 없다.
                     Chrome 은 dragstart 안에서 DOM 이 바뀌면 끌기를 취소하므로 놓을 곳은 다음 틱에 띄운다. */}
@@ -1736,25 +1873,61 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1">
+                {/* 이름을 치면 고객 명부에서 찾는다(새 예약 창과 같은 검색). 고르면 이름·연락처·요금제가 바로 저장된다. */}
+                <div className="relative grid grid-cols-2 gap-1">
                   <label className="block">
                     <span className="sr-only">Last Name</span>
                     <input
+                      aria-autocomplete="list"
+                      aria-controls={`card-search-${player.id}`}
+                      autoComplete="off"
                       className="w-full border-b border-[#d7d7dc] px-1 py-1 font-bold outline-none focus:border-[#4533ff]"
-                      onChange={(event) => setPlayerField(player, "lastName", event.target.value)}
+                      onBlur={() => setNameSearchFor(null)}
+                      onChange={(event) => {
+                        setPlayerField(player, "lastName", event.target.value);
+                        setNameSearchFor(player.id);
+                        setActiveHit(0);
+                      }}
+                      onKeyDown={(event) => nameKeyDown(player, event)}
                       placeholder="Last Name"
+                      role="combobox"
+                      aria-expanded={nameSearchFor === player.id && nameHits.length > 0}
                       value={pd.lastName}
                     />
                   </label>
                   <label className="block">
                     <span className="sr-only">First Name</span>
                     <input
+                      aria-autocomplete="list"
+                      aria-controls={`card-search-${player.id}`}
+                      autoComplete="off"
                       className="w-full border-b border-[#d7d7dc] px-1 py-1 outline-none focus:border-[#4533ff]"
-                      onChange={(event) => setPlayerField(player, "firstName", event.target.value)}
+                      onBlur={() => setNameSearchFor(null)}
+                      onChange={(event) => {
+                        setPlayerField(player, "firstName", event.target.value);
+                        setNameSearchFor(player.id);
+                        setActiveHit(0);
+                      }}
+                      onKeyDown={(event) => nameKeyDown(player, event)}
                       placeholder="First Name"
+                      role="combobox"
+                      aria-expanded={nameSearchFor === player.id && nameHits.length > 0}
                       value={pd.firstName}
                     />
                   </label>
+                  {nameSearchFor === player.id && takesHit ? (
+                    <MemberSuggestions
+                      active={activeNameHit}
+                      hits={nameHits}
+                      id={`card-search-${player.id}`}
+                      loading={nameSearching}
+                      onHover={setActiveHit}
+                      onPick={(hit) => {
+                        void applyCustomer(player.id, hit);
+                        setNameSearchFor(null);
+                      }}
+                    />
+                  ) : null}
                 </div>
 
                 {/* Postal / Mem # 은 레퍼런스에 있는 칸이지만 우리 Player 모델에는 없다.
@@ -2212,16 +2385,100 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
               여는 버튼이라, 이 카드를 없애면 기존 예약에 세 번째 사람을 붙일 방법이 사라진다. */}
           {players.length < MAX_PLAYERS ? (
             <button
-              className="w-[52px] shrink-0 border border-dashed border-[#aeb2bb] bg-[#d5d5da] text-2xl text-[#9297a1] disabled:cursor-not-allowed disabled:opacity-40"
+              className={`shrink-0 border border-dashed text-2xl disabled:cursor-not-allowed disabled:opacity-40 ${
+                dragHit
+                  ? hitOver === "new"
+                    ? "w-[120px] border-[#4533ff] bg-[#eeecff] text-[#4533ff]"
+                    : "w-[120px] border-[#b8b2ff] bg-white text-[#4533ff]"
+                  : "w-[52px] border-[#aeb2bb] bg-[#d5d5da] text-[#9297a1]"
+              }`}
               disabled={busy}
               onClick={() => void controller.addPlayer(booking.id)}
-              title="Add a player to this reservation"
+              title="Add a player to this reservation — or drop a customer here"
               type="button"
+              {...(busy ? {} : hitDropProps("new"))}
             >
               +
+              {dragHit ? <span className="block text-[11px] font-bold">Add player</span> : null}
             </button>
           ) : null}
         </div>
+
+        {/* ===== 고객 검색 — 찾은 사람을 선수 카드(바꾸기)나 + 칸(더하기)으로 끌어 놓는다 ===== */}
+        <aside className="flex w-[230px] shrink-0 flex-col gap-1.5 border-l border-[#c7c7cc] bg-[#f7f7f9] p-2">
+          <label className="block">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-[#4e5560]">Find customer</span>
+            <input
+              autoComplete="off"
+              className="mt-1 w-full border border-[#c7c7cc] bg-white px-1.5 py-1 outline-none focus:border-[#4533ff]"
+              onChange={(event) => setLookup(event.target.value)}
+              placeholder="Name, phone or member #"
+              type="search"
+              value={lookup}
+            />
+          </label>
+          <p className="text-[10px] text-[#6b7280]">Drag onto a player card to replace, or onto + to add.</p>
+          <ul className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto">
+            {lookup.trim().length < 2 ? null : lookingUp ? (
+              <li className="px-1 text-[#6b7280]">Searching…</li>
+            ) : lookupHits.length === 0 ? (
+              <li className="px-1 text-[#6b7280]">No customers found.</li>
+            ) : (
+              lookupHits.map((hit, index) => {
+                const summary = memberSummary(hit);
+                const inBooking = hitInBooking(hit);
+                return (
+                  <li
+                    className={`flex items-center gap-1.5 border bg-white px-1.5 py-1 ${
+                      inBooking ? "border-[#ececf0] opacity-50" : "cursor-grab border-[#c7c7cc] hover:border-[#4533ff]"
+                    } ${dragHit === hit ? "opacity-40" : ""}`}
+                    draggable={!inBooking && !busy}
+                    key={`${hit.customerRef ?? "m"}-${index}`}
+                    onDragEnd={() => {
+                      setDragHit(null);
+                      setHitOver(null);
+                    }}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "copy";
+                      event.dataTransfer.setData("text/plain", hit.name);
+                      // Chrome 은 dragstart 안에서 DOM 이 바뀌면 끌기를 취소하므로 놓을 곳은 다음 틱에 띄운다.
+                      window.setTimeout(() => setDragHit(hit), 0);
+                    }}
+                    title={inBooking ? "Already on this reservation" : "Drag onto a player card or onto +"}
+                  >
+                    <Glyph className="h-3.5 w-3.5 shrink-0 text-[#b6b6c0]" name="grip" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-bold">
+                        {hit.name || `${hit.firstName} ${hit.lastName}`.trim()}
+                      </span>
+                      <span className="block truncate text-[10px] text-[#6b7280]">
+                        {[hit.phone, hit.email].filter(Boolean).join(" · ") || "No contact"}
+                      </span>
+                      {summary ? (
+                        <span
+                          className={`block truncate text-[10px] font-semibold ${
+                            hit.isMember ? "text-[#2f7d4f]" : "text-[#6b7280]"
+                          }`}
+                        >
+                          {summary}
+                        </span>
+                      ) : null}
+                    </span>
+                    <button
+                      aria-label={`Add ${hit.name} as a player`}
+                      className="shrink-0 border border-[#c7c7cc] bg-white px-1.5 font-bold hover:bg-[#f2f2f5] disabled:opacity-30"
+                      disabled={inBooking || busy || players.length >= MAX_PLAYERS}
+                      onClick={() => addCustomer(hit)}
+                      type="button"
+                    >
+                      {inBooking ? "✓" : "+"}
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </aside>
 
         {/* ===== 놓을 곳 — 카드를 끄는 동안만 카드 위 아래쪽에 뜬다 ===== */}
         {draggedPlayer ? (

@@ -696,8 +696,8 @@ function SalesLineRow({
   station: BillStation;
   describe: { title: string; detail?: string } | null;
 }) {
-  // 그린피·베이 줄은 예약 하나 = 한 줄. 수량을 바꿀 수 없다.
-  const fixed = line.kind === "tee_player" || line.kind === "sim_booking";
+  // 그린피·베이·회원권 줄은 하나 = 한 줄. 수량을 바꿀 수 없다.
+  const fixed = line.kind === "tee_player" || line.kind === "sim_booking" || line.kind === "membership";
   const [qty, setQty] = useState(String(line.quantity));
   const [qtyFor, setQtyFor] = useState(line.quantity);
   if (qtyFor !== line.quantity) {
@@ -719,7 +719,9 @@ function SalesLineRow({
       ? `Tee Time: ${line.tee_date ?? ""} ${line.tee_time ?? ""}`.trim()
       : line.kind === "sim_booking"
         ? `Bay Sheet: ${line.tee_date ?? ""} ${line.tee_time ?? ""}`.trim()
-        : line.sku);
+        : line.kind === "membership"
+          ? "Membership"
+          : line.sku);
 
   return (
     <tr className="border-b border-[#e4e4e8] align-middle">
@@ -755,7 +757,7 @@ function SalesLineRow({
           onKeyDown={(event) => {
             if (event.key === "Enter") event.currentTarget.blur();
           }}
-          title={fixed ? "One player per line" : undefined}
+          title={fixed ? (line.kind === "membership" ? "One membership per line" : "One per line") : undefined}
           value={qty}
         />
       </td>

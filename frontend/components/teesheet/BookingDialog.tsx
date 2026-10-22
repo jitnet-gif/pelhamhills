@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
@@ -50,6 +51,39 @@ const FOCUSABLE =
 const FIELD =
   "w-full border border-[#d4d4d8] bg-white px-2 py-1.5 text-xs outline-none focus:border-[#4533ff] disabled:bg-[#f2f2f4] disabled:text-[#9aa0a6]";
 const LABEL = "block text-[11px] font-bold uppercase tracking-wide text-[#4e5560]";
+
+/** 검색에서 고른 사람으로 한 줄을 채운다. 회원권이 있으면 요금제도 회원 요금제로. */
+function playerFromHit(hit: MemberHit): PlayerDraft {
+  return {
+    firstName: hit.firstName || hit.name,
+    lastName: hit.lastName,
+    email: hit.email,
+    phone: hit.phone,
+    type: "Existing Customer",
+    ratePlan: hit.ratePlan,
+    linked: true,
+    customerRef: hit.customerRef ?? "",
+    memberNumber: hit.memberNumber,
+    memberLabel: memberSummary(hit) || "Customer",
+  };
+}
+
+/** 이름도 연결도 없는 줄 — 끌어 놓은 사람을 먼저 채울 자리. */
+function isBlank(player: PlayerDraft): boolean {
+  return !player.linked && player.firstName.trim() === "" && player.lastName.trim() === "";
+}
+
+/** 같은 사람이 이미 들어 있는가. 명부 번호가 있으면 그것으로, 없으면 이름+전화로 본다. */
+function alreadyIn(players: PlayerDraft[], hit: MemberHit): boolean {
+  return players.some((player) =>
+    hit.customerRef
+      ? player.linked && player.customerRef === hit.customerRef
+      : player.linked &&
+        `${player.firstName} ${player.lastName}`.trim().toLowerCase() ===
+          (hit.name || `${hit.firstName} ${hit.lastName}`).trim().toLowerCase() &&
+        player.phone === hit.phone,
+  );
+}
 
 function emptyPlayer(): PlayerDraft {
   return {
@@ -141,6 +175,13 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
   // 결과가 줄어 커서가 목록 밖이면 첫 줄로.
   const activeIndex = activeHit < hits.length ? activeHit : 0;
 
+  // 옆 칸 고객 검색: 찾은 사람을 플레이어 줄로 끌어 놓거나(+ 를 눌러) 넣는다.
+  const [lookup, setLookup] = useState("");
+  const { hits: lookupHits, loading: lookingUp } = useMemberSearch(lookup, open);
+  const [dragHit, setDragHit] = useState<MemberHit | null>(null);
+  /** 끌고 있는 사람이 지금 올라가 있는 곳: 줄 번호, 또는 "new"(새 줄로 더하기). */
+  const [dropTarget, setDropTarget] = useState<number | "new" | null>(null);
+
   const panelRef = useRef<HTMLDivElement | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const seededRef = useRef(false);
@@ -174,6 +215,9 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
     setTitleTouched(false);
     setNotes("");
     setPlayers([emptyPlayer()]);
+    setLookup("");
+    setDragHit(null);
+    setDropTarget(null);
 
     // controller.slots는 focusedDate 기준으로 로드되므로, 요금/슬롯 목록이
     // 다이얼로그의 날짜와 항상 같은 날을 가리키도록 시트를 그 날짜로 이동시킨다.
@@ -273,21 +317,53 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
     setActiveHit(0);
   }
 
-  /** 자동검색에서 고른 사람으로 그 줄을 채운다. 회원권이 있으면 요금제도 회원 요금제로. */
+  /** 자동검색에서 고른 사람으로 그 줄을 채운다. */
   function pickMember(index: number, hit: MemberHit) {
-    updatePlayer(index, {
-      firstName: hit.firstName || hit.name,
-      lastName: hit.lastName,
-      email: hit.email,
-      phone: hit.phone,
-      type: "Existing Customer",
-      ratePlan: hit.ratePlan,
-      linked: true,
-      customerRef: hit.customerRef ?? "",
-      memberNumber: hit.memberNumber,
-      memberLabel: memberSummary(hit) || "Customer",
+    updatePlayer(index, playerFromHit(hit));
+    setSearchRow(null);
+  }
+
+  /**
+   * 고객 검색 칸에서 끌어 놓은(또는 + 를 누른) 사람을 넣는다. 줄 위에 놓으면 그 줄을 바꾸고,
+   * 그 밖이면 첫 빈 줄을 채우거나 줄을 하나 더한다. 자리가 없으면 넣지 않는다.
+   */
+  function placeMember(hit: MemberHit, target: number | "new") {
+    setPlayers((current) => {
+      if (alreadyIn(current, hit)) return current;
+      const index = target === "new" ? current.findIndex(isBlank) : target;
+      if (index >= 0 && index < current.length) {
+        return current.map((player, i) => (i === index ? playerFromHit(hit) : player));
+      }
+      return current.length >= SEATS_PER_TEE_TIME ? current : [...current, playerFromHit(hit)];
     });
     setSearchRow(null);
+  }
+
+  function endDrag() {
+    setDragHit(null);
+    setDropTarget(null);
+  }
+
+  /** 놓을 수 있는 곳에 붙이는 핸들러. dragover 에서 preventDefault 를 해야 놓기가 된다. */
+  function dropProps(target: number | "new") {
+    return {
+      onDragOver: (event: DragEvent) => {
+        if (!dragHit) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        if (dropTarget !== target) setDropTarget(target);
+      },
+      onDragLeave: (event: DragEvent) => {
+        // 안쪽 칸으로 옮겨 갈 때도 dragleave 가 터지므로 정말 나갔을 때만 지운다.
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        if (dropTarget === target) setDropTarget(null);
+      },
+      onDrop: (event: DragEvent) => {
+        event.preventDefault();
+        if (dragHit) placeMember(dragHit, target);
+        endDrag();
+      },
+    };
   }
 
   function unlinkMember(index: number) {
@@ -378,7 +454,7 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
       <div
         aria-labelledby="booking-dialog-title"
         aria-modal="true"
-        className="my-6 w-full max-w-3xl rounded border border-[#d4d4d8] bg-white shadow-lg"
+        className="my-6 w-full max-w-5xl rounded border border-[#d4d4d8] bg-white shadow-lg"
         ref={panelRef}
         role="dialog"
       >
@@ -397,268 +473,377 @@ export default function BookingDialog({ open, controller, initial, onClose }: Bo
             </button>
           </div>
 
-          <div className="grid gap-4 px-4 py-4">
-            {/* ===== 예약 정보 ===== */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="grid gap-1">
-                <span className={LABEL}>Date</span>
-                <input
-                  className={FIELD}
-                  onChange={(event) => handleDateChange(event.target.value)}
-                  ref={firstFieldRef}
-                  required
-                  type="date"
-                  value={date}
-                />
-              </label>
-
-              <label className="grid gap-1">
-                <span className={LABEL}>Tee time</span>
-                <select
-                  className={FIELD}
-                  disabled={slots.length === 0}
-                  onChange={(event) => {
-                    setTime(event.target.value);
-                    setRateTouched(false);
-                  }}
-                  required
-                  value={time}
-                >
-                  {slots.length === 0 ? (
-                    <option value="">No tee times loaded</option>
-                  ) : (
-                    <>
-                      <option value="">Select a tee time…</option>
-                      {slots.map((slot) => {
-                        // 꽉 찬 슬롯만 비활성화한다. 일부만 찬 슬롯은 남은 좌석을 알려 주고
-                        // 고를 수 있게 둔다 — 그것이 분할 예약이 생기는 정상 경로다.
-                        const free = seatsFree(seatsTaken, slot.time);
-                        const dark = isSlotLocked(date, slot.minutes, locks);
-                        return (
-                          <option disabled={free === 0 || dark} key={slot.time} value={slot.time}>
-                            {dark ? "🔒 " : ""}
-                            {slot.time} · {money(slot.rate)}
-                            {dark
-                              ? " · locked"
-                              : free === 0
-                              ? " · full"
-                              : free <= SEATS_PER_TEE_TIME - STANDARD_SEATS_PER_TEE_TIME
-                                ? ` · 4 full · +${free} extra`
-                                : free < SEATS_PER_TEE_TIME
-                                  ? ` · ${free - (SEATS_PER_TEE_TIME - STANDARD_SEATS_PER_TEE_TIME)} of ${STANDARD_SEATS_PER_TEE_TIME} seats left`
-                                  : ""}
-                          </option>
-                        );
-                      })}
-                    </>
-                  )}
-                </select>
-              </label>
-
-              <label className="grid gap-1">
-                <span className={LABEL}>Holes</span>
-                <select
-                  className={FIELD}
-                  onChange={(event) => setHoles(Number(event.target.value) === 9 ? 9 : 18)}
-                  value={holes}
-                >
-                  <option value={9}>9 holes</option>
-                  <option value={18}>18 holes</option>
-                </select>
-              </label>
-
-              <label className="grid gap-1">
-                <span className={LABEL}>Rate</span>
-                <input
-                  className={FIELD}
-                  inputMode="decimal"
-                  min="0"
-                  onChange={(event) => {
-                    setRateInput(event.target.value);
-                    setRateTouched(true);
-                  }}
-                  step="0.01"
-                  type="number"
-                  value={rate}
-                />
-              </label>
-
-              <label className="grid gap-1">
-                <span className={LABEL}>Carts</span>
-                <select
-                  className={FIELD}
-                  onChange={(event) => setCartCount(Number(event.target.value))}
-                  value={cartCount}
-                >
-                  {[0, 1, 2, 3, 4].map((count) => (
-                    <option key={count} value={count}>
-                      {count}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid gap-1 sm:col-span-2 lg:col-span-3">
-                <span className={LABEL}>Title</span>
-                <input
-                  className={FIELD}
-                  onChange={(event) => {
-                    setTitle(event.target.value);
-                    setTitleTouched(true);
-                  }}
-                  placeholder="Last, First"
-                  type="text"
-                  value={resolvedTitle}
-                />
-              </label>
-            </div>
-
-            <label className="grid gap-1">
-              <span className={LABEL}>Notes</span>
-              <textarea
-                className={`${FIELD} min-h-[56px] resize-y`}
-                onChange={(event) => setNotes(event.target.value)}
-                value={notes}
-              />
-            </label>
-
-            {/* ===== 플레이어 (1–4명, 직원은 4명 더 = 최대 8명) ===== */}
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <span className={LABEL}>
-                  Players ({Math.min(players.length, STANDARD_SEATS_PER_TEE_TIME)}/{STANDARD_SEATS_PER_TEE_TIME}
-                  {players.length > STANDARD_SEATS_PER_TEE_TIME
-                    ? ` +${players.length - STANDARD_SEATS_PER_TEE_TIME} extra`
-                    : ""}
-                  )
-                </span>
-                <button
-                  className="border border-[#d4d4d8] bg-white px-2 py-1 text-xs font-bold hover:bg-[#f2f2f4] disabled:opacity-40"
-                  disabled={players.length >= SEATS_PER_TEE_TIME}
-                  onClick={addPlayer}
-                  type="button"
-                >
-                  Add player +
-                </button>
-              </div>
-
-              {players.map((player, index) => (
-                <div className="relative grid gap-2 rounded border border-[#ececf0] p-2 lg:grid-cols-6" key={index}>
+          <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="grid min-w-0 content-start gap-4">
+              {/* ===== 예약 정보 ===== */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="grid gap-1">
+                  <span className={LABEL}>Date</span>
                   <input
-                    aria-autocomplete="list"
-                    aria-controls={`member-search-${index}`}
-                    aria-expanded={searchOpen && searchRow === index}
-                    aria-label={`Player ${index + 1} first name`}
-                    autoComplete="off"
                     className={FIELD}
-                    onBlur={() => setSearchRow(null)}
-                    onChange={(event) => updateName(index, { firstName: event.target.value })}
-                    onFocus={() => setSearchRow(index)}
-                    onKeyDown={(event) => handleNameKeyDown(index, event)}
-                    placeholder="First name — type to search members"
-                    role="combobox"
-                    type="text"
-                    value={player.firstName}
+                    onChange={(event) => handleDateChange(event.target.value)}
+                    ref={firstFieldRef}
+                    required
+                    type="date"
+                    value={date}
                   />
-                  <input
-                    aria-autocomplete="list"
-                    aria-controls={`member-search-${index}`}
-                    aria-expanded={searchOpen && searchRow === index}
-                    aria-label={`Player ${index + 1} last name`}
-                    autoComplete="off"
-                    className={FIELD}
-                    onBlur={() => setSearchRow(null)}
-                    onChange={(event) => updateName(index, { lastName: event.target.value })}
-                    onFocus={() => setSearchRow(index)}
-                    onKeyDown={(event) => handleNameKeyDown(index, event)}
-                    placeholder="Last name"
-                    role="combobox"
-                    type="text"
-                    value={player.lastName}
-                  />
-                  <input
-                    aria-label={`Player ${index + 1} email`}
-                    className={FIELD}
-                    onChange={(event) => updatePlayer(index, { email: event.target.value })}
-                    placeholder="Email"
-                    type="email"
-                    value={player.email}
-                  />
-                  <input
-                    aria-label={`Player ${index + 1} phone`}
-                    className={FIELD}
-                    onChange={(event) => updatePlayer(index, { phone: event.target.value })}
-                    placeholder="Phone"
-                    type="tel"
-                    value={player.phone}
-                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className={LABEL}>Tee time</span>
                   <select
-                    aria-label={`Player ${index + 1} type`}
                     className={FIELD}
-                    onChange={(event) =>
-                      updatePlayer(index, { type: event.target.value as PlayerType })
-                    }
-                    value={player.type}
+                    disabled={slots.length === 0}
+                    onChange={(event) => {
+                      setTime(event.target.value);
+                      setRateTouched(false);
+                    }}
+                    required
+                    value={time}
                   >
-                    {PLAYER_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
+                    {slots.length === 0 ? (
+                      <option value="">No tee times loaded</option>
+                    ) : (
+                      <>
+                        <option value="">Select a tee time…</option>
+                        {slots.map((slot) => {
+                          // 꽉 찬 슬롯만 비활성화한다. 일부만 찬 슬롯은 남은 좌석을 알려 주고
+                          // 고를 수 있게 둔다 — 그것이 분할 예약이 생기는 정상 경로다.
+                          const free = seatsFree(seatsTaken, slot.time);
+                          const dark = isSlotLocked(date, slot.minutes, locks);
+                          return (
+                            <option disabled={free === 0 || dark} key={slot.time} value={slot.time}>
+                              {dark ? "🔒 " : ""}
+                              {slot.time} · {money(slot.rate)}
+                              {dark
+                                ? " · locked"
+                                : free === 0
+                                ? " · full"
+                                : free <= SEATS_PER_TEE_TIME - STANDARD_SEATS_PER_TEE_TIME
+                                  ? ` · 4 full · +${free} extra`
+                                  : free < SEATS_PER_TEE_TIME
+                                    ? ` · ${free - (SEATS_PER_TEE_TIME - STANDARD_SEATS_PER_TEE_TIME)} of ${STANDARD_SEATS_PER_TEE_TIME} seats left`
+                                    : ""}
+                            </option>
+                          );
+                        })}
+                      </>
+                    )}
+                  </select>
+                </label>
+
+                <label className="grid gap-1">
+                  <span className={LABEL}>Holes</span>
+                  <select
+                    className={FIELD}
+                    onChange={(event) => setHoles(Number(event.target.value) === 9 ? 9 : 18)}
+                    value={holes}
+                  >
+                    <option value={9}>9 holes</option>
+                    <option value={18}>18 holes</option>
+                  </select>
+                </label>
+
+                <label className="grid gap-1">
+                  <span className={LABEL}>Rate</span>
+                  <input
+                    className={FIELD}
+                    inputMode="decimal"
+                    min="0"
+                    onChange={(event) => {
+                      setRateInput(event.target.value);
+                      setRateTouched(true);
+                    }}
+                    step="0.01"
+                    type="number"
+                    value={rate}
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className={LABEL}>Carts</span>
+                  <select
+                    className={FIELD}
+                    onChange={(event) => setCartCount(Number(event.target.value))}
+                    value={cartCount}
+                  >
+                    {[0, 1, 2, 3, 4].map((count) => (
+                      <option key={count} value={count}>
+                        {count}
                       </option>
                     ))}
                   </select>
-                  <div className="flex gap-2">
+                </label>
+
+                <label className="grid gap-1 sm:col-span-2 lg:col-span-3">
+                  <span className={LABEL}>Title</span>
+                  <input
+                    className={FIELD}
+                    onChange={(event) => {
+                      setTitle(event.target.value);
+                      setTitleTouched(true);
+                    }}
+                    placeholder="Last, First"
+                    type="text"
+                    value={resolvedTitle}
+                  />
+                </label>
+              </div>
+
+              <label className="grid gap-1">
+                <span className={LABEL}>Notes</span>
+                <textarea
+                  className={`${FIELD} min-h-[56px] resize-y`}
+                  onChange={(event) => setNotes(event.target.value)}
+                  value={notes}
+                />
+              </label>
+
+              {/* ===== 플레이어 (1–4명, 직원은 4명 더 = 최대 8명) ===== */}
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <span className={LABEL}>
+                    Players ({Math.min(players.length, STANDARD_SEATS_PER_TEE_TIME)}/{STANDARD_SEATS_PER_TEE_TIME}
+                    {players.length > STANDARD_SEATS_PER_TEE_TIME
+                      ? ` +${players.length - STANDARD_SEATS_PER_TEE_TIME} extra`
+                      : ""}
+                    )
+                  </span>
+                  <button
+                    className="border border-[#d4d4d8] bg-white px-2 py-1 text-xs font-bold hover:bg-[#f2f2f4] disabled:opacity-40"
+                    disabled={players.length >= SEATS_PER_TEE_TIME}
+                    onClick={addPlayer}
+                    type="button"
+                  >
+                    Add player +
+                  </button>
+                </div>
+
+                {players.map((player, index) => (
+                  <div
+                    className={`relative grid gap-2 rounded border p-2 lg:grid-cols-6 ${
+                      dropTarget === index
+                        ? "border-dashed border-[#4533ff] bg-[#eeecff]"
+                        : dragHit
+                          ? "border-dashed border-[#b8b2ff]"
+                          : "border-[#ececf0]"
+                    }`}
+                    key={index}
+                    {...dropProps(index)}
+                  >
                     <input
-                      aria-label={`Player ${index + 1} rate plan`}
+                      aria-autocomplete="list"
+                      aria-controls={`member-search-${index}`}
+                      aria-expanded={searchOpen && searchRow === index}
+                      aria-label={`Player ${index + 1} first name`}
+                      autoComplete="off"
                       className={FIELD}
-                      onChange={(event) => updatePlayer(index, { ratePlan: event.target.value })}
-                      placeholder="Rate plan"
+                      onBlur={() => setSearchRow(null)}
+                      onChange={(event) => updateName(index, { firstName: event.target.value })}
+                      onFocus={() => setSearchRow(index)}
+                      onKeyDown={(event) => handleNameKeyDown(index, event)}
+                      placeholder="First name — type to search members"
+                      role="combobox"
                       type="text"
-                      value={player.ratePlan}
+                      value={player.firstName}
                     />
-                    <button
-                      aria-label={`Remove player ${index + 1}`}
-                      className="shrink-0 border border-[#d4d4d8] bg-white px-2 text-xs font-bold text-[#8a3f26] hover:bg-[#f2f2f4] disabled:opacity-30"
-                      disabled={players.length <= 1}
-                      onClick={() => removePlayer(index)}
-                      type="button"
+                    <input
+                      aria-autocomplete="list"
+                      aria-controls={`member-search-${index}`}
+                      aria-expanded={searchOpen && searchRow === index}
+                      aria-label={`Player ${index + 1} last name`}
+                      autoComplete="off"
+                      className={FIELD}
+                      onBlur={() => setSearchRow(null)}
+                      onChange={(event) => updateName(index, { lastName: event.target.value })}
+                      onFocus={() => setSearchRow(index)}
+                      onKeyDown={(event) => handleNameKeyDown(index, event)}
+                      placeholder="Last name"
+                      role="combobox"
+                      type="text"
+                      value={player.lastName}
+                    />
+                    <input
+                      aria-label={`Player ${index + 1} email`}
+                      className={FIELD}
+                      onChange={(event) => updatePlayer(index, { email: event.target.value })}
+                      placeholder="Email"
+                      type="email"
+                      value={player.email}
+                    />
+                    <input
+                      aria-label={`Player ${index + 1} phone`}
+                      className={FIELD}
+                      onChange={(event) => updatePlayer(index, { phone: event.target.value })}
+                      placeholder="Phone"
+                      type="tel"
+                      value={player.phone}
+                    />
+                    <select
+                      aria-label={`Player ${index + 1} type`}
+                      className={FIELD}
+                      onChange={(event) =>
+                        updatePlayer(index, { type: event.target.value as PlayerType })
+                      }
+                      value={player.type}
                     >
-                      ×
-                    </button>
-                  </div>
-                  {player.linked ? (
-                    <div className="flex items-center gap-2 text-[11px] font-semibold text-[#2f7d4f] lg:col-span-6">
-                      <span>✓ Linked: {player.memberLabel}</span>
-                      {player.ratePlan ? <span className="text-[#4e5560]">· {player.ratePlan}</span> : null}
+                      {PLAYER_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        aria-label={`Player ${index + 1} rate plan`}
+                        className={FIELD}
+                        onChange={(event) => updatePlayer(index, { ratePlan: event.target.value })}
+                        placeholder="Rate plan"
+                        type="text"
+                        value={player.ratePlan}
+                      />
                       <button
-                        className="ml-auto text-[#6b7280] underline hover:text-[#1f2328]"
-                        onClick={() => unlinkMember(index)}
+                        aria-label={`Remove player ${index + 1}`}
+                        className="shrink-0 border border-[#d4d4d8] bg-white px-2 text-xs font-bold text-[#8a3f26] hover:bg-[#f2f2f4] disabled:opacity-30"
+                        disabled={players.length <= 1}
+                        onClick={() => removePlayer(index)}
                         type="button"
                       >
-                        Unlink
+                        ×
                       </button>
                     </div>
-                  ) : null}
-                  {searchRow === index ? (
-                    <MemberSuggestions
-                      active={activeIndex}
-                      hits={hits}
-                      id={`member-search-${index}`}
-                      loading={searching}
-                      onHover={setActiveHit}
-                      onPick={(hit) => pickMember(index, hit)}
-                    />
-                  ) : null}
-                </div>
-              ))}
+                    {player.linked ? (
+                      <div className="flex items-center gap-2 text-[11px] font-semibold text-[#2f7d4f] lg:col-span-6">
+                        <span>✓ Linked: {player.memberLabel}</span>
+                        {player.ratePlan ? <span className="text-[#4e5560]">· {player.ratePlan}</span> : null}
+                        <button
+                          className="ml-auto text-[#6b7280] underline hover:text-[#1f2328]"
+                          onClick={() => unlinkMember(index)}
+                          type="button"
+                        >
+                          Unlink
+                        </button>
+                      </div>
+                    ) : null}
+                    {searchRow === index ? (
+                      <MemberSuggestions
+                        active={activeIndex}
+                        hits={hits}
+                        id={`member-search-${index}`}
+                        loading={searching}
+                        onHover={setActiveHit}
+                        onPick={(hit) => pickMember(index, hit)}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+
+                {dragHit && players.length < SEATS_PER_TEE_TIME ? (
+                  <div
+                    className={`rounded border border-dashed px-2 py-3 text-center text-xs font-semibold ${
+                      dropTarget === "new"
+                        ? "border-[#4533ff] bg-[#eeecff] text-[#4533ff]"
+                        : "border-[#b8b2ff] text-[#6b7280]"
+                    }`}
+                    {...dropProps("new")}
+                  >
+                    Drop here to add as a new player
+                  </div>
+                ) : null}
+              </div>
+
+              {time !== "" && players.length > freeSeats ? (
+                <p className="text-xs font-semibold text-[#8a3f26]">
+                  {freeSeats === 0
+                    ? `${time} is full — all ${SEATS_PER_TEE_TIME} seats (4 + 4 extra) are taken. Pick another tee time.`
+                    : `${time} has only ${freeSeats} of ${SEATS_PER_TEE_TIME} seats (4 + 4 extra) left, but you are booking ${players.length} players. Remove a player or pick another tee time.`}
+                </p>
+              ) : null}
             </div>
 
-            {time !== "" && players.length > freeSeats ? (
-              <p className="text-xs font-semibold text-[#8a3f26]">
-                {freeSeats === 0
-                  ? `${time} is full — all ${SEATS_PER_TEE_TIME} seats (4 + 4 extra) are taken. Pick another tee time.`
-                  : `${time} has only ${freeSeats} of ${SEATS_PER_TEE_TIME} seats (4 + 4 extra) left, but you are booking ${players.length} players. Remove a player or pick another tee time.`}
+            {/* ===== 고객 검색: 결과 카드를 플레이어 줄로 끌어 놓는다 ===== */}
+            <aside className="grid content-start gap-2 lg:border-l lg:border-[#ececf0] lg:pl-4">
+              <label className="grid gap-1">
+                <span className={LABEL}>Find customer</span>
+                <input
+                  autoComplete="off"
+                  className={FIELD}
+                  onChange={(event) => setLookup(event.target.value)}
+                  onKeyDown={(event) => {
+                    // 이 칸의 Enter 는 예약 제출이 아니라 첫 결과 넣기다.
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    const first = lookupHits[0];
+                    if (first) placeMember(first, "new");
+                  }}
+                  placeholder="Name, phone or member #"
+                  type="search"
+                  value={lookup}
+                />
+              </label>
+              <p className="text-[11px] text-[#6b7280]">
+                Drag a customer onto a player row, or press + to add them.
               </p>
-            ) : null}
+              <ul className="grid max-h-[420px] gap-1.5 overflow-y-auto">
+                {lookup.trim().length < 2 ? null : lookingUp ? (
+                  <li className="px-1 py-1 text-xs text-[#6b7280]">Searching…</li>
+                ) : lookupHits.length === 0 ? (
+                  <li className="px-1 py-1 text-xs text-[#6b7280]">No customers found.</li>
+                ) : (
+                  lookupHits.map((hit, index) => {
+                    const summary = memberSummary(hit);
+                    const added = alreadyIn(players, hit);
+                    const full = players.length >= SEATS_PER_TEE_TIME && !players.some(isBlank);
+                    return (
+                      <li
+                        className={`flex items-center gap-2 rounded border bg-white px-2 py-1.5 text-xs ${
+                          added ? "border-[#ececf0] opacity-50" : "cursor-grab border-[#d4d4d8] hover:border-[#4533ff]"
+                        } ${dragHit === hit ? "opacity-40" : ""}`}
+                        draggable={!added}
+                        key={`${hit.customerRef ?? "m"}-${index}`}
+                        onDragEnd={endDrag}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "copy";
+                          event.dataTransfer.setData("text/plain", hit.name);
+                          // Chrome 은 dragstart 안에서 DOM 이 바뀌면 끌기를 취소하므로 놓을 곳은 다음 틱에 띄운다.
+                          window.setTimeout(() => setDragHit(hit), 0);
+                        }}
+                      >
+                        <span aria-hidden className="text-[#9aa0a6]">
+                          ⠿
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-bold">
+                            {hit.name || `${hit.firstName} ${hit.lastName}`.trim()}
+                          </span>
+                          <span className="block truncate text-[11px] text-[#6b7280]">
+                            {[hit.phone, hit.email].filter(Boolean).join(" · ") || "No contact"}
+                          </span>
+                          {summary ? (
+                            <span
+                              className={`block truncate text-[11px] font-semibold ${
+                                hit.isMember ? "text-[#2f7d4f]" : "text-[#6b7280]"
+                              }`}
+                            >
+                              {summary}
+                            </span>
+                          ) : null}
+                        </span>
+                        <button
+                          aria-label={`Add ${hit.name} as a player`}
+                          className="shrink-0 border border-[#d4d4d8] bg-white px-2 py-0.5 font-bold hover:bg-[#f2f2f4] disabled:opacity-30"
+                          disabled={added || full}
+                          onClick={() => placeMember(hit, "new")}
+                          type="button"
+                        >
+                          {added ? "✓" : "+"}
+                        </button>
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+            </aside>
           </div>
 
           <div className="flex items-center justify-end gap-2 border-t border-[#d4d4d8] px-4 py-3">

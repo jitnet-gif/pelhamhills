@@ -9,7 +9,7 @@
  *  화면에서 가로로 밀어 가며 쓰는 것은 카운터에서 실제로 못 쓴다.)
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import CameraScanner, { type ScanOutcome } from "@/components/pos/CameraScanner";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
@@ -18,6 +18,7 @@ import retailApi, { toRetailError } from "@/lib/retail/api";
 import { code128Svg, houseBarcode, isHouseBarcode } from "@/lib/retail/barcode";
 import { LABEL_LAYOUTS, printBarcodeLabels, type LabelLayout } from "@/lib/retail/barcodeLabels";
 import { menuGroupSuggestions } from "@/lib/retail/menuGroups";
+import { setProductPhoto, uploadProductPhoto } from "@/lib/retail/productPhoto";
 import {
   LOW_STOCK_RED_BELOW,
   RETAIL_CATEGORIES,
@@ -256,12 +257,15 @@ export default function ProductsTab({
             {visible.map((product) => (
               <li className="min-w-0 border border-[#d4d4d8] bg-white p-3" key={product.id}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Thumb product={product} />
+                    <div className="min-w-0">
                     <p className="text-sm leading-tight font-bold">{product.name}</p>
                     <p className="truncate text-xs text-[#6b7280]">
                       {product.sku}{product.barcode ? ` · ${product.barcode}` : ""} · {product.category}
                       {product.menu_group ? ` › ${product.menu_group}` : ""}
                     </p>
+                    </div>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-base font-bold tabular-nums">{formatMoney(product.price)}</p>
@@ -325,7 +329,12 @@ export default function ProductsTab({
                       {product.sku}
                       {product.barcode ? <span className="block text-[#6b7280]">{product.barcode}</span> : null}
                     </Td>
-                    <Td className="font-bold">{product.name}</Td>
+                    <Td className="font-bold">
+                      <span className="flex items-center gap-2">
+                        <Thumb product={product} />
+                        {product.name}
+                      </span>
+                    </Td>
                     <Td className="text-[#6b7280]">{product.category}</Td>
                     <Td className="text-[#6b7280]">{product.menu_group || "—"}</Td>
                     <Td align="right">
@@ -389,6 +398,7 @@ export default function ProductsTab({
           defaultCategory={defaultCategory}
           onClose={() => setEditing(null)}
           onOpenExisting={(existing) => setEditing(existing)}
+          onPhotoChanged={onChanged}
           onSaved={() => {
             setEditing(null);
             onChanged();
@@ -522,6 +532,13 @@ function LabelDialog({ items, onClose }: { items: Product[]; onClose: () => void
   );
 }
 
+/** 상품 사진 미리보기. 사진이 없으면 아무것도 그리지 않는다. */
+function Thumb({ product }: { product: Product }) {
+  if (!product.photo_url) return null;
+  // eslint-disable-next-line @next/next/no-img-element -- Storage 공개 주소, 최적화 대상 아님
+  return <img alt="" className="size-10 shrink-0 border border-[#e4e4e8] object-cover" src={product.photo_url} />;
+}
+
 /** 렌탈은 `stock: null` — 재고 개념이 없다. 0 과 같이 보이면 품절로 오해한다. */
 function StockText({ product }: { product: Product }) {
   if (product.stock === null) return <span className="text-[#6b7280]">Not tracked</span>;
@@ -620,6 +637,7 @@ function ProductDialog({
   onClose,
   onSaved,
   onOpenExisting,
+  onPhotoChanged,
 }: {
   product: Product | null;
   /** 그룹 칸의 제안 목록을 만든다. */
@@ -631,11 +649,63 @@ function ProductDialog({
   onSaved: () => void;
   /** 겹치는 상품을 이 창 대신 연다. */
   onOpenExisting: (existing: Product) => void;
+  /** 사진은 저장 버튼과 상관없이 바로 바뀐다. 목록을 다시 읽게 한다. */
+  onPhotoChanged: () => void;
 }) {
   const [form, setForm] = useState<FormState>(() => toForm(product, defaultCategory));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
+  // 사진(0068). 있는 상품은 고르는 즉시 올린다. 새 상품은 id 가 없으므로 들고 있다가 저장 뒤에 올린다.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(product?.photo_url ?? null);
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!pendingPreview) return;
+    return () => URL.revokeObjectURL(pendingPreview);
+  }, [pendingPreview]);
+
+  async function onPhotoPicked(file: File | undefined) {
+    if (!file) return;
+    setError("");
+    if (!product) {
+      setPendingPhoto(file);
+      setPendingPreview(URL.createObjectURL(file));
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const updated = await uploadProductPhoto(product.id, file);
+      setPhotoUrl(updated.photo_url ?? null);
+      onPhotoChanged();
+    } catch (cause) {
+      setError(toRetailError(cause).message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    setError("");
+    if (!product) {
+      setPendingPhoto(null);
+      setPendingPreview(null);
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      await setProductPhoto(product.id, null);
+      setPhotoUrl(null);
+      onPhotoChanged();
+    } catch (cause) {
+      setError(toRetailError(cause).message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   const groupOptions = useMemo(
     () => menuGroupSuggestions(allProducts, form.category),
     [allProducts, form.category],
@@ -716,8 +786,19 @@ function ProductDialog({
     };
 
     try {
-      if (product) await retailApi.updateProduct(product.id, payload);
-      else await retailApi.createProduct(payload);
+      if (product) {
+        await retailApi.updateProduct(product.id, payload);
+      } else {
+        const created = await retailApi.createProduct(payload);
+        if (pendingPhoto) {
+          try {
+            await uploadProductPhoto(created.id, pendingPhoto);
+          } catch (cause) {
+            // 상품은 만들어졌다. 창을 닫지 않으면 다시 저장해 같은 SKU 가 겹친다 — 닫고 알려 준다.
+            window.alert(`The product was saved, but the photo was not: ${toRetailError(cause).message} Open it with Edit to add the photo again.`);
+          }
+        }
+      }
       onSaved();
     } catch (cause) {
       setError(toRetailError(cause).message);
@@ -752,6 +833,39 @@ function ProductDialog({
                   value={form.barcode}
                 />
               </div>
+            </div>
+          </Field>
+
+          <Field hint="For items without a barcode — the register camera finds the product from this photo" label="Photo">
+            <div className="flex min-w-0 items-center gap-3">
+              {pendingPreview || photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- Storage 공개 주소·로컬 미리보기
+                <img alt="" className="size-20 shrink-0 border border-[#d4d4d8] object-cover" src={pendingPreview ?? photoUrl ?? ""} />
+              ) : (
+                <span className="flex size-20 shrink-0 items-center justify-center border border-dashed border-[#d4d4d8] text-xs text-[#6b7280]">
+                  No photo
+                </span>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={photoBusy} onClick={() => photoInputRef.current?.click()}>
+                  {photoBusy ? "Uploading…" : pendingPreview || photoUrl ? "📷 Retake" : "📷 Take photo"}
+                </Button>
+                {pendingPreview || photoUrl ? (
+                  <Button disabled={photoBusy} onClick={removePhoto} tone="danger">
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+              <input
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  void onPhotoPicked(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+                ref={photoInputRef}
+                type="file"
+              />
             </div>
           </Field>
 

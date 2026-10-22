@@ -19,10 +19,11 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import BillPanel from "@/components/pos/BillPanel";
-import CameraScanner, { type ScanOutcome } from "@/components/pos/CameraScanner";
+import CameraScanner, { type PhotoOutcome, type ScanOutcome } from "@/components/pos/CameraScanner";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import type { BillStation, OpenItemInput } from "@/lib/pos/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
+import { matchPhoto } from "@/lib/retail/productPhoto";
 import { billActions, useCurrentBill } from "@/lib/pos/currentBill";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
 import { groupProducts, type MenuGroup } from "@/lib/retail/menuGroups";
@@ -230,6 +231,45 @@ export default function RegisterTab({
       : { ok: false, message: `Could not add ${product.name} — the bill shows why. Try again.` };
   }
 
+  /**
+   * 사진으로 찾기(0068). 서버가 확실하다고 한 것이 하나면 바로 담고, 아니면 후보를 띄워 직원이 누른다.
+   * 후보는 지금 계산대가 담을 수 있는 상품만(스캔과 같은 목록, 활성).
+   */
+  async function handleCameraPhoto(image: string): Promise<PhotoOutcome> {
+    if (loading) return { ok: false, message: "Products are still loading — try again in a moment." };
+    if (demo) return { ok: false, message: "Demo data — the server is not connected, nothing was added." };
+    const result = await matchPhoto(image);
+    const catalog = scanProducts ?? products;
+    const found = result.candidates
+      .map((candidate) => catalog.find((item) => item.id === candidate.product_id && item.is_active))
+      .filter((item): item is Product => Boolean(item));
+    if (found.length === 0) {
+      return {
+        ok: false,
+        message:
+          result.compared === 0
+            ? "No product has a photo yet. Add photos on the Products tab (Edit → Photo)."
+            : result.note || "Couldn't tell which product this is. Try again closer, or pick it by hand.",
+      };
+    }
+    const add = async (product: Product): Promise<ScanOutcome> =>
+      (await addToBill(product))
+        ? { ok: true, message: `${product.name} · ${formatMoney(product.price)}` }
+        : { ok: false, message: `Could not add ${product.name} — the bill shows why. Try again.` };
+    if (result.status === "match") return add(found[0]);
+    return {
+      ok: false,
+      message: result.note,
+      choices: found.map((product) => ({
+        key: String(product.id),
+        label: product.name,
+        detail: `${formatMoney(product.price)} · ${product.sku}`,
+        imageUrl: product.photo_url,
+        pick: () => add(product),
+      })),
+    };
+  }
+
   function payFromCamera() {
     setCameraOpen(false);
     if (!window.matchMedia("(min-width: 1024px)").matches) setSheetOpen(true);
@@ -384,6 +424,7 @@ export default function RegisterTab({
           onClose={() => setCameraOpen(false)}
           onCode={handleCameraCode}
           onDone={payFromCamera}
+          onPhoto={handleCameraPhoto}
           summary={
             <>
               <span className="block text-xs font-bold text-[#6b7280]">

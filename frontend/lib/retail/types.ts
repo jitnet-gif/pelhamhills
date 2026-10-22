@@ -41,6 +41,8 @@ export type Product = {
   category: RetailCategory;
   /** 계산대의 메뉴 그룹(Lightspeed 의 그룹 버튼, 예: "Hot Food"). 없으면 null(0030 이전 응답엔 키가 없다). */
   menu_group?: string | null;
+  /** 상품 사진(계산대 카메라가 사진으로 알아보는 데 쓴다). 없으면 null(0068 이전 응답엔 키가 없다). */
+  photo_url?: string | null;
   /** 판매가(센트). */
   price: Cents;
   /** 원가(센트). 마진 계산용이라 고객 화면에는 절대 내보내지 않는다. */
@@ -83,8 +85,8 @@ export type ProductUpdate = Partial<ProductCreate>;
 export type SaleLine = {
   /** 계산서 줄 id. Supabase 계산서(0005)에서만 온다. */
   id?: number;
-  /** product = 상품, tee_player = 티 시트 플레이어의 그린피, sim_booking = 실내 골프 베이, open_item = 직접 친 이름·가격(0038). 없으면 product. */
-  kind?: "product" | "tee_player" | "sim_booking" | "open_item";
+  /** product = 상품, tee_player = 티 시트 플레이어의 그린피, sim_booking = 실내 골프 베이, open_item = 직접 친 이름·가격(0038), membership = 회원권(0072). 없으면 product. */
+  kind?: "product" | "tee_player" | "sim_booking" | "open_item" | "membership";
   /** 그린피 줄은 null. */
   product_id: number | null;
   /** 그린피 줄만: 티 타임 날짜(YYYY-MM-DD)와 시각 라벨. */

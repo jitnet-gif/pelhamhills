@@ -29,7 +29,7 @@ export type Bill = Omit<Sale, "lines" | "status" | "receipt_no"> & {
 export type BillLine = Sale["lines"][number] & {
   id: number;
   /** sim_booking = 실내 골프 베이 예약(0008). 날짜·시각은 tee_date·tee_time 칸을 같이 쓴다. */
-  kind: "product" | "tee_player" | "sim_booking" | "open_item";
+  kind: "product" | "tee_player" | "sim_booking" | "open_item" | "membership";
   category: string;
   booking_id: string | null;
   player_id: string | null;
@@ -54,6 +54,16 @@ export type PaymentInput = {
 };
 
 export type OpenItemInput = { name: string; price: Cents; quantity: number; category: string };
+
+/** 고객 파일의 Sell membership(0072). 가격은 서버가 요금표로 정한다. expires_on 은 'YYYY-MM-DD' 또는 ''. */
+export type MembershipSaleInput = {
+  customer_ref: string;
+  season: number;
+  membership_type: string;
+  plan: string;
+  cart_package: string | null;
+  expires_on: string;
+};
 
 /** 티 시트 예약 하나에 실렸던 결제·환불 계산서(0022). 온라인으로 낸 것이면 `online` 이 붙는다. */
 export type TeeBill = Bill & {
@@ -90,6 +100,9 @@ export const posApi = {
   /** 오픈 아이템(0038): 상품 목록에 없는 것을 이름·가격(센트)만으로 담는다. 재고와 상관없다. */
   addOpenItem: (bill: number, item: OpenItemInput) =>
     staffRpc<Bill>("pelham_staff_bill_add_open_item", { p_bill: bill, p: item }),
+  /** 회원권 한 줄(0072). 계산서가 결제되면 회원권이 납부(active)로 바뀐다. */
+  addMembership: (bill: number, sale: MembershipSaleInput) =>
+    staffRpc<Bill>("pelham_staff_bill_add_membership", { p_bill: bill, p: sale }),
   /** players 를 비우면 그 예약에서 아직 안 낸 사람 전부. */
   addTee: (bill: number, booking: string, players?: string[]) =>
     staffRpc<Bill>("pelham_staff_bill_add_tee", {

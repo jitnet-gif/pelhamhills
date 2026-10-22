@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
@@ -20,7 +21,9 @@ import {
   type MembershipStatus,
   type MembershipType,
 } from "@/lib/memberships";
+import { billActions, getBillState } from "@/lib/pos/currentBill";
 import { CLUB_TIME_ZONE } from "@/lib/retail/receipt";
+import { computeTax, formatMoney, TAX_RATE } from "@/lib/retail/types";
 import { ADMIN_HOME } from "@/lib/nav";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
@@ -286,6 +289,11 @@ export default function CustomersPage() {
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /** Sell membership 창을 연 고객. */
+  const [sellingRef, setSellingRef] = useState<string | null>(null);
+  /** 지우는 중인 고객. */
+  const [deletingRef, setDeletingRef] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -357,6 +365,32 @@ export default function CustomersPage() {
     }
   }
 
+  // 매니저 PIN 은 서버가 요구한다(0071) — 수정 승인과 따로, 지울 때마다 받는다.
+  async function remove(c: Customer) {
+    if (deletingRef) return;
+    const who = c.name || c.customer_ref;
+    const note = c.membership ? " Their membership is kept as cancelled." : "";
+    if (
+      !window.confirm(
+        `Delete ${who} (${c.customer_ref})? This cannot be undone.${note}`,
+      )
+    )
+      return;
+    setDeletingRef(c.customer_ref);
+    setDeleteError(null);
+    try {
+      await staffRpc("pelham_staff_customer_delete", { p_ref: c.customer_ref });
+      const rows = await staffRpc<Customer[]>("pelham_staff_customers");
+      setCustomers(rows);
+      if (selectedRef === c.customer_ref) setSelectedRef(null);
+      if (viewingRef === c.customer_ref) setViewingRef(null);
+    } catch (err) {
+      setDeleteError(describeError(err));
+    } finally {
+      setDeletingRef(null);
+    }
+  }
+
   const all = useMemo(() => customers ?? [], [customers]);
   const counts = useMemo(
     () => ({
@@ -382,6 +416,9 @@ export default function CustomersPage() {
     all.find((c) => c.customer_ref === selectedRef) ?? visible[0] ?? null;
   const viewing = viewingRef
     ? (all.find((c) => c.customer_ref === viewingRef) ?? null)
+    : null;
+  const selling = sellingRef
+    ? (all.find((c) => c.customer_ref === sellingRef) ?? null)
     : null;
   const totalRounds = all.reduce((sum, c) => sum + c.rounds, 0);
 
@@ -443,12 +480,18 @@ export default function CustomersPage() {
 
         <section className="grid min-h-0 gap-4 p-4 xl:grid-cols-[1fr_360px]">
           <div className="min-w-0 overflow-x-auto border border-[#d4d4d8] bg-white">
-            <div className="min-w-[720px]">
-              <div className="grid grid-cols-[1.2fr_1fr_.8fr_.5fr] border-b border-[#d4d4d8] bg-[#f7f7f8] px-3 py-2 text-[11px] font-bold uppercase text-[#5d6673]">
+            {deleteError && (
+              <p className="border-b border-[#d4d4d8] bg-[#fde8e7] px-3 py-2 text-xs text-[#b42318]">
+                {deleteError}
+              </p>
+            )}
+            <div className="min-w-[800px]">
+              <div className="grid grid-cols-[1.2fr_1fr_.8fr_.5fr_80px] border-b border-[#d4d4d8] bg-[#f7f7f8] px-3 py-2 text-[11px] font-bold uppercase text-[#5d6673]">
                 <span>Customer</span>
                 <span>Membership</span>
                 <span>Last plan</span>
                 <span className="text-right">Rounds</span>
+                <span />
               </div>
               {error ? (
                 <p className="px-3 py-8 text-center text-sm text-[#b42318]">
@@ -467,64 +510,80 @@ export default function CustomersPage() {
               ) : (
                 <div className="divide-y divide-[#e2e4e8]">
                   {visible.map((c) => (
-                    <button
-                      className={`grid w-full grid-cols-[1.2fr_1fr_.8fr_.5fr] items-center px-3 py-3 text-left text-xs hover:bg-[#f4f5ff] ${
+                    <div
+                      className={`grid grid-cols-[1fr_80px] items-center hover:bg-[#f4f5ff] ${
                         selected?.customer_ref === c.customer_ref
                           ? "bg-[#f4f5ff]"
                           : "bg-white"
                       }`}
                       key={c.customer_ref}
-                      onClick={() => {
-                        setSelectedRef(c.customer_ref);
-                        if (!window.matchMedia("(min-width: 1280px)").matches)
-                          setViewingRef(c.customer_ref);
-                      }}
-                      type="button"
                     >
-                      <span className="min-w-0">
-                        <strong className="block text-sm">
-                          {c.name || c.customer_ref}
-                        </strong>
-                        <span className="block text-[#5d6673]">
-                          {formatPhone(c.phone)}
+                      <button
+                        className="grid w-full grid-cols-[1.2fr_1fr_.8fr_.5fr] items-center py-3 pl-3 text-left text-xs"
+                        onClick={() => {
+                          setSelectedRef(c.customer_ref);
+                          if (!window.matchMedia("(min-width: 1280px)").matches)
+                            setViewingRef(c.customer_ref);
+                        }}
+                        type="button"
+                      >
+                        <span className="min-w-0">
+                          <strong className="block text-sm">
+                            {c.name || c.customer_ref}
+                          </strong>
+                          <span className="block text-[#5d6673]">
+                            {formatPhone(c.phone)}
+                          </span>
+                          <span className="block truncate text-[#5d6673]">
+                            {c.email}
+                          </span>
                         </span>
-                        <span className="block truncate text-[#5d6673]">
-                          {c.email}
+                        <span className="flex flex-wrap gap-1">
+                          <span
+                            className={`px-2 py-1 text-[11px] font-bold ${
+                              c.is_member
+                                ? "bg-[#dff7e8] text-[#087333]"
+                                : "bg-[#ececf0] text-[#4e5560]"
+                            }`}
+                          >
+                            {c.is_member ? "Member" : "Public"}
+                          </span>
+                          {membershipLabel(c) && (
+                            <span className="border border-[#d4d4d8] px-2 py-1 text-[11px]">
+                              {membershipLabel(c)}
+                            </span>
+                          )}
+                          {c.membership?.expired && (
+                            <span className="bg-[#fde8e7] px-2 py-1 text-[11px] font-bold text-[#b42318]">
+                              Expired
+                            </span>
+                          )}
+                          {c.needs_review && (
+                            <span className="bg-[#ffd400] px-2 py-1 text-[11px] font-bold text-[#1d232b]">
+                              Review
+                            </span>
+                          )}
                         </span>
-                      </span>
-                      <span className="flex flex-wrap gap-1">
-                        <span
-                          className={`px-2 py-1 text-[11px] font-bold ${
-                            c.is_member
-                              ? "bg-[#dff7e8] text-[#087333]"
-                              : "bg-[#ececf0] text-[#4e5560]"
-                          }`}
+                        <span className="pr-2 text-[#5d6673]">
+                          {c.is_member ? c.player_type : ""}
+                        </span>
+                        <span className="text-right text-sm font-bold">
+                          {c.rounds}
+                        </span>
+                      </button>
+                      <span className="pr-3 text-right">
+                        <button
+                          className="inline-flex min-h-11 items-center border border-[#f1b8b3] bg-white px-2 text-[11px] font-bold text-[#b42318] hover:border-[#b42318] disabled:opacity-50 lg:min-h-0 lg:py-1"
+                          disabled={deletingRef !== null}
+                          onClick={() => void remove(c)}
+                          type="button"
                         >
-                          {c.is_member ? "Member" : "Public"}
-                        </span>
-                        {membershipLabel(c) && (
-                          <span className="border border-[#d4d4d8] px-2 py-1 text-[11px]">
-                            {membershipLabel(c)}
-                          </span>
-                        )}
-                        {c.membership?.expired && (
-                          <span className="bg-[#fde8e7] px-2 py-1 text-[11px] font-bold text-[#b42318]">
-                            Expired
-                          </span>
-                        )}
-                        {c.needs_review && (
-                          <span className="bg-[#ffd400] px-2 py-1 text-[11px] font-bold text-[#1d232b]">
-                            Review
-                          </span>
-                        )}
+                          {deletingRef === c.customer_ref
+                            ? "Deleting…"
+                            : "Delete"}
+                        </button>
                       </span>
-                      <span className="pr-2 text-[#5d6673]">
-                        {c.is_member ? c.player_type : ""}
-                      </span>
-                      <span className="text-right text-sm font-bold">
-                        {c.rounds}
-                      </span>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -536,6 +595,7 @@ export default function CustomersPage() {
               <CustomerFile
                 customer={selected}
                 onEdit={() => openForm(selected)}
+                onSell={() => setSellingRef(selected.customer_ref)}
               />
             </aside>
           )}
@@ -551,7 +611,14 @@ export default function CustomersPage() {
             className="max-h-full w-full max-w-lg overflow-y-auto border border-[#d4d4d8] bg-white p-5 shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <CustomerFile customer={viewing} onEdit={() => openForm(viewing)} />
+            <CustomerFile
+              customer={viewing}
+              onEdit={() => openForm(viewing)}
+              onSell={() => {
+                setViewingRef(null);
+                setSellingRef(viewing.customer_ref);
+              }}
+            />
             <div className="mt-4 flex justify-end">
               <button
                 className="min-h-11 border border-[#cfd2d8] bg-white px-4 text-xs font-bold lg:min-h-0 lg:py-2"
@@ -563,6 +630,13 @@ export default function CustomersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {selling && (
+        <SellMembershipDialog
+          customer={selling}
+          onClose={() => setSellingRef(null)}
+        />
       )}
 
       {editing && (
@@ -651,9 +725,11 @@ export default function CustomersPage() {
 function CustomerFile({
   customer,
   onEdit,
+  onSell,
 }: {
   customer: Customer;
   onEdit: () => void;
+  onSell: () => void;
 }) {
   return (
     <>
@@ -682,6 +758,13 @@ function CustomerFile({
             type="button"
           >
             Edit
+          </button>
+          <button
+            className="inline-flex min-h-11 items-center bg-[#4533ff] px-3 text-xs font-bold text-white hover:bg-[#3626d9] lg:min-h-0 lg:py-1.5"
+            onClick={onSell}
+            type="button"
+          >
+            Sell membership
           </button>
         </div>
       </div>
@@ -961,5 +1044,229 @@ function MembershipFields({
         {value.membership_type && "."}
       </p>
     </fieldset>
+  );
+}
+
+// ===== Sell membership (0072) ==========================================
+
+/** Lightspeed 의 회원권 상품 목록처럼 종류 × 플랜 × 카트를 한 줄씩 편다. */
+type MembershipProduct = {
+  key: string;
+  label: string;
+  membership_type: MembershipType;
+  plan: MembershipPlan;
+  cart_package: CartPackage | null;
+  /** 요금표 금액(HST 포함). */
+  price: number;
+};
+
+const MEMBERSHIP_PRODUCTS: MembershipProduct[] = MEMBERSHIP_TYPES.flatMap((t) =>
+  (t.spousal ? (["single", "spousal"] as const) : (["single"] as const)).flatMap((plan) =>
+    [null, ...CART_PACKAGES.map((c) => c.key)].map((cart) => {
+      const cartName = CART_PACKAGES.find((c) => c.key === cart)?.label;
+      return {
+        key: `${t.key}:${plan}:${cart ?? ""}`,
+        label: `${t.label} ${plan === "spousal" ? "Spousal" : "Single"} Membership${cartName ? ` with ${cartName}` : ""}`,
+        membership_type: t.key,
+        plan,
+        cart_package: cart,
+        price: listPrice({ membership_type: t.key, plan, cart_package: cart, range_pass: false }),
+      };
+    }),
+  ),
+);
+
+/** HST 포함 금액(달러) → 세전 센트. 서버(0072)와 같은 ÷1.13. */
+function preTaxCents(inclusive: number): number {
+  return Math.round((inclusive * 100) / (1 + TAX_RATE));
+}
+
+/**
+ * 고객 파일의 Sell membership — Lightspeed 의 Subscriptions → Sell 과 같은 순서:
+ * 회원권 고르기 → 기간(끝나는 날) → 요약(세전 + HST) → Register 로 보내 레지스터에서 결제.
+ * 결제되면 회원권이 납부(active)로 바뀐다(0072 트리거).
+ */
+function SellMembershipDialog({
+  customer,
+  onClose,
+}: {
+  customer: Customer;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const current = customer.membership;
+  const year = clubYear();
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: CLUB_TIME_ZONE,
+  });
+  const [season, setSeason] = useState(current?.season ?? year);
+  const [query, setQuery] = useState("");
+  const [pick, setPick] = useState<string>(
+    current
+      ? `${current.membership_type}:${current.plan}:${current.cart_package ?? ""}`
+      : "",
+  );
+  const [endsOn, setEndsOn] = useState(
+    current?.season === season && current.expires_on ? current.expires_on : `${season}-12-15`,
+  );
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const seasons = Array.from(
+    new Set([year, year + 1, ...(current ? [current.season] : [])]),
+  ).sort();
+  const q = query.trim().toLowerCase();
+  const products = MEMBERSHIP_PRODUCTS.filter((p) => !q || p.label.toLowerCase().includes(q));
+  const product = MEMBERSHIP_PRODUCTS.find((p) => p.key === pick) ?? null;
+  // 같은 시즌·같은 회원권에 이미 낸 돈이 있으면 남은 금액만 받는다(서버와 같다).
+  const samePaid =
+    product &&
+    current &&
+    current.season === season &&
+    current.status !== "cancelled" &&
+    current.membership_type === product.membership_type &&
+    current.plan === product.plan &&
+    (current.cart_package ?? null) === product.cart_package
+      ? Number(current.amount_paid)
+      : 0;
+  const due = product ? Math.max(0, Number(product.price) - samePaid) : 0;
+  const subtotal = preTaxCents(due);
+  const tax = computeTax(subtotal);
+
+  async function send() {
+    if (!product) return;
+    setSending(true);
+    setError(null);
+    const bill = await billActions.addMembership({
+      customer_ref: customer.customer_ref,
+      season,
+      membership_type: product.membership_type,
+      plan: product.plan,
+      cart_package: product.cart_package,
+      expires_on: endsOn,
+    });
+    setSending(false);
+    if (!bill) {
+      setError(getBillState().error || "Could not add the membership to the register.");
+      return;
+    }
+    router.push("/admin/retail?view=sale");
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-full w-full max-w-2xl flex-col overflow-y-auto border border-[#d4d4d8] bg-white p-5 shadow-xl">
+        <p className="text-[11px] font-bold uppercase text-[#5d6673]">Sell membership</p>
+        <p className="mb-4 text-xl font-bold">{customer.name || customer.customer_ref}</p>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+            Season
+            <select
+              className={SELECT_CLASS}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                setSeason(next);
+                setEndsOn(`${next}-12-15`);
+              }}
+              value={season}
+            >
+              {seasons.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+            Start
+            <input className={`${SELECT_CLASS} bg-[#f7f7f8]`} disabled type="date" value={today} />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+            End
+            <input
+              className={SELECT_CLASS}
+              min={today}
+              onChange={(event) => setEndsOn(event.target.value)}
+              type="date"
+              value={endsOn}
+            />
+          </label>
+        </div>
+
+        <p className="mt-4 mb-1 text-xs font-bold text-[#5d6673]">Membership</p>
+        <input
+          className={`${SELECT_CLASS} w-full`}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search"
+          type="search"
+          value={query}
+        />
+        <ul className="mt-2 max-h-64 overflow-y-auto border border-[#e2e4e8]" role="listbox">
+          {products.map((p) => (
+            <li key={p.key}>
+              <button
+                aria-selected={p.key === pick}
+                className={`flex w-full items-center justify-between gap-3 border-b border-[#eef0f2] px-3 py-2 text-left text-sm ${
+                  p.key === pick ? "bg-[#4533ff] font-bold text-white" : "hover:bg-[#f4f4ff]"
+                }`}
+                onClick={() => setPick(p.key)}
+                role="option"
+                type="button"
+              >
+                <span>{p.label}</span>
+                <span className="shrink-0 tabular-nums">{formatMoney(preTaxCents(p.price))}</span>
+              </button>
+            </li>
+          ))}
+          {products.length === 0 && <li className="px-3 py-2 text-sm text-[#5d6673]">No match</li>}
+        </ul>
+
+        <dl className="mt-4 grid gap-1 border-t border-[#e2e4e8] pt-3 text-sm">
+          <div className="flex justify-between">
+            <dt>Subtotal</dt>
+            <dd className="tabular-nums">{formatMoney(subtotal)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt>HST</dt>
+            <dd className="tabular-nums">{formatMoney(tax)}</dd>
+          </div>
+          <div className="flex justify-between text-base font-bold">
+            <dt>Total</dt>
+            <dd className="tabular-nums">{formatMoney(subtotal + tax)}</dd>
+          </div>
+          {samePaid > 0 && (
+            <dd className="text-xs text-[#5d6673]">
+              {money(samePaid)} already paid on this membership — only the balance goes to the register.
+            </dd>
+          )}
+        </dl>
+
+        {error && (
+          <p className="mt-3 border-l-4 border-[#b42318] bg-[#fff1f0] p-3 text-xs text-[#b42318]">{error}</p>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            className="min-h-11 border border-[#cfd2d8] bg-white px-4 text-xs font-bold lg:min-h-0 lg:py-2"
+            onClick={onClose}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="min-h-11 bg-[#4533ff] px-4 text-xs font-bold text-white disabled:opacity-50 lg:min-h-0 lg:py-2"
+            disabled={!product || due <= 0 || !endsOn || sending}
+            onClick={() => void send()}
+            type="button"
+          >
+            {sending ? "Adding…" : "Send to register"}
+          </button>
+        </div>
+        <p className="mt-2 text-right text-[11px] text-[#5d6673]">
+          Paid at the register, the membership turns Active. Card payments here are not charged the 3% card fee.
+        </p>
+      </div>
+    </div>
   );
 }

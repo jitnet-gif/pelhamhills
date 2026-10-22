@@ -17,7 +17,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import { describePosError, isMissingMigration, posApi, type Bill, type BillStation, type OpenItemInput, type PaymentInput } from "./api";
+import { describePosError, isMissingMigration, posApi, type Bill, type BillStation, type MembershipSaleInput, type OpenItemInput, type PaymentInput } from "./api";
 
 const STORAGE_KEY = "pelham.pos.currentBill";
 const CASHIER_KEY = "pelham.pos.cashier";
@@ -179,6 +179,8 @@ export const billActions = {
     mutate((id) => posApi.addProduct(id, productId, quantity), station),
   addOpenItem: (item: OpenItemInput, station: BillStation) =>
     mutate((id) => posApi.addOpenItem(id, item), station),
+  addMembership: (sale: MembershipSaleInput, station: BillStation = "pro_shop") =>
+    mutate((id) => posApi.addMembership(id, sale), station),
   addTee: (bookingId: string, playerIds: string[] | undefined, station: BillStation = "tee_sheet") =>
     mutate((id) => posApi.addTee(id, bookingId, playerIds), station),
   addSim: (reservationId: number, station: BillStation = "simulator") =>
