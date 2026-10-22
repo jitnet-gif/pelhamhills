@@ -278,20 +278,35 @@ function PaidCoin({ paid }: { paid: boolean }) {
 
 /**
  * 품목 줄 끝의 표시. 레퍼런스(Chronogolf)처럼 계산서에 담긴(Select 된) 줄은 보라색으로 채운 동그라미,
- * 아직이면 보라색 테두리만. 결제가 끝난 줄은 초록 $ 동전이다.
+ * 아직이면 보라색 테두리만. 결제가 끝난 줄은 초록 $ 동전이다. 누르면 담기를 켜고 끈다 — 계산서에는
+ * 선수 한 명이 한 줄(그린피 + 카트 + 추가 품목)이라 그 선수의 동그라미가 함께 바뀐다.
  */
-function LineMark({ paid, selected }: { paid: boolean; selected: boolean }) {
+function LineMark({
+  paid,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  paid: boolean;
+  selected: boolean;
+  disabled?: boolean;
+  onToggle?: () => void;
+}) {
   if (paid) return <PaidCoin paid />;
   return (
-    <span
-      aria-label={selected ? "Selected for payment" : "Not selected"}
-      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-[#4533ff] ${
-        selected ? "bg-[#4533ff]" : "bg-white"
+    <button
+      aria-label={selected ? "Selected for payment — click to unselect" : "Not selected — click to select"}
+      aria-pressed={selected}
+      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-[#4533ff] disabled:opacity-40 ${
+        selected ? "bg-[#4533ff]" : "bg-white hover:bg-[#ecebff]"
       }`}
-      role="img"
+      disabled={disabled || !onToggle}
+      onClick={onToggle}
+      title={selected ? "Take this player off the bill" : "Put this player's round on the current bill"}
+      type="button"
     >
       {selected ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
-    </span>
+    </button>
   );
 }
 
@@ -1412,6 +1427,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 onMethod={setPayMethod}
                 onPaidBy={(name) => void billActions.update({ label: name }, "tee_sheet")}
                 onTakePayment={() => setPayStep("checkout")}
+                onUnselect={(lineId) => void billActions.setQuantity(lineId, 0, "tee_sheet")}
               />
             ) : (
               <div className="flex h-full flex-col items-center justify-center px-6 py-8 text-center">
@@ -1438,8 +1454,24 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             <div className="flex items-center gap-3 border-b border-[#d4d4d8] bg-white px-4 py-2.5">
               <button
                 className="flex items-center gap-1 border border-[#c7c7cc] px-3 py-1.5 font-bold hover:bg-[#f2f2f5]"
-                onClick={() => setPayStep("summary")}
-                title="Back to the reservation — the bill stays open"
+                onClick={async () => {
+                  // 손님의 티타임이 있는 날 티 시트로 돌아간다 — 예약 창도 닫고, 그 칸을 화면 가운데로.
+                  // 계산서는 열린 채 남는다(useCurrentBill). 입력 중인 값은 Save 처럼 저장하고 닫는다.
+                  const date = booking.date;
+                  const id = booking.id;
+                  await Promise.all(feeCommitsRef.current.values());
+                  if (!(await saveAll())) return;
+                  setPayStep("summary");
+                  setPayOpen(false);
+                  controller.setFocusedDate(date);
+                  controller.select(null);
+                  window.setTimeout(() => {
+                    document
+                      .querySelector<HTMLElement>(`[data-booking-id="${CSS.escape(id)}"]`)
+                      ?.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+                  }, 300);
+                }}
+                title="Back to the tee sheet at this tee time — the bill stays open"
                 type="button"
               >
                 <span aria-hidden>&larr;</span> Tee sheet
@@ -1489,6 +1521,15 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             // 이 선수의 라운드가 열린 계산서에 담겼나(= 레퍼런스의 Select 된 상태).
             const onBill = useBills ? billOf(player.id) : null;
             const selected = !player.paid && Boolean(onBill);
+            // 품목 줄 끝 동그라미 — 담긴 것을 누르면 그 선수의 줄만 계산서에서 빼고, 빈 것은 담는다.
+            const markDisabled = !useBills || busy || player.cancelled || billState.busy;
+            const toggleSelect = () => {
+              if (!onBill) return void addToBill([player]);
+              const line = onBill.lines.find((item) => item.booking_id === booking.id && item.player_id === player.id);
+              if (!line) return;
+              if (billState.bill?.id !== onBill.id) void billActions.select(onBill.id);
+              void billActions.setQuantity(line.id, 0, "tee_sheet");
+            };
 
             return (
               <article
@@ -1906,7 +1947,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                       (priceAsk?.playerId === player.id ? priceAsk.fee : greenFeeOf(booking, player)).toFixed(2)
                     }
                   />
-                  <LineMark paid={player.paid} selected={selected} />
+                  <LineMark disabled={markDisabled} onToggle={toggleSelect} paid={player.paid} selected={selected} />
                 </div>
                 {greenDrafts[player.id] !== undefined && !Number.isFinite(Number(greenDrafts[player.id])) ? (
                   <span className="mt-1 block text-[10px] text-[#8a3f26]">Not a number — will not be saved</span>
@@ -2005,7 +2046,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                         <span aria-hidden>&times;</span>
                       </button>
                     )}
-                    <LineMark paid={player.paid} selected={selected} />
+                    <LineMark disabled={markDisabled} onToggle={toggleSelect} paid={player.paid} selected={selected} />
                   </div>
                 ) : null}
 
@@ -2030,7 +2071,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                         <span aria-hidden>&times;</span>
                       </button>
                     )}
-                    <LineMark paid={player.paid} selected={selected} />
+                    <LineMark disabled={markDisabled} onToggle={toggleSelect} paid={player.paid} selected={selected} />
                   </div>
                 ))}
 
@@ -2100,7 +2141,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                 {/* 레퍼런스의 Select — 담기 전에는 흰 바탕에 빈 동그라미, 담기면 보라색으로 채운다. 담긴 것을
                     다시 누르면 그 계산서를 이 계산대의 "지금 계산서" 로 불러와 Take Payment 를 펼친다(다른 탭·
                     계산대에서 담았거나 계산서를 잠시 놓아 두면 패널이 비어 받을 길이 없었다). 결제된 선수는
-                    영수증을 다시 연다. */}
+                    영수증을 다시 연다. 담기를 푸는 것은 품목 줄 끝의 동그라미다(LineMark). */}
                 <button
                   className={`mt-1.5 flex items-center justify-center gap-1.5 border px-1 py-1.5 font-bold disabled:opacity-40 ${
                     player.paid
@@ -2679,7 +2720,8 @@ function ProductsMenu({
  * Subtotal Due 를 보여 주고, Take Payment 를 누르면 실제 결제(BillPanel)로 넘어간다. 고른 수단이 그쪽의
  * 첫 결제 수단이 된다(카드 = 단말기, 금전함 = 현금).
  *
- * 품목은 계산서 줄에서 온다. 이 예약의 그린피 줄은 "그린피 · 카트 · 추가 품목" 으로 나눠 보여 주는데,
+ * 품목은 계산서 줄에서 온다. 줄마다 앞의 동그라미를 누르면 그 줄만 계산서에서 빠진다(카드의 Select 가
+ * 다시 빈 동그라미로 돌아간다). 이 예약의 그린피 줄은 "그린피 · 카트 · 추가 품목" 으로 나눠 보여 주는데,
  * 나눈 합이 그 줄의 금액과 다르면(담은 뒤 카트를 바꾼 경우) 나누지 않고 서버의 줄 그대로 보인다 —
  * 화면의 숫자가 받을 돈과 어긋나면 안 된다.
  */
@@ -2691,6 +2733,7 @@ function TakePaymentSummary({
   onMethod,
   onPaidBy,
   onTakePayment,
+  onUnselect,
 }: {
   bill: Bill;
   booking: TeeBooking;
@@ -2699,9 +2742,11 @@ function TakePaymentSummary({
   onMethod: (method: "card" | "cash") => void;
   onPaidBy: (name: string) => void;
   onTakePayment: () => void;
+  onUnselect: (lineId: number) => void;
 }) {
   const cents = (dollars: number) => Math.round(dollars * 100);
-  const items: { name: string; amount: number }[] = [];
+  // 계산서 줄마다 한 줄 — 줄 앞의 동그라미로 그 줄만 계산서에서 뺄 수 있어야 해서 사람끼리 묶지 않는다.
+  const rows: { lineId: number; name: string; amount: number; parts: { name: string; amount: number }[] }[] = [];
   const payers: string[] = [];
   for (const line of bill.lines) {
     const player =
@@ -2717,23 +2762,20 @@ function TakePaymentSummary({
         ...(player.extras ?? []).map((extra) => ({ name: extra.name, amount: cents(extra.price) })),
       ];
       const sum = parts.reduce((total, part) => total + part.amount, 0);
-      if (line.discount === 0 && sum === line.line_total) {
-        items.push(...parts);
-        continue;
-      }
+      rows.push({
+        lineId: line.id,
+        name: name || player.type,
+        amount: line.line_total,
+        parts: line.discount === 0 && sum === line.line_total ? parts : [],
+      });
+      continue;
     }
-    items.push({ name: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name, amount: line.line_total });
-  }
-  // 같은 품목은 한 줄로(레퍼런스처럼 사람 수만큼 반복하지 않는다).
-  const grouped: { name: string; amount: number; count: number }[] = [];
-  for (const item of items) {
-    const match = grouped.find((row) => row.name === item.name && row.amount === item.amount * row.count);
-    if (match) {
-      match.amount += item.amount;
-      match.count += 1;
-    } else {
-      grouped.push({ ...item, count: 1 });
-    }
+    rows.push({
+      lineId: line.id,
+      name: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+      amount: line.line_total,
+      parts: [],
+    });
   }
   const paidBy = bill.label?.trim() || payers[0] || "";
   const options = paidBy && !payers.includes(paidBy) ? [paidBy, ...payers] : payers;
@@ -2789,14 +2831,33 @@ function TakePaymentSummary({
       </div>
 
       <p className="mt-5 font-bold">Items</p>
-      <ul className="mt-1 grid gap-0.5">
-        {grouped.map((row) => (
-          <li className="flex justify-between gap-2" key={`${row.name}-${row.amount}`}>
-            <span className="min-w-0 truncate">
-              {row.name}
-              {row.count > 1 ? ` ×${row.count}` : ""}
-            </span>
-            <span className="tabular-nums">{formatMoney(row.amount)}</span>
+      <ul className="mt-1 grid gap-1.5">
+        {rows.map((row) => (
+          <li key={row.lineId}>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label={`Unselect ${row.name}`}
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-[#4533ff] bg-[#4533ff] hover:bg-white disabled:opacity-40"
+                disabled={busy}
+                onClick={() => onUnselect(row.lineId)}
+                title="Take this off the bill"
+                type="button"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              </button>
+              <span className="min-w-0 flex-1 truncate font-bold">{row.name}</span>
+              <span className="tabular-nums">{formatMoney(row.amount)}</span>
+            </div>
+            {row.parts.length > 0 ? (
+              <ul className="ml-6 text-[12px] text-[#4e5560]">
+                {row.parts.map((part, index) => (
+                  <li className="flex justify-between gap-2" key={`${part.name}-${index}`}>
+                    <span className="min-w-0 truncate">{part.name}</span>
+                    <span className="tabular-nums">{formatMoney(part.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </li>
         ))}
         {bill.discount > 0 ? (
