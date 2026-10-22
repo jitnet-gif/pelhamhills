@@ -31,22 +31,22 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  delivered: "전달됨",
-  received: "받음",
-  sent: "보냄",
-  queued: "보내는 중",
-  accepted: "보내는 중",
-  sending: "보내는 중",
-  skipped: "안 보냄",
-  failed: "실패",
-  undelivered: "전달 실패",
+  delivered: "Delivered",
+  received: "Received",
+  sent: "Sent",
+  queued: "Sending",
+  accepted: "Sending",
+  sending: "Sending",
+  skipped: "Not sent",
+  failed: "Failed",
+  undelivered: "Undelivered",
 };
 
 function MemoryNote({ source }: { source: "db" | "memory" | null }) {
   if (source !== "memory") return null;
   return (
     <p className="border border-[#f3dfa8] bg-[#fffaf0] px-3 py-2 text-sm text-[#8a5a00]">
-      DB 에서 읽지 못해 서버가 기억하는 최근 기록만 보입니다. Supabase 에 0058 을 실행했는지 확인하세요.
+      Could not read the database, so only recent texts the server remembers are shown. Check that 0058 has been run in Supabase.
     </p>
   );
 }
@@ -95,14 +95,14 @@ export function SmsLog({ refreshKey }: { refreshKey: number }) {
       {phone ? (
         <div className="flex items-center gap-3 text-sm">
           <span>
-            <strong>{prettyPhone(phone)}</strong> 와 주고받은 문자
+            Texts with <strong>{prettyPhone(phone)}</strong>
           </span>
           <button
             className="border border-[#cfd2d8] bg-white px-3 py-1 text-xs font-bold"
             onClick={() => pickPhone(null)}
             type="button"
           >
-            전체 보기
+            Show all
           </button>
         </div>
       ) : null}
@@ -139,13 +139,13 @@ export function SmsLog({ refreshKey }: { refreshKey: number }) {
                     <button
                       className="font-bold text-[#4533ff] hover:underline"
                       onClick={() => pickPhone(row.phone)}
-                      title="이 번호와 주고받은 문자만 보기"
+                      title="Show only texts with this number"
                       type="button"
                     >
                       {prettyPhone(row.phone)}
                     </button>
                   )}
-                  <span className="block text-[#6b7280]">{row.direction === "in" ? "← 받음" : "→ 보냄"}</span>
+                  <span className="block text-[#6b7280]">{row.direction === "in" ? "← Received" : "→ Sent"}</span>
                 </span>
                 <span>
                   {smsTemplateLabel(row)}
@@ -153,7 +153,7 @@ export function SmsLog({ refreshKey }: { refreshKey: number }) {
                 </span>
                 <span className="min-w-0 whitespace-pre-wrap break-words text-[#30353d]">
                   {row.body}
-                  {row.media_url ? <span className="block text-[#6b7280]">+ 바코드 이미지</span> : null}
+                  {row.media_url ? <span className="block text-[#6b7280]">+ barcode image</span> : null}
                 </span>
                 <span>
                   <span
@@ -168,7 +168,7 @@ export function SmsLog({ refreshKey }: { refreshKey: number }) {
             );
           })}
           {!loading && !rows.length && !error ? (
-            <p className="px-3 py-6 text-center text-sm text-[#6b7280]">아직 문자 기록이 없습니다.</p>
+            <p className="px-3 py-6 text-center text-sm text-[#6b7280]">No texts yet.</p>
           ) : null}
           {loading && !rows.length ? <p className="px-3 py-6 text-center text-sm text-[#6b7280]">Loading…</p> : null}
         </section>
@@ -181,7 +181,7 @@ export function SmsLog({ refreshKey }: { refreshKey: number }) {
           onClick={more}
           type="button"
         >
-          {loading ? "Loading…" : "더 보기"}
+          {loading ? "Loading…" : "Load more"}
         </button>
       ) : null}
     </>
@@ -208,8 +208,8 @@ export function SmsOptOuts({ refreshKey }: { refreshKey: number }) {
   return (
     <>
       <p className="text-sm leading-6 text-[#4e5560]">
-        STOP 으로 답한 번호입니다. 이 번호에는 예약 확정·리마인더·프로모션을 포함해 어떤 문자도 나가지 않습니다.
-        손님이 START 로 답하면 목록에서 빠집니다.
+        Numbers that replied STOP. No texts of any kind go to these numbers, including booking confirmations, reminders and promotions.
+        A number leaves the list when the guest replies START.
       </p>
       <MemoryNote source={source} />
       {error ? (
@@ -229,7 +229,7 @@ export function SmsOptOuts({ refreshKey }: { refreshKey: number }) {
           </div>
         ))}
         {!loading && !rows.length && !error ? (
-          <p className="px-3 py-6 text-center text-sm text-[#6b7280]">수신 거부한 번호가 없습니다.</p>
+          <p className="px-3 py-6 text-center text-sm text-[#6b7280]">No opted-out numbers.</p>
         ) : null}
       </div>
     </>

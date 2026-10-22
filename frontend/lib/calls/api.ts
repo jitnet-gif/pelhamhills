@@ -111,13 +111,13 @@ export function teeBookingOf(detail: CallDetail): CallBooking | null {
 }
 
 export const OUTCOME_LABEL: Record<CallOutcome, string> = {
-  booked: "예약 성사",
-  modified: "예약 변경",
-  cancelled: "예약 취소",
-  waitlist: "대기 등록",
-  lost_item: "분실물 접수",
-  transferred: "직원 연결",
-  info: "문의",
+  booked: "Booked",
+  modified: "Changed",
+  cancelled: "Cancelled",
+  waitlist: "Waitlist",
+  lost_item: "Lost item",
+  transferred: "Transferred",
+  info: "Inquiry",
 };
 
 export function clubDateTime(unix: number | null): string {
@@ -139,7 +139,7 @@ export function clubDay(unix: number | null): string {
 export function duration(seconds: number | null): string {
   if (seconds == null) return "";
   const s = Math.max(0, Math.round(seconds));
-  return `${Math.floor(s / 60)}분 ${String(s % 60).padStart(2, "0")}초`;
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 }
 
 // ===== 문자 (0058) =====================================================
@@ -176,24 +176,24 @@ export async function fetchSmsOptOuts(): Promise<{
 }
 
 export const SMS_TEMPLATE_LABEL: Record<string, string> = {
-  confirm: "예약 확정",
-  cancel: "예약 취소",
-  reminder: "리마인더",
-  payment_approved: "결제 승인",
-  rain_check: "레인 체크",
-  waitlist_offer: "대기자 제안",
-  lost_item_found: "분실물 찾음",
-  marketing: "프로모션",
-  assistant: "문자 비서",
-  reply: "자동 답장",
-  info_directions: "안내 문자 (길안내)",
-  info_booking_link: "안내 문자 (예약 링크)",
+  confirm: "Booking confirmed",
+  cancel: "Booking cancelled",
+  reminder: "Reminder",
+  payment_approved: "Payment approved",
+  rain_check: "Rain check",
+  waitlist_offer: "Waitlist offer",
+  lost_item_found: "Lost item found",
+  marketing: "Promotion",
+  assistant: "Text assistant",
+  reply: "Auto reply",
+  info_directions: "Info text (directions)",
+  info_booking_link: "Info text (booking link)",
 };
 
 export function smsTemplateLabel(row: SmsRow): string {
-  if (row.direction === "in") return "손님 문자";
-  if (!row.template) return "문자";
-  return SMS_TEMPLATE_LABEL[row.template] ?? (row.template.startsWith("info_") ? "안내 문자" : row.template);
+  if (row.direction === "in") return "Guest text";
+  if (!row.template) return "Text";
+  return SMS_TEMPLATE_LABEL[row.template] ?? (row.template.startsWith("info_") ? "Info text" : row.template);
 }
 
 /** +19058921234 → (905) 892-1234 */

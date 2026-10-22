@@ -7,7 +7,7 @@
  * 줄을 누르면:
  *   - 티타임을 잡거나 바꾼 통화 → 티 시트에서 그 예약을 연다 (`/teesheet?date=…&booking=…`).
  *   - 나머지 → 오른쪽 패널에 ElevenLabs 의 요약·녹취·녹음을 띄운다.
- * 예약 통화의 녹취도 볼 수 있게 줄 끝에 "통화 내용" 버튼을 따로 둔다.
+ * 예약 통화의 녹취도 볼 수 있게 줄 끝에 "Transcript" 버튼을 따로 둔다.
  */
 
 import { useRouter } from "next/navigation";
@@ -42,33 +42,33 @@ const OUTCOME_TONE: Record<CallRow["outcome"], string> = {
 type Tab = "calls" | "sms" | "optouts";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "calls", label: "통화" },
-  { id: "sms", label: "문자" },
-  { id: "optouts", label: "수신 거부" },
+  { id: "calls", label: "Calls" },
+  { id: "sms", label: "Texts" },
+  { id: "optouts", label: "Opt-outs" },
 ];
 
 /** 줄을 누르면 티 시트로 가는 결과. */
 const GOES_TO_TEE_SHEET = new Set<CallRow["outcome"]>(["booked", "modified"]);
 
 const TOOL_LABEL: Record<string, string> = {
-  identify_caller: "발신자 확인",
-  find_tee_times: "빈 시간 찾기",
-  hold_tee_time: "자리 잡기",
-  release_hold: "자리 반납",
-  confirm_booking: "예약 확정",
-  lookup_booking: "예약 조회",
-  cancel_booking: "예약 취소",
-  modify_booking: "예약 변경",
-  get_rates: "요금 조회",
-  send_info_sms: "안내 문자",
-  report_lost_item: "분실물 접수",
-  join_waitlist: "대기 등록",
-  find_sim_times: "시뮬레이터 빈 시간",
-  book_sim_bay: "시뮬레이터 예약",
-  lookup_sim_booking: "시뮬레이터 조회",
-  cancel_sim_booking: "시뮬레이터 취소",
-  transfer_to_number: "직원 연결",
-  end_call: "통화 종료",
+  identify_caller: "Identify caller",
+  find_tee_times: "Find tee times",
+  hold_tee_time: "Hold tee time",
+  release_hold: "Release hold",
+  confirm_booking: "Confirm booking",
+  lookup_booking: "Look up booking",
+  cancel_booking: "Cancel booking",
+  modify_booking: "Change booking",
+  get_rates: "Get rates",
+  send_info_sms: "Info text",
+  report_lost_item: "Report lost item",
+  join_waitlist: "Join waitlist",
+  find_sim_times: "Find simulator times",
+  book_sim_bay: "Book simulator",
+  lookup_sim_booking: "Look up simulator booking",
+  cancel_sim_booking: "Cancel simulator booking",
+  transfer_to_number: "Transfer to staff",
+  end_call: "End call",
 };
 
 function toolLabel(name: string): string {
@@ -122,10 +122,10 @@ export default function CallsPage() {
     const todays = calls.filter((c) => clubDay(c.started_at) === today);
     const count = (outcome: CallRow["outcome"]) => todays.filter((c) => c.outcome === outcome).length;
     return [
-      { label: "오늘 AI 통화", value: todays.length },
-      { label: "예약 성사", value: count("booked") },
-      { label: "직원 연결", value: count("transferred") },
-      { label: "안내 문자", value: todays.filter((c) => c.tools.includes("send_info_sms")).length },
+      { label: "AI calls today", value: todays.length },
+      { label: "Booked", value: count("booked") },
+      { label: "Transferred", value: count("transferred") },
+      { label: "Info texts", value: todays.filter((c) => c.tools.includes("send_info_sms")).length },
     ];
   }, [calls, today]);
 
@@ -166,8 +166,8 @@ export default function CallsPage() {
     >
       <section className="border-b border-[#d4d4d8] bg-white px-4 py-4">
         <p className="max-w-4xl text-sm leading-6 text-[#4e5560]">
-          AI 전화 예약 통화 기록입니다 (ElevenLabs). 예약이 잡힌 통화를 누르면 티 시트에서 그 예약이 열리고,
-          나머지 통화는 요약·녹취·녹음을 볼 수 있습니다. 문자 탭에는 손님에게 보낸 문자와 받은 문자가 모두 남습니다.
+          AI phone booking calls (ElevenLabs). Click a call that made a booking to open it on the tee sheet;
+          other calls show the summary, transcript and recording. The Texts tab keeps every text sent to and received from guests.
         </p>
         <div className="mt-3 flex gap-1" role="tablist">
           {TABS.map((t) => (
@@ -259,16 +259,16 @@ export default function CallsPage() {
                       }}
                       type="button"
                     >
-                      {opening === call.id ? "Opening…" : "통화 내용"}
+                      {opening === call.id ? "Opening…" : "Transcript"}
                     </button>
                   ) : (
-                    <span className="font-bold text-[#4533ff]">보기 →</span>
+                    <span className="font-bold text-[#4533ff]">View →</span>
                   )}
                 </span>
               </div>
             ))}
             {!loading && !calls.length && !error ? (
-              <p className="px-3 py-6 text-center text-sm text-[#6b7280]">아직 통화 기록이 없습니다.</p>
+              <p className="px-3 py-6 text-center text-sm text-[#6b7280]">No calls yet.</p>
             ) : null}
           </section>
         </div>
@@ -280,7 +280,7 @@ export default function CallsPage() {
             onClick={() => load(cursor)}
             type="button"
           >
-            {loading ? "Loading…" : "더 보기"}
+            {loading ? "Loading…" : "Load more"}
           </button>
         ) : null}
       </section>
@@ -350,11 +350,11 @@ function CallPanel({ id, onClose }: { id: string; onClose: () => void }) {
           {detail ? (
             <div className="grid gap-4">
               <dl className="grid grid-cols-[90px_1fr] gap-x-3 gap-y-1 text-xs">
-                <dt className="font-bold text-[#6b7280]">시각</dt>
+                <dt className="font-bold text-[#6b7280]">Time</dt>
                 <dd>{clubDateTime(detail.started_at)} · {duration(detail.duration)}</dd>
-                <dt className="font-bold text-[#6b7280]">발신번호</dt>
+                <dt className="font-bold text-[#6b7280]">Caller</dt>
                 <dd>{detail.caller || "—"}</dd>
-                <dt className="font-bold text-[#6b7280]">결과</dt>
+                <dt className="font-bold text-[#6b7280]">Result</dt>
                 <dd>
                   <span className={`inline-block px-2 py-0.5 font-bold ${OUTCOME_TONE[detail.outcome]}`}>
                     {OUTCOME_LABEL[detail.outcome]}
@@ -367,20 +367,20 @@ function CallPanel({ id, onClose }: { id: string; onClose: () => void }) {
 
               {detail.bookings.length ? (
                 <section className="grid gap-2">
-                  <h3 className="text-xs font-bold text-[#6b7280] uppercase">이 통화의 예약</h3>
+                  <h3 className="text-xs font-bold text-[#6b7280] uppercase">Bookings from this call</h3>
                   {detail.bookings.map((b, index) => (
                     <div className="flex items-center justify-between gap-3 border border-[#d6d6dc] px-3 py-2 text-xs" key={`${b.booking_id}-${index}`}>
                       <span>
-                        <strong>{b.kind === "sim" ? "시뮬레이터" : "티타임"} · {OUTCOME_LABEL[b.action]}</strong>
+                        <strong>{b.kind === "sim" ? "Simulator" : "Tee time"} · {OUTCOME_LABEL[b.action]}</strong>
                         <span className="block text-[#5d6673]">
-                          {[b.date, b.time, b.name, b.party_size ? `${b.party_size}인` : "", b.confirmation_code]
+                          {[b.date, b.time, b.name, b.party_size ? `${b.party_size} players` : "", b.confirmation_code]
                             .filter(Boolean)
                             .join(" · ")}
                         </span>
                       </span>
                       {b.kind === "tee" ? (
                         <a className="shrink-0 bg-[#4533ff] px-3 py-1.5 font-bold text-white" href={teeSheetHref(b)}>
-                          티 시트에서 열기
+                          Open on tee sheet
                         </a>
                       ) : null}
                     </div>
@@ -390,14 +390,14 @@ function CallPanel({ id, onClose }: { id: string; onClose: () => void }) {
 
               {detail.summary ? (
                 <section>
-                  <h3 className="mb-1 text-xs font-bold text-[#6b7280] uppercase">요약</h3>
+                  <h3 className="mb-1 text-xs font-bold text-[#6b7280] uppercase">Summary</h3>
                   <p className="leading-6 text-[#2b2f36]">{detail.summary}</p>
                 </section>
               ) : null}
 
               {detail.has_audio ? (
                 <section>
-                  <h3 className="mb-1 text-xs font-bold text-[#6b7280] uppercase">녹음</h3>
+                  <h3 className="mb-1 text-xs font-bold text-[#6b7280] uppercase">Recording</h3>
                   {audioUrl ? (
                     <audio autoPlay className="w-full" controls src={audioUrl} />
                   ) : (
@@ -407,14 +407,14 @@ function CallPanel({ id, onClose }: { id: string; onClose: () => void }) {
                       onClick={() => void loadAudio()}
                       type="button"
                     >
-                      {audioState === "loading" ? "불러오는 중…" : audioState === "error" ? "다시 시도" : "▶ 녹음 듣기"}
+                      {audioState === "loading" ? "Loading…" : audioState === "error" ? "Try again" : "▶ Play recording"}
                     </button>
                   )}
                 </section>
               ) : null}
 
               <section className="grid gap-2">
-                <h3 className="text-xs font-bold text-[#6b7280] uppercase">녹취</h3>
+                <h3 className="text-xs font-bold text-[#6b7280] uppercase">Transcript</h3>
                 {detail.transcript.map((turn, index) => (
                   <Turn key={index} turn={turn} />
                 ))}
@@ -444,7 +444,7 @@ function Turn({ turn }: { turn: CallDetail["transcript"][number] }) {
         <details className="mt-1 max-w-[85%] text-xs" key={`r${index}`}>
           <summary className={`cursor-pointer font-bold ${result.error ? "text-[#a12a2a]" : "text-[#4533ff]"}`}>
             ⚙ {toolLabel(result.name)}
-            {result.error ? " (실패)" : ""}
+            {result.error ? " (failed)" : ""}
           </summary>
           <pre className="mt-1 overflow-x-auto bg-[#f7f7fb] p-2 text-[11px] whitespace-pre-wrap">{result.result}</pre>
         </details>
