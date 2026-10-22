@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
-import { formatMoney, type RetailDailyReport, type Sale } from "@/lib/retail/types";
+import { computeTax, formatMoney, type Cents, type RetailDailyReport, type Sale } from "@/lib/retail/types";
 
 import CashReconcile from "@/components/reports/CashReconcile";
 import PriceReview from "@/components/reports/PriceReview";
@@ -191,7 +191,10 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
           </div>
 
           {/* 사업부 네 칸. 팔린 것(분류)으로 나눈다 — 나누는 규칙과 이유는 `lib/retail/divisions.ts`.
-              합이 위 Gross Sales 와 같다. 할인·세금은 계산서 단위라 여기 들어가지 않는다. */}
+              금액은 HST 를 더해 보인다(2026-10-22) — 카운터에서 손님에게 부르는 값이 세금 포함이라서다.
+              모든 계산서가 13% 하나라 줄 합계에 세금을 얹으면 되지만, 주문 할인은 계산서 단위라
+              여기 들어가지 않고 세금도 계산서마다 반올림하므로, 네 칸의 합은 Total Collected 와
+              몇 센트 다를 수 있다. 비율(%)은 세전 Gross Sales 기준 그대로다. */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {divisions.map((division) => (
               <section className="min-w-0 border border-[#d4d4d8] bg-white p-3" key={division.key}>
@@ -206,8 +209,8 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
                       {report.gross > 0 ? `${Math.round((division.total / report.gross) * 100)}%` : "—"}
                     </span>
                   </span>
-                  <span className="mt-1 block text-2xl font-semibold tabular-nums">{formatMoney(division.total)}</span>
-                  <span className="block text-[11px] text-[#6b7280]">before order discounts · tax excl.</span>
+                  <span className="mt-1 block text-2xl font-semibold tabular-nums">{formatMoney(withTax(division.total))}</span>
+                  <span className="block text-[11px] text-[#6b7280]">before order discounts · tax incl.</span>
                 </button>
                 {division.categories.length === 0 ? (
                   <p className="mt-2 text-xs text-[#6b7280]">No sales.</p>
@@ -223,7 +226,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
                           <span className="min-w-0 truncate">
                             {row.category} <span className="text-[#6b7280]">×{row.quantity}</span>
                           </span>
-                          <span className="shrink-0 tabular-nums">{formatMoney(row.total)}</span>
+                          <span className="shrink-0 tabular-nums">{formatMoney(withTax(row.total))}</span>
                         </button>
                       </li>
                     ))}
@@ -392,3 +395,8 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
 /** 리포트 칸 안의 한 줄 — 누르면 그 줄을 이루는 계산서가 열린다. */
 const DRILL_ROW =
   "flex w-full items-baseline justify-between gap-2 py-0.5 text-left hover:text-[#4533ff] hover:underline";
+
+/** 사업부 칸의 세금 포함 금액. 계산서와 같은 반올림(`computeTax`)을 쓴다. */
+function withTax(amount: Cents): Cents {
+  return amount + computeTax(amount);
+}

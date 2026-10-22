@@ -14,7 +14,7 @@ import { useMemo } from "react";
 
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { DIVISIONS, divisionOf, type DivisionKey } from "@/lib/retail/divisions";
-import { formatMoney, type Cents, type PaymentMethod, type Sale, type SaleLine } from "@/lib/retail/types";
+import { computeTax, formatMoney, type Cents, type PaymentMethod, type Sale, type SaleLine } from "@/lib/retail/types";
 
 import { EmptyNote, Modal } from "@/components/retail/ui";
 
@@ -163,9 +163,11 @@ export default function SalesDrilldown({
     return [...seen.entries()];
   }, [divisionLines]);
 
+  // 사업부는 Reports 칸과 같게 HST 를 더해 보인다(2026-10-22). 합계는 줄마다 반올림하지 않고 합에 한 번 얹는다.
+  const shown = (amount: Cents) => (drill.kind === "division" ? amount + computeTax(amount) : amount);
   const total = bills
     ? bills.reduce((sum, row) => sum + row.amount, 0)
-    : (lines ?? []).reduce((sum, row) => sum + row.line.line_total, 0);
+    : shown((lines ?? []).reduce((sum, row) => sum + row.line.line_total, 0));
   const count = bills ? bills.length : (lines ?? []).reduce((sum, row) => sum + row.line.quantity, 0);
 
   return (
@@ -182,7 +184,7 @@ export default function SalesDrilldown({
                 key={category}
                 onClick={() => onChange({ kind: "division", division: drill.division, category })}
               >
-                {category} · {formatMoney(amount)}
+                {category} · {formatMoney(shown(amount))}
               </Chip>
             ))}
           </div>
@@ -218,7 +220,7 @@ export default function SalesDrilldown({
               : (lines ?? []).map(({ sale, line, category }, index) => (
                   <li key={`${sale.id}-${line.id ?? index}`}>
                     <RowButton
-                      amount={line.line_total}
+                      amount={shown(line.line_total)}
                       onClick={() => onOpenSale(sale)}
                       primary={`${line.quantity}× ${line.name}`}
                       secondary={[
