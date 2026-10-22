@@ -34,10 +34,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 import {
   ADMIN_HOME,
+  ADMIN_REPORTS,
   CLUB,
   SITE_HOME,
   adminDivisions,
@@ -47,6 +48,7 @@ import {
   type AdminDivision,
 } from "@/lib/nav";
 import InstallAppHint from "@/components/admin/InstallAppHint";
+import { useReportsAccess } from "@/lib/reports/access";
 import { ApiError } from "@/lib/teeSheet/api";
 import { todayIso } from "@/lib/teeSheet/dates";
 import { accessToken, getSession, signIn, signOut, subscribe } from "@/lib/teeSheet/session";
@@ -174,6 +176,13 @@ function AdminFrame({
     },
     [pathname, router],
   );
+  // Reports 는 Emmeline 계정에만 보인다(`lib/reports/access.ts`). 다른 계정에는 메뉴에서 뺀다.
+  const reportsAllowed = useReportsAccess(email) === true;
+  const shownDivision = useMemo(
+    () =>
+      reportsAllowed ? division : { ...division, links: division.links.filter((item) => item.href !== ADMIN_REPORTS) },
+    [division, reportsAllowed],
+  );
 
   // 화면을 옮기면 서랍은 닫힌다. 닫지 않으면 새 화면 위에 이전 메뉴가 그대로
   // 덮여 있어서, 사용자가 방금 고른 화면을 볼 수 없다.
@@ -222,7 +231,7 @@ function AdminFrame({
         } ${fill ? "h-full" : "min-h-[100dvh]"}`}
       >
         {railOpen ? (
-          <DesktopSidebar division={division} onDivisionChange={changeDivision} pathname={pathname} />
+          <DesktopSidebar division={shownDivision} onDivisionChange={changeDivision} pathname={pathname} />
         ) : null}
 
         <section
@@ -259,12 +268,12 @@ function AdminFrame({
 
           <div className={fill ? "min-h-0 min-w-0 overflow-hidden" : "min-w-0"}>{children}</div>
 
-          <MobileTabBar pathname={pathname} />
+          <MobileTabBar pathname={pathname} reportsAllowed={reportsAllowed} />
         </section>
       </div>
 
       <MobileDrawer
-        division={division}
+        division={shownDivision}
         onClose={() => setDrawerOpen(false)}
         onDivisionChange={changeDivision}
         open={drawerOpen}
@@ -661,15 +670,16 @@ function MobileDrawer({
 
 // ===== 모바일 하단 탭 ===================================================
 
-function MobileTabBar({ pathname }: { pathname: string | null }) {
+function MobileTabBar({ pathname, reportsAllowed }: { pathname: string | null; reportsAllowed: boolean }) {
+  const items = reportsAllowed ? adminQuickNav : adminQuickNav.filter((item) => item.href !== ADMIN_REPORTS);
   return (
     // pb-[env(safe-area-inset-bottom)]: 홈 인디케이터가 있는 아이폰에서 마지막
     // 탭 줄이 인디케이터에 가려 눌리지 않는 것을 막는다.
     <nav
       aria-label="Quick admin sections"
-      className="grid grid-cols-4 border-t border-[#d4d4d8] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className={`grid ${items.length === 4 ? "grid-cols-4" : "grid-cols-3"} border-t border-[#d4d4d8] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden`}
     >
-      {adminQuickNav.map((item) => {
+      {items.map((item) => {
         const current = isActive(pathname, item.href);
         return (
           <Link

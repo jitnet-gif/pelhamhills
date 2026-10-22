@@ -20,7 +20,6 @@
  * 스캐너 규칙이 따로 늙는다.
  */
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
@@ -29,7 +28,7 @@ import RegisterHome from "@/components/retail/RegisterHome";
 import RegisterTab, { RECEIPT_NO } from "@/components/retail/RegisterTab";
 import { demoLowStock, demoProducts } from "@/components/retail/demoData";
 import { Chip, ErrorNote, OfflineBanner } from "@/components/retail/ui";
-import { ADMIN_REPORTS, ADMIN_RETAIL, ADMIN_SNACK_BAR } from "@/lib/nav";
+import { ADMIN_RETAIL, ADMIN_SNACK_BAR } from "@/lib/nav";
 import { clearSaleViewRequest, saleViewRequested } from "@/lib/pos/currentBill";
 import retailApi, { toRetailError } from "@/lib/retail/api";
 import type { LowStockItem, Product, RetailCategory } from "@/lib/retail/types";
@@ -178,14 +177,6 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
               {item.label}
             </Chip>
           ))}
-          {posApp ? null : (
-            <Link
-              className="inline-flex min-h-11 shrink-0 items-center border border-[#d4d4d8] bg-white px-3 text-sm font-bold whitespace-nowrap text-[#3f434a] hover:bg-[#f2f2f4]"
-              href={ADMIN_REPORTS}
-            >
-              Sales report →
-            </Link>
-          )}
         </div>
       }
       title={title}

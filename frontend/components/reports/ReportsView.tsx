@@ -2,7 +2,7 @@
 
 /**
  * Reports 의 탭들. 두 화면이 같이 쓴다:
- * - `/admin/reports`      — `cash={false}`. 현금 숫자(By payment 의 Cash, 담당자별 마감, 회계 보고서의 Cash 칸)가 없다.
+ * - `/admin/reports` — `cash`. Emmeline 계정에만 메뉴가 뜨고 화면이 열린다(2026-10-22, `lib/reports/access.ts`).
  * - `/cash` — `cash`. 현금까지 전부. 따로 로그인하는 현금 리포트 사이트, 현금 리포트 계정(0046 의 명단)만 연다.
  * 서버도 명단 밖 계정에는 현금을 주지 않는다(0046) — 화면에서 거르는 것은 두 번째 울타리다.
  *

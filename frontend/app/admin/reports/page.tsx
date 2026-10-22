@@ -11,46 +11,40 @@
  * 나눈다 — `lib/retail/divisions.ts`. 여기는 데모로 내려가지 않는다: 서버가 안 되면 오류를
  * 보여 준다. 가짜 숫자 옆의 진짜 숫자가 이 화면이 고치려던 바로 그 문제다.
  *
- * 현금은 여기 없다(2026-10-19). 현금까지 든 리포트는 따로 로그인하는 사이트 `/cash` 에서 현금 리포트
- * 계정만 본다(2026-10-20). 여기 로그인한 계정이 그 계정일 때만 오른쪽 위에 링크가 뜬다 — 그래도 `/cash` 는
- * 자기 로그인을 따로 묻는다. 탭은 `components/reports/ReportsView.tsx`.
+ * Emmeline 만 본다(2026-10-22). 메뉴는 그 계정에만 뜨고(`lib/reports/access.ts`), 주소로 들어와도
+ * 다른 계정에는 이유만 보여 준다. 그 계정은 현금 리포트 명단(0046)이라 현금까지 전부 보인다 —
+ * 따로 로그인하는 `/cash` 도 그대로 있다. 탭은 `components/reports/ReportsView.tsx`.
  */
-
-import { useEffect, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
 import ReportsView from "@/components/reports/ReportsView";
-import retailApi from "@/lib/retail/api";
+import { getSession } from "@/lib/teeSheet/session";
+import { useReportsAccess } from "@/lib/reports/access";
 
 export default function ReportsPage() {
-  const [cashAccess, setCashAccess] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    retailApi
-      .cashAccess()
-      .then((allowed) => {
-        if (!cancelled) setCashAccess(allowed);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
     <AdminShell title="Reports">
-      <ReportsView
-        aside={
-          cashAccess ? (
-            // 일반 <a>: 페이지를 새로 열어야 `/cash` 의 따로 된 로그인 칸을 읽는다.
-            <a className="text-sm font-semibold text-[#4533ff] hover:underline" href="/cash">
-              Cash report →
-            </a>
-          ) : null
-        }
-        cash={false}
-      />
+      <ReportsGate />
     </AdminShell>
   );
+}
+
+/** AdminShell 이 로그인을 확인한 뒤에야 그려진다 — 그래서 세션의 이메일을 바로 읽어도 된다. */
+function ReportsGate() {
+  const allowed = useReportsAccess(getSession()?.email ?? "");
+
+  if (allowed === null) return <p className="p-4 text-sm text-[#4e5560]">확인 중…</p>;
+  if (!allowed) {
+    return (
+      <div className="mx-auto grid max-w-md gap-3 p-4">
+        <div className="bg-white p-5 text-sm shadow-sm">
+          <p className="font-bold">Reports are for Emmeline&apos;s account only.</p>
+          <p className="mt-2 text-[#6b7280]">
+            Sign out and sign in with Emmeline&apos;s ID to open Reports.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return <ReportsView cash />;
 }
