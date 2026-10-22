@@ -16,7 +16,7 @@
  * 오도록 스크롤해 둔다. 전체 길이는 요금 조회 한도(`pelham_staff_rate_days`, 62일) 안이다.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { dayTypeLabel, useRateDays } from "@/hooks/useRateDays";
 import { addDays, columnLabel, longDate, money, toDate, todayIso } from "@/lib/teeSheet/dates";
@@ -70,19 +70,26 @@ export type DayTabsProps = {
   /** 지금 고른 날짜 (ISO). */
   value: string;
   onChange: (isoDate: string) => void;
+  /**
+   * 주면 띠 왼쪽에 **고정** Today 버튼을 그린다(띠와 같이 밀리지 않는다). 몇 주 뒤를 보고 있어도
+   * 한 번에 오늘로 돌아와 오늘부터 7일을 첫 칸부터 보여 준다.
+   */
+  onToday?: () => void;
 };
 
-export default function DayTabs({ value, onChange }: DayTabsProps) {
+export default function DayTabs({ value, onChange, onToday }: DayTabsProps) {
   const { dates, anchor, mounted } = useDayStrip(value);
   // 칸마다 그 날 그린피. 공휴일은 주황 글자 — 평일인데 요금이 다른 날을 놓치지 않게.
   const rates = useRateDays(dates);
   const stripRef = useRef<HTMLDivElement>(null);
+  // Today 를 누를 때마다 올린다 — 오늘이 이미 띠 안이면 앵커가 안 바뀌어 아래 효과가 안 돈다.
+  const [resetTick, setResetTick] = useState(0);
 
-  // 앵커가 바뀌면(첫 렌더·하이드레이션·먼 날로 점프) 앵커를 첫 칸에 맞춘다.
+  // 앵커가 바뀌면(첫 렌더·하이드레이션·먼 날로 점프·Today) 앵커를 첫 칸에 맞춘다.
   useLayoutEffect(() => {
     const strip = stripRef.current;
     if (strip) strip.scrollLeft = (strip.clientWidth / STRIP_DAYS) * STRIP_BEFORE;
-  }, [anchor]);
+  }, [anchor, resetTick]);
 
   // 고른 날이 화면 밖이면(띠를 밀어 둔 채 다른 곳에서 날짜를 바꿨을 때) 보이게 민다.
   useEffect(() => {
@@ -115,41 +122,57 @@ export default function DayTabs({ value, onChange }: DayTabsProps) {
     // 칸 폭은 내용이 아니라 띠 폭의 1/7 이라 좁은 화면에서도 7칸이 그대로 좁아지고,
     // 나머지 날은 옆으로 밀어서 본다. 스크롤바는 숨긴다(휠·트랙패드·터치로 민다).
     // 띠 자체가 파란 배경이고 칸 사이는 흰 선으로만 나눈다.
-    <div
-      className="flex overflow-x-auto overscroll-x-contain border-b border-[#d4d4d8] bg-[#a9c3e0] text-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      ref={stripRef}
-    >
-      {dates.map((iso) => {
-        // columnLabel()은 내부에서 todayIso()를 부른다 → 마운트 전에는 쓸 수 없다.
-        const label = mounted ? columnLabel(iso) : weekdayLabel(iso);
-        const active = iso === value;
-        const day = rates.get(iso);
-        const holiday = day?.dayType === "holiday";
-        return (
-          <button
-            aria-pressed={active}
-            className={`min-h-11 shrink-0 basis-[calc(100%/7)] truncate border-r border-white/60 px-2 font-bold whitespace-nowrap last:border-r-0 lg:min-h-0 lg:py-1.5 ${
-              active ? "bg-[#3a7bc4] text-white" : "text-[#1f2328] hover:bg-white/25"
-            }`}
-            data-iso={iso}
-            key={iso}
-            onClick={() => onChange(iso)}
-            title={day ? `${longDate(iso)} — ${dayTypeLabel(day)} ${money(day.rate)}` : longDate(iso)}
-            type="button"
-          >
-            {label}
-            {day && (
-              <span
-                className={`block truncate text-[10px] leading-tight font-semibold tabular-nums ${
-                  active ? "text-white/85" : holiday ? "text-[#b4530a]" : "text-[#3f4650]"
-                }`}
-              >
-                {holiday ? `★ ${money(day.rate)}` : money(day.rate)}
-              </span>
-            )}
-          </button>
-        );
-      })}
+    // Today 버튼은 띠 바깥 왼쪽에 둔다 — 띠 안에 넣으면 같이 밀려 사라진다.
+    <div className="flex border-b border-[#d4d4d8] bg-[#a9c3e0] text-xs">
+      {onToday ? (
+        <button
+          className="min-h-11 shrink-0 border-r-2 border-white/80 bg-[#2f5f96] px-3 font-bold whitespace-nowrap text-white hover:bg-[#244b78] lg:min-h-0 lg:py-1.5"
+          onClick={() => {
+            setResetTick((tick) => tick + 1);
+            onToday();
+          }}
+          title="Back to today — show the week from today"
+          type="button"
+        >
+          Today
+        </button>
+      ) : null}
+      <div
+        className="flex min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        ref={stripRef}
+      >
+        {dates.map((iso) => {
+          // columnLabel()은 내부에서 todayIso()를 부른다 → 마운트 전에는 쓸 수 없다.
+          const label = mounted ? columnLabel(iso) : weekdayLabel(iso);
+          const active = iso === value;
+          const day = rates.get(iso);
+          const holiday = day?.dayType === "holiday";
+          return (
+            <button
+              aria-pressed={active}
+              className={`min-h-11 shrink-0 basis-[calc(100%/7)] truncate border-r border-white/60 px-2 font-bold whitespace-nowrap last:border-r-0 lg:min-h-0 lg:py-1.5 ${
+                active ? "bg-[#3a7bc4] text-white" : "text-[#1f2328] hover:bg-white/25"
+              }`}
+              data-iso={iso}
+              key={iso}
+              onClick={() => onChange(iso)}
+              title={day ? `${longDate(iso)} — ${dayTypeLabel(day)} ${money(day.rate)}` : longDate(iso)}
+              type="button"
+            >
+              {label}
+              {day && (
+                <span
+                  className={`block truncate text-[10px] leading-tight font-semibold tabular-nums ${
+                    active ? "text-white/85" : holiday ? "text-[#b4530a]" : "text-[#3f4650]"
+                  }`}
+                >
+                  {holiday ? `★ ${money(day.rate)}` : money(day.rate)}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

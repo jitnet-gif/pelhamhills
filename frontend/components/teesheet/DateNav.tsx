@@ -462,7 +462,16 @@ export default function DateNav({ controller }: DateNavProps) {
 
       {/* (b) 요일 탭 스트립 — 오늘부터 7일. 요금 화면과 **같은 컴포넌트**를 쓴다
           (components/admin/DayTabs.tsx). 클래스를 베껴 두면 한쪽만 색이 바뀐다. */}
-      <DayTabs onChange={controller.setFocusedDate} value={focusedDate} />
+      <DayTabs
+        onChange={controller.setFocusedDate}
+        onToday={() => {
+          // 날짜가 바뀌면 컨트롤러가 다시 불러온다. 이미 오늘이면 직접 새로 고친다.
+          const today = todayIso();
+          if (focusedDate === today) void controller.refresh();
+          else controller.setFocusedDate(today);
+        }}
+        value={focusedDate}
+      />
 
       {/* 토스트 스택 — BookingDialog(z-50) 위에 떠야 하므로 z-[60]. */}
       <div aria-live="polite" className="pointer-events-none fixed right-4 top-4 z-[60] flex w-72 flex-col gap-2">
