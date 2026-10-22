@@ -55,15 +55,23 @@ export type PaymentInput = {
 
 export type OpenItemInput = { name: string; price: Cents; quantity: number; category: string };
 
-/** 고객 파일의 Sell membership(0072). 가격은 서버가 요금표로 정한다. expires_on 은 'YYYY-MM-DD' 또는 ''. */
+/**
+ * 고객 파일의 Sell membership(0072). 가격은 서버가 요금표로 정한다. 날짜는 'YYYY-MM-DD'(starts_on 을 비우면 오늘,
+ * expires_on 을 비우면 만료일 없음). card_fee = 신용카드로 받는다 — 줄 가격에 3% 가 들어간다.
+ */
 export type MembershipSaleInput = {
   customer_ref: string;
   season: number;
   membership_type: string;
   plan: string;
   cart_package: string | null;
+  starts_on: string;
   expires_on: string;
+  card_fee: boolean;
 };
+
+/** 회원권 줄의 SKU. 'MEMBERSHIP-CC' 는 신용카드 3% 가 들어간 줄(0072) — 신용카드로만 받는다. */
+export const MEMBERSHIP_CARD_SKU = "MEMBERSHIP-CC";
 
 /** 티 시트 예약 하나에 실렸던 결제·환불 계산서(0022). 온라인으로 낸 것이면 `online` 이 붙는다. */
 export type TeeBill = Bill & {
@@ -103,6 +111,9 @@ export const posApi = {
   /** 회원권 한 줄(0072). 계산서가 결제되면 회원권이 납부(active)로 바뀐다. */
   addMembership: (bill: number, sale: MembershipSaleInput) =>
     staffRpc<Bill>("pelham_staff_bill_add_membership", { p_bill: bill, p: sale }),
+  /** 회원권 줄의 신용카드 3% 를 켜고 끈다(0072). */
+  membershipCardFee: (bill: number, line: number, on: boolean) =>
+    staffRpc<Bill>("pelham_staff_bill_membership_card_fee", { p_bill: bill, p_line: line, p_on: on }),
   /** players 를 비우면 그 예약에서 아직 안 낸 사람 전부. */
   addTee: (bill: number, booking: string, players?: string[]) =>
     staffRpc<Bill>("pelham_staff_bill_add_tee", {
@@ -139,8 +150,20 @@ export function isMissingMigration(error: unknown): boolean {
 export const MISSING_MIGRATION_MESSAGE =
   "계산서 기능이 아직 켜지지 않았습니다. Supabase SQL Editor 에서 0005_pos_bills.sql 을 실행해 주세요.";
 
+/** 0005 이후에 더해진 계산서 함수 → 그 함수를 만드는 마이그레이션. 없으면 0005 로 안내한다. */
+const MIGRATION_OF: Record<string, string> = {
+  pelham_staff_bill_add_membership: "0072_membership_register.sql",
+  pelham_staff_bill_membership_card_fee: "0072_membership_register.sql",
+};
+
 export function describePosError(error: unknown): string {
-  if (isMissingMigration(error)) return MISSING_MIGRATION_MESSAGE;
+  if (isMissingMigration(error)) {
+    // "Could not find the function public.pelham_staff_bill_add_membership(p, p_bill) in the schema cache"
+    const fn = /function\s+(?:public\.)?(\w+)/i.exec((error as ApiError).message)?.[1];
+    const file = fn ? MIGRATION_OF[fn] : undefined;
+    if (file) return `Supabase 에 ${fn} 함수가 아직 없습니다. Supabase SQL Editor 에서 ${file} 을 실행해 주세요.`;
+    return MISSING_MIGRATION_MESSAGE;
+  }
   if (error instanceof ApiError) {
     if (error.status === 0) return "서버에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.";
     return error.message;

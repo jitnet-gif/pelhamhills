@@ -21,7 +21,7 @@ import {
   type MembershipStatus,
   type MembershipType,
 } from "@/lib/memberships";
-import { billActions, getBillState } from "@/lib/pos/currentBill";
+import { billActions, getBillState, requestSaleView } from "@/lib/pos/currentBill";
 import { CLUB_TIME_ZONE } from "@/lib/retail/receipt";
 import { computeTax, formatMoney, TAX_RATE } from "@/lib/retail/types";
 import { ADMIN_HOME } from "@/lib/nav";
@@ -69,6 +69,8 @@ type Customer = {
     amount_due?: number;
     amount_paid?: number;
     rate_plan?: string | null;
+    /** 0072. 'YYYY-MM-DD' 또는 null(시작일 없음). */
+    starts_on?: string | null;
     /** 0069. 'YYYY-MM-DD' 또는 null(만료일 없음). expired 는 오늘 클럽 날짜보다 앞이면 참. */
     expires_on?: string | null;
     expired?: boolean;
@@ -123,6 +125,8 @@ type MembershipInput = {
   plan: MembershipPlan;
   cart_package: CartPackage | "";
   status: "pending" | "active";
+  /** 'YYYY-MM-DD', "" 는 시작일 없음(0072). */
+  starts_on: string;
   /** 'YYYY-MM-DD', "" 는 만료일 없음(0069). */
   expires_on: string;
   /** PAYMENT_METHODS 중 하나, "" 는 아직 모름(0070). */
@@ -181,6 +185,7 @@ function membershipFrom(c: Customer | null): {
         plan: m.plan,
         cart_package: m.cart_package ?? "",
         status: m.status === "active" ? "active" : "pending",
+        starts_on: m.starts_on ?? "",
         expires_on: m.expires_on ?? "",
         payment_method: m.payment_method ?? "",
       },
@@ -195,6 +200,7 @@ function membershipFrom(c: Customer | null): {
       plan: draft?.plan ?? "single",
       cart_package: draft?.cart_package ?? "",
       status: "active",
+      starts_on: "",
       expires_on: "",
       payment_method: "",
     },
@@ -795,6 +801,9 @@ function CustomerFile({
                   : "text-[#5d6673]"
               }
             >
+              {customer.membership.starts_on
+                ? `Starts ${formatDate(customer.membership.starts_on)} · `
+                : ""}
               {customer.membership.expires_on
                 ? `${customer.membership.expired ? "Expired" : "Expires"} ${formatDate(customer.membership.expires_on)}`
                 : "No expiry date"}
@@ -984,9 +993,22 @@ function MembershipFields({
               </select>
             </label>
             <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+              Starts
+              <input
+                className={SELECT_CLASS}
+                max={value.expires_on || undefined}
+                onChange={(event) =>
+                  onChange({ starts_on: event.target.value })
+                }
+                type="date"
+                value={value.starts_on}
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
               Expires
               <input
                 className={SELECT_CLASS}
+                min={value.starts_on || undefined}
                 onChange={(event) =>
                   onChange({ expires_on: event.target.value })
                 }
@@ -1106,9 +1128,14 @@ function SellMembershipDialog({
       ? `${current.membership_type}:${current.plan}:${current.cart_package ?? ""}`
       : "",
   );
+  const [startsOn, setStartsOn] = useState(
+    current?.season === season && current.starts_on ? current.starts_on : today,
+  );
   const [endsOn, setEndsOn] = useState(
     current?.season === season && current.expires_on ? current.expires_on : `${season}-12-15`,
   );
+  /** 신용카드로 받으면 줄 가격에 3% 가 들어간다(신청서 규칙). 레지스터는 신용카드로만 받는다. */
+  const [byCard, setByCard] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1129,9 +1156,12 @@ function SellMembershipDialog({
     (current.cart_package ?? null) === product.cart_package
       ? Number(current.amount_paid)
       : 0;
-  const due = product ? Math.max(0, Number(product.price) - samePaid) : 0;
+  const balanceDue = product ? Math.max(0, Number(product.price) - samePaid) : 0;
+  // 서버(0072)와 같은 셈: 남은 금액 × 1.03(카드) ÷ 1.13.
+  const due = byCard ? balanceDue * (1 + CREDIT_CARD_SURCHARGE) : balanceDue;
   const subtotal = preTaxCents(due);
   const tax = computeTax(subtotal);
+  const cardFee = byCard ? subtotal - preTaxCents(balanceDue) : 0;
 
   async function send() {
     if (!product) return;
@@ -1143,14 +1173,17 @@ function SellMembershipDialog({
       membership_type: product.membership_type,
       plan: product.plan,
       cart_package: product.cart_package,
+      starts_on: startsOn,
       expires_on: endsOn,
+      card_fee: byCard,
     });
     setSending(false);
     if (!bill) {
       setError(getBillState().error || "Could not add the membership to the register.");
       return;
     }
-    router.push("/admin/retail?view=sale");
+    requestSaleView();
+    router.push("/admin/retail");
   }
 
   return (
@@ -1167,6 +1200,7 @@ function SellMembershipDialog({
               onChange={(event) => {
                 const next = Number(event.target.value);
                 setSeason(next);
+                setStartsOn(next > year ? `${next}-04-01` : today);
                 setEndsOn(`${next}-12-15`);
               }}
               value={season}
@@ -1180,13 +1214,19 @@ function SellMembershipDialog({
           </label>
           <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
             Start
-            <input className={`${SELECT_CLASS} bg-[#f7f7f8]`} disabled type="date" value={today} />
+            <input
+              className={SELECT_CLASS}
+              max={endsOn || undefined}
+              onChange={(event) => setStartsOn(event.target.value)}
+              type="date"
+              value={startsOn}
+            />
           </label>
           <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
             End
             <input
               className={SELECT_CLASS}
-              min={today}
+              min={startsOn > today ? startsOn : today}
               onChange={(event) => setEndsOn(event.target.value)}
               type="date"
               value={endsOn}
@@ -1222,7 +1262,37 @@ function SellMembershipDialog({
           {products.length === 0 && <li className="px-3 py-2 text-sm text-[#5d6673]">No match</li>}
         </ul>
 
+        <fieldset className="mt-4 grid gap-1">
+          <legend className="mb-1 text-xs font-bold text-[#5d6673]">Paying by</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { card: false, label: "Cash, debit or cheque" },
+              { card: true, label: "Credit card (+3%)" },
+            ].map((option) => (
+              <button
+                aria-pressed={byCard === option.card}
+                className={`min-h-11 border px-3 text-xs font-bold lg:min-h-0 lg:py-2 ${
+                  byCard === option.card
+                    ? "border-[#4533ff] bg-[#4533ff] text-white"
+                    : "border-[#cfd2d8] bg-white hover:border-[#4533ff]"
+                }`}
+                key={option.label}
+                onClick={() => setByCard(option.card)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
         <dl className="mt-4 grid gap-1 border-t border-[#e2e4e8] pt-3 text-sm">
+          {cardFee > 0 && (
+            <div className="flex justify-between text-[#5d6673]">
+              <dt>Includes 3% credit card fee</dt>
+              <dd className="tabular-nums">{formatMoney(cardFee)}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt>Subtotal</dt>
             <dd className="tabular-nums">{formatMoney(subtotal)}</dd>
@@ -1256,7 +1326,7 @@ function SellMembershipDialog({
           </button>
           <button
             className="min-h-11 bg-[#4533ff] px-4 text-xs font-bold text-white disabled:opacity-50 lg:min-h-0 lg:py-2"
-            disabled={!product || due <= 0 || !endsOn || sending}
+            disabled={!product || due <= 0 || !endsOn || !startsOn || startsOn > endsOn || sending}
             onClick={() => void send()}
             type="button"
           >
@@ -1264,7 +1334,7 @@ function SellMembershipDialog({
           </button>
         </div>
         <p className="mt-2 text-right text-[11px] text-[#5d6673]">
-          Paid at the register, the membership turns Active. Card payments here are not charged the 3% card fee.
+          Paid at the register, the membership turns Active. You can still add or remove the card fee on the register line.
         </p>
       </div>
     </div>

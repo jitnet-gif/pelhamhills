@@ -174,6 +174,23 @@ function mutate(task: (billId: number) => Promise<Bill>, station: BillStation): 
   });
 }
 
+// ===== 판매 화면으로 열기 ================================================
+// 고객 파일의 Sell membership(0072)이 회원권 줄을 담고 레지스터로 넘어갈 때, 레지스터를 홈이 아니라
+// 판매 화면으로 연다. 앱 안의 이동(router.push)이라 모듈 값이 이어진다. 새로고침하면 홈부터다.
+let saleViewRequest = false;
+
+export function requestSaleView(): void {
+  saleViewRequest = true;
+}
+
+export function saleViewRequested(): boolean {
+  return saleViewRequest;
+}
+
+export function clearSaleViewRequest(): void {
+  saleViewRequest = false;
+}
+
 export const billActions = {
   addProduct: (productId: number, station: BillStation, quantity = 1) =>
     mutate((id) => posApi.addProduct(id, productId, quantity), station),
@@ -181,6 +198,8 @@ export const billActions = {
     mutate((id) => posApi.addOpenItem(id, item), station),
   addMembership: (sale: MembershipSaleInput, station: BillStation = "pro_shop") =>
     mutate((id) => posApi.addMembership(id, sale), station),
+  setMembershipCardFee: (lineId: number, on: boolean, station: BillStation) =>
+    mutate((id) => posApi.membershipCardFee(id, lineId, on), station),
   addTee: (bookingId: string, playerIds: string[] | undefined, station: BillStation = "tee_sheet") =>
     mutate((id) => posApi.addTee(id, bookingId, playerIds), station),
   addSim: (reservationId: number, station: BillStation = "simulator") =>

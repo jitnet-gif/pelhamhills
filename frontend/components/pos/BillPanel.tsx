@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 
 import {
   billTakesTip,
+  MEMBERSHIP_CARD_SKU,
   newCheckoutId,
   TERMINAL_METHODS,
   type Bill,
@@ -34,7 +35,7 @@ import {
   type PaymentInput,
 } from "@/lib/pos/api";
 import { cashierForCode, isShiftCode } from "@/lib/pos/cashierCode";
-import { billActions, recentCashiers, rememberCashier, rememberedCashier, useCurrentBill } from "@/lib/pos/currentBill";
+import { billActions, getBillState, recentCashiers, rememberCashier, rememberedCashier, useCurrentBill } from "@/lib/pos/currentBill";
 import {
   describeTerminalResult,
   terminal,
@@ -745,7 +746,9 @@ function SalesLineRow({
       : line.kind === "sim_booking"
         ? `Bay Sheet: ${line.tee_date ?? ""} ${line.tee_time ?? ""}`.trim()
         : line.kind === "membership"
-          ? "Membership"
+          ? line.sku === MEMBERSHIP_CARD_SKU
+            ? "Membership · incl. 3% credit card fee"
+            : "Membership"
           : line.sku);
 
   return (
@@ -769,6 +772,7 @@ function SalesLineRow({
         {line.discount > 0 ? (
           <span className="block text-[11px] text-[#1f6b3a]">Discount −{formatMoney(line.discount)}</span>
         ) : null}
+        {line.kind === "membership" ? <MembershipCardFeeButton line={line} station={station} /> : null}
       </td>
       <td className="py-2 text-right text-[14px] tabular-nums">{formatMoney(line.unit_price)}</td>
       <td className="py-2 pl-3">
@@ -790,6 +794,36 @@ function SalesLineRow({
       <td className="py-2 pr-3 text-right text-[14px] tabular-nums">{formatMoney(line.line_total)}</td>
     </tr>
   );
+}
+
+/**
+ * 회원권 줄의 신용카드 3%(0072). 단말기는 서버 결제보다 먼저 카드를 긁으므로, 카드로 받을 거면
+ * 결제 전에 여기서 켜야 한다(결제 칸이 수단과 수수료가 맞는지 먼저 본다).
+ */
+function MembershipCardFeeButton({ line, station }: { line: { id: number; sku: string }; station: BillStation }) {
+  const on = line.sku === MEMBERSHIP_CARD_SKU;
+  return (
+    <button
+      className="mt-1 inline-flex min-h-8 items-center border border-[#c7c7cc] bg-white px-2 text-[12px] font-bold text-[#3f434a] hover:border-[#4533ff]"
+      onClick={() => void billActions.setMembershipCardFee(line.id, !on, station)}
+      type="button"
+    >
+      {on ? "Remove 3% card fee" : "Add 3% card fee (credit card)"}
+    </button>
+  );
+}
+
+/** 회원권 줄과 결제 수단이 맞는지. 신용카드면 3% 줄이어야 하고, 3% 줄은 신용카드로만 받는다. */
+function membershipTenderProblem(method: PaymentMethod): string {
+  const lines = getBillState().bill?.lines.filter((line) => line.kind === "membership") ?? [];
+  const withFee = lines.filter((line) => line.sku === MEMBERSHIP_CARD_SKU);
+  if (method === "card" && withFee.length < lines.length) {
+    return "A membership paid by credit card adds 3%. Press \"Add 3% card fee\" on the membership line first.";
+  }
+  if (method !== "card" && withFee.length > 0) {
+    return "This membership includes the 3% credit card fee. Take it by credit card, or press \"Remove 3% card fee\" first.";
+  }
+  return "";
 }
 
 /** Item 찾기 + 분류 버튼. 활성 상품만, 처음 열 때 한 번 읽는다. */
@@ -982,6 +1016,7 @@ function BillLineRow({ line, station }: { line: Bill["lines"][number]; station: 
   // 그린피·베이 줄은 예약 하나 = 한 줄. 수량을 바꿀 수 없다.
   const isTee = line.kind === "tee_player";
   const isSim = line.kind === "sim_booking";
+  const isMembership = line.kind === "membership";
   return (
     <li className="min-w-0 border border-[#e4e4e8] p-2">
       <div className="flex items-start justify-between gap-2">
@@ -1005,7 +1040,9 @@ function BillLineRow({ line, station }: { line: Bill["lines"][number]; station: 
         </button>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        {isTee || isSim ? (
+        {isMembership ? (
+          <MembershipCardFeeButton line={line} station={station} />
+        ) : isTee || isSim ? (
           <span className="text-xs text-[#6b7280]">{isTee ? "1 player" : "1 booking"}</span>
         ) : (
           <div className="flex items-center">
@@ -1158,6 +1195,11 @@ function PaymentsEditor({
 
   async function add() {
     setFormError("");
+    const tenderProblem = membershipTenderProblem(method);
+    if (tenderProblem) {
+      setFormError(tenderProblem);
+      return;
+    }
     if (isRainCheck) {
       if (!rcFound || !rcUsable) {
         setFormError(rcProblem || "Scan the rain check, or type its code and press Enter.");
