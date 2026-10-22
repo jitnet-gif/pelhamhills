@@ -43,6 +43,24 @@ export default function AccountsPage() {
 /** AdminShell 이 로그인을 확인한 뒤에야 그려진다 — 세션의 이메일을 바로 읽어도 된다. */
 function AccountsGate() {
   const allowed = useAccountsAccess(getSession()?.email ?? "");
+  // 막힌 이유를 서버에게 한 번 더 묻는다 — 0074 를 아직 안 돌렸는지, 명단 밖인지가 다르다.
+  const [reason, setReason] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (allowed !== false) return;
+    let cancelled = false;
+    accountsApi
+      .list()
+      .then(() => {
+        if (!cancelled) setReason(null);
+      })
+      .catch((err) => {
+        if (!cancelled) setReason(describeAccountError(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed]);
 
   if (allowed === null) return <p className="p-4 text-sm text-[#4e5560]">확인 중…</p>;
   if (!allowed) {
@@ -51,6 +69,7 @@ function AccountsGate() {
         <div className="bg-white p-5 text-sm shadow-sm">
           <p className="font-bold">Account Setup is for Emmeline&apos;s account only.</p>
           <p className="mt-2 text-[#6b7280]">Sign out and sign in with Emmeline&apos;s ID to manage accounts.</p>
+          {reason ? <p className="mt-3 text-[#8a1f1f]">{reason}</p> : null}
         </div>
       </div>
     );
