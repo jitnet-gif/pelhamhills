@@ -63,6 +63,9 @@ type Customer = {
     amount_due?: number;
     amount_paid?: number;
     rate_plan?: string | null;
+    /** 0069. 'YYYY-MM-DD' 또는 null(만료일 없음). expired 는 오늘 클럽 날짜보다 앞이면 참. */
+    expires_on?: string | null;
+    expired?: boolean;
   } | null;
 };
 
@@ -112,6 +115,8 @@ type MembershipInput = {
   plan: MembershipPlan;
   cart_package: CartPackage | "";
   status: "pending" | "active";
+  /** 'YYYY-MM-DD', "" 는 만료일 없음(0069). */
+  expires_on: string;
 };
 
 /** 클럽 현지 연도. */
@@ -166,6 +171,7 @@ function membershipFrom(c: Customer | null): {
         plan: m.plan,
         cart_package: m.cart_package ?? "",
         status: m.status === "active" ? "active" : "pending",
+        expires_on: m.expires_on ?? "",
       },
       dirty: false,
     };
@@ -178,6 +184,7 @@ function membershipFrom(c: Customer | null): {
       plan: draft?.plan ?? "single",
       cart_package: draft?.cart_package ?? "",
       status: "active",
+      expires_on: "",
     },
     dirty: !!draft?.membership_type,
   };
@@ -231,6 +238,15 @@ function membershipLabel(c: Customer): string | null {
   return `${m.season} ${typeInfo(m.membership_type)?.label ?? m.membership_type}${m.plan === "spousal" ? " · Spousal" : ""}`;
 }
 
+/** '2026-10-31' → 'Oct 31, 2026'. */
+function formatDate(iso: string): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString("en-CA", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function matches(c: Customer, q: string): boolean {
   if (!q) return true;
   const digits = q.replace(/\D/g, "");
@@ -248,6 +264,8 @@ export default function CustomersPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
+  /** 좁은 화면에서 줄을 누르면 고객 파일을 창으로 연다(넓은 화면은 오른쪽 칸에 보인다). */
+  const [viewingRef, setViewingRef] = useState<string | null>(null);
   /** 열린 폼. ref 가 null 이면 새 고객. */
   const [editing, setEditing] = useState<{
     ref: string | null;
@@ -277,6 +295,7 @@ export default function CustomersPage() {
   }, []);
 
   function openForm(c: Customer | null) {
+    setViewingRef(null);
     const m = membershipFrom(c);
     setEditing({
       ref: c?.customer_ref ?? null,
@@ -352,6 +371,9 @@ export default function CustomersPage() {
 
   const selected =
     all.find((c) => c.customer_ref === selectedRef) ?? visible[0] ?? null;
+  const viewing = viewingRef
+    ? (all.find((c) => c.customer_ref === viewingRef) ?? null)
+    : null;
   const totalRounds = all.reduce((sum, c) => sum + c.rounds, 0);
 
   return (
@@ -443,7 +465,12 @@ export default function CustomersPage() {
                           : "bg-white"
                       }`}
                       key={c.customer_ref}
-                      onClick={() => setSelectedRef(c.customer_ref)}
+                      onClick={() => {
+                        setSelectedRef(c.customer_ref);
+                        if (!window.matchMedia("(min-width: 1280px)").matches)
+                          setViewingRef(c.customer_ref);
+                      }}
+                      type="button"
                     >
                       <span className="min-w-0">
                         <strong className="block text-sm">
@@ -471,6 +498,11 @@ export default function CustomersPage() {
                             {membershipLabel(c)}
                           </span>
                         )}
+                        {c.membership?.expired && (
+                          <span className="bg-[#fde8e7] px-2 py-1 text-[11px] font-bold text-[#b42318]">
+                            Expired
+                          </span>
+                        )}
                         {c.needs_review && (
                           <span className="bg-[#ffd400] px-2 py-1 text-[11px] font-bold text-[#1d232b]">
                             Review
@@ -491,111 +523,38 @@ export default function CustomersPage() {
           </div>
 
           {selected && (
-            <aside className="border border-[#d4d4d8] bg-white p-4">
-              <div className="mb-4 flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-[11px] font-bold uppercase text-[#5d6673]">
-                    Customer File · {selected.customer_ref}
-                  </p>
-                  <p className="text-xl font-bold">
-                    {selected.name || selected.customer_ref}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span
-                    className={`px-2 py-1 text-[11px] font-bold ${
-                      selected.is_member
-                        ? "bg-[#dff7e8] text-[#087333]"
-                        : "bg-[#ececf0] text-[#4e5560]"
-                    }`}
-                  >
-                    {selected.is_member ? "Member" : "Public"}
-                  </span>
-                  <button
-                    className="inline-flex min-h-11 items-center border border-[#cfd2d8] bg-white px-3 text-xs font-bold hover:border-[#4533ff] lg:min-h-0 lg:py-1.5"
-                    onClick={() => openForm(selected)}
-                    type="button"
-                  >
-                    Edit
-                  </button>
-                </div>
-              </div>
-              <dl className="grid gap-3 text-xs">
-                <div>
-                  <dt className="font-bold text-[#5d6673]">Contact</dt>
-                  <dd>{formatPhone(selected.phone) || "—"}</dd>
-                  <dd>{selected.email || "—"}</dd>
-                  {selected.address && (
-                    <dd>
-                      {selected.address}
-                      {selected.postal_code ? ` ${selected.postal_code}` : ""}
-                    </dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="font-bold text-[#5d6673]">Membership</dt>
-                  <dd>
-                    {selected.membership
-                      ? `${membershipLabel(selected)} · ${STATUS_LABEL[selected.membership.status]}`
-                      : "No membership on file"}
-                  </dd>
-                  {selected.player_type && (
-                    <dd className="text-[#5d6673]">
-                      Last plan: {selected.player_type}
-                    </dd>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-[#f7f7f8] p-3">
-                    <dt className="font-bold text-[#5d6673]">Rounds</dt>
-                    <dd className="text-lg font-bold">{selected.rounds}</dd>
-                  </div>
-                  <div className="bg-[#f7f7f8] p-3">
-                    <dt className="font-bold text-[#5d6673]">Index</dt>
-                    <dd className="text-lg font-bold">
-                      {selected.scoring_factor ?? "—"}
-                    </dd>
-                  </div>
-                  <div className="bg-[#f7f7f8] p-3">
-                    <dt className="font-bold text-[#5d6673]">Card</dt>
-                    <dd className="text-lg font-bold">
-                      {selected.has_credit_card ? "On file" : "—"}
-                    </dd>
-                  </div>
-                </div>
-                <div>
-                  <dt className="font-bold text-[#5d6673]">Account</dt>
-                  <dd className="capitalize">
-                    {selected.activation_state ?? "—"}
-                  </dd>
-                  {selected.user_created_on && (
-                    <dd className="text-[#5d6673]">
-                      Since {selected.user_created_on}
-                    </dd>
-                  )}
-                </div>
-                {selected.needs_review && (
-                  <div>
-                    <dt className="font-bold text-[#5d6673]">Needs review</dt>
-                    <dd className="mt-1 border-l-4 border-[#ffd400] bg-[#fffbe6] p-3">
-                      {selected.review_reasons
-                        .map((r) => REASON_LABEL[r] ?? r)
-                        .join(", ") || "Check this record"}
-                      {selected.possible_duplicate_of.length > 0 && (
-                        <>
-                          <br />
-                          Same person as:{" "}
-                          {selected.possible_duplicate_of.join(", ")}
-                        </>
-                      )}
-                    </dd>
-                  </div>
-                )}
-              </dl>
+            <aside className="hidden border border-[#d4d4d8] bg-white p-4 xl:block">
+              <CustomerFile
+                customer={selected}
+                onEdit={() => openForm(selected)}
+              />
             </aside>
           )}
         </section>
       </div>
+
+      {viewing && !editing && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setViewingRef(null)}
+        >
+          <div
+            className="max-h-full w-full max-w-lg overflow-y-auto border border-[#d4d4d8] bg-white p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <CustomerFile customer={viewing} onEdit={() => openForm(viewing)} />
+            <div className="mt-4 flex justify-end">
+              <button
+                className="min-h-11 border border-[#cfd2d8] bg-white px-4 text-xs font-bold lg:min-h-0 lg:py-2"
+                onClick={() => setViewingRef(null)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editing && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
@@ -679,6 +638,128 @@ export default function CustomersPage() {
   );
 }
 
+/** 고객 파일 — 넓은 화면의 오른쪽 칸과 좁은 화면의 창이 같이 쓴다. */
+function CustomerFile({
+  customer,
+  onEdit,
+}: {
+  customer: Customer;
+  onEdit: () => void;
+}) {
+  return (
+    <>
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-bold uppercase text-[#5d6673]">
+            Customer File · {customer.customer_ref}
+          </p>
+          <p className="text-xl font-bold">
+            {customer.name || customer.customer_ref}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <span
+            className={`px-2 py-1 text-[11px] font-bold ${
+              customer.is_member
+                ? "bg-[#dff7e8] text-[#087333]"
+                : "bg-[#ececf0] text-[#4e5560]"
+            }`}
+          >
+            {customer.is_member ? "Member" : "Public"}
+          </span>
+          <button
+            className="inline-flex min-h-11 items-center border border-[#cfd2d8] bg-white px-3 text-xs font-bold hover:border-[#4533ff] lg:min-h-0 lg:py-1.5"
+            onClick={onEdit}
+            type="button"
+          >
+            Edit
+          </button>
+        </div>
+      </div>
+      <dl className="grid gap-3 text-xs">
+        <div>
+          <dt className="font-bold text-[#5d6673]">Contact</dt>
+          <dd>{formatPhone(customer.phone) || "—"}</dd>
+          <dd>{customer.email || "—"}</dd>
+          {customer.address && (
+            <dd>
+              {customer.address}
+              {customer.postal_code ? ` ${customer.postal_code}` : ""}
+            </dd>
+          )}
+        </div>
+        <div>
+          <dt className="font-bold text-[#5d6673]">Membership</dt>
+          <dd>
+            {customer.membership
+              ? `${membershipLabel(customer)} · ${STATUS_LABEL[customer.membership.status]}`
+              : "No membership on file"}
+          </dd>
+          {customer.membership && (
+            <dd
+              className={
+                customer.membership.expired
+                  ? "font-bold text-[#b42318]"
+                  : "text-[#5d6673]"
+              }
+            >
+              {customer.membership.expires_on
+                ? `${customer.membership.expired ? "Expired" : "Expires"} ${formatDate(customer.membership.expires_on)}`
+                : "No expiry date"}
+            </dd>
+          )}
+          {customer.player_type && (
+            <dd className="text-[#5d6673]">
+              Last plan: {customer.player_type}
+            </dd>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-[#f7f7f8] p-3">
+            <dt className="font-bold text-[#5d6673]">Rounds</dt>
+            <dd className="text-lg font-bold">{customer.rounds}</dd>
+          </div>
+          <div className="bg-[#f7f7f8] p-3">
+            <dt className="font-bold text-[#5d6673]">Index</dt>
+            <dd className="text-lg font-bold">
+              {customer.scoring_factor ?? "—"}
+            </dd>
+          </div>
+          <div className="bg-[#f7f7f8] p-3">
+            <dt className="font-bold text-[#5d6673]">Card</dt>
+            <dd className="text-lg font-bold">
+              {customer.has_credit_card ? "On file" : "—"}
+            </dd>
+          </div>
+        </div>
+        <div>
+          <dt className="font-bold text-[#5d6673]">Account</dt>
+          <dd className="capitalize">{customer.activation_state ?? "—"}</dd>
+          {customer.user_created_on && (
+            <dd className="text-[#5d6673]">Since {customer.user_created_on}</dd>
+          )}
+        </div>
+        {customer.needs_review && (
+          <div>
+            <dt className="font-bold text-[#5d6673]">Needs review</dt>
+            <dd className="mt-1 border-l-4 border-[#ffd400] bg-[#fffbe6] p-3">
+              {customer.review_reasons
+                .map((r) => REASON_LABEL[r] ?? r)
+                .join(", ") || "Check this record"}
+              {customer.possible_duplicate_of.length > 0 && (
+                <>
+                  <br />
+                  Same person as: {customer.possible_duplicate_of.join(", ")}
+                </>
+              )}
+            </dd>
+          </div>
+        )}
+      </dl>
+    </>
+  );
+}
+
 const SELECT_CLASS =
   "border border-[#cfd2d8] bg-white px-3 py-2 text-sm font-normal text-[#111315] outline-none focus:border-[#4533ff]";
 
@@ -693,6 +774,9 @@ function MembershipFields({
   onChange: (patch: Partial<MembershipInput>) => void;
 }) {
   const year = clubYear();
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: CLUB_TIME_ZONE,
+  });
   const seasons = Array.from(
     new Set([year, year + 1, ...(current ? [current.season] : [])]),
   ).sort();
@@ -801,6 +885,17 @@ function MembershipFields({
                 <option value="pending">Pending — not paid yet</option>
               </select>
             </label>
+            <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+              Expires
+              <input
+                className={SELECT_CLASS}
+                onChange={(event) =>
+                  onChange({ expires_on: event.target.value })
+                }
+                type="date"
+                value={value.expires_on}
+              />
+            </label>
           </>
         )}
       </div>
@@ -812,6 +907,10 @@ function MembershipFields({
           : current && current.season === value.season
             ? `Saving cancels the ${value.season} ${typeInfo(current.membership_type).label} membership. `
             : "Tee sheet charges public rates. "}
+        {value.membership_type &&
+          value.expires_on &&
+          value.expires_on < today &&
+          "This date has passed — the tee sheet charges public rates. "}
         {value.membership_type &&
           "The tee sheet uses this to charge member rates. Record payments on "}
         {value.membership_type && (
