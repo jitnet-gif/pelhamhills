@@ -25,6 +25,7 @@ import BookingShell from "@/components/booking/BookingShell";
 import PayOnline from "@/components/booking/PayOnline";
 import { formatLongDate, todayIso } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
+import { recordBookingSource } from "@/lib/booking/attribution";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
 import { CLUB, lookupHref } from "@/lib/nav";
@@ -170,6 +171,7 @@ export default function IndoorGolfBooking() {
           notes,
         },
       });
+      recordBookingSource("bay", data.confirmation_code);
       setReservation(data);
       setStep(4);
     } catch (err) {

@@ -31,6 +31,7 @@ import {
   upcomingDates,
 } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
+import { recordBookingSource } from "@/lib/booking/attribution";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
 import { greenFeeFor, nineHoleRule, nineHolesOpen } from "@/lib/greenFee";
 import { CLUB, bookNav, lookupHref } from "@/lib/nav";
@@ -447,6 +448,7 @@ function BookingForm({
           notes: notes.trim(),
         },
       });
+      recordBookingSource("tee", booking.confirmationCode);
       onBooked(booking);
     } catch (failure) {
       const described = describeFailure(failure, "Your tee time could not be booked.");

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 import ManagerApprovalHost from "@/components/pos/ManagerApprovalHost";
+import VisitTracker from "@/components/site/VisitTracker";
 
 export const metadata: Metadata = {
   title: {
@@ -60,6 +61,8 @@ export default function RootLayout({
         {children}
         {/* 환불·레인체크·선수 삭제의 매니저 PIN 창(0024). 직원 화면 어디서든 뜬다. */}
         <ManagerApprovalHost />
+        {/* 웹 예약의 유입 경로(0067) — 손님이 들어온 입구를 기억한다. */}
+        <VisitTracker />
       </body>
     </html>
   );

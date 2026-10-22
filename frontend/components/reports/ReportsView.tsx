@@ -8,7 +8,7 @@
  *
  * 탭: Daily close(하루 마감·영수증·환불), Accounting(기간 회계 보고서, 엑셀 모양 + .xlsx 내려받기 —
  * `AccountingWorkbook.tsx`), Stripe check(Stripe 가 받은 카드 돈과 우리 기록 대조 — `StripeReconcile.tsx`),
- * Bookings(웹사이트·전화로 들어온 티 타임·베이 예약 — `BookingsReport.tsx`), Change log(모든 변경의 전·후, 지운 것까지 —
+ * Bookings(실시간 예약 현황 — 들어온 경로별, 웹은 유입 경로까지 — `BookingsReport.tsx`·0067), Change log(모든 변경의 전·후, 지운 것까지 —
  * 따로 정한 비밀번호로만 열린다, `ChangeLog.tsx`·0057), Phone callbacks(업무시간 밖 전화에서 직원 전화를 기다리는 손님 —
  * `PhoneCallbacks.tsx`·0059), Rain checks(발행한 레인체크·사용·만료·문자 여부 — `RainChecksReport.tsx`·0062),
  * Register closes(기간 안의 계산대 마감 기록 — 기대 금액·센 돈·과부족·다시 세기, `RegisterClosesReport.tsx`·0065).
@@ -32,7 +32,7 @@ const VIEWS = [
   { key: "closes", label: "Register closes" },
   { key: "accounting", label: "Accounting (Excel)" },
   { key: "stripe", label: "Stripe check" },
-  { key: "bookings", label: "Bookings (web + phone)" },
+  { key: "bookings", label: "Bookings (live)" },
   { key: "rainchecks", label: "Rain checks" },
   { key: "callbacks", label: "Phone callbacks" },
   { key: "changes", label: "🔒 Change log" },

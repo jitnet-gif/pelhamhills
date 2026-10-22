@@ -39,6 +39,8 @@ export type SimReservation = {
   notes: string;
   status: SimStatus;
   source: SimSource;
+  /** 접수 시각(ISO). 서버는 늘 보내지만 예전 화면 코드에는 없던 칸이라 선택으로 둔다. */
+  created_at?: string | null;
 };
 
 export type SimReservationInput = Omit<SimReservation, "id" | "confirmation_code">;

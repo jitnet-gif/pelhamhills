@@ -137,6 +137,26 @@ export const staffSlots = (date: string) =>
 export const staffBookings = (from: string, to: string) =>
   staffRpc<TeeBooking[]>("pelham_staff_bookings", { p_from: from, p_to: to });
 
+/** 0067: 웹 예약의 유입 경로(Google search·Google Ads·Direct …). 플레이 날짜 기간. */
+export type BookingAttribution = {
+  kind: "tee" | "bay";
+  bookingRef: string;
+  label: string;
+  referrerHost: string | null;
+  landing: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  device: "phone" | "tablet" | "computer" | null;
+  firstLabel: string | null;
+  firstAt: string | null;
+  recordedAt: string | null;
+};
+
+export const staffBookingAttribution = (from: string, to: string) =>
+  staffRpc<BookingAttribution[]>("pelham_staff_booking_attribution", { p_from: from, p_to: to });
+
 export const staffBooking = (id: string) =>
   staffRpc<TeeBooking>("pelham_staff_booking", { p_id: id });
 
