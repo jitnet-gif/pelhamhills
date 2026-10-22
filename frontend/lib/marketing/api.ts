@@ -60,7 +60,8 @@ export type Campaign = {
   channel: Channel;
   name: string;
   message: string;
-  audience: AudienceFilter & { channel: Channel; picked?: number };
+  /** barcode: 프로모션 화면에서 온 캠페인의 PROMO-코드(0078). 문자에 바코드 그림이 MMS 로 붙는다. */
+  audience: AudienceFilter & { channel: Channel; picked?: number; barcode?: string };
   status: "ready" | "sending" | "sent" | "cancelled";
   created_by: string | null;
   created_at: string;
@@ -110,7 +111,7 @@ export const marketingApi = {
     channel: Channel;
     name: string;
     message: string;
-    audience: AudienceFilter;
+    audience: AudienceFilter & { barcode?: string };
     customer_refs?: string[];
   }) => staffRpc<Campaign>("pelham_marketing_campaign_create", { p: fields }),
   campaigns: () => staffRpc<Campaign[]>("pelham_marketing_campaigns"),

@@ -154,6 +154,12 @@ export const MISSING_MIGRATION_MESSAGE =
 const MIGRATION_OF: Record<string, string> = {
   pelham_staff_bill_add_membership: "0072_membership_register.sql",
   pelham_staff_bill_membership_card_fee: "0072_membership_register.sql",
+  pelham_staff_bill_apply_promo: "0078_promo_codes.sql",
+  pelham_staff_bill_remove_promo: "0078_promo_codes.sql",
+  pelham_staff_bill_promo: "0078_promo_codes.sql",
+  pelham_staff_promotions: "0078_promo_codes.sql",
+  pelham_staff_promotion_save: "0078_promo_codes.sql",
+  pelham_staff_promotion: "0078_promo_codes.sql",
 };
 
 export function describePosError(error: unknown): string {

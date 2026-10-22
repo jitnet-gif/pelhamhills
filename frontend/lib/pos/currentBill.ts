@@ -18,6 +18,7 @@
 import { useSyncExternalStore } from "react";
 
 import { describePosError, isMissingMigration, posApi, type Bill, type BillStation, type MembershipSaleInput, type OpenItemInput, type PaymentInput } from "./api";
+import { promoApi } from "./promo";
 
 const STORAGE_KEY = "pelham.pos.currentBill";
 const CASHIER_KEY = "pelham.pos.cashier";
@@ -210,6 +211,9 @@ export const billActions = {
     mutate((id) => posApi.updateLine(id, lineId, { discount }), station),
   update: (fields: { discount?: number; cashier?: string; note?: string; label?: string }, station: BillStation) =>
     mutate((id) => posApi.update(id, fields), station),
+  /** 프로모션 코드(0078). 바코드 값(PROMO-FALL18)이든 친 코드(FALL18)든 서버가 받는다. */
+  applyPromo: (code: string, station: BillStation) => mutate((id) => promoApi.apply(id, code), station),
+  removePromo: (station: BillStation) => mutate((id) => promoApi.remove(id), station),
 
   /** 목록에서 다른 열린 계산서로 옮겨 탄다(손님 두 팀을 번갈아 받을 때). */
   select: (billId: number) =>

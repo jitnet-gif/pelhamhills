@@ -21,6 +21,7 @@ import { useTeeSheet } from "../../hooks/useTeeSheet";
 import { useSlotLocks } from "@/hooks/useSlotLocks";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
+import { isPromoBarcode } from "@/lib/pos/promo";
 import { retailApi, toRetailError } from "@/lib/retail/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
 import { formatMoney } from "@/lib/retail/types";
@@ -187,6 +188,18 @@ export default function TeeSheetPage() {
         offerRainCheckCode(raw);
         setBillOpen(true);
         setRevealPayments((n) => n + 1);
+        return;
+      }
+      // 프로모션 바코드(0078): 계산서의 그린피에 할인을 건다. 금액·조건은 서버가 판정하고, 안 되면
+      // 그 까닭이 서랍 안 BillPanel 에 뜬다.
+      if (isPromoBarcode(raw)) {
+        const current = getBillState().bill;
+        if (!current || !current.lines.some((line) => line.kind === "tee_player")) {
+          pushToast("error", "That is a promo code. Add the green fee to the bill first, then scan it again.");
+          return;
+        }
+        setBillOpen(true);
+        void billActions.applyPromo(raw, "tee_sheet");
         return;
       }
       const match = TEE_TICKET.exec(raw.trim().toUpperCase());

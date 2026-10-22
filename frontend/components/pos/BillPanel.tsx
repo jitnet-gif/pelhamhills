@@ -37,6 +37,7 @@ import {
 } from "@/lib/pos/api";
 import { cashierForCode, isShiftCode } from "@/lib/pos/cashierCode";
 import { billActions, getBillState, rememberCashier, useCurrentBill } from "@/lib/pos/currentBill";
+import { promoApi, promoDiscountLabel, type BillPromo } from "@/lib/pos/promo";
 import {
   describeTerminalResult,
   terminal,
@@ -421,6 +422,7 @@ export default function BillPanel({
             label="Bill discount"
             onCommit={(cents) => billActions.update({ discount: cents }, station)}
           />
+          <PromoRow bill={bill} station={station} />
 
           <dl className="grid gap-1 border-t border-[#d4d4d8] pt-2 text-sm">
             <Row label="Subtotal" value={formatMoney(bill.subtotal)} />
@@ -600,6 +602,9 @@ function SalesLayout({
 
           {bill && lines.length > 0 ? (
             <div className="flex flex-wrap items-start justify-end gap-1.5 border-t border-[#d4d4d8] px-3 py-2">
+              <div className="mr-auto w-64">
+                <PromoRow bill={bill} station={station} />
+              </div>
               {discountOpen ? (
                 <div className="w-48">
                   <MoneyField
@@ -1018,6 +1023,85 @@ function BillLineRow({ line, station }: { line: Bill["lines"][number]; station: 
         onCommit={(cents) => billActions.setLineDiscount(line.id, cents, station)}
       />
     </li>
+  );
+}
+
+// ===== 프로모션 코드(0078) ================================================
+
+/**
+ * 계산서에 걸린 프로모션 코드를 보이고, 없으면 코드를 받는다. 바코드는 티 시트·계산대의 스캐너가
+ * 바로 billActions.applyPromo 로 보내고, 손님이 코드만 말하면 여기 친다. 할인은 계산서 할인에 더해진다.
+ */
+function PromoRow({ bill, station }: { bill: Bill; station: BillStation }) {
+  const [promo, setPromo] = useState<BillPromo | null>(null);
+  const [code, setCode] = useState("");
+
+  // 할인이 바뀌면(스캔·제거·다른 계산대) 다시 읽는다.
+  useEffect(() => {
+    let cancelled = false;
+    promoApi.forBill(bill.id).then(
+      (value) => {
+        if (!cancelled) setPromo(value);
+      },
+      () => {
+        // 0078 이 아직 없거나 연결이 끊겼다. 칸은 그대로 두고 적용할 때 오류를 보인다.
+        if (!cancelled) setPromo(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [bill.id, bill.discount]);
+
+  if (promo) {
+    return (
+      <div className="mt-2 flex items-center justify-between gap-2 bg-[#f0eeff] px-2 py-1.5 text-xs">
+        <span className="min-w-0">
+          <b className="text-[#4533ff]">{promo.code}</b> · {promoDiscountLabel(promo)}
+          <span className="block text-[#4e5560]">
+            −{formatMoney(promo.amount)}
+            {promo.conditions ? ` · check: ${promo.conditions}` : ""}
+          </span>
+        </span>
+        <button
+          className="shrink-0 border border-[#c7c7cc] bg-white px-2 py-1 font-bold"
+          onClick={() => void billActions.removePromo(station)}
+          type="button"
+        >
+          Remove
+        </button>
+      </div>
+    );
+  }
+
+  const apply = async () => {
+    if (!code.trim()) return;
+    const applied = await billActions.applyPromo(code.trim(), station);
+    if (applied) setCode("");
+  };
+  return (
+    <label className="mt-2 flex items-center gap-2 text-xs">
+      <span className="shrink-0 font-bold text-[#6b7280]">Promo code</span>
+      <TextInput
+        aria-label="Promo code"
+        autoCapitalize="characters"
+        className="min-h-11 flex-1 uppercase"
+        onChange={(event) => setCode(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") void apply();
+        }}
+        placeholder="Scan or type"
+        value={code}
+      />
+      <button
+        className="min-h-11 shrink-0 border border-[#c7c7cc] bg-white px-3 font-bold disabled:opacity-50"
+        disabled={!code.trim()}
+        onClick={() => void apply()}
+        type="button"
+      >
+        Apply
+      </button>
+    </label>
   );
 }
 

@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { code128Svg } from "@/lib/retail/barcode";
 import {
   type Audience,
   type AudienceCustomer,
@@ -147,7 +148,8 @@ function useAudience(channel: Channel, segment: Segment, minRounds: number, sear
   return { audience, error, loading, reload: () => setNonce((value) => value + 1) };
 }
 
-// 프로모션 화면의 "Text it" 이 ?channel=sms&name=…&message=… 로 연다. 읽은 뒤 주소에서 지운다(아래 effect).
+// 프로모션 화면의 "Text it" 이 ?channel=sms&name=…&message=…&barcode=PROMO-… 로 연다. 읽은 뒤 주소에서
+// 지운다(아래 effect). barcode 는 캠페인 audience 에 담겨 문자마다 바코드 그림(MMS)으로 붙는다.
 function readDraft() {
   if (typeof window === "undefined") return null;
   const query = new URLSearchParams(window.location.search);
@@ -156,6 +158,7 @@ function readDraft() {
     channel: (query.get("channel") === "call" ? "call" : "sms") as Channel,
     name: query.get("name") ?? "",
     message: query.get("message") ?? "",
+    barcode: /^PROMO-[A-Z0-9]{3,16}$/i.test(query.get("barcode") ?? "") ? query.get("barcode")!.toUpperCase() : "",
   };
 }
 
@@ -164,6 +167,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   const [channel, setChannel] = useState<Channel>(draft?.channel ?? "sms");
   const [name, setName] = useState(draft?.name ?? "");
   const [message, setMessage] = useState(draft?.message ?? "");
+  const [barcode, setBarcode] = useState(draft?.barcode ?? "");
 
   useEffect(() => {
     if (draft) window.history.replaceState(null, "", window.location.pathname);
@@ -210,7 +214,12 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
         channel,
         name: name.trim(),
         message: message.trim(),
-        audience: { segment, min_rounds: minRounds, search: search.trim() },
+        audience: {
+          segment,
+          min_rounds: minRounds,
+          search: search.trim(),
+          ...(channel === "sms" && barcode ? { barcode } : {}),
+        },
         customer_refs: pickMode ? [...picked] : undefined,
       });
       if (sendNow) {
@@ -289,6 +298,22 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
               {smsPreview.length} characters · about {smsParts} text{smsParts === 1 ? "" : "s"} per person. The sender
               name and opt-out line are added automatically (required by CASL).
             </p>
+          </div>
+        ) : null}
+        {channel === "sms" && barcode ? (
+          <div className="mt-2 flex flex-wrap items-center gap-3 border border-[#d9d4ff] bg-[#f6f5ff] p-3 text-xs">
+            {/* code128Svg 는 막대(rect)만 그린 SVG 다. */}
+            <span
+              className="block h-12 w-48 bg-white [&>svg]:h-full [&>svg]:w-full"
+              dangerouslySetInnerHTML={{ __html: code128Svg(barcode) }}
+            />
+            <span className="min-w-0 flex-1">
+              <b>Barcode {barcode} is attached as a picture.</b> Customers show it at the pro shop; staff scan it on the
+              tee sheet after adding the green fee. A picture text (MMS) costs a little more than a plain text.
+            </span>
+            <button className="border border-[#d4d4d8] bg-white px-2 py-1 font-bold" onClick={() => setBarcode("")} type="button">
+              Don&apos;t attach
+            </button>
           </div>
         ) : null}
         {channel === "call" ? (

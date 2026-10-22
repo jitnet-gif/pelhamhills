@@ -81,6 +81,7 @@ def env(monkeypatch):
 
     async def fake_send(to, body, template=None, booking_ref=None, media_url=None):
         state["sent"].append((to, body, template, booking_ref))
+        state.setdefault("media", []).append(media_url)
         return SmsMessage(direction="out", to_e164=to, from_e164="+15550000000", body=body,
                           status="queued", twilio_sid="SM123")
 
@@ -116,6 +117,22 @@ def test_send_runs_sms_campaign(env):
     ]
     assert state["finished"] is True
     assert marketing._running == set()
+
+
+def test_promo_campaign_attaches_the_barcode(env, monkeypatch):
+    client, state = env
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", "https://api.example.com/api/v1")
+    state["campaign"]["audience"] = {"segment": "all", "barcode": "PROMO-FALL18"}
+    state["queue"] = [{"id": 1, "name": "Ann Lee", "phone": "4165550001"}]
+    asyncio.run(marketing.run_campaign(state["campaign"]))
+    assert state["media"] == ["https://api.example.com/api/v1/sms/barcode/PROMO-FALL18.png"]
+
+
+def test_plain_campaign_has_no_barcode(env):
+    _client, state = env
+    state["queue"] = [{"id": 1, "name": "Ann Lee", "phone": "4165550001"}]
+    asyncio.run(marketing.run_campaign(state["campaign"]))
+    assert state["media"] == [None]
 
 
 def test_call_campaign_uses_elevenlabs(env, monkeypatch):

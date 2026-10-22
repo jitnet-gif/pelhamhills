@@ -24,8 +24,9 @@ import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import type { BillStation, OpenItemInput } from "@/lib/pos/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
 import { matchPhoto } from "@/lib/retail/productPhoto";
-import { billActions, useCurrentBill } from "@/lib/pos/currentBill";
+import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
+import { isPromoBarcode } from "@/lib/pos/promo";
 import { groupProducts, type MenuGroup } from "@/lib/retail/menuGroups";
 import { LOW_STOCK_RED_BELOW, RETAIL_CATEGORIES, formatMoney, type Product, type RetailCategory } from "@/lib/retail/types";
 
@@ -172,6 +173,17 @@ export default function RegisterTab({
       setRevealPayments((n) => n + 1);
       return;
     }
+    // 프로모션 바코드(0078): 그린피 줄이 있는 계산서에 할인을 건다.
+    if (isPromoBarcode(code)) {
+      if (!bill || !bill.lines.some((line) => line.kind === "tee_player")) {
+        setScanNote("That is a promo code. It discounts green fees — add the tee time to the bill first.");
+        return;
+      }
+      setScanNote("");
+      void billActions.applyPromo(code, station);
+      if (!window.matchMedia("(min-width: 1024px)").matches) setSheetOpen(true);
+      return;
+    }
     const product = findBySku(code);
     if (product) {
       addAndOpenPayment(product);
@@ -214,6 +226,15 @@ export default function RegisterTab({
       offerRainCheckCode(code);
       payFromCamera();
       return { ok: true, message: `Rain check ${code.trim().toUpperCase()}` };
+    }
+    if (isPromoBarcode(code)) {
+      if (!bill || !bill.lines.some((line) => line.kind === "tee_player")) {
+        return { ok: false, message: "That is a promo code. Add the tee time to the bill first." };
+      }
+      const applied = await billActions.applyPromo(code, station);
+      return applied
+        ? { ok: true, message: `Promo ${code.trim().toUpperCase()}` }
+        : { ok: false, message: getBillState().error || "That promo code could not be used." };
     }
     const product = findBySku(code);
     if (!product) {

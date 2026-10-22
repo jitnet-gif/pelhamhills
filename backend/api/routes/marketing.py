@@ -31,6 +31,7 @@ from backend.api.routes import terminal
 from backend.api.routes.voice import CLUB_TIMEZONE, require_tool_secret
 from backend.core.config import settings
 from backend.services import supabase_rest, voice_agent
+from backend.services.barcode_png import barcode_url
 from backend.services.twilio_sms import normalize_phone, send_sms
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,13 @@ def window_open(now: datetime | None = None) -> bool:
 WINDOW_TEXT = "Weekdays 9:00 AM–9:30 PM, weekends 10:00 AM–6:00 PM"
 
 
+def campaign_barcode_url(campaign: dict[str, Any]) -> Optional[str]:
+    """프로모션 화면의 Text it 으로 만든 캠페인은 audience.barcode 에 PROMO-코드가 있다(0078).
+    그 바코드 그림을 MMS 로 붙여, 손님이 휴대폰 화면을 내밀면 프로 샵이 찍을 수 있게 한다."""
+    code = str((campaign.get("audience") or {}).get("barcode") or "").strip().upper()
+    return barcode_url(code) if code.startswith("PROMO-") else None
+
+
 def sms_body(message: str) -> str:
     text = message.strip()
     if not text.lower().startswith("pelham hills"):
@@ -109,7 +117,7 @@ async def _send_one(channel: str, campaign: dict[str, Any], send: dict[str, Any]
         return
     if channel == "sms":
         msg = await send_sms(phone, sms_body(campaign["message"]), template="marketing",
-                             booking_ref=f"MK-{campaign['id']}")
+                             booking_ref=f"MK-{campaign['id']}", media_url=campaign_barcode_url(campaign))
         if msg.status == "failed":
             await _record(send["id"], "failed", msg.twilio_sid, msg.error)
         elif msg.status == "skipped":
