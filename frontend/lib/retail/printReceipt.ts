@@ -17,6 +17,7 @@
 
 import { CLUB } from "@/lib/nav";
 import { rainCheckBlocks, type RainCheck } from "@/lib/pos/rainCheck";
+import { shiftReportBlocks, type ShiftInput, type ShiftSummary } from "@/lib/reports/shiftReport";
 
 import {
   PAYMENT_LABELS,
@@ -101,6 +102,18 @@ export function rainCheckSheetHtml(check: RainCheck, options: { reprint?: boolea
 export function printRainChecks(checks: readonly RainCheck[], options: { reprint?: boolean } = {}): void {
   if (checks.length === 0) return;
   printSheets(checks.map((check) => rainCheckBlocks(check, { header: CLUB_HEADER, reprint: options.reprint })));
+}
+
+/**
+ * 근무 마감표(Daily close 의 Print) 한 장. 손님 영수증이 아니라 사본 표시 없이 한 장만, 서랍도 열지 않는다.
+ * 미리보기와 종이가 같도록 HTML 도 여기서 같은 블록으로 만든다.
+ */
+export function shiftReportSheetHtml(input: ShiftInput, summary: ShiftSummary, cash: boolean): string {
+  return receiptHtml(shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash }));
+}
+
+export function printShiftReport(input: ShiftInput, summary: ShiftSummary, cash: boolean): void {
+  printSheets([shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash })]);
 }
 
 function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: boolean } = {}): void {

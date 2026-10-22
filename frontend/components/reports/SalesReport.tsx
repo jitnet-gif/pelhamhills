@@ -23,9 +23,11 @@ import CashReconcile from "@/components/reports/CashReconcile";
 import PriceReview from "@/components/reports/PriceReview";
 import SaleDetail from "@/components/reports/SaleDetail";
 import SalesDrilldown, { type Drill } from "@/components/reports/SalesDrilldown";
+import ShiftReportPrint, { PrinterIcon } from "@/components/reports/ShiftReportPrint";
 import StaffCloseout from "@/components/reports/StaffCloseout";
 
 import {
+  Button,
   EmptyNote,
   ErrorNote,
   Field,
@@ -58,6 +60,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
   const [closeoutKey, setCloseoutKey] = useState(0);
   // 담당자 마감을 저장하면 대사표만 다시 읽는다(마감 패널은 저장 결과를 이미 받았다).
   const [savedKey, setSavedKey] = useState(0);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,17 +105,26 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
 
   return (
     <div className="grid min-w-0 gap-3">
-      <div className="grid gap-2 sm:max-w-xs">
-        <Field label="Business date">
-          <TextInput
-            onChange={(event) => {
-              setDate(event.target.value);
-              setDrill(null);
-            }}
-            type="date"
-            value={date}
-          />
-        </Field>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid w-full gap-2 sm:max-w-xs">
+          <Field label="Business date">
+            <TextInput
+              onChange={(event) => {
+                setDate(event.target.value);
+                setDrill(null);
+              }}
+              type="date"
+              value={date}
+            />
+          </Field>
+        </div>
+        {/* 담당자·시작·끝 시각을 적고 합계만 영수증 프린터로(`ShiftReportPrint`). 계산서 목록은 찍지 않는다. */}
+        <Button disabled={loading} onClick={() => setPrinting(true)} title="Print shift report on the receipt printer">
+          <span className="size-5">
+            <PrinterIcon />
+          </span>
+          Print
+        </Button>
       </div>
 
       {error ? <ErrorNote>{error}</ErrorNote> : null}
@@ -190,12 +202,12 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
             />
           </div>
 
-          {/* 사업부 네 칸. 팔린 것(분류)으로 나눈다 — 나누는 규칙과 이유는 `lib/retail/divisions.ts`.
+          {/* 사업부 다섯 칸(회원권 포함, 0072). 팔린 것(분류)으로 나눈다 — 나누는 규칙과 이유는 `lib/retail/divisions.ts`.
               금액은 HST 를 더해 보인다(2026-10-22) — 카운터에서 손님에게 부르는 값이 세금 포함이라서다.
               모든 계산서가 13% 하나라 줄 합계에 세금을 얹으면 되지만, 주문 할인은 계산서 단위라
-              여기 들어가지 않고 세금도 계산서마다 반올림하므로, 네 칸의 합은 Total Collected 와
+              여기 들어가지 않고 세금도 계산서마다 반올림하므로, 다섯 칸의 합은 Total Collected 와
               몇 센트 다를 수 있다. 비율(%)은 세전 Gross Sales 기준 그대로다. */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {divisions.map((division) => (
               <section className="min-w-0 border border-[#d4d4d8] bg-white p-3" key={division.key}>
                 <button
@@ -379,6 +391,10 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
           onOpenSale={setSelected}
           sales={sales}
         />
+      ) : null}
+
+      {printing ? (
+        <ShiftReportPrint cash={cash} date={date} onClose={() => setPrinting(false)} sales={sales} />
       ) : null}
 
       {selected ? (
