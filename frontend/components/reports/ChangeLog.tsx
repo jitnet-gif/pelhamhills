@@ -116,7 +116,7 @@ export default function ChangeLog() {
           <Field label="Search">
             <TextInput
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Name, receipt, email…"
+              placeholder="Name, receipt, cashier…"
               value={search}
             />
           </Field>
@@ -166,7 +166,14 @@ function ChangeCard({ row }: { row: ChangeRow }) {
         <span className="font-bold">{tableLabel(row.table)}</span>
         <span className="min-w-0 truncate text-[#3f434a]">{row.label || row.rowKey || ""}</span>
         <span className="ml-auto text-[#6b7280] tabular-nums">{clock(row.at)}</span>
-        <span className="w-full text-[11px] text-[#6b7280] sm:w-auto">by {row.actor}</span>
+        <span className="w-full text-[11px] text-[#6b7280] sm:w-auto">
+          {row.cashier ? (
+            <>
+              <span className="font-bold text-[#1f2328]">Cashier {row.cashier}</span> ·{" "}
+            </>
+          ) : null}
+          by {row.actor}
+        </span>
       </header>
       <div className="grid min-w-0 gap-2 px-3 py-2">
         {history.length > 0 ? (

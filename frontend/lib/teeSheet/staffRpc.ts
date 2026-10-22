@@ -69,6 +69,19 @@ export function approveAsManager(pin: string, action: string, ref: string) {
   });
 }
 
+/**
+ * 이 기기의 계산대 담당자 이름(`lib/pos/currentBill.ts` 의 `pelham.pos.cashier`). Change log(0076)가 이 헤더로
+ * "누가 했나" 를 적는다 — 로그인은 공용 계정이라 이메일로는 알 수 없다. currentBill 을 import 하면 순환이라 직접 읽는다.
+ */
+function cashierHeader(): Record<string, string> {
+  try {
+    const name = window.localStorage.getItem("pelham.pos.cashier")?.trim();
+    return name ? { "x-pelham-cashier": encodeURIComponent(name) } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function rawStaffRpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   const token = await accessToken();
   if (!token) throw new ApiError(401, NEEDS_SIGN_IN);
@@ -81,6 +94,7 @@ async function rawStaffRpc<T>(fn: string, args: Record<string, unknown>): Promis
         apikey: PUBLISHABLE_KEY,
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        ...cashierHeader(),
       },
       body: JSON.stringify(args),
     });

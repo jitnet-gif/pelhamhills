@@ -19,6 +19,8 @@ export type ChangeRow = {
   after: Record<string, unknown> | null;
   changed: string[] | null;
   actor: string;
+  /** 계산대 담당자 이름(0076). 공용 로그인이라 actor 는 늘 같은 이메일이다. */
+  cashier?: string | null;
 };
 
 export type ChangeLogResult = { ok: true; rows: ChangeRow[]; more: boolean };
