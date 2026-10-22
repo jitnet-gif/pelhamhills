@@ -12,7 +12,7 @@
 -- 그대로 실행하면 막는다.
 --
 -- 실행: SQL editor 에 이 파일 전체를 붙여 한 번. 다시 실행해도 안전하다.
--- 직원 판정(pelham_is_staff → is_scorecard_admin)은 따로다 — 그 함수의 기준에 이 계정도 들어가야 어드민이 열린다.
+-- 4. 직원 명단(scorecard_admins — pelham_is_staff 가 읽는다)에 넣는다. 그래야 어드민이 열린다.
 
 do $$
 declare
