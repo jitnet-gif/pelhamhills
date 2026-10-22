@@ -21,7 +21,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { REGISTER_CLOSE_GUIDE } from "@/lib/nav";
+import { cashierName } from "@/lib/pos/cashierCode";
+import { rememberCashier, rememberedCashier } from "@/lib/pos/currentBill";
+import { defaultShiftEnd, defaultShiftStart, shiftSummary, shiftWindow } from "@/lib/reports/shiftReport";
 import retailApi, { toRetailError } from "@/lib/retail/api";
+import { printShiftReport } from "@/lib/retail/printReceipt";
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import {
   CASH_DENOMINATIONS,
@@ -31,7 +35,11 @@ import {
   type Cents,
   type RegisterCloseReport,
   type RegisterCloseRow,
+  type Sale,
 } from "@/lib/retail/types";
+
+import CashierField from "@/components/reports/CashierField";
+import { PrinterIcon, ShiftPreview, ShiftTimes } from "@/components/reports/ShiftReportPrint";
 
 import { Button, ErrorNote, SkeletonRows, TextInput } from "./ui";
 
@@ -79,6 +87,8 @@ export default function RegisterClose({
 }) {
   const [report, setReport] = useState<RegisterCloseReport | null>(null);
   const [loadError, setLoadError] = useState("");
+  // 그날 계산서 — 근무 마감표(시작~끝 시각 합계)를 찍을 때 센다. 서랍이 하나라(0062) 화면을 가리지 않는다.
+  const [sales, setSales] = useState<Sale[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,16 +100,26 @@ export default function RegisterClose({
       .catch((cause) => {
         if (!cancelled) setLoadError(toRetailError(cause).message);
       });
+    retailApi
+      .listSales(date)
+      .then((value) => {
+        if (!cancelled) setSales(value);
+      })
+      .catch(() => {
+        // 마감은 계산서 목록 없이도 된다. 출력만 막힌다.
+        if (!cancelled) setSales([]);
+      });
     return () => {
       cancelled = true;
     };
   }, [date, station]);
 
   if (loadError) return <ErrorNote>{loadError}</ErrorNote>;
-  if (!report) return <SkeletonRows count={6} />;
+  if (!report || !sales) return <SkeletonRows count={6} />;
   return (
     <CloseForm
       blind={blindCash || report.cash_blind === true}
+      sales={sales}
       onCancel={onCancel}
       onSaved={setReport}
       onStaffCloseout={onStaffCloseout}
@@ -116,8 +136,10 @@ function CloseForm({
   onCancel,
   onStaffCloseout,
   blind,
+  sales,
 }: {
   blind: boolean;
+  sales: Sale[];
   report: RegisterCloseReport;
   registerName: string;
   onSaved: (report: RegisterCloseReport) => void;
@@ -133,6 +155,11 @@ function CloseForm({
   const [card, setCard] = useState(moneyText(saved?.counted.card));
   const [debit, setDebit] = useState(moneyText(saved?.counted.debit));
   const [note, setNote] = useState(saved?.note ?? "");
+  // 담당자와 근무 시각(0081). 다시 세면 저장된 값으로 연다.
+  const [cashier, setCashier] = useState(() => saved?.cashier ?? rememberedCashier());
+  const [shiftStart, setShiftStart] = useState(() => saved?.shift_start ?? defaultShiftStart(sales));
+  const [shiftEnd, setShiftEnd] = useState(() => saved?.shift_end ?? defaultShiftEnd(report.business_date));
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [justSaved, setJustSaved] = useState(false);
@@ -159,23 +186,69 @@ function CloseForm({
     { start: 0, payments: 0 as Cents | null, withdraws: 0, remaining: 0 as Cents | null },
   );
 
+  /** 담당자·시각을 확인해 돌려준다. 안 되면 오류를 띄우고 null. */
+  async function shift(): Promise<{ name: string; start: string; end: string } | null> {
+    let name: string;
+    try {
+      name = await cashierName(cashier);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "That staff ID didn't work.");
+      return null;
+    }
+    setCashier(name);
+    if (!shiftWindow({ staff: name, date: report.business_date, start: shiftStart, end: shiftEnd })) {
+      setError("Enter the shift start and end time.");
+      return null;
+    }
+    return { name, start: shiftStart, end: shiftEnd };
+  }
+
+  async function print() {
+    setError("");
+    setBusy(true);
+    try {
+      const who = await shift();
+      if (!who) return;
+      const input = { staff: who.name, date: report.business_date, start: who.start, end: who.end };
+      const range = shiftWindow(input);
+      if (range) printShiftReport(input, shiftSummary(sales, range), !blind);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit() {
     setBusy(true);
     setError("");
+    setNotice("");
     setJustSaved(false);
+    const who = await shift();
+    if (!who) {
+      setBusy(false);
+      return;
+    }
+    rememberCashier(who.name);
     const cashCounts: CashCounts = Object.fromEntries(
       CASH_DENOMINATIONS.map((cents) => [String(cents), countOf(counts[String(cents)] ?? "")]),
     );
     cashCounts.extra = parseMoney(extra);
     try {
-      onSaved(
-        await retailApi.saveRegisterClose(report.business_date, report.station, {
-          counted: { cash: counted.cash, card: counted.card, debit: counted.debit },
-          cash_counts: cashCounts,
-          note: note.trim() || null,
-        }),
-      );
+      const next = await retailApi.saveRegisterClose(report.business_date, report.station, {
+        counted: { cash: counted.cash, card: counted.card, debit: counted.debit },
+        cash_counts: cashCounts,
+        note: note.trim() || null,
+        cashier: who.name,
+        shift_start: who.start,
+        shift_end: who.end,
+      });
+      onSaved(next);
       setJustSaved(true);
+      // 0081 전 서버는 담당자·시각을 모르고 지나간다. 센 돈은 저장됐으니 그것만 알린다.
+      if (next.close && next.close.cashier === undefined) {
+        setNotice(
+          "Counts saved, but the cashier and shift times were not — run 0081_register_close_shift.sql in the Supabase SQL Editor.",
+        );
+      }
     } catch (cause) {
       setError(toRetailError(cause).message);
     } finally {
@@ -267,6 +340,12 @@ function CloseForm({
         </table>
       </div>
 
+      {/* 누가 몇 시부터 몇 시까지 맡은 서랍인가(0081). 출력은 이 시간대의 합계만 — 계산서 목록은 찍지 않는다. */}
+      <div className="grid gap-3 border-t border-[#d4d4d8] pt-3 sm:grid-cols-[1fr_1fr]">
+        <CashierField onChange={setCashier} value={cashier} />
+        <ShiftTimes end={shiftEnd} onEnd={setShiftEnd} onStart={setShiftStart} start={shiftStart} />
+      </div>
+
       <label className="grid gap-1 border-t border-[#d4d4d8] pt-3 sm:grid-cols-[5rem_1fr] sm:items-center">
         <span className="text-sm font-bold text-[#3f434a] sm:text-right sm:pr-3">Note</span>
         <TextInput
@@ -277,10 +356,29 @@ function CloseForm({
       </label>
 
       {error ? <ErrorNote>{error}</ErrorNote> : null}
+      {notice ? <p className="bg-[#fff8e1] px-3 py-2 text-sm text-[#5b4708]">{notice}</p> : null}
+
+      <details className="border border-[#d4d4d8]">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-bold">Preview shift report</summary>
+        <ShiftPreview
+          cash={!blind}
+          date={report.business_date}
+          end={shiftEnd}
+          sales={sales}
+          staff={cashier}
+          start={shiftStart}
+        />
+      </details>
 
       <div className="flex flex-wrap gap-2 border-t border-[#d4d4d8] pt-3">
         <Button disabled={busy} onClick={() => void submit()} tone="primary">
           {busy ? "Submitting…" : saved ? "Submit Counts Again" : "Submit Counts"}
+        </Button>
+        <Button disabled={busy} onClick={() => void print()} title="Print the shift totals on the receipt printer">
+          <span className="size-5">
+            <PrinterIcon />
+          </span>
+          Print
         </Button>
         <Button disabled={busy} onClick={onCancel}>
           Cancel
@@ -442,6 +540,12 @@ function SavedSummary({
         {justSaved ? "Counts submitted" : "Counted"} {new Date(close.closed_at).toLocaleString("en-CA")}
         {off.length === 0 && !blind ? " — register balances." : ""}
       </p>
+      {close.cashier ? (
+        <p>
+          {close.cashier}
+          {close.shift_start && close.shift_end ? ` · ${close.shift_start}–${close.shift_end}` : ""}
+        </p>
+      ) : null}
       {drop !== null ? (
         <p>
           Cash sales handed in: {formatMoney(Math.max(0, drop))} (float {formatMoney(close.opening_float)} kept)

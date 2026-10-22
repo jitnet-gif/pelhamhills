@@ -285,6 +285,10 @@ export type RegisterCloseReport = {
     cash_counts: CashCounts;
     note: string | null;
     closed_at: string;
+    /** 마감한 담당자 이름과 근무 시각 `HH:MM`(0081). 0081 전이거나 옛 마감이면 없거나 null. */
+    cashier?: string | null;
+    shift_start?: string | null;
+    shift_end?: string | null;
     /** 센 뒤에 이 계산대에서 결제·환불이 있었다 — 다시 세야 한다. */
     stale: boolean;
   } | null;
@@ -346,6 +350,10 @@ export type RegisterCloseHistoryRow = {
   closed_at: string | null;
   /** 닫은 계정의 이메일. */
   closed_by: string | null;
+  /** 마감한 담당자 이름과 근무 시각 `HH:MM`(0081). */
+  cashier?: string | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
   note: string | null;
   stale: boolean;
   has_sales: boolean;
@@ -365,6 +373,10 @@ export type RegisterCloseSave = {
   counted: { cash: Cents; card: Cents; debit: Cents };
   cash_counts: CashCounts;
   note?: string | null;
+  /** 담당자 이름(캐셔 번호는 화면이 이름으로 바꿔 보낸다)과 근무 시작·끝 `HH:MM`(0081). */
+  cashier?: string;
+  shift_start?: string;
+  shift_end?: string;
 };
 
 /** "7.5", "7:30", "7h30", "7h" → 분. 읽을 수 없으면 null. */

@@ -52,6 +52,13 @@ export async function cashierForCode(code: string): Promise<string> {
   return name;
 }
 
+/** 칸에 친 값 → 담당자 이름. 번호면 pelham-shift 에 묻고, 이름이면 그대로(공백 정리). 못 쓰면 문장을 던진다. */
+export async function cashierName(entry: string): Promise<string> {
+  const text = entry.trim().replace(/\s+/g, " ");
+  if (!text) throw new ApiError(422, "Enter your Pelham Shift ID or name.");
+  return isShiftCode(text) ? cashierForCode(text) : text;
+}
+
 /** 막힌 일(0024)을 이 직원 ID 로 승인한다. 틀린 번호면 `approved: false` 와 문장. */
 export async function approveByShiftId(
   code: string,

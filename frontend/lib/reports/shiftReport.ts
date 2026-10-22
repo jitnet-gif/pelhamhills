@@ -13,6 +13,7 @@
  *   실내 베이(Indoor Simulator)는 "Other" 로 간다.
  */
 
+import { localBusinessDate } from "@/lib/retail/api";
 import { CLUB_TIME_ZONE, PAYMENT_LABELS, type ReceiptBlock, type ReceiptHeader } from "@/lib/retail/receipt";
 import { divisionOf, type DivisionKey } from "@/lib/retail/divisions";
 import { formatMoney, type Cents, type PaymentMethod, type Sale } from "@/lib/retail/types";
@@ -49,6 +50,25 @@ const PAYMENT_SLOT: Partial<Record<PaymentMethod, keyof ShiftSummary["payments"]
   debit: "debit",
   rain_check: "rain_check",
 };
+
+function hhmm(date: Date): string {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+/** 시작 칸 기본값: 그날 첫 계산서의 결제 시각(분 단위로 내림). 계산서가 없으면 06:00. */
+export function defaultShiftStart(sales: readonly Sale[]): string {
+  const first = sales.reduce<number | null>((min, sale) => {
+    const at = new Date(sale.created_at).getTime();
+    return Number.isNaN(at) ? min : min === null ? at : Math.min(min, at);
+  }, null);
+  return first === null ? "06:00" : hhmm(new Date(first));
+}
+
+/** 끝 칸 기본값: 오늘이면 지금, 지난 날이면 하루 끝. */
+export function defaultShiftEnd(date: string): string {
+  const now = new Date();
+  return date === localBusinessDate(now) ? hhmm(now) : "23:59";
+}
 
 /** 시작·끝을 이 PC 시각의 순간으로. 끝이 시작보다 이르면 자정을 넘긴 근무로 본다. */
 export function shiftWindow(input: ShiftInput): { from: number; to: number } | null {

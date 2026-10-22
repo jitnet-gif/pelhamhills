@@ -171,6 +171,13 @@ export default function RegisterClosesReport({ cash }: { cash: boolean }) {
                               {[closedAt(row.closed_at), row.closed_by].filter(Boolean).join(" · ")}
                             </span>
                           ) : null}
+                          {/* 담당자·근무 시각(0081). 그 전 마감에는 없다. */}
+                          {row.cashier ? (
+                            <span className="block text-xs font-bold text-[#1f2328]">
+                              {row.cashier}
+                              {row.shift_start && row.shift_end ? ` · ${row.shift_start}–${row.shift_end}` : ""}
+                            </span>
+                          ) : null}
                         </td>
                         {counted.map((method) => (
                           <MethodCell key={method} line={lineOf(row, method)} row={row} />
