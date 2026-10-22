@@ -219,6 +219,11 @@ export const CREDIT_CARD_SURCHARGE = 0.03;
 /** 신청서의 결제 수단 네 가지. 신용카드만 3% 가 붙는다. */
 export const PAYMENT_METHODS = ["Cheque", "Credit card", "E-transfer", "Cash"] as const;
 
+/** 화면에 보이는 결제 수단 이름. 저장 값은 PAYMENT_METHODS 그대로다. */
+export function paymentMethodLabel(method: string): string {
+  return method === "E-transfer" ? "Interac e-Transfer" : method;
+}
+
 /** 지금 파는 회원권 시즌. 온라인 신청서가 이 시즌으로 낸다. */
 export const MEMBERSHIP_SEASON = 2027;
 

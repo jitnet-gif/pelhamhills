@@ -33,6 +33,7 @@ import {
   EARLY_BIRD_DEADLINE,
   MEMBERSHIP_TYPES,
   PAYMENT_METHODS,
+  paymentMethodLabel,
   RANGE_PASS_PRICE,
   STATUS_LABEL,
   balance,
@@ -619,7 +620,7 @@ function MembershipModal({
               <option value="">—</option>
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {paymentMethodLabel(m)}
                 </option>
               ))}
             </Select>

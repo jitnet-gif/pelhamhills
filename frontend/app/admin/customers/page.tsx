@@ -6,11 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import {
   CART_PACKAGES,
+  CREDIT_CARD_SURCHARGE,
   MEMBERSHIP_TYPES,
+  PAYMENT_METHODS,
   STATUS_LABEL,
   draftFromRatePlan,
   listPrice,
   money,
+  paymentMethodLabel,
   typeInfo,
   type CartPackage,
   type MembershipPlan,
@@ -66,6 +69,8 @@ type Customer = {
     /** 0069. 'YYYY-MM-DD' 또는 null(만료일 없음). expired 는 오늘 클럽 날짜보다 앞이면 참. */
     expires_on?: string | null;
     expired?: boolean;
+    /** 0070. PAYMENT_METHODS 중 하나 또는 null. */
+    payment_method?: string | null;
   } | null;
 };
 
@@ -117,6 +122,8 @@ type MembershipInput = {
   status: "pending" | "active";
   /** 'YYYY-MM-DD', "" 는 만료일 없음(0069). */
   expires_on: string;
+  /** PAYMENT_METHODS 중 하나, "" 는 아직 모름(0070). */
+  payment_method: string;
 };
 
 /** 클럽 현지 연도. */
@@ -172,6 +179,7 @@ function membershipFrom(c: Customer | null): {
         cart_package: m.cart_package ?? "",
         status: m.status === "active" ? "active" : "pending",
         expires_on: m.expires_on ?? "",
+        payment_method: m.payment_method ?? "",
       },
       dirty: false,
     };
@@ -185,6 +193,7 @@ function membershipFrom(c: Customer | null): {
       cart_package: draft?.cart_package ?? "",
       status: "active",
       expires_on: "",
+      payment_method: "",
     },
     dirty: !!draft?.membership_type,
   };
@@ -708,6 +717,11 @@ function CustomerFile({
                 : "No expiry date"}
             </dd>
           )}
+          {customer.membership?.payment_method && (
+            <dd className="text-[#5d6673]">
+              Paid by {paymentMethodLabel(customer.membership.payment_method)}
+            </dd>
+          )}
           {customer.player_type && (
             <dd className="text-[#5d6673]">
               Last plan: {customer.player_type}
@@ -787,6 +801,7 @@ function MembershipFields({
         plan: value.plan,
         cart_package: value.cart_package || null,
         range_pass: false,
+        payment_method: value.payment_method || null,
       })
     : null;
   const sameRow =
@@ -895,6 +910,31 @@ function MembershipFields({
                 type="date"
                 value={value.expires_on}
               />
+            </label>
+            <label className="grid gap-1 text-xs font-bold text-[#5d6673]">
+              <span>
+                Paid by
+                {value.payment_method === "Credit card" && (
+                  <span className="font-normal">
+                    {" "}
+                    · +{CREDIT_CARD_SURCHARGE * 100}% card fee
+                  </span>
+                )}
+              </span>
+              <select
+                className={SELECT_CLASS}
+                onChange={(event) =>
+                  onChange({ payment_method: event.target.value })
+                }
+                value={value.payment_method}
+              >
+                <option value="">—</option>
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {paymentMethodLabel(m)}
+                  </option>
+                ))}
+              </select>
             </label>
           </>
         )}
