@@ -43,6 +43,14 @@ export default function SaleDetail({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // 리더로 받았는데 아직 카드로 돌려주지 않은 결제 수. 0 이 아니면 장부 환불을 막는다 —
+  // 2026-10-21 PH-20261021-0005 가 장부만 환불되고 Stripe 에는 돈이 남았다.
+  const [cardsPending, setCardsPending] = useState(0);
+  const keyedCard = (sale.payments ?? []).some(
+    (payment) =>
+      payment.entry !== "integrated" &&
+      (payment.method === "card" || payment.method === "debit"),
+  );
 
   const created = useMemo(() => {
     // 서버 시각은 ISO-8601 UTC 다. 매장 사람이 읽는 것은 현지 시각이므로 변환한다.
@@ -179,19 +187,29 @@ export default function SaleDetail({
 
         {error ? <ErrorNote>{error}</ErrorNote> : null}
 
-        {sale.refunded_at ? null : confirming ? (
+        {sale.refunded_at ? (
+          // 장부는 환불됐어도 카드 돈이 남아 있을 수 있다. 그때 돌려줄 버튼이 사라지면 안 된다.
+          <TerminalRefunds onPendingChange={setCardsPending} sale={sale} />
+        ) : confirming ? (
           <div className="grid gap-2 border border-[#e2a5a5] p-2">
-            {sale.payments?.some(
-              (payment) =>
-                payment.method === "card" || payment.method === "debit",
-            ) ? (
+            <TerminalRefunds onPendingChange={setCardsPending} sale={sale} />
+            {keyedCard ? (
               <p className="bg-[#fff8e1] px-2 py-2 text-xs text-[#5b4708]">
-                Refund the card or debit part on the Chase DX8000 first. This
-                button only fixes the books: it puts stock back and marks any
-                green fees on this bill unpaid again.
+                A card or debit payment on this sale did not go through the
+                reader. Refund it in the Stripe Dashboard first.
               </p>
             ) : null}
-            <TerminalRefunds sale={sale} />
+            <p className="text-xs text-[#6b7280]">
+              Confirm refund only fixes the books: it puts stock back and marks
+              any green fees on this bill unpaid again. It does not send money
+              back to a card.
+            </p>
+            {cardsPending > 0 ? (
+              <p className="bg-[#fff8e1] px-2 py-2 text-xs font-bold text-[#5b4708]">
+                Refund the card payment above first. Confirm refund unlocks
+                once the money is back on the card.
+              </p>
+            ) : null}
             <Field
               hint="Required — it goes on the day's reconciliation"
               label="Refund reason"
@@ -205,7 +223,7 @@ export default function SaleDetail({
             <div className="flex gap-2">
               <Button
                 className="flex-1"
-                disabled={busy || !reason.trim()}
+                disabled={busy || !reason.trim() || cardsPending > 0}
                 onClick={refund}
                 tone="danger"
               >
@@ -229,9 +247,19 @@ export default function SaleDetail({
 /**
  * 단말기 연동으로 받은 카드 결제(`entry = "integrated"`, Stripe Terminal)를 돌려준다. 신용카드는 Stripe
  * 환불(카드 필요 없음), Interac 은 리더에서 손님이 카드를 다시 댄다. 돌려준 뒤 아래 *Confirm refund* 로
- * 장부를 맞춘다. 손으로 친("keyed") 결제는 예전처럼 단말기에서 직접 한다.
+ * 장부를 맞춘다. 손으로 친("keyed") 결제는 Stripe Dashboard 에서 돌려준다.
+ *
+ * `onPendingChange` 는 아직 돌려주지 않은 리더 결제 수를 알린다. 리더 승인 기록을 못 찾은 결제는
+ * 여기서 돌려줄 수 없으니(대시보드로 안내) 세지 않는다 — 세면 장부 환불이 영영 막힌다.
+ * 기록을 못 읽었을 때도 막지 않는다(0).
  */
-function TerminalRefunds({ sale }: { sale: Sale }) {
+function TerminalRefunds({
+  sale,
+  onPendingChange,
+}: {
+  sale: Sale;
+  onPendingChange: (count: number) => void;
+}) {
   const settings = useTerminalSettings();
   const linked = (sale.payments ?? []).filter(
     (payment) =>
@@ -260,8 +288,6 @@ function TerminalRefunds({ sale }: { sale: Sale }) {
     };
   }, [hasLinked, sale.id]);
 
-  if (!hasLinked) return null;
-
   /** 이 결제 줄의 판매 기록(Charge 때 묶인 것). */
   const saleFor = (payment: SalePayment) =>
     records.find(
@@ -282,6 +308,14 @@ function TerminalRefunds({ sale }: { sale: Sale }) {
           : record.original_auth_code === payment.auth_code),
     );
   };
+  const pending = linked.filter(
+    (payment) => saleFor(payment) && !done(payment),
+  ).length;
+  useEffect(() => {
+    onPendingChange(pending);
+  }, [onPendingChange, pending]);
+
+  if (!hasLinked) return null;
 
   async function reverse(index: number, payment: SalePayment) {
     const original = saleFor(payment);
