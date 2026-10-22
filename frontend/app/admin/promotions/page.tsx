@@ -54,6 +54,17 @@ const initialPromotions: Promotion[] = [
   },
 ];
 
+// 마케팅 사이트(/marketing)의 새 문자 캠페인을 이 코드로 채워 연다. 마케팅은 따로 로그인하므로 새 탭.
+function textCampaignHref(promotion: Promotion) {
+  // "·" 같은 글자가 하나라도 있으면 문자가 70자씩 쪼개진다(UCS-2). 쉼표로 바꾼다.
+  const condition = promotion.condition.replace(/\s*·\s*/g, ", ");
+  const message =
+    `${promotion.name}: ${promotion.discount} with code ${promotion.code} (${condition}). ` +
+    `Valid until ${promotion.expires}. Book at pelhamhills.ca/book or call 416-822-7609.`;
+  const query = new URLSearchParams({ channel: "sms", name: `${promotion.code} · ${promotion.name}`, message });
+  return `/marketing?${query.toString()}`;
+}
+
 function statusClass(status: Promotion["status"]) {
   if (status === "expired") return "bg-[#ececf0] text-[#4e5560]";
   if (status === "scheduled") return "bg-[#ffd400] text-[#1d232b]";
@@ -242,6 +253,15 @@ export default function PromotionsPage() {
                       >
                         Apply
                       </button>
+                      <a
+                        className="mt-2 ml-1 inline-block bg-[#4533ff] px-2 py-1 text-[11px] font-bold text-white"
+                        href={textCampaignHref(promotion)}
+                        rel="noopener"
+                        target="_blank"
+                        title="Open customer marketing with this code in a new text campaign"
+                      >
+                        Text it
+                      </a>
                     </span>
                   </div>
                 );

@@ -147,10 +147,27 @@ function useAudience(channel: Channel, segment: Segment, minRounds: number, sear
   return { audience, error, loading, reload: () => setNonce((value) => value + 1) };
 }
 
+// 프로모션 화면의 "Text it" 이 ?channel=sms&name=…&message=… 로 연다. 읽은 뒤 주소에서 지운다(아래 effect).
+function readDraft() {
+  if (typeof window === "undefined") return null;
+  const query = new URLSearchParams(window.location.search);
+  if (!query.has("name") && !query.has("message")) return null;
+  return {
+    channel: (query.get("channel") === "call" ? "call" : "sms") as Channel,
+    name: query.get("name") ?? "",
+    message: query.get("message") ?? "",
+  };
+}
+
 function Compose({ status, onCreated }: { status: MarketingStatus | null; onCreated: (id: number) => void }) {
-  const [channel, setChannel] = useState<Channel>("sms");
-  const [name, setName] = useState("");
-  const [message, setMessage] = useState("");
+  const [draft] = useState(readDraft);
+  const [channel, setChannel] = useState<Channel>(draft?.channel ?? "sms");
+  const [name, setName] = useState(draft?.name ?? "");
+  const [message, setMessage] = useState(draft?.message ?? "");
+
+  useEffect(() => {
+    if (draft) window.history.replaceState(null, "", window.location.pathname);
+  }, [draft]);
   const [segment, setSegment] = useState<Segment>("all");
   const [minRounds, setMinRounds] = useState(0);
   const [search, setSearch] = useState("");
