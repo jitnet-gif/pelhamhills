@@ -82,7 +82,7 @@ const cartPackages = [
 const paymentMethods = [
   { name: "Cheque", detail: "Payable to \u201cPelham Hills Golf\u201d only \u2014 do not add \u201cClub\u201d, \u201cCourse\u201d or anything else." },
   { name: "Credit Card", detail: "An additional 3% is charged on credit card payments." },
-  { name: "Interac e-Transfer", detail: "Send to info@pelhamhills.ca." },
+  { name: "Interac e-Transfer", detail: "Send to info@pelhamhills.com." },
   { name: "Cash", detail: "At the pro shop." },
 ];
 

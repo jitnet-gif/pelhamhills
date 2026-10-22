@@ -42,7 +42,7 @@ const INPUT =
 const PAY_NEXT: Record<string, string> = {
   Cheque: "Make your cheque payable to “Pelham Hills Golf” only and drop it off at the pro shop.",
   "Credit card": "You'll pay securely by card on the next page (Stripe). The 3% card charge is included.",
-  "E-transfer": "Send an Interac e-Transfer to info@pelhamhills.ca.",
+  "E-transfer": "Send an Interac e-Transfer to info@pelhamhills.com.",
   Cash: "Pay in cash at the pro shop.",
 };
 
