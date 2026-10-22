@@ -694,7 +694,7 @@ export default function CustomersPage() {
               value={editing.membership}
             />
             <p className="mt-3 text-[11px] text-[#5d6673]">
-              A manager PIN is needed to save.
+              Your Pelham Shift ID is needed to save.
             </p>
             {saveError && (
               <p className="mt-2 text-xs text-[#b42318]">{saveError}</p>

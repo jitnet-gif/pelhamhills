@@ -1517,7 +1517,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
             >
               Back
             </button>
-            <span className="text-[10px] text-[#6d3a27]">Manager PIN needed</span>
+            <span className="text-[10px] text-[#6d3a27]">Shift ID needed</span>
           </div>
         </form>
       ) : null}
@@ -1731,7 +1731,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                               check
                                 ? `${rainCheckTitle(check)} — reprint, text or void`
                                 : player.paid && !player.cancelled
-                                  ? "Give this player a rain check slip (barcode + expiry date) (manager PIN)"
+                                  ? "Give this player a rain check slip (barcode + expiry date) (Shift ID)"
                                   : "Rain check — paid players only"
                             }
                             type="button"
@@ -1760,7 +1760,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                       onClick={() => runDrop("refund", player)}
                       title={
                         player.paid
-                          ? "Refund the bill this player was paid on (reason + manager PIN)"
+                          ? "Refund the bill this player was paid on (reason + Shift ID)"
                           : "Refund — this player has not paid"
                       }
                       type="button"
@@ -1776,7 +1776,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     title={
                       players.length <= 1
                         ? "Last player — cancel or delete the whole reservation from the rail instead"
-                        : "Remove only this player — the rest of the group stays booked (reason + manager PIN)"
+                        : "Remove only this player — the rest of the group stays booked (reason + Shift ID)"
                     }
                     type="button"
                   >
@@ -1822,7 +1822,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                             className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f2f2f5]"
                             onClick={() => runDrop("refund", player)}
                             role="menuitem"
-                            title="Refund the bill this player was paid on — a reason and a manager PIN are needed"
+                            title="Refund the bill this player was paid on — a reason and a Pelham Shift ID are needed"
                             type="button"
                           >
                             <Glyph className="h-4 w-4" name="refund" />
@@ -1861,7 +1861,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                           className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[#c0262d] hover:bg-[#fff1ee]"
                           onClick={() => runDrop("delete", player)}
                           role="menuitem"
-                          title="Remove this player from the reservation — a reason and a manager PIN are needed"
+                          title="Remove this player from the reservation — a reason and a Pelham Shift ID are needed"
                           type="button"
                         >
                           <Glyph className="h-4 w-4" name="trash" />
@@ -2114,7 +2114,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                     onKeyDown={(event) => {
                       if (event.key === "Enter") event.currentTarget.blur();
                     }}
-                    title="Green fee for this player only. A price that is not the rate plan needs a reason and a manager PIN, and shows on the report."
+                    title="Green fee for this player only. A price that is not the rate plan needs a reason and a Pelham Shift ID, and shows on the report."
                     value={
                       greenDrafts[player.id] ??
                       (priceAsk?.playerId === player.id ? priceAsk.fee : greenFeeOf(booking, player)).toFixed(2)
@@ -2176,7 +2176,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                         disabled={busy || !priceAsk.reason.trim()}
                         type="submit"
                       >
-                        Save · manager PIN
+                        Save · Shift ID
                       </button>
                     </div>
                   </form>
@@ -2204,7 +2204,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                       onKeyDown={(event) => {
                         if (event.key === "Enter") event.currentTarget.blur();
                       }}
-                      title="Cart fee for this player only — filled in from the rate plan and holes. Changing it needs a manager PIN."
+                      title="Cart fee for this player only — filled in from the rate plan and holes. Changing it needs a Pelham Shift ID."
                       value={feeDrafts[player.id] ?? cartPart(player).toFixed(2)}
                     />
                     {player.paid || player.cancelled ? null : (
@@ -2524,7 +2524,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
                   {/* 안쪽 요소가 drag 이벤트를 받으면 dragleave 가 번갈아 터져 색이 깜박인다. */}
                   <Glyph className="pointer-events-none h-5 w-5" name={zone.glyph} />
                   <span className="pointer-events-none text-[13px] font-bold">{zone.label}</span>
-                  <span className="pointer-events-none text-[10px] opacity-80">{block ?? "Manager PIN · reason"}</span>
+                  <span className="pointer-events-none text-[10px] opacity-80">{block ?? "Shift ID · reason"}</span>
                 </div>
               );
             })}

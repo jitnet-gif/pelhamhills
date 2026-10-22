@@ -55,18 +55,9 @@ function isJwtProblem(code: unknown): boolean {
   return typeof code === "string" && code.startsWith("PGRST3");
 }
 
-/** 직원 함수 호출. 매니저 승인(0024)으로 막히면 PIN 창을 띄우고 한 번 더 부른다(`managerApproval`). */
+/** 직원 함수 호출. 승인(0024·0077)으로 막히면 Shift ID 창을 띄우고 한 번 더 부른다(`managerApproval`). */
 export function staffRpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
   return withManagerApproval(() => rawStaffRpc<T>(fn, args));
-}
-
-/** 매니저 PIN 확인(0024). 틀려도 오류가 아니라 `approved: false` 로 온다 — 틀린 기록이 남아야 해서. */
-export function approveAsManager(pin: string, action: string, ref: string) {
-  return rawStaffRpc<{ approved: boolean; manager?: string; message?: string }>("pelham_staff_manager_approve", {
-    p_pin: pin,
-    p_action: action,
-    p_ref: ref,
-  });
 }
 
 /**

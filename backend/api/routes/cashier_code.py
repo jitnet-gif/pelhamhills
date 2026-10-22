@@ -14,6 +14,11 @@
 ## 설정 (Fly 환경변수, 둘 다 선택)
 - `PELHAM_SHIFT_URL`  — 기본 https://pelham-shift.vercel.app
 - `PELHAM_SHIFT_TEAM` — pelham-shift 워크스페이스 id. 비우면 모든 팀에서 찾는다.
+
+## 승인 (0077)
+환불·가격 변경 같은 막힌 일(0024)도 매니저 PIN 대신 그 직원의 ID 로 승인한다 — `POST /pos/approve`.
+번호 확인은 여기서만 할 수 있어서, 승인 줄은 service_role 로 `pelham_shift_approve` 가 남긴다
+(브라우저는 그 함수를 부를 수 없다). 틀린 번호도 적어 10분에 5번이면 막는다.
 """
 
 from __future__ import annotations
@@ -43,6 +48,12 @@ class CashierCodeIn(BaseModel):
 
 class CashierCodeOut(BaseModel):
     name: str
+
+
+class ApproveIn(BaseModel):
+    code: str = Field(pattern=r"^\d{4,8}$")
+    action: str = Field(min_length=1, max_length=40)
+    ref: str = Field(min_length=1, max_length=200)
 
 
 def _token(request: Request) -> str:
@@ -87,3 +98,38 @@ def cashier_code(body: CashierCodeIn, request: Request) -> CashierCodeOut:
     if not name:
         raise HTTPException(status_code=404, detail="No staff member has that Pelham Shift ID.")
     return CashierCodeOut(name=name[:80])
+
+
+def _staff_id(request: Request) -> str:
+    """직원 확인과 그 계정의 uid 를 한 번에."""
+    try:
+        uid = supabase_rest.rpc_as(_token(request), "pelham_staff_my_id", {})
+    except supabase_rest.RpcRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from None
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(status_code=503, detail=UNAVAILABLE) from None
+    if not isinstance(uid, str) or not uid:
+        raise HTTPException(status_code=401, detail="Sign in with a pro shop account.")
+    return uid
+
+
+@router.post("/approve")
+def approve(body: ApproveIn, request: Request) -> dict:
+    uid = _staff_id(request)
+    found = _lookup(body.code)
+    if found.get("ambiguous"):
+        raise HTTPException(
+            status_code=409,
+            detail="More than one Pelham Shift team uses this ID. Ask a manager to set PELHAM_SHIFT_TEAM.",
+        )
+    name = " ".join(str(found.get("name") or "").split())[:80] or None
+    try:
+        result = supabase_rest.rpc(
+            "pelham_shift_approve",
+            {"p_uid": uid, "p_name": name, "p_action": body.action, "p_ref": body.ref},
+        )
+    except supabase_rest.RpcRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from None
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(status_code=503, detail="Can't save the approval right now. Try again.") from None
+    return result if isinstance(result, dict) else {"approved": False, "message": "Try again."}

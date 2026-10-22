@@ -1,7 +1,7 @@
 /**
  * 매니저 승인(0024). 환불·레인체크·선수 삭제·결제 취소는 서버가 PT428 로 거절하고, 메시지 끝에
- * `[approval:<action>:<ref>]` 를 붙인다. 여기서 그 거절을 잡아 PIN 창(`ManagerApprovalHost`)을 띄우고,
- * 매니저가 승인하면 같은 요청을 한 번 더 보낸다. 그래서 부르는 쪽(티 시트·Reports·계산대)은 고칠 것이 없다.
+ * `[approval:<action>:<ref>]` 를 붙인다. 여기서 그 거절을 잡아 Shift ID 창(`ManagerApprovalHost`, 0077)을 띄우고,
+ * 직원이 자기 ID 로 승인하면 같은 요청을 한 번 더 보낸다. 그래서 부르는 쪽(티 시트·Reports·계산대)은 고칠 것이 없다.
  *
  * 이 파일은 `staffRpc` 를 import 하지 않는다 — staffRpc 가 이 파일을 쓰기 때문이다(순환을 피한다).
  */
@@ -11,7 +11,7 @@ import { ApiError } from "./api";
 export type ApprovalRequest = {
   action: string;
   ref: string;
-  /** 꼬리표를 뗀 서버 메시지("A manager must approve this refund."). */
+  /** 꼬리표를 뗀 서버 메시지("Enter a Pelham Shift ID to approve this refund."). */
   message: string;
 };
 

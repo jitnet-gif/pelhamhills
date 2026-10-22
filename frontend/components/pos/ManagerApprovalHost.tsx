@@ -1,17 +1,20 @@
 "use client";
 
 /**
- * 매니저 PIN 창(0024). 루트 레이아웃에 하나만 달려 있다가, 직원 함수가 매니저 승인으로 막히면
- * (`lib/teeSheet/managerApproval`) 뜬다. 매니저가 PIN 을 치면 서버가 확인하고 10분짜리 승인을 남긴다 —
- * 그 뒤 원래 요청이 다시 나간다. 취소하면 원래 요청은 "Cancelled." 로 끝난다.
+ * 승인 창(0024 → 0077). 루트 레이아웃에 하나만 달려 있다가, 직원 함수가 승인으로 막히면
+ * (`lib/teeSheet/managerApproval`) 뜬다. 그 자리의 직원이 자기 Pelham Shift ID 를 치면 서버(FastAPI)가
+ * pelham-shift 에 확인하고 그 이름으로 10분짜리 승인을 남긴다 — 그 뒤 원래 요청이 다시 나간다.
+ * 승인한 이름은 이 기기의 담당자(Cashier)가 되어 Change log(0076)에도 그 이름이 남는다.
+ * 취소하면 원래 요청은 "Cancelled." 로 끝난다. 번호는 어디에도 적지 않는다.
  *
  * 숫자 패드는 터치 계산대용이다. 키보드 숫자·Backspace·Enter·Esc 도 받는다.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { approveByShiftId } from "@/lib/pos/cashierCode";
+import { rememberCashier } from "@/lib/pos/currentBill";
 import { setApprovalPrompt, type ApprovalRequest } from "@/lib/teeSheet/managerApproval";
-import { approveAsManager } from "@/lib/teeSheet/staffRpc";
 
 const MAX_PIN = 8;
 
@@ -56,17 +59,18 @@ export default function ManagerApprovalHost() {
     setChecking(true);
     setError(null);
     try {
-      const result = await approveAsManager(pin, current.request.action, current.request.ref);
+      const result = await approveByShiftId(pin, current.request.action, current.request.ref);
       if (openRef.current !== current) return;
-      if (result?.approved) {
+      if (result.approved) {
+        if (result.name) rememberCashier(result.name);
         finish(true);
         return;
       }
-      setError(result?.message || "That PIN is not a manager PIN.");
+      setError(result.message || "No staff member has that Pelham Shift ID.");
       setPin("");
     } catch (cause) {
       if (openRef.current !== current) return;
-      setError(cause instanceof Error ? cause.message : "Could not check the PIN.");
+      setError(cause instanceof Error ? cause.message : "Could not check the ID.");
       setPin("");
     } finally {
       setChecking(false);
@@ -110,7 +114,7 @@ export default function ManagerApprovalHost() {
       <div className="w-full max-w-[300px] border border-[#c7c7cc] bg-[#f2f2f4] text-xs text-[#1f2328] shadow-xl">
         <div className="border-b border-[#c7c7cc] bg-white px-4 py-3">
           <h2 className="text-sm font-bold" id="manager-approval-title">
-            Manager approval
+            Approval
           </h2>
           <p className="mt-1 text-[#4e5560]">{open.request.message}</p>
         </div>
@@ -123,7 +127,7 @@ export default function ManagerApprovalHost() {
             }`}
           >
             {pin.length === 0 ? (
-              <span className="text-[#9aa0a6]">Manager PIN</span>
+              <span className="text-[#9aa0a6]">Pelham Shift ID</span>
             ) : (
               Array.from({ length: pin.length }, (_, index) => (
                 <span className="h-2.5 w-2.5 rounded-full bg-[#1f2328]" key={index} />
