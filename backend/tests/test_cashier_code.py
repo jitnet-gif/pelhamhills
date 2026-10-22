@@ -1,0 +1,85 @@
+"""계산대 담당자 코드(`routes/cashier_code.py`).
+
+실행: `python -m pytest backend/tests/test_cashier_code.py -q`
+
+SQL 은 `supabase_rest.rpc_as` 자리의 가짜로, pelham-shift 는 `_lookup` 자리의 가짜로 바꾼다.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from backend.api.routes import cashier_code  # noqa: E402
+from backend.services import supabase_rest  # noqa: E402
+
+API = "/api/v1"
+STAFF = {"Authorization": "Bearer staff"}
+
+
+@pytest.fixture()
+def env(monkeypatch):
+    state = {"answer": {}, "asked": []}
+
+    def fake_rpc_as(token, function, args):
+        if not token:
+            raise supabase_rest.RpcRefused(401, "Sign in with a pro shop account.")
+        return []
+
+    def fake_lookup(code):
+        state["asked"].append(code)
+        if isinstance(state["answer"], Exception):
+            raise state["answer"]
+        return state["answer"]
+
+    monkeypatch.setattr(supabase_rest, "rpc_as", fake_rpc_as)
+    monkeypatch.setattr(cashier_code, "_lookup", fake_lookup)
+    app = FastAPI()
+    app.include_router(cashier_code.router, prefix=API)
+    return TestClient(app), state
+
+
+def test_code_becomes_name(env):
+    client, state = env
+    state["answer"] = {"name": "  Josh   Kim "}
+    response = client.post(f"{API}/pos/cashier-code", json={"code": "1001"}, headers=STAFF)
+    assert response.status_code == 200
+    assert response.json() == {"name": "Josh Kim"}
+    assert state["asked"] == ["1001"]
+
+
+def test_needs_staff_sign_in(env):
+    client, state = env
+    response = client.post(f"{API}/pos/cashier-code", json={"code": "1001"})
+    assert response.status_code == 401
+    assert state["asked"] == []
+
+
+def test_rejects_non_codes(env):
+    client, state = env
+    for code in ["12", "abcd", "123456789"]:
+        assert client.post(f"{API}/pos/cashier-code", json={"code": code}, headers=STAFF).status_code == 422
+    assert state["asked"] == []
+
+
+def test_unknown_and_ambiguous(env):
+    client, state = env
+    state["answer"] = {}
+    assert client.post(f"{API}/pos/cashier-code", json={"code": "9999"}, headers=STAFF).status_code == 404
+    state["answer"] = {"ambiguous": True}
+    assert client.post(f"{API}/pos/cashier-code", json={"code": "1001"}, headers=STAFF).status_code == 409
+
+
+def test_shift_down(env):
+    client, state = env
+    state["answer"] = HTTPException(status_code=503, detail=cashier_code.UNAVAILABLE)
+    response = client.post(f"{API}/pos/cashier-code", json={"code": "1001"}, headers=STAFF)
+    assert response.status_code == 503

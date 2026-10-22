@@ -33,6 +33,7 @@ import {
   type BillStation,
   type PaymentInput,
 } from "@/lib/pos/api";
+import { cashierForCode, isShiftCode } from "@/lib/pos/cashierCode";
 import { billActions, recentCashiers, rememberCashier, rememberedCashier, useCurrentBill } from "@/lib/pos/currentBill";
 import {
   describeTerminalResult,
@@ -245,9 +246,25 @@ export default function BillPanel({
     setCashierError("");
   }
 
+  // pelham-shift 직원 ID(숫자)를 치면 그 직원 이름으로 바꿔 담는다. 번호 자체는 어디에도 남기지 않는다.
+  const [cashierLookup, setCashierLookup] = useState(false);
+
   async function commitCashier(): Promise<boolean> {
-    const name = cashier.trim().replace(/\s+/g, " ");
+    let name = cashier.trim().replace(/\s+/g, " ");
     if (!name) return false;
+    if (isShiftCode(name)) {
+      setCashierLookup(true);
+      try {
+        name = await cashierForCode(name);
+      } catch (lookupError) {
+        setCashier("");
+        setCashierError(lookupError instanceof Error ? lookupError.message : "That staff ID didn't work.");
+        return false;
+      } finally {
+        setCashierLookup(false);
+      }
+      setCashier(name);
+    }
     rememberCashier(name);
     if (bill && name !== (bill.cashier ?? "")) {
       const updated = await billActions.update({ cashier: name }, station);
@@ -275,7 +292,7 @@ export default function BillPanel({
   async function charge(fromTerminal = false) {
     if (!bill || !canCharge || charging) return;
     if (!cashier.trim()) {
-      setCashierError("Enter who is ringing this in. Close-outs and tips go by this name.");
+      setCashierError("Enter your Pelham Shift ID (or name). Close-outs and tips go by it.");
       return;
     }
     setCharging(true);
@@ -325,16 +342,20 @@ export default function BillPanel({
         busy={busy}
         cashierField={
           <>
-            <Field hint="Close-outs and tips go by it" label="Cashier">
+            <Field hint={cashierLookup ? "Looking up the staff ID…" : "Your Pelham Shift ID — close-outs and tips go by it"} label="Cashier">
               <TextInput
                 autoComplete="off"
+                readOnly={cashierLookup}
                 list="pelham-cashiers"
                 onBlur={() => void commitCashier()}
                 onChange={(event) => {
                   setCashier(event.target.value);
                   setCashierError("");
                 }}
-                placeholder="Who is ringing this in"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void commitCashier();
+                }}
+                placeholder="Pelham Shift ID (e.g. 1001) or name"
                 value={cashier}
               />
             </Field>
@@ -455,16 +476,20 @@ export default function BillPanel({
             />
           </div>
 
-          <Field hint="Your name — close-outs and tips go by it" label="Cashier">
+          <Field hint={cashierLookup ? "Looking up the staff ID…" : "Your Pelham Shift ID — close-outs and tips go by it"} label="Cashier">
             <TextInput
               autoComplete="off"
+              readOnly={cashierLookup}
               list="pelham-cashiers"
               onBlur={() => void commitCashier()}
               onChange={(event) => {
                 setCashier(event.target.value);
                 setCashierError("");
               }}
-              placeholder="Who is ringing this in"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void commitCashier();
+              }}
+              placeholder="Pelham Shift ID (e.g. 1001) or name"
               value={cashier}
             />
           </Field>

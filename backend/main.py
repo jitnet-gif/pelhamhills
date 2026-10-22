@@ -81,6 +81,8 @@ include_route_module("backend.api.routes.rain_checks", f"{settings.API_V1_STR}",
 include_route_module("backend.api.routes.marketing", f"{settings.API_V1_STR}", ["Marketing"])
 # 계산대 카메라 사진으로 상품 찾기(0068). 직원 확인은 단말기와 같다(`pelham_staff_pos_products`).
 include_route_module("backend.api.routes.product_photo", f"{settings.API_V1_STR}", ["Retail"])
+# 계산대 담당자를 pelham-shift 직원 ID 로 정한다. 직원 확인은 단말기와 같다.
+include_route_module("backend.api.routes.cashier_code", f"{settings.API_V1_STR}", ["Retail"])
 
 if VOICE_ONLY:
     logger.warning(
