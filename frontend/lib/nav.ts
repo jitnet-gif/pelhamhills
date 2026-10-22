@@ -96,6 +96,9 @@ export const ADMIN_HOME = "/admin";
 /** 클럽 종합 매출 보고서. 리테일 작업 화면의 "Sales report" 링크도 여기를 가리킨다. */
 export const ADMIN_REPORTS = "/admin/reports";
 
+/** 로그인 계정 관리(0074). 계정 관리자에게만 메뉴에 뜬다(`lib/accounts.ts`). */
+export const ADMIN_ACCOUNTS = "/admin/accounts";
+
 export const GOLF_GPS_MAP_EDITOR = "https://golf-gps-pelhamhills-seven.vercel.app/admin/map";
 
 /**
@@ -125,6 +128,7 @@ export const adminNav: NavItem[] = [
   { label: "Course Map", href: GOLF_GPS_MAP_EDITOR, glyph: "⌖" },
   { label: "Integrations", href: "/admin/integrations", glyph: "⊞" },
   { label: "Settings", href: "/admin/settings", glyph: "⚙" },
+  { label: "Account Setup", href: ADMIN_ACCOUNTS, glyph: "👤" },
   { label: "Staff Guides", href: "/guide", glyph: "▶" },
 ];
 

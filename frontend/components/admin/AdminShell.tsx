@@ -37,6 +37,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 import {
+  ADMIN_ACCOUNTS,
   ADMIN_HOME,
   ADMIN_REPORTS,
   CLUB,
@@ -48,6 +49,7 @@ import {
   type AdminDivision,
 } from "@/lib/nav";
 import InstallAppHint from "@/components/admin/InstallAppHint";
+import { useAccountsAccess } from "@/lib/accounts";
 import { useReportsAccess } from "@/lib/reports/access";
 import { ApiError } from "@/lib/teeSheet/api";
 import { todayIso } from "@/lib/teeSheet/dates";
@@ -178,10 +180,17 @@ function AdminFrame({
   );
   // Reports 는 Emmeline 계정에만 보인다(`lib/reports/access.ts`). 다른 계정에는 메뉴에서 뺀다.
   const reportsAllowed = useReportsAccess(email) === true;
+  // Account Setup 도 계정 관리자(0074)에게만 보인다(`lib/accounts.ts`).
+  const accountsAllowed = useAccountsAccess(email) === true;
   const shownDivision = useMemo(
-    () =>
-      reportsAllowed ? division : { ...division, links: division.links.filter((item) => item.href !== ADMIN_REPORTS) },
-    [division, reportsAllowed],
+    () => ({
+      ...division,
+      links: division.links.filter(
+        (item) =>
+          (reportsAllowed || item.href !== ADMIN_REPORTS) && (accountsAllowed || item.href !== ADMIN_ACCOUNTS),
+      ),
+    }),
+    [division, reportsAllowed, accountsAllowed],
   );
 
   // 화면을 옮기면 서랍은 닫힌다. 닫지 않으면 새 화면 위에 이전 메뉴가 그대로
