@@ -14,12 +14,15 @@ import BillDrawer from "../../components/pos/BillDrawer";
 import BillPanel from "../../components/pos/BillPanel";
 import BookingDialog, { STANDARD_SEATS_PER_TEE_TIME } from "../../components/teesheet/BookingDialog";
 import DateNav from "../../components/teesheet/DateNav";
+import IdCheckinDialog from "../../components/teesheet/IdCheckinDialog";
 import ReservationDetail from "../../components/teesheet/ReservationDetail";
 import WeekGrid from "../../components/teesheet/WeekGrid";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner";
 import { useTeeSheet } from "../../hooks/useTeeSheet";
 import { useSlotLocks } from "@/hooks/useSlotLocks";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
+import { checkInByQr, checkinMessage, customerQrCode, type CheckinResult } from "@/lib/pos/customerQr";
+import { isIdCardScan, parseIdCard, type IdCard } from "@/lib/pos/idCard";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
 import { isPromoBarcode } from "@/lib/pos/promo";
 import { retailApi, toRetailError } from "@/lib/retail/api";
@@ -73,6 +76,8 @@ export default function TeeSheetPage() {
   const [billOpen, setBillOpen] = useState(false);
   // 상품을 스캔해 담았을 때 서랍의 결제 칸으로 스크롤시키는 값(BillPanel 참고).
   const [revealPayments, setRevealPayments] = useState(0);
+  // 면허증을 스캔하면 뜨는 신분증 체크인 창(0084).
+  const [idCard, setIdCard] = useState<IdCard | null>(null);
   const billState = useCurrentBill();
   // 티 시트 두 장 나란히 보기(Chronogolf 의 "Add Tee Sheet"). 오른쪽 시트는 SecondSheet 참고.
   const [split, setSplit] = useState(false);
@@ -176,8 +181,37 @@ export default function TeeSheetPage() {
     [pushToast],
   );
 
+  /** 체크인된 예약을 격자에서 연다(다른 날이면 그날로). 격자는 다음 폴링 전에 바로 다시 읽는다. */
+  const showCheckin = useCallback(
+    (result: CheckinResult) => {
+      if (!result.bookingId) return;
+      if (result.date && result.date !== focusedDate) setFocusedDate(result.date);
+      select(result.bookingId);
+      void controller.refresh();
+    },
+    [controller, focusedDate, select, setFocusedDate],
+  );
+
   const onScan = useCallback(
     (raw: string) => {
+      // 손님 개인 QR(0084): 오늘 예약에서 그 손님을 바로 체크인한다.
+      const qr = customerQrCode(raw);
+      if (qr) {
+        checkInByQr(qr)
+          .then((result) => {
+            pushToast(result.status === "none" ? "error" : "success", checkinMessage(result));
+            showCheckin(result);
+          })
+          .catch((error: unknown) => pushToast("error", error instanceof Error ? error.message : "QR check-in failed."));
+        return;
+      }
+      // 면허증 뒷면(PDF417): 이름·생년월일을 읽어 신분증 체크인 창을 연다. 못 읽으면 다시 찍게 한다.
+      if (isIdCardScan(raw)) {
+        const card = parseIdCard(raw);
+        if (card) setIdCard(card);
+        else pushToast("error", "Couldn't read the name and date of birth from that ID. Scan the barcode on the back again.");
+        return;
+      }
       // 레인체크 전표: 계산서 서랍의 결제 칸으로 넘긴다. 쓸 곳(계산서 줄)이 먼저 있어야 한다.
       if (isRainCheckCode(raw)) {
         const current = getBillState().bill;
@@ -218,7 +252,7 @@ export default function TeeSheetPage() {
       if (found.date !== focusedDate) setFocusedDate(found.date);
       select(found.id);
     },
-    [bookings, focusedDate, pushToast, select, sellScannedProduct, setFocusedDate],
+    [bookings, focusedDate, pushToast, select, sellScannedProduct, setFocusedDate, showCheckin],
   );
   useBarcodeScanner(onScan);
 
@@ -335,6 +369,10 @@ export default function TeeSheetPage() {
         >
           <BillPanel onPaid={() => void controller.refresh()} revealPayments={revealPayments} station="tee_sheet" />
         </BillDrawer>
+      ) : null}
+
+      {idCard ? (
+        <IdCheckinDialog card={idCard} onCheckedIn={showCheckin} onClose={() => setIdCard(null)} />
       ) : null}
 
       <BookingDialog

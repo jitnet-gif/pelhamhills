@@ -127,6 +127,20 @@ export function useBarcodeScanner(onScan: (code: string) => void, options: Optio
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // 면허증 바코드(`@` 로 시작, `lib/pos/idCard.ts`)는 여러 줄이다. 스캐너는 줄바꿈·구분 문자를
+      // Enter 나 Ctrl+글자로 보내므로, 그 스캔 도중에는 둘 다 끝이 아니라 줄바꿈으로 모은다.
+      // 끝은 입력이 멈추는 것으로 본다. Ctrl+J(다운로드) 같은 브라우저 단축키가 열리지 않게 막는다.
+      const licence = buffer.startsWith("@") && (event.timeStamp || performance.now()) - lastAt <= maxGapMs;
+      const isEnter = event.key === "Enter" || event.code === "Enter" || event.code === "NumpadEnter";
+      if (licence && (isEnter || event.ctrlKey)) {
+        event.preventDefault();
+        lastAt = event.timeStamp || performance.now();
+        if (!buffer.endsWith("\n")) buffer += "\n";
+        clearIdle();
+        idleTimer = setTimeout(flush, maxGapMs * 2);
+        return;
+      }
+
       if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (!everywhere && isEditable(event.target)) {
         buffer = "";
@@ -138,7 +152,7 @@ export function useBarcodeScanner(onScan: (code: string) => void, options: Optio
       const gap = now - lastAt;
       lastAt = now;
 
-      if (event.key === "Enter" || event.code === "Enter" || event.code === "NumpadEnter") {
+      if (isEnter) {
         // 스캔이 끝났다. 포커스된 버튼이 Enter 로 눌리지 않게 막는다.
         if (buffer && gap <= maxGapMs && flush()) event.preventDefault();
         else buffer = "";

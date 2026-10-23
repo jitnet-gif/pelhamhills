@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import BookingShell from "@/components/booking/BookingShell";
+import IdScanUpload from "@/components/booking/IdScanUpload";
 import PayOnline from "@/components/booking/PayOnline";
 import VoiceBooking from "@/components/booking/VoiceBooking";
 import { TeeTimeGroups } from "@/components/booking/TeeTimeCards";
@@ -799,6 +800,7 @@ function Confirmation({
       </div>
 
       {booking.confirmationCode && email ? <PayOnline creds={{ code, email }} /> : null}
+      {booking.confirmationCode && email ? <IdScanUpload code={code} email={email} /> : null}
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Link

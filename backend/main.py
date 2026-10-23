@@ -83,6 +83,8 @@ include_route_module("backend.api.routes.marketing", f"{settings.API_V1_STR}", [
 include_route_module("backend.api.routes.product_photo", f"{settings.API_V1_STR}", ["Retail"])
 # 계산대 담당자를 pelham-shift 직원 ID 로 정한다. 직원 확인은 단말기와 같다.
 include_route_module("backend.api.routes.cashier_code", f"{settings.API_V1_STR}", ["Retail"])
+# 손님 개인 QR(0084)을 문자로. QR 그림 주소는 Twilio 가 받아 가는 공개 경로다.
+include_route_module("backend.api.routes.customer_qr", f"{settings.API_V1_STR}", ["Retail"])
 
 if VOICE_ONLY:
     logger.warning(

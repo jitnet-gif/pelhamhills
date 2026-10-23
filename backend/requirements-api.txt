@@ -33,3 +33,6 @@ tzdata==2024.1
 # 예약 확정 문자(MMS)에 붙는 확인 번호 바코드 (`backend/services/barcode_png.py`).
 # 막대 패턴만 쓴다 — PNG 는 직접 쓰므로 Pillow 는 필요 없다.
 python-barcode==0.15.1
+
+# 손님 개인 QR 문자(MMS)의 QR 그림 (`backend/api/routes/customer_qr.py`). 의존성 없는 순수 파이썬.
+segno==1.6.1
