@@ -48,9 +48,15 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
 }
 
+function linkedDate(): string {
+  const wanted = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("date");
+  return wanted && /^\d{4}-\d{2}-\d{2}$/.test(wanted) ? wanted : localBusinessDate();
+}
+
 export default function StripeReconcile() {
-  const [from, setFrom] = useState(() => localBusinessDate());
-  const [to, setTo] = useState(() => localBusinessDate());
+  // Daily close 의 카드 매출 칸에서 `?view=stripe&date=YYYY-MM-DD` 로 오면 그 날을 연다.
+  const [from, setFrom] = useState(linkedDate);
+  const [to, setTo] = useState(linkedDate);
   // 마지막으로 받은 결과와 그 요청(key). 지금 key 와 다르면 읽는 중이다.
   const [loaded, setLoaded] = useState<{ key: string; report: ReconcileReport | null; error: string }>({
     key: "",
