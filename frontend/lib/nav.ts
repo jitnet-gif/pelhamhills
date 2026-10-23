@@ -277,7 +277,7 @@ export const CLUB = {
   mailingAddress: ["196 Webber Road", "Welland, Ontario, L3B 5N8", "Canada"],
   phone: "+1 (249) 805-0556",
   phoneHref: "tel:+12498050556",
-  email: "info@pelhamhills.com",
-  emailHref: "mailto:info@pelhamhills.com",
+  email: "info@pelhamhills.ca",
+  emailHref: "mailto:info@pelhamhills.ca",
   established: "Established 1966 · Niagara Region",
 } as const;

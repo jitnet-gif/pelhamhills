@@ -218,7 +218,7 @@ class SupabaseSeeder {
         established: 1925,
         website: "www.pelhamhills.com",
         phone: "(914) 738-2800",
-        email: "info@pelhamhills.com",
+        email: "info@pelhamhills.ca",
       },
       {
         id: "westchester-cc",
