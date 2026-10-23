@@ -2,7 +2,7 @@
  * 근무 마감표(Shift report) — Daily close 의 **Print** 가 영수증 프린터로 찍는 한 장(2026-10-22).
  *
  * 담당자 이름과 시작·끝 시각을 적으면, 그날 계산서 중 **그 사이에 결제된 것만** 모아 합계만 찍는다.
- * 계산서 목록(트랜잭션)은 찍지 않는다 — 클럽이 원한 것은 숫자 열한 줄이다.
+ * 기본은 합계만 찍는다(숫자 열한 줄). 담당자별 출력(`CashierShifts`)은 그 사람의 계산서를 시각 순으로 덧붙일 수 있다.
  *
  * 숫자는 서버 리포트가 아니라 화면이 이미 받은 계산서(`listSales`)에서 센다. 서버 리포트는 하루
  * 단위라 시각으로 자를 수 없어서다. 규칙은 리포트와 같게 맞춘다:
@@ -68,6 +68,26 @@ export function defaultShiftStart(sales: readonly Sale[]): string {
 export function defaultShiftEnd(date: string): string {
   const now = new Date();
   return date === localBusinessDate(now) ? hhmm(now) : "23:59";
+}
+
+/** 담당자 묶음 키. 계산서 Cashier 칸 그대로, 대소문자·공백만 무시한다(담당자별 마감 0010 의 staff_key 와 같다). */
+export function cashierKey(name: string | null | undefined): string {
+  return (name ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** 결제 시각(`created_at`) 순서의 HH:MM — 담당자 칸의 시작·끝 기본값. */
+export function saleClock(sale: Sale): string {
+  return hhmm(new Date(sale.created_at));
+}
+
+/** 시간대 안의 계산서(환불 포함), 이른 것부터. */
+export function salesInWindow(sales: readonly Sale[], window: { from: number; to: number }): Sale[] {
+  return sales
+    .filter((sale) => {
+      const at = new Date(sale.created_at).getTime();
+      return at >= window.from && at <= window.to;
+    })
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 }
 
 /** 시작·끝을 이 PC 시각의 순간으로. 끝이 시작보다 이르면 자정을 넘긴 근무로 본다. */
@@ -150,6 +170,22 @@ const PRINTED_AT = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
+const SALE_TIME = new Intl.DateTimeFormat("en-US", { timeZone: CLUB_TIME_ZONE, hour: "numeric", minute: "2-digit" });
+
+/** 계산서 한 장의 결제 수단 이름. 나눠 냈으면 Split. */
+export function salePaymentLabel(sale: Sale): string {
+  const methods = [...new Set((sale.payments ?? []).map((payment) => payment.method))];
+  if (methods.length > 1) return "Split";
+  const method = methods[0] ?? sale.payment_method;
+  if (!method) return "No charge";
+  return method === "debit" ? "Debit" : PAYMENT_LABELS[method];
+}
+
+/** 영수증 줄의 짧은 시각 `2:15 PM`. */
+export function saleTime(sale: Sale): string {
+  return SALE_TIME.format(new Date(sale.created_at));
+}
+
 /** `14:30` → `2:30 PM`. */
 function clock(value: string): string {
   const [h, m] = value.split(":").map(Number);
@@ -162,7 +198,7 @@ function clock(value: string): string {
 export function shiftReportBlocks(
   input: ShiftInput,
   summary: ShiftSummary,
-  options: { header: ReceiptHeader; cash: boolean },
+  options: { header: ReceiptHeader; cash: boolean; transactions?: readonly Sale[] },
 ): ReceiptBlock[] {
   const money = formatMoney;
   const blocks: ReceiptBlock[] = [
@@ -199,7 +235,19 @@ export function shiftReportBlocks(
   blocks.push(
     { kind: "rule" },
     { kind: "total", label: `Refund ×${summary.refundCount}`, amount: money(summary.refundTotal), bold: true },
-    { kind: "text", text: "Signature: ____________________", align: "left", gap: true },
   );
+
+  // 담당자별 출력: 계산서 한 장 = 한 줄(시각 · 영수증 끝 번호 · 결제 수단). 환불은 표시만 하고 금액은 괄호.
+  if (options.transactions) {
+    blocks.push({ kind: "section", title: `TRANSACTIONS (${options.transactions.length})` });
+    for (const sale of options.transactions) {
+      const refunded = Boolean(sale.refunded_at) || sale.status === "refunded";
+      const label = `${saleTime(sale)} #${sale.receipt_no.split("-").pop()} ${refunded ? "REFUND" : salePaymentLabel(sale)}`;
+      const amount = refunded ? `(${money(sale.total)})` : money(sale.total);
+      blocks.push({ kind: "total", label, amount });
+    }
+  }
+
+  blocks.push({ kind: "text", text: "Signature: ____________________", align: "left", gap: true });
   return blocks;
 }

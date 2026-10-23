@@ -19,6 +19,7 @@ import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
 import { computeTax, formatMoney, type Cents, type RetailDailyReport, type Sale } from "@/lib/retail/types";
 
+import CashierShifts from "@/components/reports/CashierShifts";
 import CashReconcile from "@/components/reports/CashReconcile";
 import PriceReview from "@/components/reports/PriceReview";
 import SaleDetail from "@/components/reports/SaleDetail";
@@ -341,6 +342,11 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
 
       {cash ? (
         <StaffCloseout date={date} onSaved={() => setSavedKey((key) => key + 1)} refreshKey={closeoutKey} />
+      ) : null}
+
+      {/* 담당자별·시각순 거래와 담당자별 출력(`CashierShifts`). */}
+      {!loading && sales.length > 0 ? (
+        <CashierShifts cash={cash} date={date} onOpenSale={setSelected} sales={sales} />
       ) : null}
 
       <Panel title={`Receipts — ${date}`}>

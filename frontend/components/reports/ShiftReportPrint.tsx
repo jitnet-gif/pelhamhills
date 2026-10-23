@@ -12,7 +12,15 @@ import { useState } from "react";
 import { cashierName, isShiftCode } from "@/lib/pos/cashierCode";
 import { rememberedCashier } from "@/lib/pos/currentBill";
 import { printShiftReport, shiftReportSheetHtml } from "@/lib/retail/printReceipt";
-import { defaultShiftEnd, defaultShiftStart, shiftSummary, shiftWindow, type ShiftInput } from "@/lib/reports/shiftReport";
+import {
+  cashierKey,
+  defaultShiftEnd,
+  defaultShiftStart,
+  salesInWindow,
+  shiftSummary,
+  shiftWindow,
+  type ShiftInput,
+} from "@/lib/reports/shiftReport";
 import type { Sale } from "@/lib/retail/types";
 
 import CashierField from "@/components/reports/CashierField";
@@ -20,18 +28,29 @@ import { Button, ErrorNote, Field, Modal, TextInput } from "@/components/retail/
 
 export default function ShiftReportPrint({
   date,
-  sales,
+  sales: allSales,
   cash,
+  cashier,
+  initialStart,
+  initialEnd,
   onClose,
 }: {
   date: string;
   sales: readonly Sale[];
   cash: boolean;
+  /** 담당자별 출력(`CashierShifts`): 계산서 Cashier 칸이 이 이름인 것만 센다. 빈 문자열 = 이름 없는 계산서. */
+  cashier?: string;
+  initialStart?: string;
+  initialEnd?: string;
   onClose: () => void;
 }) {
-  const [staff, setStaff] = useState(() => rememberedCashier());
-  const [start, setStart] = useState(() => defaultShiftStart(sales));
-  const [end, setEnd] = useState(() => defaultShiftEnd(date));
+  const sales =
+    cashier === undefined ? allSales : allSales.filter((sale) => cashierKey(sale.cashier) === cashierKey(cashier));
+  const [staff, setStaff] = useState(() => (cashier ? cashier : rememberedCashier()));
+  const [start, setStart] = useState(() => initialStart ?? defaultShiftStart(sales));
+  const [end, setEnd] = useState(() => initialEnd ?? defaultShiftEnd(date));
+  // 담당자별로 열면 그 사람의 계산서를 한 줄씩 같이 찍는다. 하루 전체 출력은 합계만.
+  const [withLines, setWithLines] = useState(cashier !== undefined);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -47,7 +66,7 @@ export default function ShiftReportPrint({
         setError("Enter a start and end time.");
         return;
       }
-      printShiftReport(input, shiftSummary(sales, range), cash);
+      printShiftReport(input, shiftSummary(sales, range), cash, withLines ? salesInWindow(sales, range) : undefined);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That staff ID didn't work.");
     } finally {
@@ -56,11 +75,31 @@ export default function ShiftReportPrint({
   }
 
   return (
-    <Modal onClose={onClose} title={`Print shift report — ${date}`}>
+    <Modal
+      onClose={onClose}
+      title={cashier === undefined ? `Print shift report — ${date}` : `Print ${cashier || "No cashier"} — ${date}`}
+    >
       <div className="grid gap-3">
+        {cashier !== undefined ? (
+          <p className="bg-[#f2f2f4] px-3 py-2 text-sm text-[#3f434a]">
+            Only bills rung in by <b>{cashier || "no cashier name"}</b> between the times below.
+          </p>
+        ) : null}
         <CashierField onChange={setStaff} value={staff} />
         <ShiftTimes end={end} onEnd={setEnd} onStart={setStart} start={start} />
-        <ShiftPreview cash={cash} date={date} end={end} sales={sales} staff={staff} start={start} />
+        <label className="flex items-center gap-2 text-sm font-bold text-[#3f434a]">
+          <input checked={withLines} onChange={(event) => setWithLines(event.target.checked)} type="checkbox" />
+          Print each transaction
+        </label>
+        <ShiftPreview
+          cash={cash}
+          date={date}
+          end={end}
+          sales={sales}
+          staff={staff}
+          start={start}
+          withLines={withLines}
+        />
         {error ? <ErrorNote>{error}</ErrorNote> : null}
         <div className="flex gap-2">
           <Button className="flex-1" disabled={busy} onClick={() => void print()} tone="primary">
@@ -107,6 +146,7 @@ export function ShiftPreview({
   end,
   sales,
   cash,
+  withLines = false,
 }: {
   date: string;
   staff: string;
@@ -114,6 +154,7 @@ export function ShiftPreview({
   end: string;
   sales: readonly Sale[];
   cash: boolean;
+  withLines?: boolean;
 }) {
   const shown = isShiftCode(staff) ? "—" : staff.trim().replace(/\s+/g, " ") || "—";
   const input: ShiftInput = { staff: shown, date, start, end };
@@ -124,7 +165,14 @@ export function ShiftPreview({
       <div
         className="rc-sheet mx-auto bg-white p-3 shadow"
         // 우리 포맷터가 만든 HTML 이다 — 사람이 입력한 글자는 전부 이스케이프돼 있다.
-        dangerouslySetInnerHTML={{ __html: shiftReportSheetHtml(input, shiftSummary(sales, range), cash) }}
+        dangerouslySetInnerHTML={{
+          __html: shiftReportSheetHtml(
+            input,
+            shiftSummary(sales, range),
+            cash,
+            withLines ? salesInWindow(sales, range) : undefined,
+          ),
+        }}
         style={{ width: "72mm" }}
       />
     </div>

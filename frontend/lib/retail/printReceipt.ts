@@ -108,12 +108,23 @@ export function printRainChecks(checks: readonly RainCheck[], options: { reprint
  * 근무 마감표(Daily close 의 Print) 한 장. 손님 영수증이 아니라 사본 표시 없이 한 장만, 서랍도 열지 않는다.
  * 미리보기와 종이가 같도록 HTML 도 여기서 같은 블록으로 만든다.
  */
-export function shiftReportSheetHtml(input: ShiftInput, summary: ShiftSummary, cash: boolean): string {
-  return receiptHtml(shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash }));
+export function shiftReportSheetHtml(
+  input: ShiftInput,
+  summary: ShiftSummary,
+  cash: boolean,
+  transactions?: readonly Sale[],
+): string {
+  return receiptHtml(shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions }));
 }
 
-export function printShiftReport(input: ShiftInput, summary: ShiftSummary, cash: boolean): void {
-  printSheets([shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash })]);
+/** `transactions` 를 주면 합계 아래에 계산서를 한 줄씩 덧붙인다(담당자별 출력). */
+export function printShiftReport(
+  input: ShiftInput,
+  summary: ShiftSummary,
+  cash: boolean,
+  transactions?: readonly Sale[],
+): void {
+  printSheets([shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions })]);
 }
 
 function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: boolean } = {}): void {

@@ -4,6 +4,8 @@
  * 담당자별 마감 + 팁 나누기(0010). Reports 의 매출 아래에 같은 영업일로 붙는다.
  *
  * - 담당자는 계산서의 Cashier 칸이다(공용 로그인이라 로그인으로는 사람을 가를 수 없다).
+ * - 마감은 **본인의 Pelham Shift ID(4자리)** 로 한다(2026-10-22). 이름을 누르기만 해서는 남의 마감을 닫을 수 있었다.
+ *   번호를 이름으로 바꿔(`cashierCode.ts`) 그 카드의 이름과 같아야 닫힌다. 번호는 로그인 비밀번호이기도 해서 저장하지 않는다.
  * - 각자 근무시간과 센 현금을 적고 닫는다. 기대 현금·매출은 **서버가** 계산서에서 센다 —
  *   화면에서 더하지 않는다(`SalesReport` 와 같은 이유).
  * - 팁은 그날 팁 전부를 한 통에 모아 근무시간 비율로 나눈다. 몫과 반올림도 서버가 정한다
@@ -14,7 +16,9 @@
 
 import { useEffect, useState } from "react";
 
+import { cashierForCode, isShiftCode } from "@/lib/pos/cashierCode";
 import retailApi, { toRetailError } from "@/lib/retail/api";
+import { ApiError } from "@/lib/teeSheet/api";
 import { PAYMENT_LABELS } from "@/lib/retail/receipt";
 import {
   formatMinutes,
@@ -301,6 +305,7 @@ function CloseForm({
     initial?.counted_cash != null ? (initial.counted_cash / 100).toFixed(2) : "",
   );
   const [note, setNote] = useState(initial?.note ?? "");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -318,13 +323,24 @@ function CloseForm({
       setError(`Count the cash first — ${formatMoney(expectedCash)} is expected.`);
       return;
     }
+    if (!isShiftCode(code)) {
+      setError(`${name}: enter your 4-digit Pelham Shift ID to close out.`);
+      return;
+    }
     setBusy(true);
     try {
+      const owner = await cashierForCode(code);
+      if (sameName(owner, name) === false) {
+        setError(`That ID belongs to ${owner}, not ${name}.`);
+        setCode("");
+        return;
+      }
       onSaved(
         await retailApi.saveCloseout(date, { name, minutes_worked: minutes, counted_cash: counted, note: note.trim() || null }),
       );
     } catch (cause) {
-      setError(toRetailError(cause).message);
+      setError(cause instanceof ApiError ? cause.message : toRetailError(cause).message);
+      setCode("");
     } finally {
       setBusy(false);
     }
@@ -353,10 +369,11 @@ function CloseForm({
       <Field label="Note (optional)">
         <TextInput onChange={(event) => setNote(event.target.value)} placeholder="Why it's over/short…" value={note} />
       </Field>
+      <ShiftIdInput onChange={setCode} onEnter={() => void save()} value={code} />
       {error ? <ErrorNote>{error}</ErrorNote> : null}
       <div className="flex gap-2">
-        <Button className="flex-1" disabled={busy} onClick={() => void save()} tone="primary">
-          {busy ? "Saving…" : `Close out ${name}`}
+        <Button className="flex-1" disabled={busy || !isShiftCode(code)} onClick={() => void save()} tone="primary">
+          {busy ? "Checking…" : `Close out ${name}`}
         </Button>
         {onCancel ? (
           <Button disabled={busy} onClick={onCancel}>
@@ -378,21 +395,16 @@ function AddStaff({
   known: string[];
   onChange: (report: CloseoutReport) => void;
 }) {
-  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [hours, setHours] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function add() {
     setError("");
-    const trimmed = name.trim().replace(/\s+/g, " ");
     const minutes = parseHours(hours);
-    if (!trimmed) {
-      setError("Enter a name.");
-      return;
-    }
-    if (known.includes(trimmed.toLowerCase())) {
-      setError(`${trimmed} is already listed above — close out on their card.`);
+    if (!isShiftCode(code)) {
+      setError("Enter the 4-digit Pelham Shift ID.");
       return;
     }
     if (minutes === null) {
@@ -401,11 +413,17 @@ function AddStaff({
     }
     setBusy(true);
     try {
-      onChange(await retailApi.saveCloseout(date, { name: trimmed, minutes_worked: minutes, counted_cash: null }));
-      setName("");
+      // 이름은 번호가 정한다 — 오타로 한 사람이 두 줄로 갈라지지 않는다.
+      const name = await cashierForCode(code);
+      if (known.includes(name.trim().replace(/\s+/g, " ").toLowerCase())) {
+        setError(`${name} is already listed above — close out on their card.`);
+        return;
+      }
+      onChange(await retailApi.saveCloseout(date, { name, minutes_worked: minutes, counted_cash: null }));
+      setCode("");
       setHours("");
     } catch (cause) {
-      setError(toRetailError(cause).message);
+      setError(cause instanceof ApiError ? cause.message : toRetailError(cause).message);
     } finally {
       setBusy(false);
     }
@@ -415,9 +433,7 @@ function AddStaff({
     <div className="grid gap-2 border-t border-[#d4d4d8] pt-3">
       <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Add someone with no sales</h3>
       <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
-        <Field label="Name">
-          <TextInput autoComplete="off" onChange={(event) => setName(event.target.value)} value={name} />
-        </Field>
+        <ShiftIdInput onChange={setCode} value={code} />
         <Field label="Hours">
           <TextInput inputMode="decimal" onChange={(event) => setHours(event.target.value)} value={hours} />
         </Field>
@@ -429,6 +445,39 @@ function AddStaff({
       </div>
       {error ? <ErrorNote>{error}</ErrorNote> : null}
     </div>
+  );
+}
+
+/** 같은 사람인가 — 대소문자·공백 무시(담당자 묶음 staff_key 와 같은 규칙). */
+function sameName(a: string, b: string): boolean {
+  const key = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
+  return key(a) === key(b);
+}
+
+/** Pelham Shift ID 칸. 로그인 비밀번호이기도 해서 가려 보이고, 어디에도 저장하지 않는다. */
+function ShiftIdInput({
+  value,
+  onChange,
+  onEnter,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onEnter?: () => void;
+}) {
+  return (
+    <Field hint="Your Pelham Shift ID — not saved" label="Staff ID (4 digits)">
+      <TextInput
+        autoComplete="off"
+        inputMode="numeric"
+        maxLength={8}
+        onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ""))}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") onEnter?.();
+        }}
+        type="password"
+        value={value}
+      />
+    </Field>
   );
 }
 
