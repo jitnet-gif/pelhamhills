@@ -27,7 +27,7 @@ const highlights = [
   },
   {
     title: "Pelham Hills Pub",
-    body: "Elevated comfort classics, cocktails, course views, and casual service for lunch, dinner, and weekend breakfast.",
+    body: "Our restaurant is temporarily closed, but the pub remains open and we look forward to welcoming you.",
   },
   {
     title: "Indoor Golf Year-Round",
@@ -204,12 +204,12 @@ export default function Home() {
               Pelham Hills Pub
             </p>
             <h2 className="mt-3 font-serif text-4xl font-semibold">
-              Comfort classics with clubhouse views.
+              Restaurant Temporarily Closed | Pub Remains Open
             </h2>
           </div>
           <p className="text-lg leading-8 text-[#516050]">
-            Stop in before or after your round for lunch, dinner, weekend breakfast, handcrafted
-            cocktails, and an easygoing clubhouse atmosphere overlooking the course.
+            Our restaurant is temporarily closed as we explore exciting plans for the future. In the
+            meantime, our pub remains open, and we look forward to welcoming you!
           </p>
         </section>
 
