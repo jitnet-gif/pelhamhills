@@ -33,6 +33,8 @@ export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   cash: "Cash",
   card: "Card",
   debit: "Debit (Interac)",
+  cheque: "Cheque",
+  e_transfer: "Interac e-Transfer",
   member_account: "Member account",
   gift_card: "Gift card",
   rain_check: "Rain check",

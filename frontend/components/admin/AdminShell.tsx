@@ -38,8 +38,10 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 
 import {
   ADMIN_ACCOUNTS,
+  ADMIN_DYNAMIC_PRICING,
   ADMIN_HOME,
   ADMIN_MARKETING,
+  ADMIN_PRICING,
   ADMIN_REPORTS,
   CLUB,
   SITE_HOME,
@@ -182,6 +184,8 @@ function AdminFrame({
   );
   // Reports 는 Emmeline 계정에만 보인다(`lib/reports/access.ts`). 다른 계정에는 메뉴에서 뺀다.
   const reportsAllowed = useReportsAccess(email) === true;
+  // 요금 두 화면(Tee Times & Pricing, Dynamic Pricing)도 매니저 = Reports 명단 계정에게만 보인다.
+  // Account Setup 의 Reports 체크로 켜고 끈다.
   // Account Setup 도 계정 관리자(0074)에게만 보인다(`lib/accounts.ts`).
   const accountsAllowed = useAccountsAccess(email) === true;
   // Marketing 도 마케팅 명단(0047) 계정에만 보인다(`lib/marketing/access.ts`).
@@ -191,7 +195,7 @@ function AdminFrame({
       ...division,
       links: division.links.filter(
         (item) =>
-          (reportsAllowed || item.href !== ADMIN_REPORTS) &&
+          (reportsAllowed || (item.href !== ADMIN_REPORTS && item.href !== ADMIN_PRICING && item.href !== ADMIN_DYNAMIC_PRICING)) &&
           (accountsAllowed || item.href !== ADMIN_ACCOUNTS) &&
           (marketingAllowed || item.href !== ADMIN_MARKETING),
       ),

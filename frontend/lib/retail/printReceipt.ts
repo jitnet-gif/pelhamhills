@@ -29,7 +29,7 @@ import {
   type ReceiptHeader,
 } from "./receipt";
 import { printBluetooth, printNetwork, readReceiptPrinterMode } from "./receiptPrinter";
-import type { Sale } from "./types";
+import type { CloseoutReport, Sale } from "./types";
 
 const ROOT_ID = "receipt-print-root";
 
@@ -113,8 +113,9 @@ export function shiftReportSheetHtml(
   summary: ShiftSummary,
   cash: boolean,
   transactions?: readonly Sale[],
+  tipSplit?: CloseoutReport | null,
 ): string {
-  return receiptHtml(shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions }));
+  return receiptHtml(shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions, tipSplit }));
 }
 
 /** `transactions` 를 주면 합계 아래에 계산서를 한 줄씩 덧붙인다(담당자별 출력). */
@@ -123,8 +124,9 @@ export function printShiftReport(
   summary: ShiftSummary,
   cash: boolean,
   transactions?: readonly Sale[],
+  tipSplit?: CloseoutReport | null,
 ): void {
-  printSheets([shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions })]);
+  printSheets([shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions, tipSplit })]);
 }
 
 function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: boolean } = {}): void {

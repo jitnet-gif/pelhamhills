@@ -103,6 +103,10 @@ export const ADMIN_MARKETING = "/marketing";
 /** 로그인 계정 관리(0074). 계정 관리자에게만 메뉴에 뜬다(`lib/accounts.ts`). */
 export const ADMIN_ACCOUNTS = "/admin/accounts";
 
+/** 요금 두 화면. 매니저(Reports 명단, 0046 — 지금은 admin@pelhamhills.ca)에게만 메뉴에 뜬다(2026-10-23). */
+export const ADMIN_PRICING = "/admin/pricing";
+export const ADMIN_DYNAMIC_PRICING = "/admin/dynamic-pricing";
+
 export const GOLF_GPS_MAP_EDITOR = "https://golf-gps-pelhamhills-seven.vercel.app/admin/map";
 
 /**
@@ -115,8 +119,8 @@ export const adminNav: NavItem[] = [
   { label: "Tee Sheet", href: "/admin", glyph: "▦" },
   // 프로 샵 계산대. 티 시트에서 담은 그린피를 여기서 받으므로 골프 메뉴에도 둔다(2026-10-12).
   { label: "ProShop Sale", href: "/admin/retail", glyph: "🛒" },
-  { label: "Tee Times & Pricing", href: "/admin/pricing", glyph: "◉" },
-  { label: "Dynamic Pricing", href: "/admin/dynamic-pricing", glyph: "↗" },
+  { label: "Tee Times & Pricing", href: ADMIN_PRICING, glyph: "◉" },
+  { label: "Dynamic Pricing", href: ADMIN_DYNAMIC_PRICING, glyph: "↗" },
   { label: "Events", href: "/admin/events", glyph: "▤" },
   { label: "Customers", href: "/admin/customers", glyph: "●" },
   { label: "Memberships", href: "/admin/memberships", glyph: "★" },

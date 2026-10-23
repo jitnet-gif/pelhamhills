@@ -5,12 +5,14 @@
  * 계산서 목록은 찍지 않는다. 무엇을 어떻게 세는지는 `lib/reports/shiftReport.ts`.
  * 미리보기와 종이가 같은 HTML 이다(`printReceipt.ts` 의 다른 전표와 같은 규칙).
  * 계산대 마감(`RegisterClose`)도 같은 칸·같은 출력을 쓴다.
+ * 현금 리포트 계정이면 그날 팁 나누기(0010)도 아래에 붙는다(`useTipSplit`).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { cashierName, isShiftCode } from "@/lib/pos/cashierCode";
 import { rememberedCashier } from "@/lib/pos/currentBill";
+import retailApi from "@/lib/retail/api";
 import { printShiftReport, shiftReportSheetHtml } from "@/lib/retail/printReceipt";
 import {
   cashierKey,
@@ -21,7 +23,7 @@ import {
   shiftWindow,
   type ShiftInput,
 } from "@/lib/reports/shiftReport";
-import type { Sale } from "@/lib/retail/types";
+import type { CloseoutReport, Sale } from "@/lib/retail/types";
 
 import CashierField from "@/components/reports/CashierField";
 import { Button, ErrorNote, Field, Modal, TextInput } from "@/components/retail/ui";
@@ -53,6 +55,7 @@ export default function ShiftReportPrint({
   const [withLines, setWithLines] = useState(cashier !== undefined);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const tipSplit = useTipSplit(date, cash);
 
   async function print() {
     setError("");
@@ -66,7 +69,13 @@ export default function ShiftReportPrint({
         setError("Enter a start and end time.");
         return;
       }
-      printShiftReport(input, shiftSummary(sales, range), cash, withLines ? salesInWindow(sales, range) : undefined);
+      printShiftReport(
+        input,
+        shiftSummary(sales, range),
+        cash,
+        withLines ? salesInWindow(sales, range) : undefined,
+        tipSplit,
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That staff ID didn't work.");
     } finally {
@@ -98,6 +107,7 @@ export default function ShiftReportPrint({
           sales={sales}
           staff={staff}
           start={start}
+          tipSplit={tipSplit}
           withLines={withLines}
         />
         {error ? <ErrorNote>{error}</ErrorNote> : null}
@@ -147,6 +157,7 @@ export function ShiftPreview({
   sales,
   cash,
   withLines = false,
+  tipSplit,
 }: {
   date: string;
   staff: string;
@@ -155,6 +166,7 @@ export function ShiftPreview({
   sales: readonly Sale[];
   cash: boolean;
   withLines?: boolean;
+  tipSplit?: CloseoutReport | null;
 }) {
   const shown = isShiftCode(staff) ? "—" : staff.trim().replace(/\s+/g, " ") || "—";
   const input: ShiftInput = { staff: shown, date, start, end };
@@ -171,12 +183,37 @@ export function ShiftPreview({
             shiftSummary(sales, range),
             cash,
             withLines ? salesInWindow(sales, range) : undefined,
+            tipSplit,
           ),
         }}
         style={{ width: "72mm" }}
       />
     </div>
   );
+}
+
+/**
+ * 그날 팁 나누기(0010) — 근무 마감표 아래에 붙인다. 서버가 현금 리포트 계정에게만 주므로(0046) `cash` 일 때만 읽는다.
+ * 못 읽으면(0010 전, 권한 없음) null — 마감표는 팁 없이 그대로 찍힌다.
+ */
+export function useTipSplit(date: string, cash: boolean): CloseoutReport | null {
+  const [loaded, setLoaded] = useState<{ date: string; report: CloseoutReport | null } | null>(null);
+  useEffect(() => {
+    if (!cash) return;
+    let cancelled = false;
+    retailApi
+      .getCloseouts(date)
+      .then((report) => {
+        if (!cancelled) setLoaded({ date, report });
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded({ date, report: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [date, cash]);
+  return cash && loaded?.date === date ? loaded.report : null;
 }
 
 export function PrinterIcon() {

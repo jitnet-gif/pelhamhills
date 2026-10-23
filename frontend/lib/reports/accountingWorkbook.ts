@@ -7,14 +7,14 @@
  * 숫자가 어디서 왔는지 볼 수 있고, 화면은 같은 결과값을 보여 준다.
  *
  * 숫자의 출처
- * - 일별 매출·할인·세금·Net·결제 수단·사업부: 서버 마감 리포트(`pelham_staff_pos_report_daily`).
+ * - 일별 매출·할인·세금·Total collected(서버의 `net`, 세금 포함)·결제 수단·사업부: 서버 마감 리포트(`pelham_staff_pos_report_daily`).
  *   여기서 계산서를 다시 더하지 않는다 — 마감 숫자는 서버가 정답이다.
  * - 영수증·품목: 그 날의 계산서 목록(`pelham_staff_bills`, paid + refunded).
  *
  * 맞아야 하는 것(0005 SQL 기준)
- * - Daily 의 Cash+Card+Debit+Member+Gift = Net. 결제 금액은 팁을 빼고 계산서 합계와 같아야
+ * - Daily 의 Cash+Card+Debit+Member+Gift = Total collected. 결제 금액은 팁을 빼고 계산서 합계와 같아야
  *   결제가 된다(`pelham_staff_bill_pay`). 팁은 따로 한 칸.
- * - Receipts 의 Paid 합계 = Daily Net, Lines 의 Paid 합계 = Daily Gross.
+ * - Receipts 의 Paid 합계 = Daily Total collected, Lines 의 Paid 합계 = Daily Gross.
  *   환불 계산서는 목록에 남지만 Gross·Net 에서는 서버가 이미 뺐다 → 시트에서도 Status 로 나눠 더한다.
  */
 
@@ -147,7 +147,7 @@ const statusText = (sale: Sale) => (sale.refunded_at || sale.status === "refunde
 // ===== 통합 문서 ========================================================
 
 /**
- * `cash` 가 거짓이면(일반 Reports) 결제 수단 칸에서 Cash 를 뺀다. 그때 결제 합은 Net 이 아니라
+ * `cash` 가 거짓이면(일반 Reports) 결제 수단 칸에서 Cash 를 뺀다. 그때 결제 합은 Total collected 가 아니라
  * "현금 아닌 결제" 다 — 서버도 현금 리포트 계정이 아니면 cash 줄을 주지 않는다(0046).
  */
 export function buildAccountingWorkbook(
@@ -181,7 +181,7 @@ const dailyColumns = (methods: PaymentMethod[]): Column[] => [
   { header: "Gross", width: 13, format: "money" },
   { header: "Discounts", width: 11, format: "money" },
   { header: "HST", width: 11, format: "money" },
-  { header: "Net (tax incl.)", width: 14, format: "money" },
+  { header: "Total collected", width: 15, format: "money" },
   ...methods.map((method) => ({ header: PAYMENT_LABELS[method], width: 13, format: "money" as const })),
   { header: "Tips", width: 10, format: "money" },
   { header: "Refunds #", width: 10, format: "int" },
@@ -235,7 +235,7 @@ function buildDaily(period: string, days: DayData[], methods: PaymentMethod[], c
     name: "Daily",
     title: "Daily sales — Pelham Hills",
     subtitle: cash
-      ? `${period} · gross before order discounts & tax · payments exclude tips (they add up to Net)`
+      ? `${period} · gross before order discounts & tax · payments exclude tips (they add up to Total collected)`
       : `${period} · gross before order discounts & tax · payments exclude tips · cash not shown`,
     columns,
     rows: [...rows, { cells: totals, style: "total" }],
@@ -300,11 +300,18 @@ function buildSummary(period: string, days: DayData[], methods: PaymentMethod[],
   });
   const discountRow = excelRow();
   rows.push({ cells: ["Less: order discounts", null, discount ? -dollars(discount) : 0] });
+  // 화면(SalesReport)과 같은 순서·이름: Net sales 는 세전, 세금을 더한 것은 Total collected.
+  const netRow = excelRow();
+  const net = round2(gross - dollars(discount));
+  rows.push({
+    cells: ["Net sales (tax excl.)", saleCount, { formula: `C${grossRow}+C${discountRow}`, value: net }],
+    style: "total",
+  });
   const taxRow = excelRow();
   rows.push({ cells: ["HST collected", null, dollars(tax)] });
-  const net = round2(gross - dollars(discount) + dollars(tax));
+  const collected = round2(net + dollars(tax));
   rows.push({
-    cells: ["Net sales (tax incl.)", saleCount, { formula: `C${grossRow}+C${discountRow}+C${taxRow}`, value: net }],
+    cells: ["Total collected (tax incl.)", saleCount, { formula: `C${netRow}+C${taxRow}`, value: collected }],
     style: "total",
   });
 
@@ -318,10 +325,10 @@ function buildSummary(period: string, days: DayData[], methods: PaymentMethod[],
     rows.push({ cells: [PAYMENT_LABELS[method], row.count, dollars(row.total)] });
   }
   rows.push({
-    cells: [cash ? "Total payments (= Net sales)" : "Total non-cash payments", null, sumFormula(2, firstPay, excelRow() - 1, paid)],
+    cells: [cash ? "Total payments (= Total collected)" : "Total non-cash payments", null, sumFormula(2, firstPay, excelRow() - 1, paid)],
     style: "total",
   });
-  rows.push({ cells: ["Tips (outside Net, paid to staff)", null, dollars(tips)] });
+  rows.push({ cells: ["Tips (outside Total collected, paid to staff)", null, dollars(tips)] });
 
   rows.push({ cells: [null, null, null] });
   rows.push({ cells: ["BY REGISTER (tax incl.)", "Bills", "Amount"], style: "section" });
@@ -409,7 +416,7 @@ function buildReceipts(period: string, days: DayData[]): Sheet {
   return {
     name: "Receipts",
     title: "Receipts journal — Pelham Hills",
-    subtitle: `${period} · refunded bills stay listed but are left out of the Paid total (= Daily Net)`,
+    subtitle: `${period} · refunded bills stay listed but are left out of the Paid total (= Daily Total collected)`,
     columns: RECEIPT_COLUMNS,
     rows: [...rows, ...statusTotals(rows, RECEIPT_COLUMNS, RECEIPT_STATUS_COL, 0)],
     filter: true,

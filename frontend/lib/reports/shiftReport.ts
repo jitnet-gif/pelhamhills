@@ -16,7 +16,14 @@
 import { localBusinessDate } from "@/lib/retail/api";
 import { CLUB_TIME_ZONE, PAYMENT_LABELS, type ReceiptBlock, type ReceiptHeader } from "@/lib/retail/receipt";
 import { divisionOf, type DivisionKey } from "@/lib/retail/divisions";
-import { formatMoney, type Cents, type PaymentMethod, type Sale } from "@/lib/retail/types";
+import {
+  formatMinutes,
+  formatMoney,
+  type Cents,
+  type CloseoutReport,
+  type PaymentMethod,
+  type Sale,
+} from "@/lib/retail/types";
 
 export type ShiftInput = {
   staff: string;
@@ -31,7 +38,7 @@ export type ShiftSummary = {
   saleCount: number;
   totalSales: Cents;
   divisions: Record<"tee_sheet" | "pro_shop" | "snack_bar" | "membership" | "other", Cents>;
-  payments: Record<"cash" | "card" | "debit" | "rain_check" | "other", Cents>;
+  payments: Record<"cash" | "card" | "debit" | "cheque" | "e_transfer" | "rain_check" | "other", Cents>;
   refundCount: number;
   refundTotal: Cents;
 };
@@ -48,6 +55,8 @@ const PAYMENT_SLOT: Partial<Record<PaymentMethod, keyof ShiftSummary["payments"]
   cash: "cash",
   card: "card",
   debit: "debit",
+  cheque: "cheque",
+  e_transfer: "e_transfer",
   rain_check: "rain_check",
 };
 
@@ -105,7 +114,7 @@ export function shiftSummary(sales: readonly Sale[], window: { from: number; to:
     saleCount: 0,
     totalSales: 0,
     divisions: { tee_sheet: 0, pro_shop: 0, snack_bar: 0, membership: 0, other: 0 },
-    payments: { cash: 0, card: 0, debit: 0, rain_check: 0, other: 0 },
+    payments: { cash: 0, card: 0, debit: 0, cheque: 0, e_transfer: 0, rain_check: 0, other: 0 },
     refundCount: 0,
     refundTotal: 0,
   };
@@ -194,11 +203,12 @@ function clock(value: string): string {
 
 /**
  * 영수증 한 장의 블록. `cash` 가 거짓이면(일반 Reports) Cash 줄을 찍지 않는다 — 블라인드 카운트(0046).
+ * `tipSplit` 을 주면 그날 팁 나누기(0010, 근무시간 비율)를 덧붙인다. 서버가 현금 리포트 계정에게만 준다(0046).
  */
 export function shiftReportBlocks(
   input: ShiftInput,
   summary: ShiftSummary,
-  options: { header: ReceiptHeader; cash: boolean; transactions?: readonly Sale[] },
+  options: { header: ReceiptHeader; cash: boolean; transactions?: readonly Sale[]; tipSplit?: CloseoutReport | null },
 ): ReceiptBlock[] {
   const money = formatMoney;
   const blocks: ReceiptBlock[] = [
@@ -227,6 +237,12 @@ export function shiftReportBlocks(
     { kind: "total", label: "Debit", amount: money(summary.payments.debit) },
     { kind: "total", label: PAYMENT_LABELS.rain_check, amount: money(summary.payments.rain_check) },
   );
+  // 수표·e-Transfer 는 받는 날이 드물다 — 받은 날만 찍는다.
+  for (const method of ["cheque", "e_transfer"] as const) {
+    if (summary.payments[method] > 0) {
+      blocks.push({ kind: "total", label: PAYMENT_LABELS[method], amount: money(summary.payments[method]) });
+    }
+  }
   // 회원 계정·기프트카드. 없으면 줄을 찍지 않는다 — 있으면 빠뜨려서 결제 합이 매출과 어긋나 보이지 않게.
   if (summary.payments.other > 0) {
     blocks.push({ kind: "total", label: "Other (account / gift)", amount: money(summary.payments.other) });
@@ -248,6 +264,38 @@ export function shiftReportBlocks(
     }
   }
 
+  if (options.tipSplit) blocks.push(...tipSplitBlocks(options.tipSplit));
+
   blocks.push({ kind: "text", text: "Signature: ____________________", align: "left", gap: true });
+  return blocks;
+}
+
+/** 그날 팁 통과 사람별 몫. 시간대가 아니라 하루 전체다 — 팁은 하루 통 하나로 나눈다(0010). */
+function tipSplitBlocks(report: CloseoutReport): ReceiptBlock[] {
+  const shared = report.staff.filter((row) => row.tip_share !== null);
+  const blocks: ReceiptBlock[] = [
+    { kind: "section", title: "TIP SPLIT (WHOLE DAY)" },
+    { kind: "total", label: "Tip pool", amount: formatMoney(report.tip_pool), bold: true },
+  ];
+  if (shared.length === 0) {
+    blocks.push({ kind: "text", text: "No hours entered yet.", align: "left" });
+    return blocks;
+  }
+  for (const row of shared) {
+    blocks.push({
+      kind: "total",
+      label: `${row.name} ${formatMinutes(row.closeout?.minutes_worked ?? 0)}`,
+      amount: formatMoney(row.tip_share ?? 0),
+    });
+  }
+  blocks.push({
+    kind: "total",
+    label: `Total ${formatMinutes(report.total_minutes)}`,
+    amount: formatMoney(shared.reduce((sum, row) => sum + (row.tip_share ?? 0), 0)),
+    bold: true,
+  });
+  if (report.provisional) {
+    blocks.push({ kind: "text", text: "Provisional - not everyone has closed out.", align: "left" });
+  }
   return blocks;
 }
