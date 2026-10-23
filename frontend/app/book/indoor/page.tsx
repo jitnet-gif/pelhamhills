@@ -34,6 +34,8 @@ interface TimeSlot {
   time: string;
   available_bays: number;
   total_bays: number;
+  /** 이 시간에 빈 베이 번호(0083). 0083 전의 서버는 보내지 않는다. */
+  free_bays?: number[];
 }
 
 interface AvailabilityResponse {
@@ -44,6 +46,8 @@ interface AvailabilityResponse {
   available_slots: TimeSlot[];
   /** 슬롯이 비었을 때 그 이유. 서버가 사람이 읽을 문장으로 채워 준다. */
   reason?: string | null;
+  /** 예약을 받는 베이 번호 전체(0083). 없으면 베이 고르기를 숨긴다. */
+  bays?: number[];
 }
 
 interface ReservationResponse {
@@ -77,6 +81,9 @@ export default function IndoorGolfBooking() {
   const [playerCount, setPlayerCount] = useState(1);
   const [duration, setDuration] = useState(1);
   const [selectedTime, setSelectedTime] = useState("");
+  /** 손님이 고른 베이 번호. `null` 은 "아무 베이나"(서버가 빈 베이 중 번호가 작은 것). */
+  const [selectedBay, setSelectedBay] = useState<number | null>(null);
+  const [bayNumbers, setBayNumbers] = useState<number[]>([]);
   const [availability, setAvailability] = useState<TimeSlot[]>([]);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   /** "슬롯이 없다"는 정상 응답에 대한 안내. 붉은 오류 배너와 구분해서 쓴다. */
@@ -121,6 +128,8 @@ export default function IndoorGolfBooking() {
           p_duration_hours: duration,
         });
         setAvailability(data.available_slots);
+        setBayNumbers(data.bays ?? []);
+        if (!data.bays?.length) setSelectedBay(null);
         // 시간을 고른 뒤 인원/시간을 바꾸면 그 슬롯이 사라질 수 있다.
         // 사라진 시간을 들고 다음 단계로 넘어가지 못하게 여기서 비운다.
         setSelectedTime((current) =>
@@ -165,6 +174,7 @@ export default function IndoorGolfBooking() {
           start_time: selectedTime,
           duration_hours: duration,
           player_count: playerCount,
+          bay_number: selectedBay,
           customer_name: customerName,
           customer_email: customerEmail,
           phone: customerPhone,
@@ -198,6 +208,21 @@ export default function IndoorGolfBooking() {
 
   const selectedBayLabel =
     bayTypeDisplay[selectedBayType as keyof typeof bayTypeDisplay];
+  /** 그 시간에 고른 베이가 비어 있는가. 베이를 안 골랐거나 옛 서버면 늘 참. */
+  const bayFreeAt = (slot: TimeSlot, bay: number | null) =>
+    bay === null || !slot.free_bays || slot.free_bays.includes(bay);
+
+  const chooseBay = (bay: number | null) => {
+    setSelectedBay(bay);
+    // 고른 시간에 그 베이가 차 있으면 시간을 비운다 — 다시 고르게 한다.
+    setSelectedTime((current) => {
+      const slot = availability.find((s) => s.time === current);
+      return slot && bayFreeAt(slot, bay) ? current : "";
+    });
+  };
+
+  const bayChoiceLabel = selectedBay === null ? "Any available bay" : `Bay ${selectedBay}`;
+
   const estimatedTotal =
     (bayHourlyRate[selectedBayType as keyof typeof bayHourlyRate] ?? 20) * duration;
 
@@ -394,6 +419,30 @@ export default function IndoorGolfBooking() {
             </select>
           </div>
 
+          {/* Bay — 고른 베이가 빈 시간만 시간 슬롯에서 누를 수 있다. */}
+          {bayNumbers.length > 0 && (
+            <div className="mb-6">
+              <p className="mb-3 block text-sm font-semibold">Choose a bay</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[null, ...bayNumbers].map((bay) => (
+                  <button
+                    aria-pressed={selectedBay === bay}
+                    className={`tap-target min-w-0 rounded-sm border-2 px-2 text-base font-semibold transition ${
+                      selectedBay === bay
+                        ? "border-[#214d2f] bg-[#214d2f] text-white"
+                        : "border-[#d8d1c3] bg-white text-[#182118] hover:border-[#214d2f]"
+                    }`}
+                    key={bay ?? "any"}
+                    onClick={() => chooseBay(bay)}
+                    type="button"
+                  >
+                    {bay === null ? "Any bay" : `Bay ${bay}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Time Slots */}
           <div className="mb-6">
             <p className="mb-3 block text-sm font-semibold">Select a time slot</p>
@@ -415,23 +464,27 @@ export default function IndoorGolfBooking() {
             ) : (
               // 390px 에서 4열이면 "14:15" 가 줄바꿈되어 버튼이 뭉개진다.
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {availability.map((slot) => (
-                  <button
-                    className={`tap-target min-w-0 rounded-sm border px-2 text-sm font-semibold transition ${
-                      selectedTime === slot.time
-                        ? "border-[#214d2f] bg-[#214d2f] text-white"
-                        : slot.available_bays === 0
-                          ? "cursor-not-allowed border-[#e2ddd0] bg-[#efece3] text-[#a8a698]"
-                          : "border-[#d8d1c3] bg-white hover:border-[#214d2f]"
-                    }`}
-                    disabled={slot.available_bays === 0}
-                    key={slot.time}
-                    onClick={() => setSelectedTime(slot.time)}
-                    type="button"
-                  >
-                    {slot.time}
-                  </button>
-                ))}
+                {availability.map((slot) => {
+                  const taken = slot.available_bays === 0 || !bayFreeAt(slot, selectedBay);
+                  return (
+                    <button
+                      aria-label={taken ? `${slot.time}, ${bayChoiceLabel} is booked` : undefined}
+                      className={`tap-target min-w-0 rounded-sm border px-2 text-sm font-semibold transition ${
+                        selectedTime === slot.time
+                          ? "border-[#214d2f] bg-[#214d2f] text-white"
+                          : taken
+                            ? "cursor-not-allowed border-[#e2ddd0] bg-[#efece3] text-[#a8a698] line-through"
+                            : "border-[#d8d1c3] bg-white hover:border-[#214d2f]"
+                      }`}
+                      disabled={taken}
+                      key={slot.time}
+                      onClick={() => setSelectedTime(slot.time)}
+                      type="button"
+                    >
+                      {slot.time}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -486,6 +539,12 @@ export default function IndoorGolfBooking() {
                 <p className="font-semibold text-[#8a6f30]">Players</p>
                 <p>{playerCount}</p>
               </div>
+              {bayNumbers.length > 0 && (
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#8a6f30]">Bay</p>
+                  <p>{bayChoiceLabel}</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -600,6 +659,11 @@ export default function IndoorGolfBooking() {
               <p>
                 <span className="font-semibold">Players:</span> {playerCount}
               </p>
+              {bayNumbers.length > 0 && (
+                <p>
+                  <span className="font-semibold">Bay:</span> {bayChoiceLabel}
+                </p>
+              )}
             </div>
 
             <div className="mt-4 border-t border-[#d8d1c3] pt-4">
@@ -675,7 +739,7 @@ export default function IndoorGolfBooking() {
 
           <div className="mb-8 rounded-sm bg-[#f7f4ed] p-5 sm:p-6">
             <p className="mb-4 text-sm text-[#5c6459]">
-              {bayTypeDisplay[selectedBayType as keyof typeof bayTypeDisplay]} on{" "}
+              {reservation.bay_number ? `Bay ${reservation.bay_number}` : bayTypeDisplay[selectedBayType as keyof typeof bayTypeDisplay]} on{" "}
               {formatDate(selectedDate)}
             </p>
 
