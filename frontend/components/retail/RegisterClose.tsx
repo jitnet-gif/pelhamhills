@@ -17,6 +17,8 @@
  * 캐셔의 마감은 **현금만**이다(2026-10-23, 0090): 카드·체크카드·회원 계정 같은 다른 줄은 그리지 않고, 카드 단말기
  * 전표도 세지 않는다 — 카드 매출을 캐셔에게 보이지 않는다. 카드는 현금 리포트 계정이 같은 화면(전부 보임)이나
  * Stripe 대사에서 맞춘다. 출력하는 근무 마감표도 센 현금·남길 잔돈·넘길 현금만 찍는다.
+ * 2026-10-24 부터는 현금 리포트 계정(매니저)도 이 화면에서 **현금 줄만** 본다 — 카드·체크카드는 Daily close 의
+ * Card & debit vs. Stripe 에서 맞춘다. 매니저는 현금 줄의 기대 금액·과부족을 그대로 본다.
  *
  * 하루 두 번 마감한다 — **Morning · Dinner**(2026-10-24, 0092). 모닝 캐셔가 자기 시간의 현금을 세어 잔돈 $200 만 남기고
  * 넘기고, 디너 캐셔가 그 뒤를 센다. 경계는 모닝 마감의 끝 시각이다(그 분까지 모닝). 모닝을 건너뛰면 디너가 하루 전체를 센다.
@@ -218,8 +220,6 @@ function CloseForm({
     Object.fromEntries(CASH_DENOMINATIONS.map((cents) => [String(cents), String(saved?.cash_counts[String(cents)] ?? 0)])),
   );
   const [extra, setExtra] = useState(moneyText(saved?.cash_counts.extra));
-  const [card, setCard] = useState(moneyText(saved?.counted.card));
-  const [debit, setDebit] = useState(moneyText(saved?.counted.debit));
   const [note, setNote] = useState(saved?.note ?? "");
   // 담당자와 근무 시각(0081). 다시 세면 저장된 값으로 연다.
   const [cashier, setCashier] = useState(() => saved?.cashier ?? rememberedCashier());
@@ -242,25 +242,13 @@ function CloseForm({
       parseMoney(extra),
     [counts, extra],
   );
-  const counted: Record<string, Cents> = { cash: cashTotal, card: parseMoney(card), debit: parseMoney(debit) };
 
-  // 블라인드면 현금 줄 하나만, 기대 금액 없이 — 마감은 현금만, 카드 매출은 캐셔에게 보이지 않는다(0090).
-  // 0090 전 서버가 다른 줄을 보내도 여기서 뺀다.
+  // 마감은 현금 줄 하나만(누구든, 2026-10-24). 블라인드면 기대 금액도 없이(0046·0090).
+  const cashRows = report.rows.filter((row) => row.method === "cash");
   const rows = blind
-    ? report.rows
-        .filter((row) => row.method === "cash")
-        .map((row) => ({ ...row, payments: null, payment_count: null, remaining: null }))
-    : report.rows;
+    ? cashRows.map((row) => ({ ...row, payments: null, payment_count: null, remaining: null }))
+    : cashRows;
   const float = report.rows.find((row) => row.method === "cash")?.start ?? 0;
-  const totals = rows.reduce(
-    (sum, row) => ({
-      start: sum.start + row.start,
-      payments: sum.payments === null || row.payments === null ? null : sum.payments + row.payments,
-      withdraws: sum.withdraws + row.withdraws,
-      remaining: sum.remaining === null || row.remaining === null ? null : sum.remaining + row.remaining,
-    }),
-    { start: 0, payments: 0 as Cents | null, withdraws: 0, remaining: 0 as Cents | null },
-  );
 
   /** 담당자·시각을 확인해 돌려준다. 안 되면 오류를 띄우고 null. */
   async function shift(): Promise<{ name: string; start: string; end: string } | null> {
@@ -313,8 +301,8 @@ function CloseForm({
     try {
       const next = await retailApi.saveRegisterClose(report.business_date, report.station, {
         shift: shiftKey,
-        // 캐셔는 현금만 센다 — 카드 칸을 보내지 않으면 서버(0090)가 매니저가 센 값을 그대로 둔다.
-        counted: blind ? { cash: counted.cash } : { cash: counted.cash, card: counted.card, debit: counted.debit },
+        // 현금만 센다 — 카드 칸을 보내지 않는다(캐셔는 서버(0090)가 옛 카드 값을 지킨다).
+        counted: { cash: cashTotal },
         cash_counts: cashCounts,
         note: note.trim() || null,
         cashier: who.name,
@@ -404,41 +392,19 @@ function CloseForm({
                 <Money value={row.withdraws} />
                 <Money value={row.remaining} />
                 <td className="border-l border-[#d4d4d8] px-2 py-2">
-                  {row.method === "cash" ? (
-                    <CashCount
-                      counts={counts}
-                      extra={extra}
-                      onCount={(key, value) => setCounts((prev) => ({ ...prev, [key]: value }))}
-                      onExtra={setExtra}
-                      total={cashTotal}
-                    />
-                  ) : row.countable ? (
-                    <MoneyInput
-                      label={`${rowLabel(row.method)} closing count`}
-                      onChange={row.method === "card" ? setCard : setDebit}
-                      value={row.method === "card" ? card : debit}
-                    />
-                  ) : (
-                    <p className="py-0.5 text-right tabular-nums">{formatMoney(row.remaining ?? 0)}</p>
-                  )}
-                  {row.countable && row.remaining !== null ? (
-                    <Diff counted={counted[row.method]} expected={row.remaining} />
-                  ) : row.method === "cash" ? (
-                    <CashDrop counted={cashTotal} float={row.start} />
-                  ) : null}
+                  <CashCount
+                    counts={counts}
+                    extra={extra}
+                    onCount={(key, value) => setCounts((prev) => ({ ...prev, [key]: value }))}
+                    onExtra={setExtra}
+                    total={cashTotal}
+                  />
+                  {/* 매니저는 과부족, 캐셔(블라인드)는 남길 잔돈·넘길 현금만. */}
+                  {row.remaining !== null ? <Diff counted={cashTotal} expected={row.remaining} /> : null}
+                  <CashDrop counted={cashTotal} float={row.start} />
                 </td>
               </tr>
             ))}
-            {blind ? null : (
-              <tr className="border-t border-[#d4d4d8] bg-[#f2f2f4] font-bold">
-                <td className="px-2 py-2">Totals</td>
-                <Money value={totals.start} />
-                <Money value={totals.payments} />
-                <Money value={totals.withdraws} />
-                <Money value={totals.remaining} />
-                <td className="border-l border-[#d4d4d8]" />
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
