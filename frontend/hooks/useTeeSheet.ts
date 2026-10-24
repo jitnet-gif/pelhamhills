@@ -1259,13 +1259,22 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       players += booking.players.length;
       arrived += booking.players.filter((player) => player.arrived).length;
       paid += booking.players.filter((player) => player.paid).length;
-      carts += booking.cartCount;
-      // 체크인한 사람이 하나라도 있는 예약의 카트는 이미 코스에 나간 것으로 센다.
-      if (booking.status !== "cancelled" && booking.players.some((player) => player.arrived && !player.cancelled)) {
-        cartsOut += booking.cartCount;
+      if (booking.status === "cancelled") continue; // 취소 예약은 카트·매출에서 제외
+
+      // 카트 대수 = 예약의 cartCount 와 "카트 탄 사람 ÷ 2(올림)" 중 큰 쪽. 프런트에서 사람별로
+      // 카트를 붙이면 cartCount 는 그대로라 cartCount 만 세면 모자란다.
+      const live = booking.players.filter((player) => !player.cancelled);
+      const riders = live.filter((player) => player.cart);
+      const bookingCarts = Math.max(booking.cartCount, Math.ceil(riders.length / 2));
+      carts += bookingCarts;
+      // 나간 카트 = 체크인한 탑승자 ÷ 2(올림). 사람별 카트 표시가 없는 예약은 한 명이라도
+      // 체크인하면 예약의 카트가 다 나간 것으로 본다.
+      if (riders.length > 0) {
+        cartsOut += Math.min(bookingCarts, Math.ceil(riders.filter((player) => player.arrived).length / 2));
+      } else if (live.some((player) => player.arrived)) {
+        cartsOut += bookingCarts;
       }
 
-      if (booking.status === "cancelled") continue; // 취소 예약은 매출에서 제외
       for (const player of booking.players) {
         if (player.cancelled) continue;
         // 한 사람이 내는 돈 = 그린피 + (카트를 쓰면) 카트 요금. 서버 일일 리포트와 같은 식이다.

@@ -1254,7 +1254,9 @@ def build_daily_report(iso_date: str, bookings: list[TeeBooking]) -> DailyReport
             total_revenue += due
             if player.paid:
                 collected_revenue += due
-        carts += booking.cartCount
+        # 사람별로 붙인 카트는 cartCount 를 바꾸지 않으니 "탑승자 ÷ 2(올림)" 와 큰 쪽을 센다.
+        riders = sum(1 for player in payable if player.cart)
+        carts += max(booking.cartCount, -(-riders // 2))
 
     available = max(total_slots - booked_slots, 0)
     occupancy = (booked_slots / total_slots * 100) if total_slots else 0.0
