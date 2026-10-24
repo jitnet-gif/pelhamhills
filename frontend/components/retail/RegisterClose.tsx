@@ -18,6 +18,10 @@
  * 전표도 세지 않는다 — 카드 매출을 캐셔에게 보이지 않는다. 카드는 현금 리포트 계정이 같은 화면(전부 보임)이나
  * Stripe 대사에서 맞춘다. 출력하는 근무 마감표도 센 현금·남길 잔돈·넘길 현금만 찍는다.
  *
+ * 하루 두 번 마감한다 — **Morning · Dinner**(2026-10-24, 0092). 모닝 캐셔가 자기 시간의 현금을 세어 잔돈 $200 만 남기고
+ * 넘기고, 디너 캐셔가 그 뒤를 센다. 경계는 모닝 마감의 끝 시각이다(그 분까지 모닝). 모닝을 건너뛰면 디너가 하루 전체를 센다.
+ * 현금 리포트 계정은 Cash 줄의 Payments 를 눌러 그 근무의 현금 거래를 담당자별로 본다(`CashTransactions`).
+ *
  * Lightspeed 의 Open Drawer 버튼은 없다 — 이 계산대는 아직 서랍을 열 수 없다(눌러도 안 되는 버튼은
  * 그리지 않는다, `RegisterHome` 과 같은 규칙).
  */
@@ -39,13 +43,15 @@ import {
   type Cents,
   type RegisterCloseReport,
   type RegisterCloseRow,
+  type RegisterShift,
   type Sale,
 } from "@/lib/retail/types";
 
 import CashierField from "@/components/reports/CashierField";
+import { CashShiftModal, SHIFT_LABELS } from "@/components/reports/CashTransactions";
 import { PrinterIcon, ShiftPreview, ShiftTimes } from "@/components/reports/ShiftReportPrint";
 
-import { Button, ErrorNote, SkeletonRows, TextInput } from "./ui";
+import { Button, Chip, ErrorNote, SkeletonRows, TextInput } from "./ui";
 
 /** Lightspeed 표와 같은 이름. */
 const ROW_LABELS: Partial<Record<string, string>> = {
@@ -65,6 +71,11 @@ function denominationLabel(cents: number): string {
 /** 돈 입력칸 초깃값. 0 은 "0.00" 으로(Lightspeed 처럼). */
 function moneyText(cents: Cents | null | undefined): string {
   return ((cents ?? 0) / 100).toFixed(2);
+}
+
+/** 처음 열 때의 근무. 오후 3시 전이면 모닝 — 직원이 칩으로 바꾼다. */
+function guessShift(): RegisterShift {
+  return new Date().getHours() < 15 ? "morning" : "dinner";
 }
 
 function countOf(text: string): number {
@@ -89,21 +100,31 @@ export default function RegisterClose({
   /** 담당자별 마감(근무시간·팁)으로. 현금 리포트 계정이 아니면 없다(0046) — 버튼을 그리지 않는다. */
   onStaffCloseout?: () => void;
 }) {
-  const [report, setReport] = useState<RegisterCloseReport | null>(null);
-  const [loadError, setLoadError] = useState("");
+  const [shift, setShift] = useState<RegisterShift>(guessShift);
+  // 근무를 바꾸면 그 근무의 표를 다시 읽는다. 다른 근무의 표는 그리지 않는다.
+  const [loaded, setLoaded] = useState<{ shift: RegisterShift; report: RegisterCloseReport | null; error: string } | null>(
+    null,
+  );
   // 그날 계산서 — 근무 마감표(시작~끝 시각 합계)를 찍을 때 센다. 서랍이 하나라(0062) 화면을 가리지 않는다.
   const [sales, setSales] = useState<Sale[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     retailApi
-      .getRegisterClose(date, station)
+      .getRegisterClose(date, station, shift)
       .then((value) => {
-        if (!cancelled) setReport(value);
+        if (!cancelled) setLoaded({ shift, report: value, error: "" });
       })
       .catch((cause) => {
-        if (!cancelled) setLoadError(toRetailError(cause).message);
+        if (!cancelled) setLoaded({ shift, report: null, error: toRetailError(cause).message });
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [date, station, shift]);
+
+  useEffect(() => {
+    let cancelled = false;
     retailApi
       .listSales(date)
       .then((value) => {
@@ -116,20 +137,59 @@ export default function RegisterClose({
     return () => {
       cancelled = true;
     };
-  }, [date, station]);
+  }, [date]);
 
-  if (loadError) return <ErrorNote>{loadError}</ErrorNote>;
-  if (!report || !sales) return <SkeletonRows count={6} />;
+  const report = loaded?.shift === shift ? loaded.report : null;
   return (
-    <CloseForm
-      blind={blindCash || report.cash_blind === true}
-      sales={sales}
-      onCancel={onCancel}
-      onSaved={setReport}
-      onStaffCloseout={onStaffCloseout}
-      registerName={registerName}
-      report={report}
-    />
+    <div className="grid min-w-0 gap-3">
+      {/* 0092 전 서버(근무 없음)면 칩을 그리지 않는다 — 하루 한 마감 그대로. */}
+      {loaded?.report && !loaded.report.shift ? null : (
+        <ShiftPicker onPick={setShift} shift={shift} shifts={loaded?.report?.shifts} />
+      )}
+      {loaded?.shift === shift && loaded.error ? (
+        <ErrorNote>{loaded.error}</ErrorNote>
+      ) : !report || !sales ? (
+        <SkeletonRows count={6} />
+      ) : (
+        <CloseForm
+          blind={blindCash || report.cash_blind === true}
+          key={shift}
+          sales={sales}
+          shift={shift}
+          onCancel={onCancel}
+          onSaved={(next) => setLoaded({ shift, report: next, error: "" })}
+          onStaffCloseout={onStaffCloseout}
+          registerName={registerName}
+          report={report}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Morning | Dinner. 이미 닫은 근무는 ✓ 와 담당자 이름. */
+function ShiftPicker({
+  shift,
+  shifts,
+  onPick,
+}: {
+  shift: RegisterShift;
+  shifts: RegisterCloseReport["shifts"];
+  onPick: (shift: RegisterShift) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm font-bold text-[#3f434a]">Shift</span>
+      {(["morning", "dinner"] as const).map((key) => {
+        const info = shifts?.find((item) => item.shift === key);
+        return (
+          <Chip active={shift === key} key={key} onClick={() => onPick(key)}>
+            {SHIFT_LABELS[key]}
+            {info?.closed ? ` ✓ ${info.cashier ?? ""}`.trimEnd() : ""}
+          </Chip>
+        );
+      })}
+    </div>
   );
 }
 
@@ -141,9 +201,11 @@ function CloseForm({
   onStaffCloseout,
   blind,
   sales,
+  shift: shiftKey,
 }: {
   blind: boolean;
   sales: Sale[];
+  shift: RegisterShift;
   report: RegisterCloseReport;
   registerName: string;
   onSaved: (report: RegisterCloseReport) => void;
@@ -161,12 +223,18 @@ function CloseForm({
   const [note, setNote] = useState(saved?.note ?? "");
   // 담당자와 근무 시각(0081). 다시 세면 저장된 값으로 연다.
   const [cashier, setCashier] = useState(() => saved?.cashier ?? rememberedCashier());
-  const [shiftStart, setShiftStart] = useState(() => saved?.shift_start ?? defaultShiftStart(sales));
+  // 디너는 모닝이 끝난 시각부터 시작한다(모닝을 닫았으면).
+  const morningEnd = report.shifts?.find((item) => item.shift === "morning" && item.closed)?.shift_end ?? null;
+  const [shiftStart, setShiftStart] = useState(
+    () => saved?.shift_start ?? (shiftKey === "dinner" && morningEnd ? morningEnd : defaultShiftStart(sales)),
+  );
   const [shiftEnd, setShiftEnd] = useState(() => saved?.shift_end ?? defaultShiftEnd(report.business_date));
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [justSaved, setJustSaved] = useState(false);
+  // 현금 리포트 계정이 Cash 줄 Payments 를 눌러 여는 그 근무의 현금 거래.
+  const [showCash, setShowCash] = useState(false);
 
   const cashTotal = useMemo(
     () =>
@@ -244,6 +312,7 @@ function CloseForm({
     cashCounts.extra = parseMoney(extra);
     try {
       const next = await retailApi.saveRegisterClose(report.business_date, report.station, {
+        shift: shiftKey,
         // 캐셔는 현금만 센다 — 카드 칸을 보내지 않으면 서버(0090)가 매니저가 센 값을 그대로 둔다.
         counted: blind ? { cash: counted.cash } : { cash: counted.cash, card: counted.card, debit: counted.debit },
         cash_counts: cashCounts,
@@ -271,8 +340,26 @@ function CloseForm({
     <div className="grid min-w-0 gap-4">
       <h3 className="text-lg font-bold text-[#2b2f36]">
         Register - &quot;{report.stations && report.stations.length > 1 ? stationLabel(report.station) : registerName}&quot;
-        Closing Totals
+        Closing Totals{report.shift ? ` — ${SHIFT_LABELS[shiftKey]}` : ""}
       </h3>
+
+      {/* 0092: 경계는 모닝의 끝 시각. 모닝을 안 닫았으면 디너가 하루 전체다. 0092 전 서버면 안내하지 않는다. */}
+      {!report.shift ? (
+        blind ? null : (
+          <p className="bg-[#fff8e1] px-3 py-2 text-sm text-[#5b4708]">
+            Shift 1 / Shift 2 closes switch on once 0092_register_close_morning_dinner.sql is run in the Supabase SQL
+            Editor. Until then this is the one close for the day.
+          </p>
+        )
+      ) : (
+        <p className="bg-[#eef6f0] px-3 py-2 text-sm text-[#1f4d2e]">
+          {shiftKey === "morning"
+            ? "Shift 1 covers sales up to the shift end time below. Count the drawer, keep the float, hand in the rest — Shift 2 counts everything after."
+            : morningEnd
+              ? `Shift 2 covers sales from ${morningEnd}, when Shift 1 ended. Count the drawer, keep the float, hand in the rest.`
+              : "Shift 1 (Morning) has not been closed today, so this count covers the whole day."}
+        </p>
+      )}
 
       {/* 0062: 서랍이 하나라 어느 화면에서 열어도 같은 마감이다. 무엇이 들어 있는지 적어 둔다. */}
       {report.stations && report.stations.length > 1 ? (
@@ -310,7 +397,10 @@ function CloseForm({
               <tr className="border-t border-[#d4d4d8] align-top" key={row.method}>
                 <td className="px-2 py-2 font-bold">{rowLabel(row.method)}</td>
                 <Money value={row.start} />
-                <Money value={row.payments} />
+                <Money
+                  onClick={row.method === "cash" && row.payments !== null ? () => setShowCash(true) : undefined}
+                  value={row.payments}
+                />
                 <Money value={row.withdraws} />
                 <Money value={row.remaining} />
                 <td className="border-l border-[#d4d4d8] px-2 py-2">
@@ -404,6 +494,16 @@ function CloseForm({
         ) : null}
       </div>
 
+      {showCash ? (
+        <CashShiftModal
+          date={report.business_date}
+          onClose={() => setShowCash(false)}
+          sales={sales}
+          title={`Cash transactions — ${SHIFT_LABELS[shiftKey]} · ${report.business_date}`}
+          window={report.window}
+        />
+      ) : null}
+
       {/* 이 화면 사용법(나레이션 프레젠테이션). 새 탭으로 열어 마감 창은 그대로 둔다. */}
       <a
         className="justify-self-start text-sm font-bold text-[#4533ff] underline"
@@ -423,11 +523,24 @@ function Th({ children, className = "text-right" }: { children: ReactNode; class
   return <th className={`border-l border-[#d4d4d8] px-2 py-2 font-bold first:border-l-0 ${className}`}>{children}</th>;
 }
 
-/** null = 이 계정에는 가린 칸(블라인드 카운트). */
-function Money({ value }: { value: Cents | null }) {
+/** null = 이 계정에는 가린 칸(블라인드 카운트). `onClick` 이 있으면 눌러서 거래를 본다. */
+function Money({ value, onClick }: { value: Cents | null; onClick?: () => void }) {
   return (
     <td className="border-l border-[#d4d4d8] px-2 py-2 text-right tabular-nums">
-      {value === null ? <span className="text-[#6b7280]">—</span> : formatMoney(value)}
+      {value === null ? (
+        <span className="text-[#6b7280]">—</span>
+      ) : onClick ? (
+        <button
+          className="font-bold text-[#4533ff] underline"
+          onClick={onClick}
+          title="See the cash transactions in this shift"
+          type="button"
+        >
+          {formatMoney(value)}
+        </button>
+      ) : (
+        formatMoney(value)
+      )}
     </td>
   );
 }

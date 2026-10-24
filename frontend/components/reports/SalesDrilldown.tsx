@@ -16,6 +16,7 @@ import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { DIVISIONS, divisionOf, type DivisionKey } from "@/lib/retail/divisions";
 import { computeTax, formatMoney, type Cents, type PaymentMethod, type Sale, type SaleLine } from "@/lib/retail/types";
 
+import { CashByCashier, cashRows } from "@/components/reports/CashTransactions";
 import { EmptyNote, Modal } from "@/components/retail/ui";
 
 export type Drill =
@@ -23,8 +24,8 @@ export type Drill =
   | { kind: "division"; division: DivisionKey; category?: string }
   | { kind: "station"; station: string }
   | { kind: "payment"; method: PaymentMethod }
-  // 현금만 계산대별로(현금 리포트 계정만). station 이 없으면 계산대 목록, 있으면 그 계산대의 현금 계산서.
-  | { kind: "cash"; station?: string }
+  // 현금만 담당자(계산서의 Cashier)별로(현금 리포트 계정만, 2026-10-24) — 서랍이 하나라(0062) 계산대별은 뜻이 없다.
+  | { kind: "cash" }
   | { kind: "product"; productId: number; name: string };
 
 /** 리포트의 `live` 와 같다. 예전 응답에 status 가 없으면 환불 표시로 가른다. */
@@ -74,7 +75,7 @@ function title(drill: Drill) {
     case "payment":
       return `Payment — ${PAYMENT_LABELS[drill.method]}`;
     case "cash":
-      return drill.station ? `Cash Sales — ${stationLabel(drill.station)}` : "Cash Sales — by register";
+      return "Cash Sales — by cashier";
     case "product":
       return drill.name;
   }
@@ -88,8 +89,6 @@ function paidWith(sale: Sale, method: PaymentMethod): Cents | null {
   return rows.length ? rows.reduce((sum, payment) => sum + payment.amount, 0) : null;
 }
 
-/** 현금 계산대 목록 순서. 현금이 없는 날에도 세 칸은 늘 보인다($0.00). 그 밖의 계산대는 있을 때만 뒤에 붙는다. */
-const CASH_STATIONS = ["tee_sheet", "snack_bar", "pro_shop"];
 type LineRow = { sale: Sale; line: SaleLine; category: string };
 
 export default function SalesDrilldown({
@@ -132,14 +131,12 @@ export default function SalesDrilldown({
           .filter((sale) => (sale.station ?? "") === drill.station)
           .map((sale) => ({ sale, amount: sale.total }));
       case "payment":
-      case "cash": {
-        const method = drill.kind === "cash" ? "cash" : drill.method;
-        const station = drill.kind === "cash" ? drill.station : undefined;
         return paid
-          .filter((sale) => station === undefined || (sale.station ?? "") === station)
-          .map((sale) => ({ sale, amount: paidWith(sale, method) }))
+          .map((sale) => ({ sale, amount: paidWith(sale, drill.method) }))
           .filter((row): row is BillRow => row.amount !== null);
-      }
+      case "cash":
+        // Cash Sales 칸과 같게 팁은 뺀다.
+        return cashRows(paid);
       default:
         return null;
     }
@@ -167,20 +164,6 @@ export default function SalesDrilldown({
     }
     return null;
   }, [drill, divisionLines, paid]);
-
-  // 현금 계산대 목록 — station 을 고르기 전에도, 고른 뒤 칩으로도 쓴다.
-  const cashStations = useMemo(() => {
-    if (drill.kind !== "cash") return [];
-    const seen = new Map<string, { count: number; total: Cents }>(CASH_STATIONS.map((key) => [key, { count: 0, total: 0 }]));
-    for (const sale of paid) {
-      const amount = paidWith(sale, "cash");
-      if (amount === null) continue;
-      const key = sale.station ?? "";
-      const row = seen.get(key) ?? { count: 0, total: 0 };
-      seen.set(key, { count: row.count + 1, total: row.total + amount });
-    }
-    return [...seen.entries()].map(([station, row]) => ({ station, ...row }));
-  }, [drill, paid]);
 
   const categories = useMemo(() => {
     const seen = new Map<string, Cents>();
@@ -215,36 +198,8 @@ export default function SalesDrilldown({
           </div>
         ) : null}
 
-        {drill.kind === "cash" && drill.station !== undefined ? (
-          <div className="flex flex-wrap gap-1.5">
-            <Chip active={false} onClick={() => onChange({ kind: "cash" })}>
-              All registers
-            </Chip>
-            {cashStations.map((row) => (
-              <Chip
-                active={drill.station === row.station}
-                key={row.station}
-                onClick={() => onChange({ kind: "cash", station: row.station })}
-              >
-                {stationLabel(row.station) || "No register"} · {formatMoney(row.total)}
-              </Chip>
-            ))}
-          </div>
-        ) : null}
-
-        {drill.kind === "cash" && drill.station === undefined ? (
-          <ul className="grid gap-1.5">
-            {cashStations.map((row) => (
-              <li key={row.station}>
-                <RowButton
-                  amount={row.total}
-                  onClick={() => onChange({ kind: "cash", station: row.station })}
-                  primary={stationLabel(row.station) || "No register"}
-                  secondary={`${row.count} cash transaction(s)`}
-                />
-              </li>
-            ))}
-          </ul>
+        {drill.kind === "cash" ? (
+          <CashByCashier onOpenSale={onOpenSale} rows={bills ?? []} />
         ) : count === 0 ? (
           <EmptyNote>Nothing here for this date.</EmptyNote>
         ) : (
@@ -293,15 +248,18 @@ export default function SalesDrilldown({
           </ul>
         )}
 
-        <div className="flex items-baseline justify-between gap-2 border-t border-[#d4d4d8] pt-2">
-          <span className="text-sm font-bold">
-            Total <span className="text-xs font-normal text-[#6b7280]">{bills ? `${count} bill(s)` : `×${count}`}</span>
-          </span>
-          <span className="text-lg font-bold tabular-nums">{formatMoney(total)}</span>
-        </div>
+        {/* 현금은 CashByCashier 가 합계 줄을 같이 그린다. */}
+        {drill.kind === "cash" ? null : (
+          <div className="flex items-baseline justify-between gap-2 border-t border-[#d4d4d8] pt-2">
+            <span className="text-sm font-bold">
+              Total <span className="text-xs font-normal text-[#6b7280]">{bills ? `${count} bill(s)` : `×${count}`}</span>
+            </span>
+            <span className="text-lg font-bold tabular-nums">{formatMoney(total)}</span>
+          </div>
+        )}
         <p className="text-[11px] text-[#6b7280]">
-          {drill.kind === "cash" && drill.station === undefined
-            ? "Tap a register to see its cash transactions."
+          {drill.kind === "cash"
+            ? "Cash per cashier, tips excluded (same as the Cash Sales figure). Tap a row to open the receipt."
             : "Tap a row to open the receipt."}
         </p>
       </div>

@@ -295,9 +295,27 @@ export type RegisterCloseRow = {
   counted: Cents | null;
 };
 
+/** 하루 두 번 마감 — 모닝 캐셔와 디너 캐셔(0092). 경계는 모닝 마감의 근무 끝 시각. */
+export type RegisterShift = "morning" | "dinner";
+
+/** 근무의 결제 시각 범위(ISO). null = 끝이 없다. 모닝 마감 전에는 둘 다 null — 하루 전체. */
+export type ShiftWindow = { from: string | null; to: string | null };
+
 export type RegisterCloseReport = {
   business_date: string;
   station: string;
+  /** 0092 전 서버에는 없다(하루 한 마감). */
+  shift?: RegisterShift;
+  window?: ShiftWindow;
+  /** 두 근무의 마감 여부·담당자(0092). */
+  shifts?: {
+    shift: RegisterShift;
+    closed: boolean;
+    cashier: string | null;
+    shift_start: string | null;
+    shift_end: string | null;
+    closed_at: string | null;
+  }[];
   /** 이 계산대에 아직 결제 안 된 계산서 수(오늘만). 0062 부터는 서랍에 든 화면 전부. */
   open_bills: number;
   /** 이 서랍에 결제가 들어가는 화면들(0062). 2026-10-21 부터 네 화면 모두 — 마감 하나에 클럽 전체 매출. */
@@ -344,6 +362,8 @@ export type CashReconcile = {
   business_date: string;
   registers: {
     station: string;
+    /** 0092: 근무마다 한 줄. 모닝은 마감했을 때만 있다. */
+    shift?: RegisterShift;
     has_sales: boolean;
     closed: boolean;
     stale: boolean;
@@ -372,6 +392,9 @@ export type RegisterCloseHistoryLine = {
 export type RegisterCloseHistoryRow = {
   business_date: string;
   drawer: string;
+  /** 0092: 근무마다 한 줄. 모닝은 마감했을 때만 있다 — 모닝 마감이 없으면 디너가 하루 전체다. */
+  shift?: RegisterShift;
+  window?: ShiftWindow;
   /** 이 서랍에 결제가 들어간 화면들. 2026-10-21 부터 네 화면 모두. */
   stations: string[];
   closed: boolean;
@@ -398,6 +421,8 @@ export type RegisterCloseHistory = {
 };
 
 export type RegisterCloseSave = {
+  /** 0092. 없으면 서버가 dinner 로 본다. */
+  shift?: RegisterShift;
   /** 캐셔(블라인드)는 현금만 보낸다 — 서버(0090)가 카드·체크카드 센 값을 그대로 둔다. */
   counted: { cash: Cents; card?: Cents; debit?: Cents };
   cash_counts: CashCounts;

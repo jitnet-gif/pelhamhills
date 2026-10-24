@@ -18,9 +18,15 @@ import retailApi, { toRetailError } from "@/lib/retail/api";
 import { stationLabel } from "@/lib/retail/receipt";
 import { formatMoney, type CashReconcile as Report, type CashReconcileLine, type Cents } from "@/lib/retail/types";
 
+import { SHIFT_LABELS } from "@/components/reports/CashTransactions";
 import { Button, ErrorNote, Panel, SkeletonRows } from "@/components/retail/ui";
 
 const METHOD_LABELS: Record<CashReconcileLine["method"], string> = { cash: "Cash", card: "Card", debit: "Debit" };
+
+/** 서랍 이름 + 근무(0092, 하루 두 번 마감). */
+function registerName(row: Report["registers"][number]): string {
+  return row.shift ? `${stationLabel(row.station)} · ${SHIFT_LABELS[row.shift]}` : stationLabel(row.station);
+}
 
 export default function CashReconcile({ date, refreshKey = 0 }: { date: string; refreshKey?: number }) {
   const [nonce, setNonce] = useState(0);
@@ -184,8 +190,8 @@ function RegisterTable({ report }: { report: Report }) {
         </thead>
         <tbody className="tabular-nums">
           {rows.map((row) => (
-            <tr className="border-t border-[#f2f2f4]" key={row.station}>
-              <td className="py-1.5 pr-2 font-semibold">{stationLabel(row.station)}</td>
+            <tr className="border-t border-[#f2f2f4]" key={`${row.station}-${row.shift ?? "day"}`}>
+              <td className="py-1.5 pr-2 font-semibold">{registerName(row)}</td>
               <td className="py-1.5 pr-2">{cell(row.cash)}</td>
               <td className="py-1.5 pr-2">{cell(row.card)}</td>
               <td className="py-1.5 pr-2">{cell(row.debit)}</td>
@@ -194,7 +200,9 @@ function RegisterTable({ report }: { report: Report }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-[11px] text-[#6b7280]">Cash is shown without the $200 float.</p>
+      <p className="mt-1 text-[11px] text-[#6b7280]">
+        Cash is shown without the $200 float each shift keeps. Morning (Shift 1) and Evening (Shift 2) are counted separately.
+      </p>
     </div>
   );
 }
@@ -207,20 +215,20 @@ function uncountedSlips(report: Report, method: CashReconcileLine["method"]): st
   if (method === "cash") return [];
   return report.registers
     .filter((row) => row.closed && row[method].counted === null && row[method].expected !== 0)
-    .map((row) => row.station);
+    .map(registerName);
 }
 
 /** 차이를 확정하지 못하게 하는 것들. 서버의 `complete` 와 같은 조건을 사람이 읽는 문장으로. */
 function openItems(report: Report): string[] {
   const items: string[] = [];
   for (const row of report.registers) {
-    if (row.has_sales && !row.closed) items.push(`${stationLabel(row.station)} register is not closed yet.`);
-    else if (row.stale) items.push(`${stationLabel(row.station)} changed after it was closed — close it again.`);
+    if (row.has_sales && !row.closed) items.push(`${registerName(row)} register is not closed yet.`);
+    else if (row.stale) items.push(`${registerName(row)} changed after it was closed — close it again.`);
   }
   for (const method of ["card", "debit"] as const) {
-    for (const station of uncountedSlips(report, method)) {
+    for (const name of uncountedSlips(report, method)) {
       items.push(
-        `${stationLabel(station)}: the ${METHOD_LABELS[method].toLowerCase()} slip is not counted yet — enter it on Close Register.`,
+        `${name}: the ${METHOD_LABELS[method].toLowerCase()} slip is not counted yet — enter it on Close Register.`,
       );
     }
   }

@@ -32,6 +32,7 @@ import {
   type RegisterCloseHistory,
   type RegisterCloseReport,
   type RegisterCloseSave,
+  type RegisterShift,
   type RefundRequest,
   type RetailDailyReport,
   type Sale,
@@ -207,11 +208,28 @@ export const retailApi = {
   },
 
   // ===== 계산대 마감 (0023) =====
-  getRegisterClose: (businessDate: string, station: string) =>
-    registerCloseCall<RegisterCloseReport>("pelham_staff_register_close_report", {
-      p_date: businessDate,
-      p_station: station,
-    }),
+  getRegisterClose: async (businessDate: string, station: string, shift: RegisterShift) => {
+    try {
+      return await staffRpc<RegisterCloseReport>("pelham_staff_register_close_report", {
+        p_date: businessDate,
+        p_station: station,
+        p_shift: shift,
+      });
+    } catch (cause) {
+      // 0092 전 서버에는 근무 인자가 없는 함수뿐이라 "함수 없음"으로 온다. 그때는 하루 한 마감(옛 함수)으로
+      // 읽는다 — 응답에 `shift` 가 없어 화면이 근무 칩을 숨긴다. 저장의 shift 키는 옛 서버가 무시한다.
+      if (!isMissingMigration(cause)) throw toRetailError(cause);
+    }
+    try {
+      return await staffRpc<RegisterCloseReport>("pelham_staff_register_close_report", {
+        p_date: businessDate,
+        p_station: station,
+      });
+    } catch (cause) {
+      if (isMissingMigration(cause)) throw new RetailApiError("http", 404, REGISTER_CLOSE_MISSING_MESSAGE);
+      throw toRetailError(cause);
+    }
+  },
 
   /** 센 돈을 적는다(다시 세면 덮어쓴다). 표 전체를 돌려준다. */
   saveRegisterClose: (businessDate: string, station: string, body: RegisterCloseSave) =>

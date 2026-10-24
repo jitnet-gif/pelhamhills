@@ -184,7 +184,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
           </div>
 
           {/* 위 흐름 밖의 숫자. 환불은 위에서 이미 빠졌고, 팁은 매출이 아니다.
-              Cash Sales 는 현금 리포트 계정만(0046) — By payment 의 Cash 줄과 같은 값이다. 누르면 계산대별 → 거래. */}
+              Cash Sales 는 현금 리포트 계정만(0046) — By payment 의 Cash 줄과 같은 값이다. 누르면 담당자별 → 거래. */}
           <div className={`grid gap-2 lg:grid-cols-5 ${cash ? "grid-cols-2" : "grid-cols-3"}`}>
             <StatCard
               hint="refunds excluded"
@@ -206,7 +206,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
             />
             {cash ? (
               <StatCard
-                hint="tax incl. · tips excl. · by register"
+                hint="tax incl. · tips excl. · by cashier"
                 label="Cash Sales"
                 onClick={() => setDrill({ kind: "cash" })}
                 value={formatMoney(report.by_payment.find((row) => row.method === "cash")?.total ?? 0)}
@@ -341,7 +341,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
       ) : null}
 
       {/* By payment 의 Card·Debit 을 Stripe 숫자로 이어 준다(팁·환불·손으로 친 전표·온라인). */}
-      {!loading ? <CardSales date={date} sales={sales} /> : null}
+      {!loading ? <CardSales date={date} onOpenSale={setSelected} sales={sales} /> : null}
 
       {/* 환불·void 계산서·예약 취소(0088). 카드 쪽 취소는 바로 위 칸. */}
       {!loading ? <Cancellations date={date} onOpenSale={setSelected} sales={sales} /> : null}
