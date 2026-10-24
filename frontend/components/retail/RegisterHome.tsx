@@ -3,7 +3,7 @@
 /**
  * 계산대 첫 화면. Lightspeed R-Series 의 Register 화면을 그대로 옮겼다 — 직원들이 그 화면에
  * 손이 익어 있다(2026-10-12). 위 줄은 지금 손님(Continue Sale / Refund / New Sale), 아래 줄은
- * 이 계산대 자체(Switch Registers / Close Register / Receipt Printer), 맨 아래는 오늘 이 계산대의 영수증.
+ * 이 계산대 자체(Close Register / Receipt Printer), 맨 아래는 오늘 이 계산대의 영수증.
  *
  * Lightspeed 의 Special Order · Layaway · Payout/Drop · Add Amount 는 아직 없다. 빈 타일을
  * 두면 눌러 보고 "고장" 이라고 판단하므로 그리지 않는다.
@@ -46,8 +46,6 @@ type Props = {
   registerName: string;
   station: BillStation;
   demo: boolean;
-  /** 다른 계산대로 가는 주소. */
-  switchHref: string;
   /** 판매 화면으로. */
   onOpenSale: () => void;
   /** 홈에서 영수증을 쐈다 → 그 번호로 Refund 창을 연다. 값이 바뀔 때마다 연다. */
@@ -69,7 +67,6 @@ export default function RegisterHome({
   registerName,
   station,
   demo,
-  switchHref,
   onOpenSale,
   refundRequest,
 }: Props) {
@@ -212,11 +209,6 @@ export default function RegisterHome({
         note={`The register is where you do sales and refunds. You are using ${registerName} at Pelham Hills Golf Club.`}
         title={`Current register is ${registerName}`}
       >
-        <Tile
-          href={switchHref}
-          icon={<SwitchIcon />}
-          label="Switch Registers"
-        />
         <Tile
           disabled={demo}
           icon={<PowerIcon />}
@@ -778,14 +770,6 @@ function PlusIcon() {
   return (
     <svg {...SVG}>
       <path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7V3z" />
-    </svg>
-  );
-}
-
-function SwitchIcon() {
-  return (
-    <svg {...SVG}>
-      <path d="M16 3l5 4.5L16 12V9H4V6h12V3zM8 12v3h12v3H8v3l-5-4.5L8 12z" />
     </svg>
   );
 }

@@ -30,7 +30,7 @@ export default function PosHome() {
     } catch {
       last = null;
     }
-    // 계산대 첫 화면의 Switch Registers 는 `?pick=1` 로 온다 — 지난 계산대로 되돌려 보내지 않는다.
+    // `?pick=1` 로 오면 지난 계산대로 되돌려 보내지 않고 고르기 화면을 보인다.
     const picking = new URLSearchParams(window.location.search).has("pick");
     const station = picking ? undefined : STATIONS.find((item) => item.id === last);
     if (station) {

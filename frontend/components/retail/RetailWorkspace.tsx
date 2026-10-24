@@ -28,7 +28,6 @@ import RegisterHome from "@/components/retail/RegisterHome";
 import RegisterTab, { RECEIPT_NO } from "@/components/retail/RegisterTab";
 import { demoLowStock, demoProducts } from "@/components/retail/demoData";
 import { Chip, ErrorNote, OfflineBanner } from "@/components/retail/ui";
-import { ADMIN_RETAIL, ADMIN_SNACK_BAR } from "@/lib/nav";
 import { clearSaleViewRequest, saleViewRequested } from "@/lib/pos/currentBill";
 import retailApi, { toRetailError } from "@/lib/retail/api";
 import type { LowStockItem, Product, RetailCategory } from "@/lib/retail/types";
@@ -135,8 +134,6 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
 
   const registerName = category ? "Snack Bar / Bev Cart" : "Pro Shop";
   const station = category === "Food & Beverage" ? "snack_bar" : "pro_shop";
-  // 설치형 앱은 `/pos` 의 계산대 고르기로(`pick` 이 있으면 지난 계산대로 바로 가지 않는다).
-  const switchHref = posApp ? "/pos?pick=1" : category ? ADMIN_RETAIL : ADMIN_SNACK_BAR;
 
   /** 첫 화면에서 쏜 스캔: 영수증이면 환불 창, 상품이면 판매 화면으로 넘기고 계산대가 담는다. */
   function onScanned(code: string): boolean {
@@ -199,7 +196,6 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
             refundRequest={refundRequest}
             registerName={registerName}
             station={station}
-            switchHref={switchHref}
           />
         ) : null}
 
