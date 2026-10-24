@@ -46,6 +46,18 @@ DETAIL = {
 }
 
 
+def _transfer(is_error: bool, value: str) -> dict:
+    return {"conversation_id": "conv_x", "transcript": [
+        {"role": "agent", "message": None, "time_in_call_secs": 38,
+         "tool_calls": [{"tool_name": "transfer_to_number", "params_as_json": "{}"}],
+         "tool_results": [{"tool_name": "transfer_to_number", "is_error": is_error, "result_value": value}]},
+    ]}
+
+
+TRANSFERRED = _transfer(False, "{}")
+TRANSFER_ABANDONED = _transfer(True, "Tool execution was abandoned due to user input")
+
+
 @pytest.fixture()
 def client(monkeypatch):
     monkeypatch.setattr(terminal, "_require_staff", lambda request: None)
@@ -55,10 +67,11 @@ def client(monkeypatch):
             {"conversation_id": "conv_abc", "tool_names": ["identify_caller", "confirm_booking"],
              "call_summary_title": "Tee time booking", "start_time_unix_secs": 1760000000},
             {"conversation_id": "conv_def", "tool_names": ["transfer_to_number"]},
+            {"conversation_id": "conv_ghi", "tool_names": ["transfer_to_number"]},
         ], "has_more": False, "next_cursor": None}
 
     async def fake_get(conversation_id):
-        return DETAIL
+        return {"conv_def": TRANSFERRED, "conv_ghi": TRANSFER_ABANDONED}.get(conversation_id, DETAIL)
 
     monkeypatch.setattr(voice_agent, "list_conversations", fake_list)
     monkeypatch.setattr(voice_agent, "get_conversation", fake_get)
@@ -70,7 +83,7 @@ def client(monkeypatch):
 
 def test_list_labels_outcome(client):
     body = client.get(f"{API}/calls").json()
-    assert [c["outcome"] for c in body["calls"]] == ["booked", "transferred"]
+    assert [c["outcome"] for c in body["calls"]] == ["booked", "transferred", "transfer_failed"]
 
 
 def test_detail_finds_booking_and_skips_preview(client):
@@ -93,3 +106,8 @@ def test_staff_only(monkeypatch, client):
         raise HTTPException(status_code=401, detail="Sign in")
     monkeypatch.setattr(terminal, "_require_staff", refuse)
     assert client.get(f"{API}/calls").status_code == 401
+
+
+def test_detail_marks_abandoned_transfer(client):
+    assert client.get(f"{API}/calls/conv_ghi").json()["outcome"] == "transfer_failed"
+    assert client.get(f"{API}/calls/conv_def").json()["outcome"] == "transferred"

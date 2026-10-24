@@ -80,6 +80,23 @@ def outcome(tool_names: list[str]) -> str:
     return "info"
 
 
+def transfer_failed(transcript: list[dict[str, Any]]) -> bool:
+    """직원 연결을 불렀지만 하나도 이어지지 않았나.
+
+    ElevenLabs 는 연결 중에 손님이 말하면 도구를 버리고 is_error 로 남긴다
+    ("Tool execution was abandoned due to user input"). 결과가 없으면 실패로 보지 않는다.
+    """
+    results = [
+        res for turn in transcript for res in turn.get("tool_results") or []
+        if res.get("tool_name") == "transfer_to_number"
+    ]
+    return bool(results) and all(res.get("is_error") for res in results)
+
+
+def _settle(label: str, transcript: list[dict[str, Any]]) -> str:
+    return "transfer_failed" if label == "transferred" and transfer_failed(transcript) else label
+
+
 def _row(item: dict[str, Any]) -> dict[str, Any]:
     tools = [str(t) for t in item.get("tool_names") or []]
     return {
@@ -189,8 +206,19 @@ async def list_calls(
         payload = await voice_agent.list_conversations(cursor, page_size)
     except voice_agent.VoiceAgentError as exc:
         raise _upstream(exc) from None
+    rows = [_row(item) for item in payload.get("conversations") or []]
+    # 목록에는 도구 이름만 온다. 연결이 실제로 됐는지는 녹취를 봐야 알아서, 연결한 통화만
+    # 한 건씩 더 읽는다(드물다). 못 읽으면 "Transferred" 그대로 둔다.
+    transfers = [row for row in rows if row["outcome"] == "transferred" and row["id"]]
+    details = await asyncio.gather(
+        *(voice_agent.get_conversation(str(row["id"])) for row in transfers), return_exceptions=True,
+    )
+    for row, detail in zip(transfers, details):
+        if isinstance(detail, dict):
+            transcript = [t for t in detail.get("transcript") or [] if isinstance(t, dict)]
+            row["outcome"] = _settle(row["outcome"], transcript)
     return {
-        "calls": [_row(item) for item in payload.get("conversations") or []],
+        "calls": rows,
         "next_cursor": payload.get("next_cursor"),
         "has_more": bool(payload.get("has_more")),
     }
@@ -223,7 +251,7 @@ async def get_call(request: Request, conversation_id: str) -> dict[str, Any]:
         "summary": analysis.get("transcript_summary") or "",
         "successful": analysis.get("call_successful"),
         "has_audio": bool(detail.get("has_audio")),
-        "outcome": outcome(tool_names),
+        "outcome": _settle(outcome(tool_names), transcript),
         "bookings": bookings_from(transcript),
         "transcript": _turns(transcript),
     }

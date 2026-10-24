@@ -36,6 +36,7 @@ const OUTCOME_TONE: Record<CallRow["outcome"], string> = {
   waitlist: "bg-[#fff4dc] text-[#8a5a00]",
   lost_item: "bg-[#f1ecff] text-[#5b3cc4]",
   transferred: "bg-[#fff0e6] text-[#a4500f]",
+  transfer_failed: "bg-[#fdeaea] text-[#a12a2a]",
   info: "bg-[#f0f1f3] text-[#4e5560]",
 };
 

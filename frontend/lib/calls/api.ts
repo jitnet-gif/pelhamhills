@@ -8,7 +8,7 @@ import { CLUB_TIME_ZONE } from "@/lib/retail/receipt";
 import { ApiError } from "@/lib/teeSheet/api";
 import { accessToken } from "@/lib/teeSheet/session";
 
-export type CallOutcome = "booked" | "modified" | "cancelled" | "waitlist" | "lost_item" | "transferred" | "info";
+export type CallOutcome = "booked" | "modified" | "cancelled" | "waitlist" | "lost_item" | "transferred" | "transfer_failed" | "info";
 
 export type CallRow = {
   id: string;
@@ -117,6 +117,7 @@ export const OUTCOME_LABEL: Record<CallOutcome, string> = {
   waitlist: "Waitlist",
   lost_item: "Lost item",
   transferred: "Transferred",
+  transfer_failed: "Transfer failed",
   info: "Inquiry",
 };
 
