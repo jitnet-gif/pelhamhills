@@ -184,8 +184,9 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
           </div>
 
           {/* 위 흐름 밖의 숫자. 환불은 위에서 이미 빠졌고, 팁은 매출이 아니다.
-              Cash Sales 는 현금 리포트 계정만(0046) — By payment 의 Cash 줄과 같은 값이다. 누르면 담당자별 → 거래. */}
-          <div className={`grid gap-2 lg:grid-cols-5 ${cash ? "grid-cols-2" : "grid-cols-3"}`}>
+              Cash Sales 는 현금 리포트 계정만(0046) — By payment 의 Cash 줄과 같은 값이다. 누르면 담당자별 → 거래.
+              Credit Card Sales 는 By payment 의 Card 줄(Debit 은 따로) — 누구에게나 보인다. */}
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
             <StatCard
               hint="refunds excluded"
               label="Sales"
@@ -212,6 +213,12 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
                 value={formatMoney(report.by_payment.find((row) => row.method === "cash")?.total ?? 0)}
               />
             ) : null}
+            <StatCard
+              hint="tax incl. · tips excl. · debit apart"
+              label="Credit Card Sales"
+              onClick={() => setDrill({ kind: "payment", method: "card" })}
+              value={formatMoney(report.by_payment.find((row) => row.method === "card")?.total ?? 0)}
+            />
           </div>
 
           {/* 사업부 다섯 칸(회원권 포함, 0072). 팔린 것(분류)으로 나눈다 — 나누는 규칙과 이유는 `lib/retail/divisions.ts`.
