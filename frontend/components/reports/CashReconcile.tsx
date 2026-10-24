@@ -10,6 +10,8 @@
  *
  * 아직 닫지 않은 계산대·사람이 있거나 닫은 뒤 숫자가 바뀌었으면 차이를 확정하지 않고 "Not final" 로 둔다.
  * 계산대 마감은 다른 화면(계산대 홈)에서 하므로 Refresh 로 다시 읽는다.
+ *
+ * 수단마다 Sales report 줄을 누르면 그날 그 수단의 결제를 담당자별 요약 → 거래로 본다(2026-10-24, `CashShiftModal`).
  */
 
 import { useEffect, useState } from "react";
@@ -18,7 +20,7 @@ import retailApi, { toRetailError } from "@/lib/retail/api";
 import { stationLabel } from "@/lib/retail/receipt";
 import { formatMoney, type CashReconcile as Report, type CashReconcileLine, type Cents } from "@/lib/retail/types";
 
-import { SHIFT_LABELS } from "@/components/reports/CashTransactions";
+import { CashShiftModal, SHIFT_LABELS } from "@/components/reports/CashTransactions";
 import { Button, ErrorNote, Panel, SkeletonRows } from "@/components/retail/ui";
 
 const METHOD_LABELS: Record<CashReconcileLine["method"], string> = { cash: "Cash", card: "Card", debit: "Debit" };
@@ -30,6 +32,7 @@ function registerName(row: Report["registers"][number]): string {
 
 export default function CashReconcile({ date, refreshKey = 0 }: { date: string; refreshKey?: number }) {
   const [nonce, setNonce] = useState(0);
+  const [opened, setOpened] = useState<CashReconcileLine["method"] | null>(null);
   const requestKey = `${date}#${refreshKey}#${nonce}`;
   const [loaded, setLoaded] = useState<{ key: string; report: Report | null; error: string } | null>(null);
   const loading = loaded?.key !== requestKey;
@@ -95,9 +98,24 @@ export default function CashReconcile({ date, refreshKey = 0 }: { date: string; 
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {lines.map((line) => (
-            <LineCard key={line.method} line={line} uncounted={uncountedSlips(report, line.method).length > 0} />
+            <LineCard
+              key={line.method}
+              line={line}
+              onOpen={() => setOpened(line.method)}
+              uncounted={uncountedSlips(report, line.method).length > 0}
+            />
           ))}
         </div>
+        {opened ? (
+          <CashShiftModal
+            date={date}
+            method={opened}
+            note={`${METHOD_LABELS[opened]} payments on paid bills this day, tips and online payments included — the same total as the Sales report line.`}
+            onClose={() => setOpened(null)}
+            title={`${METHOD_LABELS[opened]} payments — ${report.business_date}`}
+            window={null}
+          />
+        ) : null}
 
         <RegisterTable report={report} />
       </div>
@@ -105,7 +123,7 @@ export default function CashReconcile({ date, refreshKey = 0 }: { date: string; 
   );
 }
 
-function LineCard({ line, uncounted }: { line: CashReconcileLine; uncounted: boolean }) {
+function LineCard({ line, uncounted, onOpen }: { line: CashReconcileLine; uncounted: boolean; onOpen: () => void }) {
   const cash = line.method === "cash";
   return (
     <section className="min-w-0 border border-[#e4e4e8]">
@@ -114,6 +132,7 @@ function LineCard({ line, uncounted }: { line: CashReconcileLine; uncounted: boo
         <Row
           detail={`${formatMoney(line.report.amount)} + ${formatMoney(line.report.tip)} tips`}
           label="Sales report"
+          onOpen={onOpen}
           value={line.report.total}
         />
         <Row
@@ -142,11 +161,32 @@ function LineCard({ line, uncounted }: { line: CashReconcileLine; uncounted: boo
   );
 }
 
-function Row({ label, detail, value, status }: { label: string; detail: string; value: Cents; status?: React.ReactNode }) {
+function Row({
+  label,
+  detail,
+  value,
+  status,
+  onOpen,
+}: {
+  label: string;
+  detail: string;
+  value: Cents;
+  status?: React.ReactNode;
+  /** 줄 이름을 눌러 그 숫자의 결제를 연다. */
+  onOpen?: () => void;
+}) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-[#f2f2f4] pb-2 last:border-b-0 last:pb-0">
       <div className="min-w-0">
-        <dt className="font-semibold">{label}</dt>
+        <dt className="font-semibold">
+          {onOpen ? (
+            <button className="text-left text-[#4533ff] hover:underline" onClick={onOpen} type="button">
+              {label} ›
+            </button>
+          ) : (
+            label
+          )}
+        </dt>
         <dd className="text-xs text-[#6b7280]">{detail}</dd>
       </div>
       <div className="grid shrink-0 justify-items-end gap-1">

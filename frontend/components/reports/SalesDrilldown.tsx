@@ -8,6 +8,9 @@
  * - 매출 칸·사업부·계산대·결제 = `status = 'paid'` 계산서만 (환불은 따로).
  * - 사업부·분류·상품 = 그 계산서의 살아 있는 줄 `line_total` (줄의 `category` 로 나눈다).
  * 그래서 펼친 목록의 합은 누른 칸의 숫자와 같아야 한다. 다르면 아래 합계 줄에서 바로 보인다.
+ *
+ * 어느 칸이든 먼저 요약, 줄 하나를 누르면 그 거래(2026-10-24). 묶는 기준은 `groupingOf`: 매출 칸·결제 수단·상품은
+ * 계산대별, 할인·환불·팁·계산대는 담당자별, 사업부는 분류별. Cash 는 담당자별, Card 는 신용·직불별(따로 둔다).
  */
 
 import { useMemo, type ReactNode } from "react";
@@ -33,6 +36,7 @@ import {
 } from "@/components/reports/CashTransactions";
 import { cashierKey, saleTime } from "@/lib/reports/shiftReport";
 import StaffName from "@/components/reports/StaffName";
+import { BackLink, summarize, type DrillGroup } from "@/components/reports/ReportDrill";
 import { EmptyNote, Modal } from "@/components/retail/ui";
 
 export type Drill =
@@ -46,16 +50,18 @@ export type Drill =
         | "net"
         | "refunded"
         | "tips";
+      /** 요약에서 고른 묶음(`groupingOf` 의 key). 없으면 요약. */
+      group?: string;
     }
   | { kind: "division"; division: DivisionKey; category?: string }
-  | { kind: "station"; station: string }
-  | { kind: "payment"; method: PaymentMethod }
+  | { kind: "station"; station: string; group?: string }
+  | { kind: "payment"; method: PaymentMethod; group?: string }
   // 현금만 담당자(계산서의 Cashier)별로(현금 리포트 계정만, 2026-10-24) — 서랍이 하나라(0062) 계산대별은 뜻이 없다.
   // 먼저 담당자별 요약, 한 사람을 누르면 그 사람의 거래(`cashier` = `cashierKey`).
   | { kind: "cash"; cashier?: string }
   // Card Sales 칸 — 먼저 신용카드·직불(Interac) 요약, 하나를 누르면 그 거래.
   | { kind: "cards"; method?: CardMethod }
-  | { kind: "product"; productId: number; name: string };
+  | { kind: "product"; productId: number; name: string; group?: string };
 
 type CardMethod = "card" | "debit";
 const CARD_LABELS: Record<CardMethod, string> = {
@@ -124,6 +130,36 @@ function title(drill: Drill) {
   }
 }
 
+const byRegister = (sale: Sale): DrillGroup => ({
+  key: sale.station ?? "",
+  label: sale.station ? stationLabel(sale.station) : "No register",
+});
+const byCashier = (sale: Sale): DrillGroup => ({
+  key: cashierKey(sale.cashier),
+  label: (sale.cashier ?? "").trim() || "No cashier name",
+});
+
+/** 요약을 무엇으로 묶나. Cash·Card·사업부는 따로 처리해서 null. */
+function groupingOf(drill: Drill): { of: (sale: Sale) => DrillGroup; name: string } | null {
+  switch (drill.kind) {
+    case "sales":
+    case "gross":
+    case "net_sales":
+    case "tax":
+    case "net":
+    case "payment":
+    case "product":
+      return { of: byRegister, name: "registers" };
+    case "discount":
+    case "refunded":
+    case "tips":
+    case "station":
+      return { of: byCashier, name: "cashiers" };
+    default:
+      return null;
+  }
+}
+
 type BillRow = { sale: Sale; amount: Cents };
 
 /** 계산서 안의 그 결제 수단 금액 합(분할 결제면 그 몫만). 없으면 null. 팁은 `tip` 에 따로 있어 빠진다. */
@@ -169,7 +205,14 @@ export default function SalesDrilldown({
 }) {
   const paid = useMemo(() => sales.filter(isPaid), [sales]);
 
-  const bills = useMemo<BillRow[] | null>(() => {
+  const grouping = useMemo(() => groupingOf(drill), [drill]);
+  const group = "group" in drill ? drill.group : undefined;
+  const inGroup = <R extends { sale: Sale }>(rows: R[] | null): R[] | null =>
+    rows && grouping && group !== undefined
+      ? rows.filter((row) => grouping.of(row.sale).key === group)
+      : rows;
+
+  const allBills = useMemo<BillRow[] | null>(() => {
     switch (drill.kind) {
       case "sales":
       case "net":
@@ -233,7 +276,7 @@ export default function SalesDrilldown({
     );
   }, [drill, paid]);
 
-  const lines = useMemo<LineRow[] | null>(() => {
+  const allLines = useMemo<LineRow[] | null>(() => {
     if (drill.kind === "division") {
       return drill.category
         ? divisionLines.filter((row) => row.category === drill.category)
@@ -253,10 +296,13 @@ export default function SalesDrilldown({
     return null;
   }, [drill, divisionLines, paid]);
 
-  // Cash·Card 칸은 요약 먼저(2026-10-24): 현금은 담당자별, 카드는 신용·직불별.
+  const bills = inGroup(allBills);
+  const lines = inGroup(allLines);
+
+  // 요약 먼저(2026-10-24): 현금은 담당자별, 카드는 신용·직불별, 사업부는 분류별, 나머지는 `groupingOf`.
   const summary = useMemo<SummaryRow[] | null>(() => {
     if (drill.kind === "cash" && drill.cashier === undefined) {
-      return groupCashByCashier(bills ?? []).map((group) => ({
+      return groupCashByCashier(allBills ?? []).map((group) => ({
         key: group.key || "(none)",
         label: <StaffName date={group.rows[0].sale.business_date} empty="No cashier name" name={group.name} />,
         detail: `${saleTime(group.rows[0].sale)} – ${saleTime(group.rows[group.rows.length - 1].sale)} · ${group.rows.length} cash transaction(s)`,
@@ -276,8 +322,46 @@ export default function SalesDrilldown({
         };
       });
     }
+    if (drill.kind === "division" && !drill.category) {
+      return summarize(divisionLines, (row) => ({ key: row.category, label: row.category }), (row) => row.line.line_total).map(
+        (item) => ({
+          key: item.key,
+          label: item.label,
+          detail: `×${item.rows.reduce((sum, row) => sum + row.line.quantity, 0)}`,
+          // 사업부 칸처럼 HST 포함.
+          total: item.total + computeTax(item.total),
+          next: { kind: "division", division: drill.division, category: item.key },
+        }),
+      );
+    }
+    if (grouping && !("group" in drill && drill.group !== undefined)) {
+      const next = (key: string) => ({ ...drill, group: key }) as Drill;
+      // 담당자별이면 다른 칸처럼 ID 확인 표시(`StaffName`)를 붙인다.
+      const staffLabel = (label: string, sale: Sale) =>
+        grouping.name === "cashiers" ? (
+          <StaffName date={sale.business_date} empty="No cashier name" name={sale.cashier} />
+        ) : (
+          label
+        );
+      if (allBills) {
+        return summarize(allBills, (row) => grouping.of(row.sale), (row) => row.amount, "").map((item) => ({
+          key: item.key || "(none)",
+          label: staffLabel(item.label, item.rows[0].sale),
+          detail: `${item.rows.length} bill(s)`,
+          total: item.total,
+          next: next(item.key),
+        }));
+      }
+      return summarize(allLines ?? [], (row) => grouping.of(row.sale), (row) => row.line.line_total, "").map((item) => ({
+        key: item.key || "(none)",
+        label: staffLabel(item.label, item.rows[0].sale),
+        detail: `×${item.rows.reduce((sum, row) => sum + row.line.quantity, 0)}`,
+        total: item.total,
+        next: next(item.key),
+      }));
+    }
     return null;
-  }, [drill, bills, paid]);
+  }, [drill, grouping, allBills, allLines, divisionLines, paid]);
 
   const categories = useMemo(() => {
     const seen = new Map<string, Cents>();
@@ -299,19 +383,27 @@ export default function SalesDrilldown({
     ? bills.length
     : (lines ?? []).reduce((sum, row) => sum + row.line.quantity, 0);
 
+  const first = (bills ?? lines ?? [])[0];
+  const groupLabel =
+    grouping && group !== undefined && first ? grouping.of(first.sale).label : "";
+  const back =
+    drill.kind === "cash" && drill.cashier !== undefined
+      ? { label: "All cashiers", to: { kind: "cash" } as Drill }
+      : drill.kind === "cards" && drill.method
+        ? { label: "Credit & debit summary", to: { kind: "cards" } as Drill }
+        : drill.kind === "division" && drill.category
+          ? { label: "All categories", to: { kind: "division", division: drill.division } as Drill }
+          : grouping && group !== undefined
+            ? { label: `All ${grouping.name}`, to: { ...drill, group: undefined } as Drill }
+            : null;
+
   return (
-    <Modal onClose={onClose} title={title(drill)}>
+    <Modal onClose={onClose} title={groupLabel ? `${title(drill)} — ${groupLabel}` : title(drill)}>
       <div className="grid gap-3">
-        {drill.kind === "division" && categories.length > 1 ? (
+        {back ? <BackLink label={back.label} onClick={() => onChange(back.to)} /> : null}
+
+        {drill.kind === "division" && drill.category && categories.length > 1 ? (
           <div className="flex flex-wrap gap-1.5">
-            <Chip
-              active={!drill.category}
-              onClick={() =>
-                onChange({ kind: "division", division: drill.division })
-              }
-            >
-              All
-            </Chip>
             {categories.map(([category, amount]) => (
               <Chip
                 active={drill.category === category}
@@ -330,19 +422,7 @@ export default function SalesDrilldown({
           </div>
         ) : null}
 
-        {(drill.kind === "cash" && drill.cashier !== undefined) ||
-        (drill.kind === "cards" && drill.method) ? (
-          <button
-            className="justify-self-start text-xs font-bold text-[#4533ff] hover:underline"
-            onClick={() => onChange({ kind: drill.kind })}
-            type="button"
-          >
-            ←{" "}
-            {drill.kind === "cash" ? "All cashiers" : "Credit & debit summary"}
-          </button>
-        ) : null}
-
-        {summary ? (
+        {summary && summary.length > 0 ? (
           <ul className="grid gap-1.5">
             {summary.map((row) => (
               <li key={row.key}>
@@ -426,7 +506,9 @@ export default function SalesDrilldown({
           {summary
             ? drill.kind === "cash"
               ? "Cash per cashier, tips excluded (same as the Cash Sales figure). Tap a cashier to see the transactions."
-              : "Credit and debit, tips excluded (same as the Card Sales figure). Tap a line to see the transactions."
+              : drill.kind === "cards"
+                ? "Credit and debit, tips excluded (same as the Card Sales figure). Tap a line to see the transactions."
+                : "Tap a line to see the transactions."
             : "Tap a row to open the receipt."}
         </p>
       </div>

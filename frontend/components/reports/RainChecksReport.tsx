@@ -6,6 +6,9 @@
  * 각 줄: 누구에게(예약 날짜·시간), 얼마를, 언제까지, 지금 상태(발행됨·사용됨·무효·만료), 바코드 문자가
  * 나갔는지(0058 문자 기록). 위의 "Outstanding" 은 기간과 상관없이 지금 쓸 수 있는 크레딧 전체다.
  * 서버 함수는 0062 `pelham_staff_rain_check_report`.
+ *
+ * Issued·Used·Expired·Void 칸은 먼저 요약(Issued 는 상태별, Void 는 사유별, 나머지는 발행한 담당자별), 줄을 누르면
+ * 그 전표들(2026-10-24, `ReportDrill`). Outstanding 은 기간 밖 전표까지라 이 화면의 목록으로는 펼칠 수 없다.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +27,7 @@ import { ApiError } from "@/lib/teeSheet/api";
 import { addDays } from "@/lib/teeSheet/dates";
 
 import StaffName from "@/components/reports/StaffName";
+import ReportDrill, { type DrillGroup } from "@/components/reports/ReportDrill";
 import { Chip, EmptyNote, ErrorNote, Field, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 type State = "live" | "redeemed" | "expired" | "void";
@@ -62,6 +66,16 @@ function when(iso: string | null): string {
   return at.toLocaleString("en-CA", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+type DrillBy = "status" | "cashier" | "reason";
+
+function groupOf(by: DrillBy) {
+  return (row: RainCheckReportRow): DrillGroup => {
+    if (by === "status") return { key: stateOf(row), label: BADGE[stateOf(row)].label };
+    const text = ((by === "reason" ? row.void_reason : row.cashier) ?? "").trim();
+    return { key: text.toLowerCase(), label: text || (by === "reason" ? "No reason given" : "No cashier name") };
+  };
+}
+
 function sum(rows: RainCheckReportRow[]): { count: number; amount: number } {
   return { count: rows.length, amount: rows.reduce((total, row) => total + row.amount, 0) };
 }
@@ -71,6 +85,7 @@ export default function RainChecksReport() {
   const [from, setFrom] = useState(() => addDays(today, -29));
   const [to, setTo] = useState(today);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
+  const [drill, setDrill] = useState<{ title: string; rows: RainCheckReportRow[]; by: DrillBy } | null>(null);
   const [loaded, setLoaded] = useState<{ range: string; report: RainCheckReport | null; error: string } | null>(null);
 
   const range = `${from}..${to}`;
@@ -129,12 +144,28 @@ export default function RainChecksReport() {
             <StatCard
               hint={`${issued.count} slip(s) issued in these dates`}
               label="Issued"
+              onClick={() => setDrill({ title: "Issued", rows: rows.filter((row) => row.status !== "void"), by: "status" })}
               strong
               value={formatMoney(issued.amount)}
             />
-            <StatCard hint={`${used.count} slip(s)`} label="Used" value={formatMoney(used.amount)} />
-            <StatCard hint={`${expired.count} slip(s) never used`} label="Expired" value={formatMoney(expired.amount)} />
-            <StatCard hint={`${voided.count} slip(s)`} label="Void" value={formatMoney(voided.amount)} />
+            <StatCard
+              hint={`${used.count} slip(s)`}
+              label="Used"
+              onClick={() => setDrill({ title: "Used", rows: rows.filter((row) => stateOf(row) === "redeemed"), by: "cashier" })}
+              value={formatMoney(used.amount)}
+            />
+            <StatCard
+              hint={`${expired.count} slip(s) never used`}
+              label="Expired"
+              onClick={() => setDrill({ title: "Expired", rows: rows.filter((row) => stateOf(row) === "expired"), by: "cashier" })}
+              value={formatMoney(expired.amount)}
+            />
+            <StatCard
+              hint={`${voided.count} slip(s)`}
+              label="Void"
+              onClick={() => setDrill({ title: "Void", rows: rows.filter((row) => stateOf(row) === "void"), by: "reason" })}
+              value={formatMoney(voided.amount)}
+            />
             <StatCard
               hint={`${report.outstanding.count} slip(s) still usable · all dates`}
               label="Outstanding"
@@ -243,8 +274,36 @@ export default function RainChecksReport() {
           )}
           <p className="text-xs text-[#6b7280]">
             Dates are issue dates. Rain checks are good for 180 days. Outstanding counts every unused, unexpired slip
-            no matter when it was issued — credit the club still owes.
+            no matter when it was issued — credit the club still owes. Tap Issued, Used, Expired or Void for a summary,
+            then the slips (Used and Expired are grouped by the cashier who issued them).
           </p>
+          {drill ? (
+            <ReportDrill
+              amountOf={(row) => row.amount}
+              groupName={drill.by === "status" ? "statuses" : drill.by === "reason" ? "reasons" : "cashiers"}
+              groupOf={groupOf(drill.by)}
+              itemOf={(row) => ({
+                key: String(row.id),
+                primary: `${row.code} · ${row.player_name}`,
+                secondary: [
+                  `issued ${usDate(row.issued_on)}`,
+                  row.tee_date ? `round ${usDate(row.tee_date)}${row.tee_time ? ` ${row.tee_time}` : ""}` : "",
+                  BADGE[stateOf(row)].label,
+                  stateOf(row) === "redeemed" ? [row.redeemed_receipt, when(row.redeemed_at)].filter(Boolean).join(" ") : "",
+                  stateOf(row) === "void" ? row.void_reason : `valid through ${usDate(row.expires_on)}`,
+                  row.cashier,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+                amount: row.amount,
+              })}
+              key={drill.title}
+              onClose={() => setDrill(null)}
+              rows={drill.rows}
+              title={`Rain checks — ${drill.title}`}
+              unit="slip"
+            />
+          ) : null}
         </>
       )}
     </div>

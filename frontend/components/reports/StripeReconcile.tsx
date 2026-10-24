@@ -11,6 +11,9 @@
  *
  * Problem = 돈이 어긋났다. Check = 돈은 맞지만 기록이 덜 끝났다. Matched = 둘이 같다.
  * Reviewed = 어긋났지만 그대로 두기로 정했다(이유가 남아 있다).
+ *
+ * 위 숫자 칸은 먼저 요약(금액 칸은 받은 곳별, Problems·To check 는 무엇이 어긋났는지별), 줄을 누르면 그 결제,
+ * 결제를 누르면 상세 창(2026-10-24, `ReportDrill`).
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -36,6 +39,7 @@ import {
 } from "@/lib/reports/stripeReconcile";
 
 import ReconcileDetail from "@/components/reports/ReconcileDetail";
+import ReportDrill, { type DrillGroup } from "@/components/reports/ReportDrill";
 import { Button, Chip, EmptyNote, ErrorNote, Field, Panel, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 const BADGE: Record<Level, string> = {
@@ -49,6 +53,47 @@ const FILTERS = [
   { key: "issues", label: "Problems & checks" },
   { key: "all", label: "All payments" },
 ] as const;
+
+/** 서버(`stripe_reconcile.py` 의 `_issue`) 코드 → 요약 줄 이름. 모르는 코드는 서버 문장 그대로. */
+const ISSUE_LABEL: Record<string, string> = {
+  stripe_only: "Charged in Stripe, no record here",
+  not_recorded: "Charged in Stripe, not paid here",
+  ours_only: "Paid here, not charged in Stripe",
+  amount: "Amounts differ",
+  refund_stripe_only: "Refunded in Stripe only",
+  refund_ours_only: "Refunded here only",
+  disputed: "Disputed (chargeback)",
+  refund_pending: "Refund still pending on the reader",
+  bill_open: "Charged, bill still open",
+  not_on_bill: "Charged, not on any bill",
+  bill_line: "Bill line differs from the card charge",
+  orphaned: "Paid online, could not be booked",
+  bill_refunded_card_not: "Bill refunded, card not refunded",
+  card_refunded_bill_paid: "Card refunded, bill still paid",
+};
+
+type StatDrill = "stripe" | "ours" | "difference" | "errors" | "warnings" | "matched";
+
+const STAT_TITLES: Record<StatDrill, string> = {
+  stripe: "Stripe net",
+  ours: "Our records net",
+  difference: "Difference — Stripe − our records",
+  errors: "Problems — money does not match",
+  warnings: "To check — records unfinished",
+  matched: "Matched",
+};
+
+const bySource = (row: ReconcileRow): DrillGroup => ({ key: row.source, label: SOURCE_LABEL[row.source] });
+
+function byIssue(level: "error" | "warn") {
+  return (row: ReconcileRow): DrillGroup => {
+    const issue = row.issues.find((item) => item.level === level) ?? row.issues[0];
+    return issue ? { key: issue.code, label: ISSUE_LABEL[issue.code] ?? issue.message } : { key: "", label: "Other" };
+  };
+}
+
+const stripeNet = (row: ReconcileRow) => (row.stripe ? row.stripe.amount - row.stripe.refunded : 0);
+const oursNet = (row: ReconcileRow) => (row.ours ? row.ours.amount - row.ours.refunded : 0);
 
 function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
@@ -88,6 +133,8 @@ export default function StripeReconcile() {
   const [reloadKey, setReloadKey] = useState(0);
   // 상세 창. 다시 읽는 동안(report 가 비는 동안)은 연 때의 줄을 그대로 보여 준다.
   const [opened, setOpened] = useState<ReconcileRow | null>(null);
+  // 숫자 칸을 눌러 연 요약.
+  const [drill, setDrill] = useState<StatDrill | null>(null);
   const wantedPi = useRef(linkedParam("pi"));
 
   const rangeError = useMemo(() => {
@@ -194,34 +241,37 @@ export default function StripeReconcile() {
             <StatCard
               hint={`${formatMoney(s.stripe_charged)} in − ${formatMoney(s.stripe_refunded)} refunded`}
               label="Stripe net"
+              onClick={() => setDrill("stripe")}
               value={formatMoney(s.stripe_net)}
             />
             <StatCard
               hint={`${formatMoney(s.ours_charged)} in − ${formatMoney(s.ours_refunded)} refunded`}
               label="Our records net"
+              onClick={() => setDrill("ours")}
               value={formatMoney(s.ours_net)}
             />
             <StatCard
               hint={s.difference === 0 ? "Stripe and our records agree" : "Stripe − our records"}
               label="Difference"
+              onClick={() => setDrill("difference")}
               value={formatMoney(s.difference)}
             />
             <StatCard
               hint="money does not match"
               label="Problems"
-              onClick={() => setFilter("issues")}
+              onClick={() => setDrill("errors")}
               value={String(s.errors)}
             />
             <StatCard
               hint="money matches, records unfinished"
               label="To check"
-              onClick={() => setFilter("issues")}
+              onClick={() => setDrill("warnings")}
               value={String(s.warnings)}
             />
             <StatCard
               hint={s.reviewed ? `Stripe = our records · ${s.reviewed} reviewed` : "Stripe = our records"}
               label="Matched"
-              onClick={() => setFilter("all")}
+              onClick={() => setDrill("matched")}
               value={String(s.matched)}
             />
           </div>
@@ -269,6 +319,18 @@ export default function StripeReconcile() {
         </>
       ) : null}
 
+      {drill && report ? (
+        <StatDrillModal
+          drill={drill}
+          onClose={() => setDrill(null)}
+          onOpen={(row) => {
+            setDrill(null);
+            openDetail(row);
+          }}
+          rows={report.rows}
+        />
+      ) : null}
+
       {openRow && report ? (
         <ReconcileDetail
           environment={report.environment}
@@ -278,6 +340,72 @@ export default function StripeReconcile() {
         />
       ) : null}
     </div>
+  );
+}
+
+function StatDrillModal({
+  drill,
+  rows,
+  onOpen,
+  onClose,
+}: {
+  drill: StatDrill;
+  rows: ReconcileRow[];
+  onOpen: (row: ReconcileRow) => void;
+  onClose: () => void;
+}) {
+  const amountOf =
+    drill === "stripe" ? stripeNet : drill === "ours" ? oursNet : drill === "difference" ? rowDifference : undefined;
+  const picked = rows.filter((row) =>
+    drill === "stripe"
+      ? row.stripe
+      : drill === "ours"
+        ? row.ours
+        : drill === "difference"
+          ? rowDifference(row) !== 0
+          : drill === "errors"
+            ? row.level === "error"
+            : drill === "warnings"
+              ? row.level === "warn"
+              : row.level === "ok",
+  );
+  const groupOf =
+    drill === "errors"
+      ? byIssue("error")
+      : drill === "warnings"
+        ? byIssue("warn")
+        : drill === "matched"
+          ? (row: ReconcileRow): DrillGroup =>
+              row.reviewed ? { key: "reviewed", label: "Reviewed — left as is" } : bySource(row)
+          : bySource;
+  return (
+    <ReportDrill
+      amountOf={amountOf}
+      groupName={drill === "errors" || drill === "warnings" ? "problems" : "sources"}
+      groupOf={groupOf}
+      itemOf={(row) => ({
+        key: row.key,
+        primary: row.ours?.label || cardText(row) || row.key,
+        secondary: [
+          clubTime(row.at),
+          SOURCE_LABEL[row.source],
+          cardText(row),
+          row.ours?.receipt_no ?? "",
+          ...row.issues.map((issue) => issue.message),
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        amount: amountOf ? amountOf(row) : (row.stripe?.amount ?? row.ours?.amount ?? 0),
+        onOpen: () => onOpen(row),
+      })}
+      lastGroup="reviewed"
+      note={drill === "matched" ? "Reviewed payments do not match but were left as is, so they are not counted as Matched." : null}
+      onClose={onClose}
+      rows={picked}
+      title={STAT_TITLES[drill]}
+      unit="payment"
+      wide
+    />
   );
 }
 

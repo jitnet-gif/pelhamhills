@@ -8,14 +8,17 @@
  *
  * 근무 범위(`ShiftWindow`)는 서버가 정한다(모닝 마감의 끝 시각). 화면은 결제 시각(`created_at`)으로 같은 범위를 고른다.
  * 금액: 마감 표와 맞출 때는 팁까지(서랍에 들어간 돈, `withTips`), Daily close 의 Cash Sales 와 맞출 때는 팁 빼고.
+ *
+ * 카드·체크카드도 같은 창으로 연다(2026-10-24, `paymentRows`·`method`) — Register closes 의 Card·Debit 칸,
+ * 대사표의 Sales report 줄. 서랍 마감과 맞출 때는 온라인 결제를 뺀다(`drawerOnly` — 서랍에 들어오지 않는다).
  */
 
 import { useEffect, useMemo, useState } from "react";
 
 import retailApi, { toRetailError } from "@/lib/retail/api";
-import { stationLabel } from "@/lib/retail/receipt";
 import { cashierKey, saleTime } from "@/lib/reports/shiftReport";
-import { formatMoney, type Cents, type RegisterShift, type Sale, type ShiftWindow } from "@/lib/retail/types";
+import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
+import { formatMoney, type Cents, type PaymentMethod, type RegisterShift, type Sale, type ShiftWindow } from "@/lib/retail/types";
 
 import StaffName from "@/components/reports/StaffName";
 import { EmptyNote, ErrorNote, Modal, SkeletonRows } from "@/components/retail/ui";
@@ -42,14 +45,25 @@ export function inShift(sale: Sale, window: ShiftWindow | null | undefined): boo
 
 /** 결제된 계산서의 현금 몫(분할 결제면 현금 줄만). 마감 표의 Payments 와 같은 범위 — `status = 'paid'`. */
 export function cashRows(sales: readonly Sale[], window?: ShiftWindow | null, withTips = false): CashRow[] {
+  return paymentRows(sales, "cash", window, withTips);
+}
+
+/** `cashRows` 를 결제 수단 하나로. `drawerOnly` 면 온라인 계산서(서랍 밖)를 뺀다. */
+export function paymentRows(
+  sales: readonly Sale[],
+  method: PaymentMethod,
+  window?: ShiftWindow | null,
+  withTips = false,
+  drawerOnly = false,
+): CashRow[] {
   return sales
-    .filter((sale) => isPaid(sale) && inShift(sale, window))
+    .filter((sale) => isPaid(sale) && inShift(sale, window) && !(drawerOnly && sale.station === "online"))
     .map((sale) => {
-      const cash = (sale.payments ?? []).filter((payment) => payment.method === "cash");
+      const paid = (sale.payments ?? []).filter((payment) => payment.method === method);
       return {
         sale,
-        amount: cash.length
-          ? cash.reduce((sum, payment) => sum + payment.amount + (withTips ? (payment.tip ?? 0) : 0), 0)
+        amount: paid.length
+          ? paid.reduce((sum, payment) => sum + payment.amount + (withTips ? (payment.tip ?? 0) : 0), 0)
           : null,
       };
     })
@@ -78,10 +92,19 @@ export function groupCashByCashier(rows: readonly CashRow[]): Group[] {
 }
 
 /** 담당자 칸 목록. 담당자가 셋 이하면 펼쳐서 연다. */
-export function CashByCashier({ rows, onOpenSale }: { rows: readonly CashRow[]; onOpenSale?: (sale: Sale) => void }) {
+export function CashByCashier({
+  rows,
+  onOpenSale,
+  method = "cash",
+}: {
+  rows: readonly CashRow[];
+  onOpenSale?: (sale: Sale) => void;
+  method?: PaymentMethod;
+}) {
   const groups = useMemo(() => groupCashByCashier(rows), [rows]);
   const total = rows.reduce((sum, row) => sum + row.amount, 0);
-  if (rows.length === 0) return <EmptyNote>No cash transactions in this period.</EmptyNote>;
+  const noun = `${PAYMENT_LABELS[method].toLowerCase()} transaction(s)`;
+  if (rows.length === 0) return <EmptyNote>No {noun.replace("(s)", "s")} in this period.</EmptyNote>;
   return (
     <div className="grid gap-2">
       {groups.map((group) => (
@@ -93,7 +116,7 @@ export function CashByCashier({ rows, onOpenSale }: { rows: readonly CashRow[]; 
               </span>
               <span className="block text-xs text-[#6b7280]">
                 {saleTime(group.rows[0].sale)} – {saleTime(group.rows[group.rows.length - 1].sale)} ·{" "}
-                {group.rows.length} cash transaction(s)
+                {group.rows.length} {noun}
               </span>
             </span>
             <span className="shrink-0 text-base font-bold tabular-nums">{formatMoney(group.total)}</span>
@@ -106,7 +129,7 @@ export function CashByCashier({ rows, onOpenSale }: { rows: readonly CashRow[]; 
                     <span className="tabular-nums">{saleTime(sale)}</span> · {sale.receipt_no}
                     <span className="text-[#6b7280]">
                       {sale.station ? ` · ${stationLabel(sale.station)}` : ""}
-                      {(sale.payments ?? []).some((payment) => payment.method !== "cash") ? " · split" : ""}
+                      {(sale.payments ?? []).some((payment) => payment.method !== method) ? " · split" : ""}
                     </span>
                   </span>
                   <span className="shrink-0 tabular-nums">{formatMoney(amount)}</span>
@@ -143,19 +166,27 @@ export function CashByCashier({ rows, onOpenSale }: { rows: readonly CashRow[]; 
 
 /**
  * 한 근무의 현금 거래 창. `sales` 를 주면 그것으로(마감 화면은 이미 읽었다), 없으면 그날 계산서를 읽는다.
- * 금액은 팁 포함 — 마감 표의 Cash Payments 와 같은 값이다.
+ * 금액은 팁 포함 — 마감 표의 Cash Payments 와 같은 값이다. `method` 로 카드·체크카드도 연다.
  */
 export function CashShiftModal({
   title,
   date,
   window,
   sales: given,
+  method = "cash",
+  drawerOnly = false,
+  note,
   onClose,
 }: {
   title: string;
   date: string;
   window: ShiftWindow | null | undefined;
   sales?: readonly Sale[];
+  method?: PaymentMethod;
+  /** 서랍 마감과 맞출 때 — 온라인 결제를 뺀다. */
+  drawerOnly?: boolean;
+  /** 아래 설명을 바꿀 때. */
+  note?: string;
   onClose: () => void;
 }) {
   const [loaded, setLoaded] = useState<{
@@ -180,7 +211,10 @@ export function CashShiftModal({
   }, [date, given]);
 
   const sales = given ?? loaded?.sales ?? null;
-  const rows = useMemo(() => (sales ? cashRows(sales, window, true) : []), [sales, window]);
+  const rows = useMemo(
+    () => (sales ? paymentRows(sales, method, window, true, drawerOnly) : []),
+    [sales, window, method, drawerOnly],
+  );
 
   return (
     <Modal onClose={onClose} title={title}>
@@ -190,9 +224,10 @@ export function CashShiftModal({
         <SkeletonRows count={4} />
       ) : (
         <div className="grid gap-2">
-          <CashByCashier rows={rows} />
+          <CashByCashier method={method} rows={rows} />
           <p className="text-[11px] text-[#6b7280]">
-            Cash taken in this shift, tips included — the same total as the Cash Payments on Close Register.
+            {note ??
+              `${PAYMENT_LABELS[method]} taken in this shift, tips included — the same total as the ${PAYMENT_LABELS[method]} Payments on Close Register.`}
           </p>
         </div>
       )}

@@ -6,6 +6,8 @@
  * 업무시간 밖에 걸려 온 전화에서 손님이 사람과 얘기해야 하면 전화 비서가 "업무시간에 직원이 전화드리겠습니다"
  * 라고 말하고 여기에 적는다(0059, `request_callback`). 직원은 위에서부터 전화하고 "Called" 로 바꾼다.
  * 누가 언제 바꿨는지는 서버가 적는다.
+ *
+ * 위 두 칸은 먼저 요청한 날짜별 요약, 날짜를 누르면 그 날 기다리는 손님들(2026-10-24, `ReportDrill`).
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -19,6 +21,7 @@ import {
 } from "@/lib/callbacks";
 import { ApiError } from "@/lib/teeSheet/api";
 
+import ReportDrill from "@/components/reports/ReportDrill";
 import { Button, Chip, EmptyNote, ErrorNote, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 const FILTERS = [
@@ -37,6 +40,16 @@ function describe(cause: unknown): string {
   return (cause as Error)?.message ?? "Something went wrong.";
 }
 
+/** 요청한 날(브라우저 시간대) — 요약의 묶음. */
+function requestedDay(iso: string): { key: string; label: string } {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return { key: "", label: "Unknown date" };
+  return {
+    key: at.toLocaleDateString("en-CA"),
+    label: at.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" }),
+  };
+}
+
 const BADGE: Record<CallbackStatus, string> = {
   open: "bg-[#fff1cc] text-[#8a5a00]",
   called: "bg-[#dcfce7] text-[#166534]",
@@ -49,6 +62,7 @@ export default function PhoneCallbacks() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [drill, setDrill] = useState(false);
 
   const [reload, setReload] = useState(0);
   const load = useCallback(() => setReload((count) => count + 1), []);
@@ -98,10 +112,17 @@ export default function PhoneCallbacks() {
   return (
     <div className="grid min-w-0 gap-3">
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <StatCard hint="waiting for a call from staff" label="To call" strong value={rows ? String(open.length) : "—"} />
+        <StatCard
+          hint="waiting for a call from staff"
+          label="To call"
+          onClick={rows ? () => setDrill(true) : undefined}
+          strong
+          value={rows ? String(open.length) : "—"}
+        />
         <StatCard
           hint="call this one first"
           label="Oldest waiting"
+          onClick={open.length ? () => setDrill(true) : undefined}
           value={open.length ? callbackTime(open[open.length - 1].created_at) : "—"}
         />
       </div>
@@ -205,6 +226,24 @@ export default function PhoneCallbacks() {
         The phone assistant adds a request here when someone calls outside staff hours and needs a person. Call them
         back during business hours, then press Called. Notes are saved when you press Called, Close or Reopen.
       </p>
+      {drill ? (
+        <ReportDrill
+          groupName="days"
+          groupOf={(row) => requestedDay(row.created_at)}
+          itemOf={(row) => ({
+            key: row.id,
+            primary: `${`${row.first_name} ${row.last_name}`.trim() || "—"} · ${row.phone}`,
+            secondary: [row.ticket,row.reason, row.preferred_time ? `best time ${row.preferred_time}` : ""]
+              .filter(Boolean)
+              .join(" · "),
+            value: callbackTime(row.created_at),
+          })}
+          onClose={() => setDrill(false)}
+          rows={[...open].reverse()}
+          title="To call — oldest first"
+          unit="caller"
+        />
+      ) : null}
     </div>
   );
 }

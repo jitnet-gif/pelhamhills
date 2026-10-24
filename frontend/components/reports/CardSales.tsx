@@ -16,15 +16,19 @@
  * 줄마다 눌러서 그 숫자를 이루는 결제를 본다(2026-10-24, `Detail`). Difference 는 계산서마다 "Stripe 가 받은 돈 −
  * 우리 기록" 을 나란히 놓고, 0 이 아닌 계산서와 계산서 없는 Stripe 승인만 보인다. 그 합이 Difference 와 다르면
  * 나머지를 따로 적는다(숨기지 않는다).
+ *
+ * 상세는 먼저 담당자별 요약, 한 사람을 누르면 그 결제(2026-10-24). 계산서가 없는 Stripe 승인은 "No bill here",
+ * 취소·거절된 시도는 상태별로 묶는다.
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { CLUB_TIME_ZONE, PAYMENT_LABELS } from "@/lib/retail/receipt";
 import { formatMoney, type Cents, type Sale, type SalePayment } from "@/lib/retail/types";
-import { saleTime } from "@/lib/reports/shiftReport";
+import { cashierKey, saleTime } from "@/lib/reports/shiftReport";
 import { fetchReconcile, type ReconcileReport, type ReconcileRow } from "@/lib/reports/stripeReconcile";
 
+import { BackLink, summarize, type DrillGroup } from "@/components/reports/ReportDrill";
 import StaffName from "@/components/reports/StaffName";
 import { Button, EmptyNote, ErrorNote, Modal, Panel } from "@/components/retail/ui";
 
@@ -108,7 +112,16 @@ type Item = {
   amount: Cents;
   sale?: Sale;
   tone?: "warn" | "muted";
+  /** 요약 단계의 묶음 — 대개 담당자. */
+  group: DrillGroup;
 };
+
+const NO_BILL: DrillGroup = { key: "\u0000no-bill", label: "No bill here" };
+
+function cashierGroup(sale: Sale | undefined): DrillGroup {
+  if (!sale) return NO_BILL;
+  return { key: cashierKey(sale.cashier), label: (sale.cashier ?? "").trim() || "No cashier name" };
+}
 
 type PaymentRow = { sale: Sale; pay: SalePayment; refunded: boolean; source: Source };
 
@@ -144,6 +157,7 @@ function paymentItem(row: PaymentRow, amount: Cents, index: number): Item {
       .join(" · "),
     amount,
     sale,
+    group: cashierGroup(sale),
   };
 }
 
@@ -174,6 +188,7 @@ function stripeItem(row: ReconcileRow, amount: Cents, salesById: Map<number, Sal
       .join(" · "),
     amount,
     sale,
+    group: cashierGroup(sale),
   };
 }
 
@@ -237,6 +252,7 @@ function differenceItems(
       amount: inStripe - here,
       sale,
       tone: "warn",
+      group: cashierGroup(sale),
     });
   }
   return items;
@@ -356,6 +372,7 @@ export default function CardSales({
       {detail ? (
         <DetailModal
           detail={detail}
+          key={detail}
           onClose={() => setDetail(null)}
           onOpenSale={
             onOpenSale
@@ -411,6 +428,8 @@ function DetailModal({
   onOpenSale?: (sale: Sale) => void;
   onClose: () => void;
 }) {
+  // 요약에서 고른 묶음. null = 요약.
+  const [picked, setPicked] = useState<string | null>(null);
   const pay = (filter: (row: PaymentRow) => boolean, amount: (row: PaymentRow) => Cents) =>
     payments
       .filter(filter)
@@ -493,6 +512,7 @@ function DetailModal({
           .join(" · "),
         amount: attempt.amount,
         tone: "muted" as const,
+        group: { key: attempt.status_label, label: attempt.status_label },
       }));
       note = "The card was never charged for these — they are not in any total.";
       break;
@@ -500,18 +520,24 @@ function DetailModal({
 
   const total = items.reduce((sum, item) => sum + item.amount, 0);
   const rest = expectedTotal !== null ? expectedTotal - total : 0;
+  const groups = summarize(items, (item) => item.group, (item) => item.amount, NO_BILL.key);
+  const group = picked === null ? null : (groups.find((item) => item.key === picked) ?? null);
+  const shown = group ? group.rows : items;
 
   return (
-    <Modal onClose={onClose} title={DETAIL_TITLES[detail]} wide>
+    <Modal onClose={onClose} title={group ? `${DETAIL_TITLES[detail]} — ${group.label}` : DETAIL_TITLES[detail]} wide>
       <div className="grid gap-3">
-        {note ? <p className="text-xs text-[#6b7280]">{note}</p> : null}
+        {group ? (
+          <BackLink label={detail === "attempts" ? "All statuses" : "All cashiers"} onClick={() => setPicked(null)} />
+        ) : null}
+        {note && !group ? <p className="text-xs text-[#6b7280]">{note}</p> : null}
         {items.length === 0 ? (
           <EmptyNote>
             {detail === "difference" ? "Every bill matches Stripe." : "Nothing here for this date."}
           </EmptyNote>
-        ) : (
+        ) : group ? (
           <ul className="grid gap-1.5">
-            {items.map((item) => (
+            {group.rows.map((item) => (
               <li key={item.key}>
                 <DetailRow
                   item={item}
@@ -520,8 +546,25 @@ function DetailModal({
               </li>
             ))}
           </ul>
+        ) : (
+          <ul className="grid gap-1.5">
+            {groups.map((item) => (
+              <li key={item.key}>
+                <DetailRow
+                  item={{
+                    key: item.key,
+                    primary: `${item.label} ›`,
+                    secondary: `${item.rows.length} line(s)`,
+                    amount: item.total,
+                    group: item,
+                  }}
+                  onOpen={() => setPicked(item.key)}
+                />
+              </li>
+            ))}
+          </ul>
         )}
-        {rest !== 0 ? (
+        {rest !== 0 && !group ? (
           <p className="bg-[#fff8e1] px-3 py-2 text-xs text-[#5b4708]">
             {formatMoney(rest)} of the difference is not tied to one bill (for example a payment made on another day, or
             a card payment recorded without its reader approval). Open Stripe check to see every payment.
@@ -529,11 +572,19 @@ function DetailModal({
         ) : null}
         <div className="flex items-baseline justify-between gap-2 border-t border-[#d4d4d8] pt-2">
           <span className="text-sm font-bold">
-            Total <span className="text-xs font-normal text-[#6b7280]">{items.length} line(s)</span>
+            Total <span className="text-xs font-normal text-[#6b7280]">{shown.length} line(s)</span>
           </span>
-          <span className="text-lg font-bold tabular-nums">{formatMoney(expectedTotal ?? total)}</span>
+          <span className="text-lg font-bold tabular-nums">
+            {formatMoney(group ? group.total : (expectedTotal ?? total))}
+          </span>
         </div>
-        {onOpenSale ? <p className="text-[11px] text-[#6b7280]">Tap a receipt to open it.</p> : null}
+        {!group ? (
+          <p className="text-[11px] text-[#6b7280]">
+            {detail === "attempts" ? "Tap a status to see the attempts." : "Tap a cashier to see the payments."}
+          </p>
+        ) : onOpenSale ? (
+          <p className="text-[11px] text-[#6b7280]">Tap a receipt to open it.</p>
+        ) : null}
       </div>
     </Modal>
   );

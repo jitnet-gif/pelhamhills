@@ -9,6 +9,8 @@
  *
  * 2026-10-24 부터 하루 두 번(Morning · Dinner, 0092) — 근무마다 한 줄, 담당자(캐셔)와 근무 시각이 같이 보인다.
  * 모닝 마감이 없으면 디너 한 줄이 하루 전체다. 현금 칸을 누르면 그 근무의 현금 거래를 담당자별로 본다(`CashTransactions`).
+ * Card·Debit 칸도 같다(온라인 결제는 서랍 밖이라 뺀다). 위 숫자 칸은 먼저 근무·담당자별 요약, 줄을 누르면 그 마감,
+ * 마감을 누르면 그 근무의 거래(2026-10-24, `ReportDrill`).
  *
  * 현금은 `/cash` 에서만 보인다. 서버(0065)도 현금 리포트 계정이 아니면 현금 줄을 보내지 않는다 —
  * `cash` 로 한 번 더 거르는 것은 다른 탭과 같은 두 번째 울타리다.
@@ -28,6 +30,7 @@ import {
 import { addDays } from "@/lib/teeSheet/dates";
 
 import { CashShiftModal, SHIFT_LABELS } from "@/components/reports/CashTransactions";
+import ReportDrill, { type DrillGroup } from "@/components/reports/ReportDrill";
 import StaffName from "@/components/reports/StaffName";
 import { EmptyNote, ErrorNote, Field, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
@@ -72,8 +75,10 @@ export default function RegisterClosesReport({ cash }: { cash: boolean }) {
   const [from, setFrom] = useState(() => addDays(today, -13));
   const [to, setTo] = useState(today);
   const [loaded, setLoaded] = useState<{ range: string; report: RegisterCloseHistory | null; error: string } | null>(null);
-  // 현금 칸을 눌러 연 근무.
-  const [cashOf, setCashOf] = useState<RegisterCloseHistoryRow | null>(null);
+  // 결제 칸을 눌러 연 근무의 거래.
+  const [paymentsOf, setPaymentsOf] = useState<{ row: RegisterCloseHistoryRow; method: string } | null>(null);
+  // 숫자 칸을 눌러 연 요약. method 가 있으면 그 수단의 과부족.
+  const [drill, setDrill] = useState<{ title: string; rows: RegisterCloseHistoryRow[]; method?: string } | null>(null);
 
   const range = `${from}..${to}`;
   const rangeError = from && to && from > to ? "From must be on or before To." : "";
@@ -127,14 +132,37 @@ export default function RegisterClosesReport({ cash }: { cash: boolean }) {
       ) : !report ? null : (
         <>
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-            <StatCard hint={`${rows.length} shift close(s) with sales or a count`} label="Closed" strong value={String(closedRows.length)} />
-            <StatCard hint="sales but nobody closed" label="Not closed" value={String(openRows.length)} />
-            <StatCard hint="payments or refunds after the count" label="Recount" value={String(staleRows.length)} />
+            <StatCard
+              hint={`${rows.length} shift close(s) with sales or a count`}
+              label="Closed"
+              onClick={() => setDrill({ title: "Closed", rows: closedRows })}
+              strong
+              value={String(closedRows.length)}
+            />
+            <StatCard
+              hint="sales but nobody closed"
+              label="Not closed"
+              onClick={() => setDrill({ title: "Not closed", rows: openRows })}
+              value={String(openRows.length)}
+            />
+            <StatCard
+              hint="payments or refunds after the count"
+              label="Recount"
+              onClick={() => setDrill({ title: "Recount", rows: staleRows })}
+              value={String(staleRows.length)}
+            />
             {overShort.map((item) => (
               <StatCard
                 hint="counted − expected, closed days"
                 key={item.method}
                 label={`${METHOD_LABELS[item.method]} over/short`}
+                onClick={() =>
+                  setDrill({
+                    title: `${METHOD_LABELS[item.method]} over/short`,
+                    method: item.method,
+                    rows: closedRows.filter((row) => (lineOf(row, item.method)?.diff ?? 0) !== 0),
+                  })
+                }
                 value={signed(item.diff)}
               />
             ))}
@@ -196,7 +224,7 @@ export default function RegisterClosesReport({ cash }: { cash: boolean }) {
                           <MethodCell
                             key={method}
                             line={lineOf(row, method)}
-                            onOpen={method === "cash" ? () => setCashOf(row) : undefined}
+                            onOpen={() => setPaymentsOf({ row, method })}
                             row={row}
                           />
                         ))}
@@ -223,21 +251,63 @@ export default function RegisterClosesReport({ cash }: { cash: boolean }) {
             count — open Close Register for that day and count again. From Oct 21, 2026 one drawer takes every
             screen&apos;s payments. From Oct 24, 2026 the drawer is closed twice a day — Morning · Shift 1 (up to the
             morning shift end time) and Evening · Shift 2 (everything after); a day with no Shift 1 close has one Shift 2 row for the
-            whole day. Tap a cash amount to see that shift&apos;s cash transactions by cashier. Online payments are
-            never in a drawer.
+            whole day. Tap an amount to see that shift&apos;s transactions by cashier, or a number at the top for a
+            summary first. Online payments are never in a drawer.
           </p>
-          {cashOf ? (
+          {drill ? (
+            <ReportDrill
+              amountOf={drill.method ? (row) => lineOf(row, drill.method ?? "")?.diff ?? 0 : undefined}
+              groupName={drill.method ? "cashiers" : "shifts"}
+              groupOf={drill.method ? closeCashier : closeShift}
+              itemOf={(row) => ({
+                key: `${row.business_date}-${row.drawer}-${row.shift ?? "day"}`,
+                primary: `${usDate(row.business_date)} · ${row.shift ? SHIFT_LABELS[row.shift] : "Whole day"}`,
+                secondary: [
+                  BADGE[statusOf(row)].label,
+                  row.cashier,
+                  row.closed ? [closedAt(row.closed_at), row.closed_by].filter(Boolean).join(" · ") : "",
+                  row.note,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+                ...(drill.method ? {} : { value: "›" }),
+                onOpen: () => {
+                  setDrill(null);
+                  setPaymentsOf({ row, method: drill.method ?? (showCash ? "cash" : "card") });
+                },
+              })}
+              key={drill.title}
+              onClose={() => setDrill(null)}
+              rows={drill.rows}
+              title={drill.title}
+              unit="shift close"
+            />
+          ) : null}
+          {paymentsOf ? (
             <CashShiftModal
-              date={cashOf.business_date}
-              onClose={() => setCashOf(null)}
-              title={`Cash transactions — ${cashOf.shift ? SHIFT_LABELS[cashOf.shift] : "Day"} · ${usDate(cashOf.business_date)}`}
-              window={cashOf.window}
+              date={paymentsOf.row.business_date}
+              drawerOnly
+              method={paymentsOf.method === "debit" ? "debit" : paymentsOf.method === "card" ? "card" : "cash"}
+              onClose={() => setPaymentsOf(null)}
+              title={`${METHOD_LABELS[paymentsOf.method] ?? "Cash"} transactions — ${
+                paymentsOf.row.shift ? SHIFT_LABELS[paymentsOf.row.shift] : "Day"
+              } · ${usDate(paymentsOf.row.business_date)}`}
+              window={paymentsOf.row.window}
             />
           ) : null}
         </>
       )}
     </div>
   );
+}
+
+function closeShift(row: RegisterCloseHistoryRow): DrillGroup {
+  return { key: row.shift ?? "day", label: row.shift ? SHIFT_LABELS[row.shift] : "Whole day" };
+}
+
+function closeCashier(row: RegisterCloseHistoryRow): DrillGroup {
+  const name = (row.cashier || row.closed_by || "").trim();
+  return { key: name.toLowerCase(), label: name || "No cashier name" };
 }
 
 function lineOf(row: RegisterCloseHistoryRow, method: string): RegisterCloseHistoryLine | undefined {
@@ -251,7 +321,7 @@ function MethodCell({
 }: {
   line: RegisterCloseHistoryLine | undefined;
   row: RegisterCloseHistoryRow;
-  /** 현금 칸 — 눌러서 그 근무의 현금 거래를 본다. */
+  /** 눌러서 그 근무의 그 수단 거래를 본다. */
   onOpen?: () => void;
 }) {
   if (!line) return <td className="px-3 py-2" />;
@@ -259,7 +329,7 @@ function MethodCell({
     <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
       {onOpen ? (
         <button className="block w-full text-right text-xs font-bold text-[#4533ff] underline" onClick={onOpen} type="button">
-          cash sales {formatMoney(line.now - CASH_FLOAT)} →
+          {line.method === "cash" ? `cash sales ${formatMoney(line.now - CASH_FLOAT)}` : `${line.method} payments ${formatMoney(line.now)}`} →
         </button>
       ) : null}
       {row.closed && line.counted === null && line.method !== "cash" ? (

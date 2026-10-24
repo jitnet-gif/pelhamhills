@@ -19,6 +19,8 @@
  * 이 화면을 연 뒤 새로 생긴 예약에는 NEW 표시가 붙는다. 다시 읽는 동안 표를 비우지 않는다.
  *
  * 날짜 칸은 **플레이 날짜**다. "Booked today" 는 그 기간 안에서 오늘 접수된 것이다.
+ *
+ * 위 숫자 칸과 웹 유입 경로 줄은 먼저 요약(경로별·유입 경로별·플레이 날짜별), 줄을 누르면 그 예약들(2026-10-24, `ReportDrill`).
  */
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +33,7 @@ import type { TeeBooking } from "@/lib/teeSheet/types";
 import { localBusinessDate } from "@/lib/retail/api";
 import { datesBetween } from "@/lib/reports/accountingWorkbook";
 
+import ReportDrill, { type DrillGroup } from "@/components/reports/ReportDrill";
 import { Button, Chip, EmptyNote, ErrorNote, Field, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 const MAX_DAYS = 31;
@@ -247,6 +250,8 @@ export default function BookingsReport() {
   const [to, setTo] = useState(() => addDays(today, 6));
   const [channel, setChannel] = useState<Channel | "all">("all");
   const [area, setArea] = useState<(typeof AREAS)[number]["key"]>("all");
+  // 숫자 칸을 눌러 연 요약 — 무엇으로 묶을지(경로·웹 유입 경로·플레이 날짜).
+  const [drill, setDrill] = useState<{ title: string; rows: Row[]; by: "channel" | "web" | "date" } | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
   const [paused, setPaused] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -483,21 +488,38 @@ export default function BookingsReport() {
           ) : null}
 
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <StatCard hint={`${totalPlayers} player(s)`} label="Bookings" strong value={String(inArea.length)} />
+            <StatCard
+              hint={`${totalPlayers} player(s)`}
+              label="Bookings"
+              onClick={() => setDrill({ title: "Bookings", rows: inArea, by: "channel" })}
+              strong
+              value={String(inArea.length)}
+            />
             <StatCard
               hint={`${bookedToday.reduce((sum, row) => sum + row.players, 0)} player(s)`}
               label="Booked today"
+              onClick={() => setDrill({ title: "Booked today", rows: bookedToday, by: "channel" })}
               strong
               value={String(bookedToday.length)}
             />
             <StatCard
               hint={`${inArea.filter((row) => row.channel === "web").reduce((sum, row) => sum + row.players, 0)} player(s)`}
               label="Online (website)"
+              onClick={() =>
+                setDrill({ title: "Online (website)", rows: inArea.filter((row) => row.channel === "web"), by: "web" })
+              }
               value={String(inArea.filter((row) => row.channel === "web").length)}
             />
             <StatCard
               hint={holds.length > 0 ? `${holds.length} call(s) holding a time now` : "No call in progress"}
               label="Phone (AI + staff)"
+              onClick={() =>
+                setDrill({
+                  title: "Phone (AI + staff)",
+                  rows: inArea.filter((row) => row.channel === "phone_ai" || row.channel === "phone_staff"),
+                  by: "channel",
+                })
+              }
               value={String(inArea.filter((row) => row.channel === "phone_ai" || row.channel === "phone_staff").length)}
             />
           </div>
@@ -558,11 +580,25 @@ export default function BookingsReport() {
               ) : (
                 <ul className="divide-y divide-[#ececf0] text-sm">
                   {webSources.map(([label, count]) => (
-                    <li className="flex items-center justify-between px-3 py-2" key={label}>
-                      <span className={label === "Source not recorded" ? "text-[#9ca3af]" : ""}>{label}</span>
-                      <span className="tabular-nums">
-                        <b>{count.bookings}</b> <span className="text-xs text-[#6b7280]">· {count.players} pl.</span>
-                      </span>
+                    <li key={label}>
+                      <button
+                        className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-[#f9fafb] hover:text-[#4533ff]"
+                        onClick={() =>
+                          setDrill({
+                            title: `Website — ${label}`,
+                            rows: inArea.filter(
+                              (row) => row.channel === "web" && webSource(current.sources.get(row.key)).label === label,
+                            ),
+                            by: "date",
+                          })
+                        }
+                        type="button"
+                      >
+                        <span className={label === "Source not recorded" ? "text-[#9ca3af]" : ""}>{label}</span>
+                        <span className="tabular-nums">
+                          <b>{count.bookings}</b> <span className="text-xs text-[#6b7280]">· {count.players} pl.</span>
+                        </span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -689,8 +725,35 @@ export default function BookingsReport() {
             Dates are play dates. Refreshes every {POLL_MS / 1000} seconds while this tab is open. Pro shop = tee times
             staff entered by hand (a call the staff took cannot be told apart from a walk-in on the tee sheet). Website
             sources are recorded from the visitor&apos;s entry page; Google search and a Google Maps link look the same
-            unless the Maps link carries utm tags.
+            unless the Maps link carries utm tags. Tap a number at the top or a website source for a summary, then the
+            bookings.
           </p>
+          {drill ? (
+            <ReportDrill
+              detailOf={(list) => `${list.reduce((sum, row) => sum + row.players, 0)} player(s)`}
+              groupName={drill.by === "channel" ? "channels" : drill.by === "web" ? "sources" : "dates"}
+              groupOf={(row): DrillGroup =>
+                drill.by === "channel"
+                  ? { key: row.channel, label: CHANNEL[row.channel].label }
+                  : drill.by === "web"
+                    ? (({ label }) => ({ key: label, label }))(webSource(current.sources.get(row.key)))
+                    : { key: row.date, label: shortDate(row.date) }
+              }
+              itemOf={(row) => ({
+                key: row.key,
+                primary: `${shortDate(row.date)} ${row.time} · ${row.name}`,
+                secondary: [CHANNEL[row.channel].label, row.where, row.status, row.code ? `#${row.code}` : "", row.contact]
+                  .filter(Boolean)
+                  .join(" · "),
+                value: `${row.players} pl.`,
+              })}
+              key={drill.title}
+              onClose={() => setDrill(null)}
+              rows={drill.rows}
+              title={drill.title}
+              unit="booking"
+            />
+          ) : null}
         </>
       )}
     </div>

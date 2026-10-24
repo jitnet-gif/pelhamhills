@@ -11,6 +11,8 @@
  * 카드 쪽 취소(Stripe 의 Canceled·거절, 단말기 VOID)는 위 Card & debit 칸과 Stripe check 에 있다.
  *
  * 세 목록은 따로 읽는다 — 하나가 실패해도(0088 전 등) 나머지는 보인다.
+ *
+ * 칸 제목(건수·합계)을 누르면 먼저 요약(환불·void 는 담당자별, 예약은 종류별), 줄을 누르면 그 건들(2026-10-24).
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -23,7 +25,9 @@ import { staffBookings } from "@/lib/teeSheet/staffRpc";
 import type { TeeBooking } from "@/lib/teeSheet/types";
 import { clubTime } from "@/lib/reports/stripeReconcile";
 
+import ReportDrill, { type DrillGroup, type DrillItem } from "@/components/reports/ReportDrill";
 import StaffName, { localDateOf } from "@/components/reports/StaffName";
+import { cashierKey } from "@/lib/reports/shiftReport";
 import { Button, EmptyNote, ErrorNote, Panel, SkeletonRows } from "@/components/retail/ui";
 
 type Loaded<T> = { key: string; rows: T[]; error: string };
@@ -47,6 +51,14 @@ function useList<T>(key: string, load: () => Promise<T[]>, describe: (cause: unk
   }, [key]);
   return loaded?.key === key ? loaded : null;
 }
+
+/** 요약용 한 줄 — 묶음과 그 줄. */
+type CancelRow = DrillItem & { group: DrillGroup };
+
+const cashierGroup = (name: string | null): DrillGroup => ({
+  key: cashierKey(name),
+  label: (name ?? "").trim() || "No cashier name",
+});
 
 const errorText = (cause: unknown) => (cause instanceof Error ? cause.message : "Could not load.");
 
@@ -85,6 +97,58 @@ export default function Cancellations({
 
   const refundTotal = refunds.reduce((sum, sale) => sum + sale.total, 0);
   const voidTotal = (voids?.rows ?? []).reduce((sum, bill) => sum + bill.total, 0);
+  const [drill, setDrill] = useState<"refunds" | "voids" | "bookings" | null>(null);
+
+  const drillRows = (): CancelRow[] => {
+    if (drill === "refunds") {
+      return refunds.map((sale) => ({
+        key: String(sale.id),
+        group: cashierGroup(sale.cashier),
+        primary: sale.receipt_no,
+        secondary: [clubTime(sale.refunded_at), sale.payment_method ? PAYMENT_LABELS[sale.payment_method] : "", sale.refund_reason]
+          .filter(Boolean)
+          .join(" · "),
+        amount: sale.total,
+        onOpen: () => {
+          setDrill(null);
+          onOpenSale(sale);
+        },
+      }));
+    }
+    if (drill === "voids") {
+      return (voids?.rows ?? []).map((bill) => ({
+        key: String(bill.id),
+        group: cashierGroup(bill.cashier),
+        primary: bill.label || `Bill #${bill.id}`,
+        secondary: [stationLabel(bill.station), clubTime(bill.voided_at), linesText(bill)].filter(Boolean).join(" · "),
+        amount: bill.total,
+      }));
+    }
+    return [
+      ...teeCancelled.map((booking) => ({
+        key: `tee-${booking.id}`,
+        group: { key: "tee", label: "Tee times cancelled" },
+        primary: `${booking.time} tee time · ${booking.title || booking.players[0]?.name || "—"}`,
+        secondary: [`${booking.players.length} player(s)`, booking.cancelReason, booking.confirmationCode].filter(Boolean).join(" · "),
+        value: booking.players.some((p) => p.paid) ? "was paid" : "",
+      })),
+      ...bayCancelled.map((reservation) => ({
+        key: `bay-${reservation.id}`,
+        group: { key: "bay", label: "Indoor bays cancelled" },
+        primary: `${reservation.start_time} indoor bay · ${reservation.customer_name || "—"}`,
+        secondary: [`${reservation.duration_hours}h`, `${reservation.player_count} player(s)`, reservation.confirmation_code]
+          .filter(Boolean)
+          .join(" · "),
+      })),
+      ...playersDropped.map(({ booking, player }) => ({
+        key: `player-${booking.id}-${player.id}`,
+        group: { key: "dropped", label: "Players dropped from a tee time" },
+        primary: `${booking.time} tee time · ${player.name || "Player"}`,
+        secondary: booking.title,
+        value: player.paid ? "was paid" : "",
+      })),
+    ];
+  };
 
   return (
     <Panel
@@ -92,7 +156,13 @@ export default function Cancellations({
       title={`Cancels & voids — ${date}`}
     >
       <div className="grid gap-4 lg:grid-cols-3">
-        <Section count={refunds.length} hint="already taken out of sales" title="Refunded sales" total={refundTotal}>
+        <Section
+          count={refunds.length}
+          hint="already taken out of sales"
+          onOpen={() => setDrill("refunds")}
+          title="Refunded sales"
+          total={refundTotal}
+        >
           {refunds.length === 0 ? (
             <EmptyNote>No refunds.</EmptyNote>
           ) : (
@@ -127,6 +197,7 @@ export default function Cancellations({
         <Section
           count={voids?.rows.length ?? 0}
           hint="deleted before payment · never in sales"
+          onOpen={voids && !voids.error ? () => setDrill("voids") : undefined}
           title="Voided bills"
           total={voidTotal}
         >
@@ -163,6 +234,7 @@ export default function Cancellations({
         <Section
           count={teeCancelled.length + bayCancelled.length}
           hint="bookings for this play date"
+          onOpen={tee && bays ? () => setDrill("bookings") : undefined}
           title="Cancelled bookings"
         >
           {!tee || !bays ? (
@@ -225,6 +297,19 @@ export default function Cancellations({
           )}
         </Section>
       </div>
+      {drill ? (
+        <ReportDrill
+          amountOf={drill === "bookings" ? undefined : (row) => row.amount ?? 0}
+          groupName={drill === "bookings" ? "kinds" : "cashiers"}
+          groupOf={(row) => row.group}
+          itemOf={(row) => row}
+          key={drill}
+          onClose={() => setDrill(null)}
+          rows={drillRows()}
+          title={drill === "refunds" ? "Refunded sales" : drill === "voids" ? "Voided bills" : "Cancelled bookings"}
+          unit={drill === "bookings" ? "cancellation" : "bill"}
+        />
+      ) : null}
     </Panel>
   );
 }
@@ -234,25 +319,39 @@ function Section({
   hint,
   count,
   total,
+  onOpen,
   children,
 }: {
   title: string;
   hint: string;
   count: number;
   total?: number;
+  /** 제목 줄을 눌러 요약을 연다. */
+  onOpen?: () => void;
   children: ReactNode;
 }) {
+  const head = (
+    <>
+      <span className="min-w-0">
+        {/* 버튼 안이라 제목 태그 대신 span. */}
+        <span className="block font-bold">
+          {title} <span className="text-xs font-normal text-[#6b7280]">×{count}</span>
+        </span>
+        <span className="block text-[11px] text-[#6b7280]">{hint}</span>
+      </span>
+      {total !== undefined ? <span className="shrink-0 font-bold tabular-nums">{formatMoney(total)}</span> : null}
+    </>
+  );
+  const headClass = "flex items-baseline justify-between gap-2 border-b border-[#ececf0] pb-1";
   return (
     <section className="grid min-w-0 content-start gap-2 text-sm">
-      <header className="flex items-baseline justify-between gap-2 border-b border-[#ececf0] pb-1">
-        <span className="min-w-0">
-          <h3 className="font-bold">
-            {title} <span className="text-xs font-normal text-[#6b7280]">×{count}</span>
-          </h3>
-          <span className="block text-[11px] text-[#6b7280]">{hint}</span>
-        </span>
-        {total !== undefined ? <span className="shrink-0 font-bold tabular-nums">{formatMoney(total)}</span> : null}
-      </header>
+      {onOpen ? (
+        <button className={`${headClass} w-full text-left hover:text-[#4533ff]`} onClick={onOpen} type="button">
+          {head}
+        </button>
+      ) : (
+        <header className={headClass}>{head}</header>
+      )}
       {children}
     </section>
   );
