@@ -39,10 +39,13 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import {
   ADMIN_ACCOUNTS,
   ADMIN_AI_MARKETING,
+  ADMIN_CALLS,
   ADMIN_DYNAMIC_PRICING,
+  ADMIN_EVENTS,
   ADMIN_HOME,
   ADMIN_MARKETING,
   ADMIN_PRICING,
+  ADMIN_PROMOTIONS,
   ADMIN_REPORTS,
   CLUB,
   SITE_HOME,
@@ -57,6 +60,7 @@ import { useAccountsAccess } from "@/lib/accounts";
 import { useAiMarketingAccess } from "@/lib/aiMarketing/access";
 import { useMarketingAccess } from "@/lib/marketing/access";
 import { useReportsAccess } from "@/lib/reports/access";
+import { SCREENS, canOpen, useScreenAccess, type Screen } from "@/lib/screens";
 import { ApiError } from "@/lib/teeSheet/api";
 import { todayIso } from "@/lib/teeSheet/dates";
 import { accessToken, getSession, signIn, signOut, subscribe } from "@/lib/teeSheet/session";
@@ -77,7 +81,20 @@ type Props = {
    * 그 앱의 범위(scope)는 `/pos` 라서, 어드민 메뉴로 나가면 앱 창에 주소 표시줄이 뜬다.
    */
   variant?: "admin" | "pos";
+  /**
+   * Account Setup 의 화면 권한(0098)으로 여는 화면이면 그 이름. 권한이 없는 계정에는 본문 대신 이유만 보인다.
+   * 주소로 바로 들어와도 같다 — 메뉴만 가리면 북마크로 열린다.
+   */
+  screen?: Screen;
   children: ReactNode;
+};
+
+/** 메뉴 항목 → 화면 권한. */
+const SCREEN_OF_HREF: Record<string, Screen> = {
+  [ADMIN_DYNAMIC_PRICING]: "dynamic_pricing",
+  [ADMIN_EVENTS]: "events",
+  [ADMIN_PROMOTIONS]: "promotions",
+  [ADMIN_CALLS]: "calls",
 };
 
 /**
@@ -161,6 +178,7 @@ function AdminFrame({
   title,
   actions,
   fill = false,
+  screen,
   children,
   email,
   onSignOut,
@@ -186,27 +204,31 @@ function AdminFrame({
   );
   // Reports 는 Emmeline 계정에만 보인다(`lib/reports/access.ts`). 다른 계정에는 메뉴에서 뺀다.
   const reportsAllowed = useReportsAccess(email) === true;
-  // 요금 두 화면(Tee Times & Pricing, Dynamic Pricing)도 매니저 = Reports 명단 계정에게만 보인다.
-  // Account Setup 의 Reports 체크로 켜고 끈다.
+  // Tee Times & Pricing 도 매니저 = Reports 명단 계정에게만 보인다. Account Setup 의 Reports 체크로 켜고 끈다.
   // Account Setup 도 계정 관리자(0074)에게만 보인다(`lib/accounts.ts`).
   const accountsAllowed = useAccountsAccess(email) === true;
   // Marketing 도 마케팅 명단(0047) 계정에만 보인다(`lib/marketing/access.ts`).
   const marketingAllowed = useMarketingAccess(email) === true;
   // AI Manager Marketing Strategies 는 매니저와 admin@ · proshop@ · analysis@ 에게만(0094, `lib/aiMarketing/access.ts`).
   const aiMarketingAllowed = useAiMarketingAccess(email) === true;
-  const shownDivision = useMemo(
-    () => ({
-      ...division,
-      links: division.links.filter(
-        (item) =>
-          (reportsAllowed || (item.href !== ADMIN_REPORTS && item.href !== ADMIN_PRICING && item.href !== ADMIN_DYNAMIC_PRICING)) &&
-          (accountsAllowed || item.href !== ADMIN_ACCOUNTS) &&
-          (marketingAllowed || item.href !== ADMIN_MARKETING) &&
-          (aiMarketingAllowed || item.href !== ADMIN_AI_MARKETING),
-      ),
-    }),
-    [division, reportsAllowed, accountsAllowed, marketingAllowed, aiMarketingAllowed],
+  // Dynamic Pricing · Events · Promotions · Calls & SMS 는 Account Setup 의 화면 체크(0098, `lib/screens.ts`).
+  const screenAccess = useScreenAccess(email);
+  const showHref = useCallback(
+    (href: string) => {
+      if (href === ADMIN_REPORTS || href === ADMIN_PRICING) return reportsAllowed;
+      if (href === ADMIN_ACCOUNTS) return accountsAllowed;
+      if (href === ADMIN_MARKETING) return marketingAllowed;
+      if (href === ADMIN_AI_MARKETING) return aiMarketingAllowed;
+      const needs = SCREEN_OF_HREF[href];
+      return needs ? canOpen(screenAccess, needs, reportsAllowed) === true : true;
+    },
+    [reportsAllowed, accountsAllowed, marketingAllowed, aiMarketingAllowed, screenAccess],
   );
+  const shownDivision = useMemo(
+    () => ({ ...division, links: division.links.filter((item) => showHref(item.href)) }),
+    [division, showHref],
+  );
+  const screenOpen = screen ? canOpen(screenAccess, screen, reportsAllowed) : true;
 
   // 화면을 옮기면 서랍은 닫힌다. 닫지 않으면 새 화면 위에 이전 메뉴가 그대로
   // 덮여 있어서, 사용자가 방금 고른 화면을 볼 수 없다.
@@ -274,7 +296,7 @@ function AdminFrame({
           <div className="min-w-0">
             <MobileTopBar onOpen={() => setDrawerOpen(true)} onSignOut={onSignOut} title={title} />
             <DesktopHeader
-              actions={actions}
+              actions={screenOpen ? actions : null}
               email={email}
               onSignOut={onSignOut}
               onToggleRail={() => setRailOpen((open) => !open)}
@@ -283,16 +305,18 @@ function AdminFrame({
             />
 
             {/* 모바일에서는 헤더의 액션이 좁아 잘리므로 제목 줄 아래로 내려 준다. */}
-            {actions ? (
+            {actions && screenOpen ? (
               <div className="flex flex-wrap items-center gap-2 border-b border-[#d4d4d8] bg-white px-4 py-2 lg:hidden">
                 {actions}
               </div>
             ) : null}
           </div>
 
-          <div className={fill ? "min-h-0 min-w-0 overflow-hidden" : "min-w-0"}>{children}</div>
+          <div className={fill ? "min-h-0 min-w-0 overflow-hidden" : "min-w-0"}>
+            {screen && screenOpen !== true ? <ScreenDenied checking={screenOpen === null} screen={screen} /> : children}
+          </div>
 
-          <MobileTabBar pathname={pathname} reportsAllowed={reportsAllowed} />
+          <MobileTabBar pathname={pathname} showHref={showHref} />
         </section>
       </div>
 
@@ -708,14 +732,30 @@ function MobileDrawer({
 
 // ===== 모바일 하단 탭 ===================================================
 
-function MobileTabBar({ pathname, reportsAllowed }: { pathname: string | null; reportsAllowed: boolean }) {
-  const items = reportsAllowed ? adminQuickNav : adminQuickNav.filter((item) => item.href !== ADMIN_REPORTS);
+/** 화면 권한(0098)이 없는 계정이 주소로 들어왔을 때. */
+function ScreenDenied({ screen, checking }: { screen: Screen; checking: boolean }) {
+  if (checking) return <p className="p-4 text-sm text-[#4e5560]">확인 중…</p>;
+  const label = SCREENS.find((item) => item.key === screen)?.label ?? screen;
+  return (
+    <div className="mx-auto grid max-w-md gap-3 p-4">
+      <div className="bg-white p-5 text-sm shadow-sm">
+        <p className="font-bold">This account can&apos;t open {label}.</p>
+        <p className="mt-2 text-[#6b7280]">Ask Emmeline to turn on {label} for this account in Account Setup.</p>
+      </div>
+    </div>
+  );
+}
+
+const TAB_COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
+
+function MobileTabBar({ pathname, showHref }: { pathname: string | null; showHref: (href: string) => boolean }) {
+  const items = adminQuickNav.filter((item) => showHref(item.href));
   return (
     // pb-[env(safe-area-inset-bottom)]: 홈 인디케이터가 있는 아이폰에서 마지막
     // 탭 줄이 인디케이터에 가려 눌리지 않는 것을 막는다.
     <nav
       aria-label="Quick admin sections"
-      className={`grid ${items.length === 4 ? "grid-cols-4" : "grid-cols-3"} border-t border-[#d4d4d8] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden`}
+      className={`grid ${TAB_COLS[items.length] ?? "grid-cols-4"} border-t border-[#d4d4d8] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden`}
     >
       {items.map((item) => {
         const current = isActive(pathname, item.href);

@@ -13,6 +13,7 @@
 import { useState, type ReactNode } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
+import type { Screen } from "@/lib/screens";
 
 type Metric = {
   label: string;
@@ -31,6 +32,7 @@ export default function AdminFeaturePage({
   metrics,
   rows,
   actionLabel,
+  screen,
   children,
 }: {
   title: string;
@@ -38,6 +40,8 @@ export default function AdminFeaturePage({
   metrics: Metric[];
   rows: Row[];
   actionLabel: string;
+  /** Account Setup 의 화면 권한(0098)으로 여는 화면이면 그 이름(`AdminShell` 의 같은 prop). */
+  screen?: Screen;
   /** 뼈대(설명·지표·표) 아래에 붙일 진짜 패널. 없으면 아무것도 그리지 않는다. */
   children?: ReactNode;
 }) {
@@ -69,6 +73,7 @@ export default function AdminFeaturePage({
 
   return (
     <AdminShell
+      screen={screen}
       actions={
         <>
           <span className="text-xs font-bold text-[#6b7280]">{saved}</span>

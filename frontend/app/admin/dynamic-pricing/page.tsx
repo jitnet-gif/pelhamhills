@@ -16,6 +16,7 @@ export default function DynamicPricingPage() {
         { name: "Twilight Saver", detail: "After 4:00 PM 9-hole and 18-hole discounted rates", status: "Active" },
         { name: "Low Demand Recovery", detail: "Reduce public rate by $7 when same-day occupancy is under 45%", status: "Paused" },
       ]}
+      screen="dynamic_pricing"
       title="Dynamic Pricing"
     />
   );

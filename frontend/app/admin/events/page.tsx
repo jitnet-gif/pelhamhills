@@ -16,6 +16,7 @@ export default function EventsPage() {
         { name: "Corporate Outing", detail: "Shotgun start with banquet room hold", status: "Active" },
         { name: "Junior Clinic", detail: "Practice area and front-nine partial block", status: "Draft" },
       ]}
+      screen="events"
       title="Events"
     />
   );

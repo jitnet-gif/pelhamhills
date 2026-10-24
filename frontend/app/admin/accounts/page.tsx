@@ -15,6 +15,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import { Button, Chip, EmptyNote, ErrorNote, Field, Modal, SkeletonRows, TextInput } from "@/components/retail/ui";
 import { accountsApi, describeAccountError, useAccountsAccess, type Account, type AccountInput } from "@/lib/accounts";
 import { clubDateTime } from "@/lib/lostItems";
+import { SCREENS, type Screen } from "@/lib/screens";
 import { getSession } from "@/lib/teeSheet/session";
 
 const FILTERS = [
@@ -30,7 +31,7 @@ function matches(filter: FilterKey, row: Account): boolean {
   return filter === "staff" ? row.staff : !row.staff;
 }
 
-const BLANK: AccountInput = { id: null, email: "", password: "", staff: true, reports: false };
+const BLANK: AccountInput = { id: null, email: "", password: "", staff: true, reports: false, screens: [] };
 
 export default function AccountsPage() {
   return (
@@ -135,6 +136,9 @@ function AccountsManager() {
           Every sign-in for this site is listed here. <b>Staff</b> opens the admin screens; <b>Reports</b> also shows
           Reports with cash.
         </p>
+        <p>
+          Dynamic Pricing, Events, Promotions, Calls &amp; SMS and Marketing only show for accounts you tick them for.
+        </p>
         <p className="text-[#6b7280]">
           Passwords are stored encrypted and can&apos;t be shown. To give someone a password, set a new one with Edit.
         </p>
@@ -176,7 +180,14 @@ function AccountsManager() {
               key={row.id}
               onDelete={() => void remove(row)}
               onEdit={() =>
-                setEditing({ id: row.id, email: row.email, password: "", staff: row.staff, reports: row.reports })
+                setEditing({
+                  id: row.id,
+                  email: row.email,
+                  password: "",
+                  staff: row.staff,
+                  reports: row.reports,
+                  screens: row.screens ?? null,
+                })
               }
               row={row}
             />
@@ -186,7 +197,7 @@ function AccountsManager() {
 
       {editing ? (
         <EditorModal
-          initial={editing}
+          initial={editing.id === null && rows?.some((row) => !row.screens) ? { ...editing, screens: null } : editing}
           isMe={rows?.some((row) => row.id === editing.id && row.is_me) ?? false}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -218,6 +229,9 @@ function AccountRow({
         {row.staff ? <Badge>Staff</Badge> : null}
         {row.reports ? <Badge>Reports</Badge> : null}
         {row.account_admin ? <Badge>Account manager</Badge> : null}
+        {SCREENS.filter((item) => row.screens?.includes(item.key)).map((item) => (
+          <Badge key={item.key}>{item.label}</Badge>
+        ))}
         {!row.confirmed ? <Badge>Email not confirmed</Badge> : null}
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
@@ -265,7 +279,8 @@ function EditorModal({
     event.preventDefault();
     setSaving(true);
     try {
-      await accountsApi.save(draft);
+      const saved = await accountsApi.save(draft);
+      if (draft.screens) await accountsApi.setScreens(saved.id, draft.screens);
       onSaved();
     } catch (err) {
       setError(describeAccountError(err));
@@ -326,6 +341,25 @@ function EditorModal({
             <b>Reports</b> — sees Reports, including cash
           </span>
         </label>
+        <fieldset className="grid gap-2 border-t border-[#e4e4e7] pt-3">
+          <legend className="pr-2 text-xs font-bold tracking-wide text-[#6b7280] uppercase">Screens</legend>
+          {draft.screens === null ? (
+            <p className="text-sm text-[#8a1f1f]">Run migration 0098 in the Supabase SQL Editor to set screen access.</p>
+          ) : (
+            SCREENS.map((item) => (
+              <label className="flex items-center gap-2 text-sm" key={item.key}>
+                <input
+                  checked={draft.screens?.includes(item.key) ?? false}
+                  onChange={(event) => setDraft({ ...draft, screens: toggle(draft.screens ?? [], item.key, event.target.checked) })}
+                  type="checkbox"
+                />
+                <span>
+                  <b>{item.label}</b> — {item.hint}
+                </span>
+              </label>
+            ))
+          )}
+        </fieldset>
         {error ? <ErrorNote>{error}</ErrorNote> : null}
         <Button disabled={saving} full tone="primary" type="submit">
           {saving ? "Saving…" : isNew ? "Create account" : "Save"}
@@ -333,4 +367,9 @@ function EditorModal({
       </form>
     </Modal>
   );
+}
+
+function toggle(screens: Screen[], screen: Screen, on: boolean): Screen[] {
+  const rest = screens.filter((item) => item !== screen);
+  return on ? [...rest, screen] : rest;
 }

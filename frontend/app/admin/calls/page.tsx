@@ -162,6 +162,7 @@ export default function CallsPage() {
           {tab === "calls" && loading ? "Loading…" : "Refresh"}
         </button>
       }
+      screen="calls"
       title="Calls & SMS"
     >
       <section className="border-b border-[#d4d4d8] bg-white px-4 py-4">

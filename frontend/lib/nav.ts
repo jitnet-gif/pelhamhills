@@ -111,6 +111,11 @@ export const ADMIN_ACCOUNTS = "/admin/accounts";
 export const ADMIN_PRICING = "/admin/pricing";
 export const ADMIN_DYNAMIC_PRICING = "/admin/dynamic-pricing";
 
+/** Account Setup 의 화면 권한(0098)으로 계정마다 켜는 화면들. Dynamic Pricing 과 Marketing 도 같은 체크다(`lib/screens.ts`). */
+export const ADMIN_EVENTS = "/admin/events";
+export const ADMIN_PROMOTIONS = "/admin/promotions";
+export const ADMIN_CALLS = "/admin/calls";
+
 export const GOLF_GPS_MAP_EDITOR = "https://golf-gps-pelhamhills-seven.vercel.app/admin/map";
 
 /**
@@ -125,14 +130,14 @@ export const adminNav: NavItem[] = [
   { label: "ProShop Sale", href: "/admin/retail", glyph: "🛒" },
   { label: "Tee Times & Pricing", href: ADMIN_PRICING, glyph: "◉" },
   { label: "Dynamic Pricing", href: ADMIN_DYNAMIC_PRICING, glyph: "↗" },
-  { label: "Events", href: "/admin/events", glyph: "▤" },
+  { label: "Events", href: ADMIN_EVENTS, glyph: "▤" },
   { label: "Customers", href: "/admin/customers", glyph: "●" },
   { label: "Memberships", href: "/admin/memberships", glyph: "★" },
   { label: "Tour Operators", href: "/admin/tour-operators", glyph: "✈" },
-  { label: "Promotions", href: "/admin/promotions", glyph: "▶" },
+  { label: "Promotions", href: ADMIN_PROMOTIONS, glyph: "▶" },
   // 공개 사이트·예약 화면에 뜨는 팝업 공지(서리 지연·프로모션 등, 0060).
   { label: "Website Pop-ups", href: "/admin/notices", glyph: "📣" },
-  { label: "Calls & SMS", href: "/admin/calls", glyph: "☏" },
+  { label: "Calls & SMS", href: ADMIN_CALLS, glyph: "☏" },
   { label: "Marketing", href: ADMIN_MARKETING, glyph: "✉" },
   { label: "Lost & Found", href: "/admin/lost-items", glyph: "?" },
   { label: "Reports", href: ADMIN_REPORTS, glyph: "▥" },

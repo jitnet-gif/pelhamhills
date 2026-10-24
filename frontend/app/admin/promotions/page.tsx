@@ -167,6 +167,7 @@ export default function PromotionsPage() {
           Tee Sheet
         </Link>
       }
+      screen="promotions"
       title="Promotions"
     >
       <div className="grid min-w-0 grid-rows-[auto_1fr]">

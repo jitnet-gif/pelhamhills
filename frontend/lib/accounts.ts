@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 
+import type { Screen } from "@/lib/screens";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
@@ -24,6 +25,8 @@ export type Account = {
   reports: boolean;
   /** 이 화면을 쓰는 계정. SQL 에서만 바꾼다. */
   account_admin: boolean;
+  /** 화면 권한(0098) — Dynamic Pricing · Events · Promotions · Calls & SMS · Marketing. 0098 전이면 없다. */
+  screens?: Screen[];
   is_me: boolean;
 };
 
@@ -34,6 +37,8 @@ export type AccountInput = {
   password: string;
   staff: boolean;
   reports: boolean;
+  /** null = 0098 을 아직 안 돌려 화면 권한을 건드리지 않는다. */
+  screens: Screen[] | null;
 };
 
 export const accountsApi = {
@@ -54,6 +59,9 @@ export const accountsApi = {
       p_staff: input.staff,
       p_reports: input.reports,
     }),
+  /** 계정 저장(0074) 뒤에 부른다. 화면 권한을 통째로 바꾼다(0098). */
+  setScreens: (id: string, screens: Screen[]) =>
+    staffRpc<Screen[]>("pelham_staff_account_screens_set", { p_id: id, p_screens: screens }),
   remove: (id: string) => staffRpc<void>("pelham_staff_account_delete", { p_id: id }),
 };
 
@@ -64,6 +72,9 @@ function isMissingFunction(error: unknown): boolean {
 export function describeAccountError(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 0) return "Can't reach the server. Check the connection and try again.";
+    if (isMissingFunction(error) && /screens_set/i.test(error.message)) {
+      return "Screen access is missing — run migration 0098 in the Supabase SQL Editor.";
+    }
     if (isMissingFunction(error)) return "Account functions are missing — run migration 0074 in the Supabase SQL Editor.";
     return error.message;
   }
