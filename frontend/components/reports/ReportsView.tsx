@@ -49,7 +49,8 @@ export default function ReportsView({ cash, aside }: { cash: boolean; aside?: Re
 
   return (
     <div className="grid min-w-0 gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* 모바일은 탭 여덟 개가 네 줄로 쌓이지 않게 가로로 밀어 본다. */}
+      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         {VIEWS.map((item) => (
           <Chip active={view === item.key} key={item.key} onClick={() => setView(item.key)}>
             {item.label}

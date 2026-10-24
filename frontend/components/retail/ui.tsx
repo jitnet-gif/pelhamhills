@@ -139,10 +139,13 @@ export function StatCard({
   hint,
   onClick,
   strong,
+  className = "",
 }: {
   label: string;
   value: string;
   hint?: string;
+  /** 그리드 칸 너비 등(예: 모바일에서 홀로 남는 칸을 두 칸으로). */
+  className?: string;
   /** 주면 카드 전체가 버튼이 된다(리포트의 상세 보기). */
   onClick?: () => void;
   /** 한 줄에서 먼저 읽어야 할 숫자. 값을 크게, 테두리를 진하게. */
@@ -154,7 +157,8 @@ export function StatCard({
         {label}
       </p>
       <p className={`mt-0.5 font-bold tabular-nums ${strong ? "text-2xl" : "text-lg"}`}>{value}</p>
-      {hint ? <p className="mt-0.5 truncate text-xs text-[#6b7280]">{hint}</p> : null}
+      {/* 좁은 화면(두 칸 그리드)에서 잘리지 않게 줄을 넘긴다. */}
+      {hint ? <p className="mt-0.5 text-xs leading-snug text-[#6b7280]">{hint}</p> : null}
     </>
   );
   if (onClick) {
@@ -162,7 +166,7 @@ export function StatCard({
       <button
         className={`min-w-0 border bg-white px-3 py-2.5 text-left hover:border-[#4533ff] ${
           strong ? "border-[#18181b]" : "border-[#d4d4d8]"
-        }`}
+        } ${className}`}
         onClick={onClick}
         type="button"
       >
@@ -171,7 +175,7 @@ export function StatCard({
     );
   }
   return (
-    <div className={`min-w-0 border bg-white px-3 py-2.5 ${strong ? "border-[#18181b]" : "border-[#d4d4d8]"}`}>
+    <div className={`min-w-0 border bg-white px-3 py-2.5 ${strong ? "border-[#18181b]" : "border-[#d4d4d8]"} ${className}`}>
       {body}
     </div>
   );

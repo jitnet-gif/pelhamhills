@@ -90,7 +90,59 @@ export default function PriceReview({ date }: { date: string }) {
       ) : rows.length === 0 ? (
         <EmptyNote>Every player paid the rate card price.</EmptyNote>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          {/* 모바일: 가로로 밀어야 하는 표 대신 선수 한 명당 카드 한 장. */}
+          <ul className="grid gap-2 sm:hidden">
+            {rows.map((row) => (
+              <li className="border border-[#ececf0] p-2.5 text-xs" key={`${row.bookingId}-${row.playerId}`}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold">
+                      {row.time} · {row.player}
+                      <ChannelBadge row={row} />
+                    </span>
+                    <span className="block text-[11px] text-[#6b7280]">
+                      {row.holes} holes · {row.ratePlan || "Public"}
+                      {row.paid ? " · paid" : ""}
+                      {row.code ? ` · ${row.code}` : ""}
+                    </span>
+                  </span>
+                  <span
+                    className={`shrink-0 text-sm font-bold tabular-nums ${
+                      row.difference < 0 ? "text-[#b42318]" : "text-[#1f2328]"
+                    }`}
+                  >
+                    {money(row.difference)}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="bg-[#fff1cc] px-1 py-0.5 text-[11px] font-semibold text-[#8a5a00]">
+                    {KIND_LABEL[row.kind]}
+                  </span>
+                  <span className="tabular-nums">
+                    {money(row.greenStandard)} → {money(row.greenCharged)}
+                  </span>
+                  {row.cartStandard || row.cartCharged ? (
+                    <span className="text-[#6b7280] tabular-nums">
+                      cart {money(row.cartStandard)} → {money(row.cartCharged)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-[11px]">
+                  {row.reason ? <span>{row.reason} · </span> : null}
+                  {row.manager ? (
+                    <span className="text-[#6b7280]">
+                      {row.manager}
+                      {row.approvedAt ? ` · ${clock(row.approvedAt)}` : ""}
+                    </span>
+                  ) : (
+                    <span className="text-[#b42318]">No approval on record</span>
+                  )}
+                </p>
+              </li>
+            ))}
+          </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="text-[11px] uppercase tracking-wide text-[#6b7280]">
               <tr className="border-b border-[#ececf0]">
@@ -115,21 +167,7 @@ export default function PriceReview({ date }: { date: string }) {
                   </td>
                   <td className="px-2 py-1.5">
                     {row.player}
-                    {(() => {
-                      const channel = channelOf(row);
-                      if (!channel) return null;
-                      const badge = CHANNEL_BADGE[channel];
-                      const detail = row.channelDetail && row.channelDetail !== badge.label ? row.channelDetail : "";
-                      return (
-                        <span
-                          className={`ml-1.5 px-1 py-0.5 text-[10px] font-semibold ${badge.className}`}
-                          title={detail ? `Reservation source: ${detail}` : undefined}
-                        >
-                          {badge.label}
-                          {detail ? ` · ${detail}` : ""}
-                        </span>
-                      );
-                    })()}
+                    <ChannelBadge row={row} />
                     <span className="block text-[11px] text-[#6b7280]">
                       {row.ratePlan || "Public"}
                       {row.paid ? " · paid" : ""}
@@ -171,7 +209,24 @@ export default function PriceReview({ date }: { date: string }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </Panel>
+  );
+}
+
+function ChannelBadge({ row }: { row: PriceReviewRow }) {
+  const channel = channelOf(row);
+  if (!channel) return null;
+  const badge = CHANNEL_BADGE[channel];
+  const detail = row.channelDetail && row.channelDetail !== badge.label ? row.channelDetail : "";
+  return (
+    <span
+      className={`ml-1.5 px-1 py-0.5 text-[10px] font-semibold ${badge.className}`}
+      title={detail ? `Reservation source: ${detail}` : undefined}
+    >
+      {badge.label}
+      {detail ? ` · ${detail}` : ""}
+    </span>
   );
 }

@@ -108,8 +108,8 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
 
   return (
     <div className="grid min-w-0 gap-3">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="grid w-full gap-2 sm:max-w-xs">
+      <div className="flex items-end gap-2">
+        <div className="grid min-w-0 flex-1 gap-2 sm:max-w-xs">
           <Field label="Business date">
             <TextInput
               onChange={(event) => {
@@ -122,7 +122,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
           </Field>
         </div>
         {/* 담당자·시작·끝 시각을 적고 합계만 영수증 프린터로(`ShiftReportPrint`). 계산서 목록은 찍지 않는다. */}
-        <Button disabled={loading} onClick={() => setPrinting(true)} title="Print shift report on the receipt printer">
+        <Button className="shrink-0" disabled={loading} onClick={() => setPrinting(true)} title="Print shift report on the receipt printer">
           <span className="size-5">
             <PrinterIcon />
           </span>
@@ -176,6 +176,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
             />
             <StatCard
               hint="tax incl. · tips excl."
+              className="col-span-2 lg:col-span-1"
               label="Total Collected"
               onClick={() => setDrill({ kind: "net" })}
               strong
@@ -214,6 +215,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
               />
             ) : null}
             <StatCard
+              className={cash ? "col-span-2 lg:col-span-1" : ""}
               hint="credit & debit · tax incl. · tips excl."
               label="Card Sales"
               onClick={() => setDrill({ kind: "cards" })}
