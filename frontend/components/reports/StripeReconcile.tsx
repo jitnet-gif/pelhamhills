@@ -5,13 +5,15 @@
  *
  * 하루 마감(Daily close)은 우리 장부 안에서만 더한다. 그래서 "단말기에서는 승인됐는데 계산서에 안 붙음",
  * "전산에서는 환불했는데 카드는 그대로", "Stripe 대시보드에서 직접 환불" 같은 어긋남은 거기서 보이지 않는다.
- * 이 화면이 그것을 찾는다. 대조는 서버가 한다(`lib/reports/stripeReconcile.ts`). 여기는 읽기만 한다 —
- * 고치는 일은 영수증(Daily close)이나 Stripe 대시보드에서 한다.
+ * 이 화면이 그것을 찾는다. 대조는 서버가 한다(`lib/reports/stripeReconcile.ts`).
+ * 줄을 누르면 상세 창(`ReconcileDetail.tsx`)이 열리고, 거기서 매출로 반영·카드 환불·그대로 둠을 정한다(0089).
+ * `?view=stripe&date=…&pi=pi_…` 로 그 줄을 바로 연다.
  *
  * Problem = 돈이 어긋났다. Check = 돈은 맞지만 기록이 덜 끝났다. Matched = 둘이 같다.
+ * Reviewed = 어긋났지만 그대로 두기로 정했다(이유가 남아 있다).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { localBusinessDate } from "@/lib/retail/api";
 import { formatMoney } from "@/lib/retail/types";
@@ -20,6 +22,7 @@ import {
   buildReconcileWorkbook,
   cardText,
   clubTime,
+  DECISION_LABEL,
   fetchReconcile,
   LEVEL_LABEL,
   MAX_DAYS,
@@ -29,8 +32,10 @@ import {
   type Level,
   type ReconcileReport,
   type ReconcileRow,
+  type StripeAttempt,
 } from "@/lib/reports/stripeReconcile";
 
+import ReconcileDetail from "@/components/reports/ReconcileDetail";
 import { Button, Chip, EmptyNote, ErrorNote, Field, Panel, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 const BADGE: Record<Level, string> = {
@@ -38,6 +43,7 @@ const BADGE: Record<Level, string> = {
   warn: "bg-[#fff6e0] text-[#7a5200] border-[#e8c873]",
   ok: "bg-[#ecf7ef] text-[#1d6b34] border-[#a8d5b5]",
 };
+const REVIEWED_BADGE = "bg-[#f3f2ff] text-[#2e2499] border-[#c7c2ff]";
 
 const FILTERS = [
   { key: "issues", label: "Problems & checks" },
@@ -46,6 +52,19 @@ const FILTERS = [
 
 function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+}
+
+function linkedParam(name: string): string {
+  return typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get(name) ?? "");
+}
+
+/** 열린 상세 창의 PaymentIntent 를 주소에 남긴다(새로고침·공유해도 같은 줄이 열린다). */
+function writePiParam(key: string | null) {
+  const params = new URLSearchParams(window.location.search);
+  if (key) params.set("pi", key);
+  else params.delete("pi");
+  const rest = params.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
 }
 
 function linkedDate(): string {
@@ -67,6 +86,9 @@ export default function StripeReconcile() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("issues");
   const [exporting, setExporting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // 상세 창. 다시 읽는 동안(report 가 비는 동안)은 연 때의 줄을 그대로 보여 준다.
+  const [opened, setOpened] = useState<ReconcileRow | null>(null);
+  const wantedPi = useRef(linkedParam("pi"));
 
   const rangeError = useMemo(() => {
     if (!from || !to) return "Pick both dates.";
@@ -87,6 +109,11 @@ export default function StripeReconcile() {
       .then((result) => {
         if (cancelled) return;
         setLoaded({ key: requestKey, report: result, error: "" });
+        if (wantedPi.current) {
+          const found = result.rows.find((row) => row.key === wantedPi.current);
+          wantedPi.current = "";
+          if (found) setOpened(found);
+        }
         // 문제가 없으면 "전부" 를 보여 준다. 빈 표만 보면 실제로 대조가 됐는지 알 수 없다.
         setFilter(result.summary.errors + result.summary.warnings > 0 ? "issues" : "all");
       })
@@ -120,6 +147,12 @@ export default function StripeReconcile() {
   }
 
   const s = report?.summary;
+  const openRow = (opened && report?.rows.find((row) => row.key === opened.key)) || opened;
+
+  function openDetail(row: ReconcileRow | null) {
+    setOpened(row);
+    writePiParam(row?.key ?? null);
+  }
 
   return (
     <div className="grid min-w-0 gap-3">
@@ -186,7 +219,7 @@ export default function StripeReconcile() {
               value={String(s.warnings)}
             />
             <StatCard
-              hint="Stripe = our records"
+              hint={s.reviewed ? `Stripe = our records · ${s.reviewed} reviewed` : "Stripe = our records"}
               label="Matched"
               onClick={() => setFilter("all")}
               value={String(s.matched)}
@@ -214,9 +247,13 @@ export default function StripeReconcile() {
                   : "Nothing to fix — every Stripe payment matches our records."}
               </EmptyNote>
             ) : (
-              <ReconcileTable environment={report.environment} rows={rows} />
+              <ReconcileTable environment={report.environment} onOpen={openDetail} rows={rows} />
             )}
           </Panel>
+
+          {report.attempts && report.attempts.length > 0 ? (
+            <Attempts attempts={report.attempts} environment={report.environment} />
+          ) : null}
 
           <p className="text-xs text-[#6b7280]">
             {s.outside_window > 0
@@ -226,11 +263,59 @@ export default function StripeReconcile() {
               ? `${report.keyed.count} card payment(s) totalling ${formatMoney(report.keyed.amount)} were keyed in by hand ` +
                 "(not through Stripe), so they cannot be checked here. "
               : ""}
-            Checked {clubTime(report.generated_at)}. Amounts include tips.
+            Checked {clubTime(report.generated_at)}. Amounts include tips. Click a row to see it in full and decide
+            whether it counts as a sale.
           </p>
         </>
       ) : null}
+
+      {openRow && report ? (
+        <ReconcileDetail
+          environment={report.environment}
+          onChanged={() => setReloadKey((key) => key + 1)}
+          onClose={() => openDetail(null)}
+          row={openRow}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Stripe 대시보드에 Canceled·Incomplete 로 보이는 시도 — 단말기에서 취소, 카드 거절, 끝내지 않은 온라인 결제.
+ * 카드에서 돈이 빠지지 않았으므로 위 대조와 합계에는 넣지 않는다. 대시보드 목록과 맞춰 볼 수 있게만 보인다.
+ */
+function Attempts({ attempts, environment }: { attempts: StripeAttempt[]; environment: "test" | "live" }) {
+  const total = attempts.reduce((sum, attempt) => sum + attempt.amount, 0);
+  return (
+    <Panel title={`Canceled & declined in Stripe ×${attempts.length} · ${formatMoney(total)} · no money moved`}>
+      <ul className="grid gap-1 text-sm">
+        {attempts.map((attempt) => (
+          <li className="flex items-baseline justify-between gap-2 py-0.5" key={attempt.payment_intent}>
+            <span className="min-w-0">
+              <span className="block">
+                <span className="font-semibold">{attempt.status_label}</span>{" "}
+                <span className="text-xs text-[#6b7280]">
+                  {[clubTime(attempt.at), SOURCE_LABEL[attempt.source], attempt.label].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+              <span className="block text-xs text-[#6b7280]">
+                {[attempt.reason.replace(/_/g, " "), attempt.message].filter(Boolean).join(" — ")}{" "}
+                <a
+                  className="text-[#4533ff] underline"
+                  href={stripeUrl(environment, attempt.payment_intent)}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {attempt.payment_intent}
+                </a>
+              </span>
+            </span>
+            <span className="shrink-0 tabular-nums text-[#6b7280]">{formatMoney(attempt.amount)}</span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }
 
@@ -247,7 +332,7 @@ function Verdict({ report }: { report: ReconcileReport }) {
       {ok
         ? s.warnings
           ? `Money matches Stripe. ${s.warnings} payment(s) need a look to finish the records.`
-          : `All ${s.matched} card payment(s) match Stripe.`
+          : `All ${s.matched} card payment(s) match Stripe.` + (s.reviewed ? ` ${s.reviewed} left as is on purpose.` : "")
         : `${s.errors} payment(s) do not match Stripe` +
           (s.difference !== 0 ? ` — Stripe is ${formatMoney(Math.abs(s.difference))} ${s.difference > 0 ? "higher" : "lower"} than our records.` : ".")}
     </p>
@@ -311,7 +396,15 @@ function sortRows(rows: ReconcileRow[], sort: Sort): ReconcileRow[] {
     .map((item) => item.row);
 }
 
-function ReconcileTable({ rows, environment }: { rows: ReconcileRow[]; environment: "test" | "live" }) {
+function ReconcileTable({
+  rows,
+  environment,
+  onOpen,
+}: {
+  rows: ReconcileRow[];
+  environment: "test" | "live";
+  onOpen: (row: ReconcileRow) => void;
+}) {
   const [sort, setSort] = useState<Sort>({ key: "at", dir: "asc" });
   const sorted = useMemo(() => sortRows(rows, sort), [rows, sort]);
 
@@ -354,7 +447,7 @@ function ReconcileTable({ rows, environment }: { rows: ReconcileRow[]; environme
         </thead>
         <tbody>
           {sorted.map((row) => (
-            <ReconcileLine environment={environment} key={row.key} row={row} />
+            <ReconcileLine environment={environment} key={row.key} onOpen={onOpen} row={row} />
           ))}
         </tbody>
       </table>
@@ -371,15 +464,35 @@ function Amounts({ amount, refunded }: { amount: number; refunded: number }) {
   );
 }
 
-function ReconcileLine({ row, environment }: { row: ReconcileRow; environment: "test" | "live" }) {
+// 줄 안의 링크(Stripe·영수증)는 그 링크로 가고, 나머지를 누르면 상세 창이 열린다.
+const stop = (event: React.MouseEvent) => event.stopPropagation();
+
+function ReconcileLine({
+  row,
+  environment,
+  onOpen,
+}: {
+  row: ReconcileRow;
+  environment: "test" | "live";
+  onOpen: (row: ReconcileRow) => void;
+}) {
   const diff = rowDifference(row);
   const ours = row.ours;
   return (
-    <tr className="border-b border-[#ececef] align-top">
+    <tr className="cursor-pointer border-b border-[#ececef] align-top hover:bg-[#f9fafb]" onClick={() => onOpen(row)}>
       <td className="px-3 py-2">
-        <span className={`inline-block border px-1.5 py-0.5 text-xs font-bold ${BADGE[row.level]}`}>
-          {LEVEL_LABEL[row.level]}
-        </span>
+        {/* 키보드로도 열 수 있게 상태 표시가 버튼이다. */}
+        <button
+          className={`inline-block border px-1.5 py-0.5 text-xs font-bold ${row.reviewed ? REVIEWED_BADGE : BADGE[row.level]}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(row);
+          }}
+          title="Open this payment"
+          type="button"
+        >
+          {row.reviewed ? "Reviewed" : LEVEL_LABEL[row.level]}
+        </button>
       </td>
       <td className="px-3 py-2 whitespace-nowrap tabular-nums">{clubTime(row.at)}</td>
       <td className="px-3 py-2">
@@ -389,6 +502,7 @@ function ReconcileLine({ row, environment }: { row: ReconcileRow; environment: "
           <a
             className="block text-xs break-all text-[#4533ff] underline"
             href={stripeUrl(environment, row.stripe.payment_intent)}
+            onClick={stop}
             rel="noreferrer"
             target="_blank"
           >
@@ -410,6 +524,7 @@ function ReconcileLine({ row, environment }: { row: ReconcileRow; environment: "
               <a
                 className="block text-xs text-[#4533ff] underline"
                 href={`/admin/reports?date=${ours.business_date ?? ""}`}
+                onClick={stop}
               >
                 {ours.receipt_no}
                 {ours.bill_status ? ` · ${ours.bill_status}` : ""}
@@ -442,6 +557,13 @@ function ReconcileLine({ row, environment }: { row: ReconcileRow; environment: "
         ) : (
           <span className="text-[#6b7280]">Matches</span>
         )}
+        {row.decision ? (
+          <span className="mt-1 block text-xs text-[#2e2499]">
+            {DECISION_LABEL[row.decision.decision]}
+            {row.decision.staff_name ? ` by ${row.decision.staff_name}` : ""}
+            {row.decision.note ? ` — ${row.decision.note}` : ""}
+          </span>
+        ) : null}
       </td>
     </tr>
   );

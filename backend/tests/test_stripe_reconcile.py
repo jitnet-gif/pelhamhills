@@ -80,6 +80,32 @@ def test_declined_and_abandoned_attempts_are_left_out():
     res = run([pi("pi_1", 1130, status="canceled"), pi("pi_2", 500, status="requires_payment_method")],
               [sale(1, "pi_1", 1130, approved=False, result="canceled", on_bill=False)])
     assert res["rows"] == []
+    # 대사에서는 빠지지만 Stripe 의 Canceled·Incomplete 목록으로 따로 돌려준다.
+    assert [(a["payment_intent"], a["status_label"], a["amount"], a["source"]) for a in res["attempts"]] == [
+        ("pi_1", "Canceled", 1130, "terminal"), ("pi_2", "Declined / not finished", 500, "unknown")]
+    assert res["summary"]["attempts"] == 2 and res["summary"]["attempts_amount"] == 1630
+
+
+def test_reader_void_is_counted():
+    res = run([pi("pi_1", 1130, refunded=1130)],
+              [sale(1, "pi_1", 1130, on_bill=False, voided=True), refund_row(2, 1, "pi_1", 1130)])
+    assert res["summary"]["voided"] == 1 and res["summary"]["voided_amount"] == 1130
+
+
+def test_note_decision_marks_row_reviewed():
+    note = {"decision": "note", "note": "Gave the guest cash back", "staff_name": "Kim"}
+    res = rc.reconcile([pi("pi_1", 5700), pi("pi_2", 4600)],
+                       {"terminal": [sale(1, "pi_1", 5700, bill_status="refunded"),
+                                     sale(2, "pi_2", 4600, bill_status="open", on_bill=False)], "online": []},
+                       WINDOW, {"pi_1": note, "pi_2": {"decision": "refund"}})
+    rows = {r["key"]: r for r in res["rows"]}
+    # 그대로 두기로 정한 줄: 어긋남은 남기되 문제로 세지 않는다.
+    assert rows["pi_1"]["level"] == "ok" and rows["pi_1"]["reviewed"] and rows["pi_1"]["decision"] == note
+    assert [i["code"] for i in rows["pi_1"]["issues"]] == ["bill_refunded_card_not"]
+    # 환불 결정은 돈이 실제로 맞아야 풀린다 — 아직 카드가 그대로면 경고 그대로.
+    assert rows["pi_2"]["level"] == "warn" and not rows["pi_2"]["reviewed"]
+    s = res["summary"]
+    assert s["reviewed"] == 1 and s["errors"] == 0 and s["warnings"] == 1 and s["matched"] == 0
 
 
 def test_charge_only_in_stripe():
@@ -253,3 +279,35 @@ def test_route_stripe_failure_is_502(client):
         lambda r: httpx.Response(401, json={"error": {"message": "Invalid API Key"}})))
     res = c.get("/api/v1/payments/reconcile?from=2026-10-14&to=2026-10-14", headers=AUTH)
     assert res.status_code == 502 and "Invalid API Key" in res.json()["detail"]
+
+
+def test_route_reads_decisions(client):
+    c, calls, records, mp = client
+    mp.setattr(sg, "_transport", httpx.MockTransport(FakeStripe([pi("pi_1", 5700)], [])))
+    records["terminal"] = [sale(1, "pi_1", 5700, bill_status="refunded")]
+
+    def as_user(token: str, function: str, args: dict[str, Any]) -> Any:
+        calls.append((function, args))
+        if function == "pelham_staff_reconcile_decisions":
+            return {"pi_1": {"decision": "note", "note": "cash back"}}
+        return records
+
+    mp.setattr(supabase_rest, "rpc_as", as_user)
+    body = c.get("/api/v1/payments/reconcile?from=2026-10-14&to=2026-10-14", headers=AUTH).json()
+    assert dict(calls)["pelham_staff_reconcile_decisions"] == {"p_ids": ["pi_1"]}
+    assert body["rows"][0]["reviewed"] is True and body["summary"]["reviewed"] == 1
+
+
+def test_route_works_before_0089(client):
+    c, calls, records, mp = client
+    mp.setattr(sg, "_transport", httpx.MockTransport(FakeStripe([pi("pi_1", 1130)], [])))
+    records["terminal"] = [sale(1, "pi_1", 1130)]
+
+    def as_user(token: str, function: str, args: dict[str, Any]) -> Any:
+        if function == "pelham_staff_reconcile_decisions":
+            raise supabase_rest.RpcRefused(404, "Could not find the function")
+        return records
+
+    mp.setattr(supabase_rest, "rpc_as", as_user)
+    res = c.get("/api/v1/payments/reconcile?from=2026-10-14&to=2026-10-14", headers=AUTH)
+    assert res.status_code == 200 and res.json()["rows"][0]["level"] == "ok"

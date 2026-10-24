@@ -36,6 +36,7 @@ import {
   type RetailDailyReport,
   type Sale,
   type SaleCreate,
+  type VoidBill,
 } from "./types";
 
 /**
@@ -163,6 +164,9 @@ export const retailApi = {
     call<Sale>("pelham_staff_bill_refund", { p_bill: id, p_reason: body.reason }),
 
   // ===== 리포트 =====
+  /** 그 날(클럽 현지) void 한 계산서(0088). 결제 전이라 영수증 번호·영업일이 없다. */
+  listVoidBills: (date: string) => call<VoidBill[]>("pelham_staff_void_bills", { p_date: date }),
+
   getDailyReport: (businessDate: string) =>
     call<RetailDailyReport>("pelham_staff_pos_report_daily", { p_date: businessDate }),
 

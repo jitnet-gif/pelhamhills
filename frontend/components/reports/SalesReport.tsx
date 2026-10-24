@@ -19,6 +19,7 @@ import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
 import { computeTax, formatMoney, type Cents, type RetailDailyReport, type Sale } from "@/lib/retail/types";
 
+import Cancellations from "@/components/reports/Cancellations";
 import CardSales from "@/components/reports/CardSales";
 import CashierShifts from "@/components/reports/CashierShifts";
 import CashReconcile from "@/components/reports/CashReconcile";
@@ -341,6 +342,9 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
 
       {/* By payment 의 Card·Debit 을 Stripe 숫자로 이어 준다(팁·환불·손으로 친 전표·온라인). */}
       {!loading ? <CardSales date={date} sales={sales} /> : null}
+
+      {/* 환불·void 계산서·예약 취소(0088). 카드 쪽 취소는 바로 위 칸. */}
+      {!loading ? <Cancellations date={date} onOpenSale={setSelected} sales={sales} /> : null}
 
       {cash ? <CashReconcile date={date} refreshKey={closeoutKey + savedKey} /> : null}
 

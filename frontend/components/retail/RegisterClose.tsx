@@ -14,6 +14,10 @@
  * 화면은 "남길 잔돈"과 "넘길 현금"(센 돈 − 잔돈)만 알려 준다. 과부족은 현금 리포트 계정이 본다.
  * 서버도 그 계정이 아니면 현금 기대 금액을 보내지 않는다. 화면의 `blindCash` 는 0046 전에도 가리려는 두 번째 울타리다.
  *
+ * 캐셔의 마감은 **현금만**이다(2026-10-23, 0090): 카드·체크카드·회원 계정 같은 다른 줄은 그리지 않고, 카드 단말기
+ * 전표도 세지 않는다 — 카드 매출을 캐셔에게 보이지 않는다. 카드는 현금 리포트 계정이 같은 화면(전부 보임)이나
+ * Stripe 대사에서 맞춘다. 출력하는 근무 마감표도 센 현금·남길 잔돈·넘길 현금만 찍는다.
+ *
  * Lightspeed 의 Open Drawer 버튼은 없다 — 이 계산대는 아직 서랍을 열 수 없다(눌러도 안 되는 버튼은
  * 그리지 않는다, `RegisterHome` 과 같은 규칙).
  */
@@ -174,10 +178,14 @@ function CloseForm({
   );
   const counted: Record<string, Cents> = { cash: cashTotal, card: parseMoney(card), debit: parseMoney(debit) };
 
-  // 블라인드면 현금 줄의 기대 금액을 지운다. 합계도 지운다 — 합계에서 다른 줄을 빼면 현금 매출이 나온다.
-  const rows = report.rows.map((row) =>
-    blind && row.method === "cash" ? { ...row, payments: null, payment_count: null, remaining: null } : row,
-  );
+  // 블라인드면 현금 줄 하나만, 기대 금액 없이 — 마감은 현금만, 카드 매출은 캐셔에게 보이지 않는다(0090).
+  // 0090 전 서버가 다른 줄을 보내도 여기서 뺀다.
+  const rows = blind
+    ? report.rows
+        .filter((row) => row.method === "cash")
+        .map((row) => ({ ...row, payments: null, payment_count: null, remaining: null }))
+    : report.rows;
+  const float = report.rows.find((row) => row.method === "cash")?.start ?? 0;
   const totals = rows.reduce(
     (sum, row) => ({
       start: sum.start + row.start,
@@ -213,7 +221,9 @@ function CloseForm({
       if (!who) return;
       const input = { staff: who.name, date: report.business_date, start: who.start, end: who.end };
       const range = shiftWindow(input);
-      if (range) printShiftReport(input, shiftSummary(sales, range), !blind, undefined, tipSplit);
+      if (range) {
+        printShiftReport(input, shiftSummary(sales, range), !blind, undefined, tipSplit, { counted: cashTotal, float });
+      }
     } finally {
       setBusy(false);
     }
@@ -236,7 +246,8 @@ function CloseForm({
     cashCounts.extra = parseMoney(extra);
     try {
       const next = await retailApi.saveRegisterClose(report.business_date, report.station, {
-        counted: { cash: counted.cash, card: counted.card, debit: counted.debit },
+        // 캐셔는 현금만 센다 — 카드 칸을 보내지 않으면 서버(0090)가 매니저가 센 값을 그대로 둔다.
+        counted: blind ? { cash: counted.cash } : { cash: counted.cash, card: counted.card, debit: counted.debit },
         cash_counts: cashCounts,
         note: note.trim() || null,
         cashier: who.name,
@@ -330,14 +341,16 @@ function CloseForm({
                 </td>
               </tr>
             ))}
-            <tr className="border-t border-[#d4d4d8] bg-[#f2f2f4] font-bold">
-              <td className="px-2 py-2">Totals</td>
-              <Money value={totals.start} />
-              <Money value={totals.payments} />
-              <Money value={totals.withdraws} />
-              <Money value={totals.remaining} />
-              <td className="border-l border-[#d4d4d8]" />
-            </tr>
+            {blind ? null : (
+              <tr className="border-t border-[#d4d4d8] bg-[#f2f2f4] font-bold">
+                <td className="px-2 py-2">Totals</td>
+                <Money value={totals.start} />
+                <Money value={totals.payments} />
+                <Money value={totals.withdraws} />
+                <Money value={totals.remaining} />
+                <td className="border-l border-[#d4d4d8]" />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -365,6 +378,7 @@ function CloseForm({
         <ShiftPreview
           cash={!blind}
           date={report.business_date}
+          drop={{ counted: cashTotal, float }}
           end={shiftEnd}
           sales={sales}
           staff={cashier}
@@ -525,23 +539,28 @@ function SavedSummary({
 }) {
   // 블라인드면 현금은 과부족을 말하지 않고, 넘긴 현금(센 돈 − 잔돈)만 적는다.
   const drop = blind ? (close.counted.cash ?? 0) - close.opening_float : null;
-  const off = rows
-    .filter((row) => row.countable && !(blind && row.method === "cash"))
+  const countedRows = rows.filter((row) => row.countable && !(blind && row.method === "cash"));
+  const off = countedRows
+    .filter((row) => close.counted[row.method] !== undefined)
     .map((row) => ({
       label: rowLabel(row.method),
       diff: (close.counted[row.method] ?? 0) - (close.expected[row.method] ?? 0),
     }))
     .filter((item) => item.diff !== 0);
+  // 캐셔는 현금만 센다(0090) — 카드 전표를 아직 아무도 안 셌으면 매니저에게 그렇게 적는다.
+  const notCounted = countedRows
+    .filter((row) => row.method !== "cash" && close.counted[row.method] === undefined)
+    .map((row) => rowLabel(row.method));
   const tone = close.stale
     ? "bg-[#fdf0f0] text-[#8a1f1f]"
-    : off.length === 0
+    : off.length === 0 && notCounted.length === 0
       ? "bg-[#e8f5ec] text-[#1f6b3a]"
       : "bg-[#fff8e1] text-[#5b4708]";
   return (
     <div className={`grid gap-0.5 px-3 py-2 text-sm ${tone}`}>
       <p className="font-bold">
         {justSaved ? "Counts submitted" : "Counted"} {new Date(close.closed_at).toLocaleString("en-CA")}
-        {off.length === 0 && !blind ? " — register balances." : ""}
+        {off.length === 0 && notCounted.length === 0 && !blind ? " — register balances." : ""}
       </p>
       {close.cashier ? (
         <p>
@@ -559,6 +578,7 @@ function SavedSummary({
           {item.label}: {item.diff > 0 ? "over" : "short"} {formatMoney(Math.abs(item.diff))}
         </p>
       ))}
+      {notCounted.length > 0 ? <p>{notCounted.join(" and ")}: not counted yet.</p> : null}
       {close.stale ? <p>Sales on this register changed after the count. Count again.</p> : null}
     </div>
   );

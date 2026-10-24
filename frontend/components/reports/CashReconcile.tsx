@@ -89,7 +89,7 @@ export default function CashReconcile({ date, refreshKey = 0 }: { date: string; 
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {lines.map((line) => (
-            <LineCard key={line.method} line={line} />
+            <LineCard key={line.method} line={line} uncounted={uncountedSlips(report, line.method).length > 0} />
           ))}
         </div>
 
@@ -99,7 +99,7 @@ export default function CashReconcile({ date, refreshKey = 0 }: { date: string; 
   );
 }
 
-function LineCard({ line }: { line: CashReconcileLine }) {
+function LineCard({ line, uncounted }: { line: CashReconcileLine; uncounted: boolean }) {
   const cash = line.method === "cash";
   return (
     <section className="min-w-0 border border-[#e4e4e8]">
@@ -119,7 +119,8 @@ function LineCard({ line }: { line: CashReconcileLine }) {
                 : "counted at the registers"
           }
           label="Registers"
-          status={<Diff complete={line.registers.complete} diff={line.registers.diff} />}
+          // 서버는 안 센 전표를 0 으로 더한다 — 그대로 두면 카드 매출 전액이 short 로 보인다.
+          status={<Diff complete={line.registers.complete && !uncounted} diff={line.registers.diff} />}
           value={line.registers.counted + line.online}
         />
         {line.staff ? (
@@ -198,12 +199,30 @@ function RegisterTable({ report }: { report: Report }) {
   );
 }
 
+/**
+ * 마감은 됐는데 카드·체크카드 전표를 아무도 안 센 서랍. 캐셔는 현금만 센다(0090) — 전표는 현금 리포트 계정이
+ * Close Register 에서 센다. 그 수단에 결제가 없으면 셀 것도 없다.
+ */
+function uncountedSlips(report: Report, method: CashReconcileLine["method"]): string[] {
+  if (method === "cash") return [];
+  return report.registers
+    .filter((row) => row.closed && row[method].counted === null && row[method].expected !== 0)
+    .map((row) => row.station);
+}
+
 /** 차이를 확정하지 못하게 하는 것들. 서버의 `complete` 와 같은 조건을 사람이 읽는 문장으로. */
 function openItems(report: Report): string[] {
   const items: string[] = [];
   for (const row of report.registers) {
     if (row.has_sales && !row.closed) items.push(`${stationLabel(row.station)} register is not closed yet.`);
     else if (row.stale) items.push(`${stationLabel(row.station)} changed after it was closed — close it again.`);
+  }
+  for (const method of ["card", "debit"] as const) {
+    for (const station of uncountedSlips(report, method)) {
+      items.push(
+        `${stationLabel(station)}: the ${METHOD_LABELS[method].toLowerCase()} slip is not counted yet — enter it on Close Register.`,
+      );
+    }
   }
   if (report.staff.missing.length > 0) {
     items.push(`Not closed out yet (took cash): ${report.staff.missing.join(", ")}.`);

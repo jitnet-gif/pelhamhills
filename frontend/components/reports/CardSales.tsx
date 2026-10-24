@@ -116,7 +116,7 @@ export default function CardSales({ date, sales }: { date: string; sales: readon
           Card and Debit under By payment leave tips out and drop refunded sales. Stripe charges the tip with the sale,
           keeps refunded charges (the refund is a separate line), and lists card and Interac debit together. Card slips
           keyed in by hand never went through Stripe. Online booking payments are in Card but not on the register
-          reader.
+          reader. Canceled and declined attempts show in Stripe&apos;s list but no money moved.
         </p>
 
         <div className="grid gap-3 lg:grid-cols-2">
@@ -132,38 +132,11 @@ export default function CardSales({ date, sales }: { date: string; sales: readon
           </ul>
 
           <ul className="grid content-start gap-1 text-sm">
-            <Row bold label="Should be charged in Stripe" value={inStripe} />
+            <Row label="Reader + online" value={inStripe} />
             {loading ? (
               <li className="text-xs text-[#6b7280]">Reading Stripe…</li>
             ) : stripe ? (
-              <>
-                <Row
-                  bold
-                  label={`Stripe charged${stripe.environment === "test" ? " (test mode)" : ""}`}
-                  value={stripe.summary.stripe_charged}
-                />
-                <Row
-                  bold
-                  label="Difference"
-                  value={stripe.summary.stripe_charged - inStripe}
-                  warn={stripe.summary.stripe_charged !== inStripe}
-                />
-                <Row label="Refunded here (reader & online)" value={refundedInStripe} />
-                <Row
-                  label="Stripe refunded"
-                  value={stripe.summary.stripe_refunded}
-                  warn={stripe.summary.stripe_refunded !== refundedInStripe}
-                />
-                <li className="pt-1 text-xs text-[#6b7280]">
-                  {stripe.summary.errors + stripe.summary.warnings > 0
-                    ? `${stripe.summary.errors} problem(s) and ${stripe.summary.warnings} to check, payment by payment — `
-                    : "Every Stripe payment matched a record here — "}
-                  <a className="font-semibold text-[#4533ff] underline" href={`?view=stripe&date=${date}`}>
-                    open Stripe check
-                  </a>
-                  . A refund made on another day shows on that day in Stripe but takes the sale out of this day here.
-                </li>
-              </>
+              <StripeSide inStripe={inStripe} refundedInStripe={refundedInStripe} report={stripe} date={date} />
             ) : (
               <li>
                 <ErrorNote>{loaded?.error || "Could not read Stripe."}</ErrorNote>
@@ -173,6 +146,56 @@ export default function CardSales({ date, sales }: { date: string; sales: readon
         </div>
       </div>
     </Panel>
+  );
+}
+
+/**
+ * Stripe 쪽. 단말기에서 승인했다가 계산서에 쓰기 전에 VOID 한 것은 계산서가 없어 왼쪽에 없지만 Stripe 에는
+ * 승인과 환불로 남는다 — 그래서 여기서 더해 맞춘다. 취소·거절된 시도는 돈이 오가지 않아 합계 밖에 둔다.
+ */
+function StripeSide({
+  report,
+  inStripe,
+  refundedInStripe,
+  date,
+}: {
+  report: ReconcileReport;
+  inStripe: Cents;
+  refundedInStripe: Cents;
+  date: string;
+}) {
+  const s = report.summary;
+  const voided = s.voided_amount ?? 0;
+  const expected = inStripe + voided;
+  const expectedRefunds = refundedInStripe + voided;
+  return (
+    <>
+      <Row label={`+ Voided on the reader before the bill ×${s.voided ?? 0}`} value={voided} />
+      <Row bold label="= Should be charged in Stripe" value={expected} />
+      <Row
+        bold
+        label={`Stripe charged${report.environment === "test" ? " (test mode)" : ""}`}
+        value={s.stripe_charged}
+      />
+      <Row bold label="Difference" value={s.stripe_charged - expected} warn={s.stripe_charged !== expected} />
+      <Row label="Refunded & voided here (reader & online)" value={expectedRefunds} />
+      <Row label="Stripe refunded" value={s.stripe_refunded} warn={s.stripe_refunded !== expectedRefunds} />
+      {s.attempts !== undefined ? (
+        <li className="flex items-baseline justify-between gap-2 text-[#6b7280]">
+          <span className="min-w-0">Canceled / declined in Stripe ×{s.attempts} — no money moved</span>
+          <span className="shrink-0 tabular-nums">{formatMoney(s.attempts_amount ?? 0)}</span>
+        </li>
+      ) : null}
+      <li className="pt-1 text-xs text-[#6b7280]">
+        {s.errors + s.warnings > 0
+          ? `${s.errors} problem(s) and ${s.warnings} to check, payment by payment — `
+          : "Every Stripe payment matched a record here — "}
+        <a className="font-semibold text-[#4533ff] underline" href={`?view=stripe&date=${date}`}>
+          open Stripe check
+        </a>
+        . A refund made on another day shows on that day in Stripe but takes the sale out of this day here.
+      </li>
+    </>
   );
 }
 

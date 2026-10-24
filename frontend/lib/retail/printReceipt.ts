@@ -17,7 +17,7 @@
 
 import { CLUB } from "@/lib/nav";
 import { rainCheckBlocks, type RainCheck } from "@/lib/pos/rainCheck";
-import { shiftReportBlocks, type ShiftInput, type ShiftSummary } from "@/lib/reports/shiftReport";
+import { shiftReportBlocks, type ShiftCashDrop, type ShiftInput, type ShiftSummary } from "@/lib/reports/shiftReport";
 
 import {
   PAYMENT_LABELS,
@@ -114,8 +114,9 @@ export function shiftReportSheetHtml(
   cash: boolean,
   transactions?: readonly Sale[],
   tipSplit?: CloseoutReport | null,
+  drop?: ShiftCashDrop,
 ): string {
-  return receiptHtml(shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions, tipSplit }));
+  return receiptHtml(shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions, tipSplit, drop }));
 }
 
 /** `transactions` 를 주면 합계 아래에 계산서를 한 줄씩 덧붙인다(담당자별 출력). */
@@ -125,8 +126,9 @@ export function printShiftReport(
   cash: boolean,
   transactions?: readonly Sale[],
   tipSplit?: CloseoutReport | null,
+  drop?: ShiftCashDrop,
 ): void {
-  printSheets([shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions, tipSplit })]);
+  printSheets([shiftReportBlocks(input, summary, { header: CLUB_HEADER, cash, transactions, tipSplit, drop })]);
 }
 
 function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: boolean } = {}): void {

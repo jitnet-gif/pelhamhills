@@ -21,6 +21,7 @@ import {
   salesInWindow,
   shiftSummary,
   shiftWindow,
+  type ShiftCashDrop,
   type ShiftInput,
 } from "@/lib/reports/shiftReport";
 import type { CloseoutReport, Sale } from "@/lib/retail/types";
@@ -158,6 +159,7 @@ export function ShiftPreview({
   cash,
   withLines = false,
   tipSplit,
+  drop,
 }: {
   date: string;
   staff: string;
@@ -167,6 +169,8 @@ export function ShiftPreview({
   cash: boolean;
   withLines?: boolean;
   tipSplit?: CloseoutReport | null;
+  /** 캐셔 마감표(`cash` 거짓)에 찍을 서랍 — 센 현금과 남길 잔돈. */
+  drop?: ShiftCashDrop;
 }) {
   const shown = isShiftCode(staff) ? "—" : staff.trim().replace(/\s+/g, " ") || "—";
   const input: ShiftInput = { staff: shown, date, start, end };
@@ -184,6 +188,7 @@ export function ShiftPreview({
             cash,
             withLines ? salesInWindow(sales, range) : undefined,
             tipSplit,
+            drop,
           ),
         }}
         style={{ width: "72mm" }}

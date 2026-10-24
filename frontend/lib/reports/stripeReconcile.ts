@@ -7,9 +7,12 @@
  */
 
 import { paymentsApiBase } from "@/lib/booking/payments";
+import { isMissingMigration } from "@/lib/pos/api";
 import { CLUB_TIME_ZONE } from "@/lib/retail/receipt";
+import type { Sale } from "@/lib/retail/types";
 import { ApiError } from "@/lib/teeSheet/api";
 import { accessToken } from "@/lib/teeSheet/session";
+import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
 import type { Row, Workbook } from "./accountingWorkbook";
 
@@ -47,6 +50,43 @@ export type OurSide = {
   card_last4: string | null;
   label: string;
   customer_name?: string | null;
+  /** 단말기 승인을 계산서에 쓰기 전에 VOID 했다(0019). */
+  voided?: boolean;
+  /** 단말기만. amount 안의 팁(계산서 합계 밖). */
+  tip?: number;
+  /** 단말기만. 계산서 결제 줄에 붙었나. */
+  on_bill?: boolean;
+  /** 단말기만. credit · debit(Interac 환불은 리더에 카드를 다시 댄다). */
+  card_type?: "credit" | "debit" | "gift" | "ebt" | null;
+  pending_refunds?: number;
+};
+
+/** 상세 창에서 정한 것(0089). sale = 매출로 반영, refund = 카드 환불, note = 그대로 둠(이유). */
+export type ReconcileDecision = {
+  id: number;
+  payment_intent: string;
+  terminal_txn_id: number | null;
+  decision: "sale" | "refund" | "note";
+  note: string | null;
+  staff_name: string | null;
+  bill_id: number | null;
+  amount: number;
+  created_at: string;
+};
+
+/** 카드에서 돈이 빠지지 않은 시도 — Stripe 대시보드의 Canceled·Incomplete. 대사(rows)에는 들어가지 않는다. */
+export type StripeAttempt = {
+  payment_intent: string;
+  at: string;
+  status: string;
+  status_label: string;
+  amount: number;
+  reason: string;
+  message: string;
+  source: "terminal" | "online" | "unknown";
+  card_brand: string;
+  card_last4: string;
+  label: string;
 };
 
 export type ReconcileRow = {
@@ -57,6 +97,10 @@ export type ReconcileRow = {
   issues: ReconcileIssue[];
   stripe: StripeSide | null;
   ours: OurSide | null;
+  /** 이 PaymentIntent 의 마지막 결정(0089). Fly 서버가 2026-10-23 판 이후일 때만 온다. */
+  decision?: ReconcileDecision | null;
+  /** 그대로 두기로 정해서 문제로 세지 않는 줄. */
+  reviewed?: boolean;
 };
 
 export type ReconcileReport = {
@@ -77,8 +121,15 @@ export type ReconcileReport = {
     matched: number;
     rows: number;
     outside_window: number;
+    /** 아래 넷은 Fly 서버가 2026-10-23 판 이후일 때만 온다. */
+    attempts?: number;
+    attempts_amount?: number;
+    voided?: number;
+    voided_amount?: number;
+    reviewed?: number;
   };
   rows: ReconcileRow[];
+  attempts?: StripeAttempt[];
   keyed: { count: number; amount: number };
   truncated: boolean;
   unchecked: number;
@@ -111,9 +162,49 @@ export async function fetchReconcile(from: string, to: string): Promise<Reconcil
   return (await response.json()) as ReconcileReport;
 }
 
+// ===== 정하기 (0089) ===================================================
+
+export const DECISIONS_MISSING_MESSAGE =
+  "Deciding from the Stripe check is not switched on yet. Run 0089_reconcile_decisions.sql in the Supabase SQL Editor.";
+
+async function decisionCall<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  try {
+    return await staffRpc<T>(fn, args);
+  } catch (cause) {
+    if (isMissingMigration(cause)) throw new ApiError(404, DECISIONS_MISSING_MESSAGE);
+    throw cause;
+  }
+}
+
+/** 매출로 반영: 단말기 승인을 계산서의 카드 결제로 붙이고 계산서를 끝낸다(void 계산서는 되살린다). */
+export function keepAsSale(terminalTxn: number, note: string) {
+  return decisionCall<{ bill: Sale; decision: ReconcileDecision }>("pelham_staff_reconcile_keep", {
+    p_txn: terminalTxn,
+    p_note: note.trim() || null,
+  });
+}
+
+/** 카드 환불을 마친 뒤(refund), 또는 그대로 둘 때(note — 이유 필수) 결정을 남긴다. */
+export function recordDecision(input: {
+  payment_intent: string;
+  decision: "refund" | "note";
+  note?: string;
+  terminal_txn?: number | null;
+}) {
+  return decisionCall<ReconcileDecision>("pelham_staff_reconcile_decide", {
+    p: { ...input, note: input.note?.trim() || null },
+  });
+}
+
 // ===== 보이기 ==========================================================
 
 export const LEVEL_LABEL: Record<Level, string> = { error: "Problem", warn: "Check", ok: "Matched" };
+
+export const DECISION_LABEL: Record<ReconcileDecision["decision"], string> = {
+  sale: "Counted as sale",
+  refund: "Refunded to card",
+  note: "Left as is",
+};
 
 export const SOURCE_LABEL: Record<ReconcileRow["source"], string> = {
   terminal: "Register (S700)",
@@ -159,7 +250,7 @@ export function buildReconcileWorkbook(report: ReconcileReport): Workbook {
   const s = report.summary;
   const rows: Row[] = report.rows.map((row) => ({
     cells: [
-      LEVEL_LABEL[row.level],
+      row.reviewed ? "Reviewed" : LEVEL_LABEL[row.level],
       clubTime(row.at),
       SOURCE_LABEL[row.source],
       cardText(row),
@@ -172,7 +263,15 @@ export function buildReconcileWorkbook(report: ReconcileReport): Workbook {
       row.ours ? cents(row.ours.amount) : null,
       row.ours ? cents(row.ours.refunded) : null,
       cents(rowDifference(row)),
-      row.issues.map((issue) => issue.message).join(" "),
+      [
+        row.issues.map((issue) => issue.message).join(" "),
+        row.decision
+          ? `${DECISION_LABEL[row.decision.decision]}${row.decision.staff_name ? ` by ${row.decision.staff_name}` : ""}` +
+            (row.decision.note ? `: ${row.decision.note}` : "")
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" — "),
     ],
   }));
   rows.push({

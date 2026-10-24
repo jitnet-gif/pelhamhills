@@ -146,6 +146,22 @@ export type Sale = {
   created_at: string;
 };
 
+/** 결제 전에 void 한 계산서(0088). 금액은 void 직전 값, 줄은 지운 것까지 다 싣는다. */
+export type VoidBill = {
+  id: number;
+  label: string | null;
+  station: string;
+  cashier: string | null;
+  note: string | null;
+  opened_at: string;
+  voided_at: string;
+  subtotal: Cents;
+  discount: Cents;
+  tax: Cents;
+  total: Cents;
+  lines: { name: string; quantity: number; line_total: Cents }[];
+};
+
 /**
  * 결제 한 줄. 카드·체크카드는 단말기(Stripe Terminal, 또는 손으로 친 전표)의 승인번호가 있다.
  * `entry: "keyed"` = 직원이 단말기에 금액을 직접 쳤다. `"integrated"` = 앱이 단말기로 보냈고 승인 결과를 받았다(0019).
@@ -307,6 +323,8 @@ export type RegisterCloseReport = {
    * 남기고 나머지를 현금 매출로 넘긴다 — 현금 매출이 얼마여야 하는지는 모른다.
    */
   cash_blind?: boolean;
+  /** 0090: 현금 줄 하나만 왔다 — 캐셔에게 카드·체크카드 매출을 보이지 않는다. `close.expected` 는 비어 있다. */
+  cash_only?: boolean;
 };
 
 /** 대사표(0061) — 매출 리포트 · 계산대 마감 · 담당자 마감을 한 영업일로 맞춘 결과. 차이는 서버가 센다. */
@@ -380,7 +398,8 @@ export type RegisterCloseHistory = {
 };
 
 export type RegisterCloseSave = {
-  counted: { cash: Cents; card: Cents; debit: Cents };
+  /** 캐셔(블라인드)는 현금만 보낸다 — 서버(0090)가 카드·체크카드 센 값을 그대로 둔다. */
+  counted: { cash: Cents; card?: Cents; debit?: Cents };
   cash_counts: CashCounts;
   note?: string | null;
   /** 담당자 이름(캐셔 번호는 화면이 이름으로 바꿔 보낸다)과 근무 시작·끝 `HH:MM`(0081). */

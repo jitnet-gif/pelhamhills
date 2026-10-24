@@ -71,6 +71,7 @@ def _terminal_ours(sale: dict[str, Any], refunds: list[dict[str, Any]]) -> dict[
         "status": sale.get("result"),
         "approved": bool(sale.get("approved")),
         "amount": int(sale.get("total_amount") or 0) if sale.get("approved") else 0,
+        "tip": int(sale.get("tip") or 0) if sale.get("approved") else 0,
         "refunded": sum(int(r.get("total_amount") or 0) for r in ok_refunds),
         "refund_ids": [r.get("transaction_id") for r in ok_refunds if r.get("transaction_id")],
         "pending_refunds": sum(1 for r in refunds if r.get("result") == "pending"),
@@ -82,6 +83,7 @@ def _terminal_ours(sale: dict[str, Any], refunds: list[dict[str, Any]]) -> dict[
         "station": sale.get("station"),
         "card_brand": sale.get("card_brand"),
         "card_last4": sale.get("card_last4"),
+        "card_type": sale.get("card_type"),
         "on_bill": sale.get("bill_payment_id") is not None,
         "voided": sale.get("voided_at") is not None,
         "pay_total": (int(sale.get("pay_amount") or 0) + int(sale.get("pay_tip") or 0))
@@ -186,11 +188,14 @@ def reconcile(
     intents: list[dict[str, Any]],
     records: dict[str, Any],
     window: tuple[int, int],
+    decisions: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """intents: Stripe PaymentIntent(latest_charge 펼친 것). records: 0027 의 결과. window: [시작, 끝) epoch.
+    decisions: PaymentIntent 별 마지막 결정(0089). 'note'(그대로 둠)로 정한 줄은 Reviewed — 문제 수에서 빠진다.
 
-    돌려주는 것: {rows, summary}. rows 는 문제 있는 것부터(error → warn → ok), 같은 수준에서는 시간순.
+    돌려주는 것: {rows, summary, attempts}. rows 는 문제 있는 것부터(error → warn → ok), 같은 수준에서는 시간순.
     """
+    decisions = decisions or {}
     terminal = list(records.get("terminal") or [])
     online = list(records.get("online") or [])
 
@@ -210,6 +215,7 @@ def reconcile(
     used_sales: set[str] = set()
     used_online: set[str] = set()
     rows: list[dict[str, Any]] = []
+    attempts: list[dict[str, Any]] = []
 
     def ours_for(pi_id: str, meta: dict[str, Any]) -> Optional[dict[str, Any]]:
         sale = sales_by_pi.get(pi_id) or sales_by_id.get(str(meta.get("terminal_txn") or ""))
@@ -228,8 +234,12 @@ def reconcile(
             continue
         ours = ours_for(stripe["payment_intent"], stripe["metadata"])
         if not stripe["amount"] and not stripe["refunded"] and not (ours and ours["amount"]):
-            continue  # 돈이 오가지 않은 시도(거절·취소·버려진 Checkout).
-        rows.append(_row(stripe, ours))
+            # 돈이 오가지 않은 시도(거절·취소·버려진 Checkout). Stripe 대시보드에 Canceled·Incomplete 로 보이므로
+            # 대사에는 넣지 않고 따로 돌려준다.
+            if window[0] <= stripe["created"] < window[1]:
+                attempts.append(_attempt(pi, stripe, ours))
+            continue
+        rows.append(_row(stripe, ours, decisions.get(stripe["payment_intent"])))
 
     # Stripe 에서 찾지 못한 우리 기록.
     for sale in sales_by_id.values():
@@ -256,19 +266,61 @@ def reconcile(
         "ours_refunded": sum(r["ours"]["refunded"] for r in rows if r["ours"]),
         "errors": sum(1 for r in rows if r["level"] == "error"),
         "warnings": sum(1 for r in rows if r["level"] == "warn"),
-        "matched": sum(1 for r in rows if r["level"] == "ok"),
+        "matched": sum(1 for r in rows if r["level"] == "ok" and not r["reviewed"]),
+        "reviewed": sum(1 for r in rows if r["reviewed"]),
         "rows": len(rows),
         "outside_window": sum(1 for r in rows if r["stripe"] and not start <= r["stripe"]["created"] < end),
     }
+    summary["attempts"] = len(attempts)
+    summary["attempts_amount"] = sum(a["amount"] for a in attempts)
+    voided = [r for r in rows if r["ours"] and r["ours"].get("voided")]
+    summary["voided"] = len(voided)
+    summary["voided_amount"] = sum(r["stripe"]["amount"] if r["stripe"] else r["ours"]["amount"] for r in voided)
     summary["stripe_net"] = summary["stripe_charged"] - summary["stripe_refunded"]
     summary["ours_net"] = summary["ours_charged"] - summary["ours_refunded"]
     summary["difference"] = summary["stripe_net"] - summary["ours_net"]
-    return {"rows": rows, "summary": summary}
+    attempts.sort(key=lambda a: a["created"])
+    return {"rows": rows, "summary": summary, "attempts": attempts}
 
 
-def _row(stripe: Optional[dict[str, Any]], ours: Optional[dict[str, Any]]) -> dict[str, Any]:
+# 카드에서 돈이 빠지지 않은 PaymentIntent 상태 → 사람이 읽는 이름.
+ATTEMPT_LABELS = {
+    "canceled": "Canceled",
+    "requires_payment_method": "Declined / not finished",
+    "requires_confirmation": "Not finished",
+    "requires_action": "Not finished",
+    "processing": "Processing",
+}
+
+
+def _attempt(pi: dict[str, Any], stripe: dict[str, Any], ours: Optional[dict[str, Any]]) -> dict[str, Any]:
+    error = pi.get("last_payment_error") or {}
+    meta = stripe.get("metadata") or {}
+    return {
+        "payment_intent": stripe["payment_intent"],
+        "created": stripe["created"],
+        "at": datetime.fromtimestamp(stripe["created"], tz=timezone.utc).isoformat().replace("+00:00", "Z"),
+        "status": stripe["status"],
+        "status_label": ATTEMPT_LABELS.get(stripe["status"], stripe["status"] or "Unknown"),
+        "amount": int(pi.get("amount") or 0),
+        "reason": str(pi.get("cancellation_reason") or error.get("decline_code") or error.get("code") or ""),
+        "message": str(error.get("message") or ""),
+        "source": ours["source"] if ours else ("terminal" if meta.get("terminal_txn") else
+                                               "online" if meta.get("invoice") else "unknown"),
+        "card_brand": stripe["card_brand"],
+        "card_last4": stripe["card_last4"],
+        "label": ours["label"] if ours else str(pi.get("description") or ""),
+    }
+
+
+def _row(stripe: Optional[dict[str, Any]], ours: Optional[dict[str, Any]],
+         decision: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     issues = _check(stripe, ours)
     level = "error" if any(i["level"] == "error" for i in issues) else "warn" if issues else "ok"
+    # 그대로 두기로 정했다(이유와 승인한 직원이 남아 있다). 어긋남은 그대로 보이되 문제로 세지 않는다.
+    reviewed = bool(issues) and bool(decision) and decision.get("decision") == "note"
+    if reviewed:
+        level = "ok"
     at = None
     if stripe and stripe["created"]:
         at = datetime.fromtimestamp(stripe["created"], tz=timezone.utc).isoformat().replace("+00:00", "Z")
@@ -285,4 +337,6 @@ def _row(stripe: Optional[dict[str, Any]], ours: Optional[dict[str, Any]]) -> di
         "issues": issues,
         "stripe": stripe,
         "ours": ours,
+        "decision": decision,
+        "reviewed": reviewed,
     }

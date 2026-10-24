@@ -219,7 +219,13 @@ function MethodCell({ line, row }: { line: RegisterCloseHistoryLine | undefined;
   if (!line) return <td className="px-3 py-2" />;
   return (
     <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
-      {row.closed ? (
+      {row.closed && line.counted === null && line.method !== "cash" ? (
+        <>
+          {/* 캐셔는 현금만 센다(0090) — 카드 전표는 매니저가 세기 전까지 비어 있다. */}
+          <span className="block text-[#6b7280]">not counted</span>
+          <span className="block text-xs text-[#6b7280]">expected {formatMoney(line.expected)}</span>
+        </>
+      ) : row.closed ? (
         <>
           <span className="block font-bold">{formatMoney(line.counted ?? 0)}</span>
           <span className="block text-xs text-[#6b7280]">expected {formatMoney(line.expected)}</span>

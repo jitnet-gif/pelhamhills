@@ -201,14 +201,25 @@ function clock(value: string): string {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
+/** 캐셔가 센 서랍 — 센 돈과 남길 시작 잔돈. 넘길 현금 = 센 돈 − 잔돈. */
+export type ShiftCashDrop = { counted: Cents; float: Cents };
+
 /**
- * 영수증 한 장의 블록. `cash` 가 거짓이면(일반 Reports) Cash 줄을 찍지 않는다 — 블라인드 카운트(0046).
- * `tipSplit` 을 주면 그날 팁 나누기(0010, 근무시간 비율)를 덧붙인다. 서버가 현금 리포트 계정에게만 준다(0046).
+ * 영수증 한 장의 블록. `tipSplit` 을 주면 그날 팁 나누기(0010, 근무시간 비율)를 덧붙인다. 서버가 현금 리포트 계정에게만 준다(0046).
+ *
+ * `cash` 가 거짓이면 캐셔의 마감표다 — 마감은 현금만(0090). 매출·결제수단·환불 합계는 찍지 않고(카드 매출을 캐셔에게
+ * 보이지 않는다), `drop` 을 주면 센 현금·남길 잔돈·넘길 현금만 찍는다.
  */
 export function shiftReportBlocks(
   input: ShiftInput,
   summary: ShiftSummary,
-  options: { header: ReceiptHeader; cash: boolean; transactions?: readonly Sale[]; tipSplit?: CloseoutReport | null },
+  options: {
+    header: ReceiptHeader;
+    cash: boolean;
+    transactions?: readonly Sale[];
+    tipSplit?: CloseoutReport | null;
+    drop?: ShiftCashDrop;
+  },
 ): ReceiptBlock[] {
   const money = formatMoney;
   const blocks: ReceiptBlock[] = [
@@ -220,7 +231,27 @@ export function shiftReportBlocks(
     { kind: "field", label: "Date", value: input.date },
     { kind: "field", label: "Start", value: clock(input.start) },
     { kind: "field", label: "End", value: clock(input.end) },
+  ];
 
+  if (!options.cash) {
+    if (options.drop) {
+      blocks.push(
+        { kind: "section", title: "CASH DRAWER" },
+        { kind: "total", label: "Cash counted", amount: money(options.drop.counted) },
+        { kind: "total", label: "Keep in drawer", amount: money(options.drop.float) },
+        {
+          kind: "total",
+          label: "Cash handed in",
+          amount: money(Math.max(0, options.drop.counted - options.drop.float)),
+          bold: true,
+        },
+      );
+    }
+    blocks.push({ kind: "text", text: "Signature: ____________________", align: "left", gap: true });
+    return blocks;
+  }
+
+  blocks.push(
     { kind: "section", title: "SALES (TAX INCL.)" },
     { kind: "total", label: `Total Sales ×${summary.saleCount}`, amount: money(summary.totalSales), bold: true },
     { kind: "total", label: "Tee Sheet", amount: money(summary.divisions.tee_sheet) },
@@ -230,9 +261,7 @@ export function shiftReportBlocks(
     { kind: "total", label: "Other", amount: money(summary.divisions.other) },
 
     { kind: "section", title: "PAYMENTS" },
-  ];
-  if (options.cash) blocks.push({ kind: "total", label: PAYMENT_LABELS.cash, amount: money(summary.payments.cash) });
-  blocks.push(
+    { kind: "total", label: PAYMENT_LABELS.cash, amount: money(summary.payments.cash) },
     { kind: "total", label: PAYMENT_LABELS.card, amount: money(summary.payments.card) },
     { kind: "total", label: "Debit", amount: money(summary.payments.debit) },
     { kind: "total", label: PAYMENT_LABELS.rain_check, amount: money(summary.payments.rain_check) },

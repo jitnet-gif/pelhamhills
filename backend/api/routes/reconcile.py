@@ -6,9 +6,10 @@ GET /payments/reconcile?from=YYYY-MM-DD&to=YYYY-MM-DD (영업일, America/Toront
 2. Stripe: 그 기간에 만든 PaymentIntent 와 환불을 전부 읽는다.
 3. 우리: `pelham_staff_stripe_records`(0027)에 기간과 Stripe 에서 본 id 들을 넘긴다.
 4. 한쪽에만 있는 PaymentIntent(자정에 걸친 것, 지난 결제의 오늘 환불)는 Stripe 에 하나씩 다시 묻는다.
-5. `stripe_reconcile.reconcile` 이 짝을 맞추고 문제를 적는다.
+5. 결정 기록(0089 `pelham_staff_reconcile_decisions`) — 상세 창에서 매출로 반영·환불·그대로 둠을 정한 것.
+6. `stripe_reconcile.reconcile` 이 짝을 맞추고 문제를 적는다.
 
-읽기만 한다. 고치는 일(환불·계산서 정리)은 기존 화면에서 한다.
+읽기만 한다. 고치는 일은 상세 창(`ReconcileDetail.tsx`)이 SQL·단말기 환불로 한다.
 """
 
 from __future__ import annotations
@@ -46,6 +47,20 @@ def _window(start: date, end: date) -> tuple[datetime, datetime]:
     lo = datetime.combine(start, time.min, CLUB_TZ).astimezone(timezone.utc)
     hi = datetime.combine(end + timedelta(days=1), time.min, CLUB_TZ).astimezone(timezone.utc)
     return lo, hi
+
+
+def _decisions(request: Request, by_pi: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """PaymentIntent 별 마지막 결정. 0089 를 아직 돌리지 않았으면(함수 없음) 결정 없이 맞춘다."""
+    if not by_pi:
+        return {}
+    try:
+        found = terminal._as_staff(request, "pelham_staff_reconcile_decisions", {"p_ids": sorted(by_pi)})
+    except HTTPException as exc:
+        if exc.status_code in (401, 403):
+            raise
+        logger.info("대사 결정 기록을 읽지 못함 (%s): %s", exc.status_code, exc.detail)
+        return {}
+    return found if isinstance(found, dict) else {}
 
 
 @router.get("/reconcile")
@@ -106,7 +121,7 @@ def reconcile(
                 continue  # Stripe 에 없다 → 우리 쪽만 있는 기록으로 남는다.
             raise HTTPException(status_code=502, detail=f"Stripe: {exc.message}") from None
 
-    result = stripe_reconcile.reconcile(list(by_pi.values()), records, window)
+    result = stripe_reconcile.reconcile(list(by_pi.values()), records, window, _decisions(request, by_pi))
     keyed = records.get("keyed") or {"count": 0, "amount": 0}
     return {
         "environment": sg.environment(),
@@ -116,6 +131,7 @@ def reconcile(
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "summary": result["summary"],
         "rows": result["rows"],
+        "attempts": result["attempts"],
         "keyed": keyed,
         # 다 읽지 못했다(2,000 건 넘음 또는 하나씩 묻는 한도). 화면이 기간을 줄이라고 알린다.
         "truncated": bool(more_intents or more_refunds or unchecked),
