@@ -27,7 +27,6 @@ import PriceReview from "@/components/reports/PriceReview";
 import SaleDetail from "@/components/reports/SaleDetail";
 import SalesDrilldown, { type Drill } from "@/components/reports/SalesDrilldown";
 import ShiftReportPrint, { PrinterIcon } from "@/components/reports/ShiftReportPrint";
-import StaffCloseout from "@/components/reports/StaffCloseout";
 
 import {
   Button,
@@ -60,10 +59,8 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
   const [selected, setSelected] = useState<Sale | null>(null);
   // 숫자를 눌러 연 상세. 영수증을 열면 잠시 가렸다가, 영수증을 닫으면 그 목록으로 돌아온다.
   const [drill, setDrill] = useState<Drill | null>(null);
-  // 환불하면 담당자별 마감 숫자도 바뀐다. 마감 패널에 다시 읽으라고 알린다.
+  // 환불하면 대사표 숫자도 바뀐다. 대사표에 다시 읽으라고 알린다.
   const [closeoutKey, setCloseoutKey] = useState(0);
-  // 담당자 마감을 저장하면 대사표만 다시 읽는다(마감 패널은 저장 결과를 이미 받았다).
-  const [savedKey, setSavedKey] = useState(0);
   const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
@@ -360,11 +357,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
       {/* 환불·void 계산서·예약 취소(0088). 카드 쪽 취소는 바로 위 칸. */}
       {!loading ? <Cancellations date={date} onOpenSale={setSelected} sales={sales} /> : null}
 
-      {cash ? <CashReconcile date={date} refreshKey={closeoutKey + savedKey} /> : null}
-
-      {cash ? (
-        <StaffCloseout date={date} onSaved={() => setSavedKey((key) => key + 1)} refreshKey={closeoutKey} />
-      ) : null}
+      {cash ? <CashReconcile date={date} refreshKey={closeoutKey} /> : null}
 
       {/* 담당자별·시각순 거래와 담당자별 출력(`CashierShifts`). */}
       {!loading && sales.length > 0 ? (

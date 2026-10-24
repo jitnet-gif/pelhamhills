@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   describeTerminalResult,
   terminal,
+  terminalConfig,
   terminalEnabled,
   TerminalError,
   useTerminalSettings,
@@ -19,6 +20,7 @@ import retailApi, { toRetailError } from "@/lib/retail/api";
 import { printReceipt } from "@/lib/retail/printReceipt";
 import { PAYMENT_LABELS } from "@/lib/retail/receipt";
 import { formatMoney, type Sale, type SalePayment } from "@/lib/retail/types";
+import { stripeUrl } from "@/lib/reports/stripeReconcile";
 
 import {
   Button,
@@ -52,6 +54,8 @@ export default function SaleDetail({
       payment.entry !== "integrated" &&
       (payment.method === "card" || payment.method === "debit"),
   );
+
+  const stripeLink = useStripeLinks(sale);
 
   const created = useMemo(() => {
     // 서버 시각은 ISO-8601 UTC 다. 매장 사람이 읽는 것은 현지 시각이므로 변환한다.
@@ -168,6 +172,16 @@ export default function SaleDetail({
                       {payment.card_last4 ? ` · ****${payment.card_last4}` : ""}
                     </span>
                   ) : null}
+                  {stripeLink(payment) ? (
+                    <a
+                      className="ml-1.5 text-[11px] text-[#4533ff] underline"
+                      href={stripeLink(payment) ?? undefined}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      View in Stripe ↗
+                    </a>
+                  ) : null}
                 </span>
                 <span className="shrink-0 tabular-nums">
                   {formatMoney(payment.amount)}
@@ -244,6 +258,46 @@ export default function SaleDetail({
       </div>
     </Modal>
   );
+}
+
+/**
+ * 카드·직불 결제 줄 → Stripe 대시보드의 그 결제. 이 계산서에 묶인 단말기 기록(0021) 중 승인 번호가 같은
+ * 판매의 payment_intent 로 찾는다. 단말기 기록이 없는 결제(온라인·손으로 친 옛 결제)는 링크가 없다.
+ */
+function useStripeLinks(sale: Sale): (payment: SalePayment) => string | null {
+  const hasCard = (sale.payments ?? []).some(
+    (payment) => (payment.method === "card" || payment.method === "debit") && payment.auth_code,
+  );
+  const [found, setFound] = useState<{
+    id: number;
+    records: TerminalRecord[];
+    environment: "test" | "live";
+  } | null>(null);
+
+  useEffect(() => {
+    if (!hasCard) return;
+    let cancelled = false;
+    Promise.all([terminal.forBill(sale.id), terminalConfig()])
+      .then(([records, config]) => {
+        if (!cancelled) setFound({ id: sale.id, records, environment: config.environment });
+      })
+      .catch(() => {
+        // 못 읽으면 링크만 안 보인다.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasCard, sale.id]);
+
+  return (payment) => {
+    if (!found || found.id !== sale.id || !payment.auth_code) return null;
+    if (payment.method !== "card" && payment.method !== "debit") return null;
+    const record = found.records.find(
+      (item) =>
+        item.kind === "sale" && item.approved && item.payment_intent && item.auth_code === payment.auth_code,
+    );
+    return record?.payment_intent ? stripeUrl(found.environment, record.payment_intent) : null;
+  };
 }
 
 /**

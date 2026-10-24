@@ -71,7 +71,8 @@ export class RetailApiError extends Error {
 /** 알 수 없는 throw 값을 화면이 다룰 수 있는 형태로. */
 export function toRetailError(cause: unknown): RetailApiError {
   if (cause instanceof RetailApiError) return cause;
-  if (isMissingMigration(cause)) return new RetailApiError("http", 404, MISSING_MIGRATION_MESSAGE);
+  if (isMissingMigration(cause))
+    return new RetailApiError("http", 404, MISSING_MIGRATION_MESSAGE);
   if (cause instanceof ApiError) {
     return cause.status === 0
       ? new RetailApiError("network", 0, NO_RETAIL_API_MESSAGE)
@@ -80,7 +81,10 @@ export function toRetailError(cause: unknown): RetailApiError {
   return new RetailApiError("network", 0, NO_RETAIL_API_MESSAGE);
 }
 
-async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
+async function call<T>(
+  fn: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
   try {
     return await staffRpc<T>(fn, args);
   } catch (cause) {
@@ -92,11 +96,15 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
 export const CLOSEOUT_MISSING_MESSAGE =
   "담당자별 마감이 아직 켜지지 않았습니다. Supabase SQL Editor 에서 0010_staff_closeout.sql 을 실행해 주세요.";
 
-async function closeoutCall<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+async function closeoutCall<T>(
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   try {
     return await staffRpc<T>(fn, args);
   } catch (cause) {
-    if (isMissingMigration(cause)) throw new RetailApiError("http", 404, CLOSEOUT_MISSING_MESSAGE);
+    if (isMissingMigration(cause))
+      throw new RetailApiError("http", 404, CLOSEOUT_MISSING_MESSAGE);
     throw toRetailError(cause);
   }
 }
@@ -104,11 +112,15 @@ async function closeoutCall<T>(fn: string, args: Record<string, unknown>): Promi
 export const REGISTER_CLOSE_MISSING_MESSAGE =
   "계산대 마감이 아직 켜지지 않았습니다. Supabase SQL Editor 에서 0023_register_close.sql 을 실행해 주세요.";
 
-async function registerCloseCall<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+async function registerCloseCall<T>(
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   try {
     return await staffRpc<T>(fn, args);
   } catch (cause) {
-    if (isMissingMigration(cause)) throw new RetailApiError("http", 404, REGISTER_CLOSE_MISSING_MESSAGE);
+    if (isMissingMigration(cause))
+      throw new RetailApiError("http", 404, REGISTER_CLOSE_MISSING_MESSAGE);
     throw toRetailError(cause);
   }
 }
@@ -131,29 +143,42 @@ export const retailApi = {
    * 필터를 주지 않으면 **비활성 상품까지 포함해** 돌려준다(재활성화용).
    * 분류·검색 필터는 여기서 거른다 — 상품은 수십 개라 서버에서 나눌 이유가 없다.
    */
-  listProducts: async (filters?: { category?: string; q?: string; active?: boolean }) => {
+  listProducts: async (filters?: {
+    category?: string;
+    q?: string;
+    active?: boolean;
+  }) => {
     const list = await call<Product[]>("pelham_staff_pos_products", {
       p_active: filters?.active === undefined ? null : filters.active,
     });
     const needle = filters?.q?.trim().toLowerCase();
     return list
-      .filter((item) => (filters?.category ? item.category === filters.category : true))
       .filter((item) =>
-        needle ? item.name.toLowerCase().includes(needle) || item.sku.toLowerCase().includes(needle) : true,
+        filters?.category ? item.category === filters.category : true,
+      )
+      .filter((item) =>
+        needle
+          ? item.name.toLowerCase().includes(needle) ||
+            item.sku.toLowerCase().includes(needle)
+          : true,
       );
   },
 
-  createProduct: (input: ProductCreate) => call<Product>("pelham_staff_pos_product_create", { p: input }),
+  createProduct: (input: ProductCreate) =>
+    call<Product>("pelham_staff_pos_product_create", { p: input }),
 
   updateProduct: (id: number, patch: ProductUpdate) =>
     call<Product>("pelham_staff_pos_product_update", { p_id: id, p: patch }),
 
   /** 지우지 않고 `is_active = false`. 지난 계산서가 이 상품을 가리키기 때문이다. */
-  deactivateProduct: (id: number) => call<Product>("pelham_staff_pos_product_deactivate", { p_id: id }),
+  deactivateProduct: (id: number) =>
+    call<Product>("pelham_staff_pos_product_deactivate", { p_id: id }),
 
   // ===== 매출 (= 결제된·환불된 계산서) =====
   listSales: (businessDate?: string) =>
-    call<Sale[]>("pelham_staff_bills", { p_date: businessDate || localBusinessDate() }),
+    call<Sale[]>("pelham_staff_bills", {
+      p_date: businessDate || localBusinessDate(),
+    }),
 
   getSale: (id: number) => call<Sale>("pelham_staff_bill", { p_id: id }),
 
@@ -162,20 +187,27 @@ export const retailApi = {
    * 계산서를 refunded 로, 재고를 되돌리고, 그린피를 미결제로.
    */
   refundSale: (id: number, body: RefundRequest) =>
-    call<Sale>("pelham_staff_bill_refund", { p_bill: id, p_reason: body.reason }),
+    call<Sale>("pelham_staff_bill_refund", {
+      p_bill: id,
+      p_reason: body.reason,
+    }),
 
   // ===== 리포트 =====
   /** 그 날(클럽 현지) void 한 계산서(0088). 결제 전이라 영수증 번호·영업일이 없다. */
-  listVoidBills: (date: string) => call<VoidBill[]>("pelham_staff_void_bills", { p_date: date }),
+  listVoidBills: (date: string) =>
+    call<VoidBill[]>("pelham_staff_void_bills", { p_date: date }),
 
   /** 그 기간에 Pelham Shift ID 로 확인된 담당자 이름(0095). 0095 전이면 빈 목록. */
   listVerifiedCashiers: (from: string, to: string = from) =>
-    call<{ business_date: string; name: string }[]>("pelham_staff_verified_cashiers", { p_from: from, p_to: to }).catch(
-      () => [],
-    ),
+    call<{ business_date: string; name: string }[]>(
+      "pelham_staff_verified_cashiers",
+      { p_from: from, p_to: to },
+    ).catch(() => []),
 
   getDailyReport: (businessDate: string) =>
-    call<RetailDailyReport>("pelham_staff_pos_report_daily", { p_date: businessDate }),
+    call<RetailDailyReport>("pelham_staff_pos_report_daily", {
+      p_date: businessDate,
+    }),
 
   listLowStock: () => call<LowStockItem[]>("pelham_staff_pos_low_stock"),
 
@@ -192,53 +224,92 @@ export const retailApi = {
     }
   },
 
+  /**
+   * 이 계정이 Refund 창에서 지난 날 영수증 목록을 볼 수 있는가(0096: 매니저 + admin@·proshop@·analysis@).
+   * 0096 전이면 매니저(현금 리포트 계정)만.
+   */
+  pastSalesAccess: async (): Promise<boolean> => {
+    try {
+      return await staffRpc<boolean>("pelham_staff_past_sales_access");
+    } catch (cause) {
+      if (isMissingMigration(cause)) return retailApi.cashAccess();
+      throw toRetailError(cause);
+    }
+  },
+
   // ===== 담당자별 마감 + 팁 나누기 (0010) — 현금 리포트 계정만(0046) =====
   getCloseouts: (businessDate: string) =>
-    closeoutCall<CloseoutReport>("pelham_staff_closeout_report", { p_date: businessDate }),
+    closeoutCall<CloseoutReport>("pelham_staff_closeout_report", {
+      p_date: businessDate,
+    }),
 
   /** 마감(같은 사람을 다시 마감하면 덮어쓴다). 리포트 전체를 돌려준다. */
   saveCloseout: (businessDate: string, body: CloseoutSave) =>
-    closeoutCall<CloseoutReport>("pelham_staff_closeout_save", { p_date: businessDate, p: body }),
+    closeoutCall<CloseoutReport>("pelham_staff_closeout_save", {
+      p_date: businessDate,
+      p: body,
+    }),
 
   reopenCloseout: (businessDate: string, staffKey: string) =>
-    closeoutCall<CloseoutReport>("pelham_staff_closeout_reopen", { p_date: businessDate, p_staff_key: staffKey }),
+    closeoutCall<CloseoutReport>("pelham_staff_closeout_reopen", {
+      p_date: businessDate,
+      p_staff_key: staffKey,
+    }),
 
   // ===== 대사표 (0061) — 현금 리포트 계정만 =====
   getCashReconcile: async (businessDate: string): Promise<CashReconcile> => {
     try {
-      return await staffRpc<CashReconcile>("pelham_staff_cash_reconcile", { p_date: businessDate });
+      return await staffRpc<CashReconcile>("pelham_staff_cash_reconcile", {
+        p_date: businessDate,
+      });
     } catch (cause) {
-      if (isMissingMigration(cause)) throw new RetailApiError("http", 404, CASH_RECONCILE_MISSING_MESSAGE);
+      if (isMissingMigration(cause))
+        throw new RetailApiError("http", 404, CASH_RECONCILE_MISSING_MESSAGE);
       throw toRetailError(cause);
     }
   },
 
   // ===== 계산대 마감 (0023) =====
-  getRegisterClose: async (businessDate: string, station: string, shift: RegisterShift) => {
+  getRegisterClose: async (
+    businessDate: string,
+    station: string,
+    shift: RegisterShift,
+  ) => {
     try {
-      return await staffRpc<RegisterCloseReport>("pelham_staff_register_close_report", {
-        p_date: businessDate,
-        p_station: station,
-        p_shift: shift,
-      });
+      return await staffRpc<RegisterCloseReport>(
+        "pelham_staff_register_close_report",
+        {
+          p_date: businessDate,
+          p_station: station,
+          p_shift: shift,
+        },
+      );
     } catch (cause) {
       // 0092 전 서버에는 근무 인자가 없는 함수뿐이라 "함수 없음"으로 온다. 그때는 하루 한 마감(옛 함수)으로
       // 읽는다 — 응답에 `shift` 가 없어 화면이 근무 칩을 숨긴다. 저장의 shift 키는 옛 서버가 무시한다.
       if (!isMissingMigration(cause)) throw toRetailError(cause);
     }
     try {
-      return await staffRpc<RegisterCloseReport>("pelham_staff_register_close_report", {
-        p_date: businessDate,
-        p_station: station,
-      });
+      return await staffRpc<RegisterCloseReport>(
+        "pelham_staff_register_close_report",
+        {
+          p_date: businessDate,
+          p_station: station,
+        },
+      );
     } catch (cause) {
-      if (isMissingMigration(cause)) throw new RetailApiError("http", 404, REGISTER_CLOSE_MISSING_MESSAGE);
+      if (isMissingMigration(cause))
+        throw new RetailApiError("http", 404, REGISTER_CLOSE_MISSING_MESSAGE);
       throw toRetailError(cause);
     }
   },
 
   /** 센 돈을 적는다(다시 세면 덮어쓴다). 표 전체를 돌려준다. */
-  saveRegisterClose: (businessDate: string, station: string, body: RegisterCloseSave) =>
+  saveRegisterClose: (
+    businessDate: string,
+    station: string,
+    body: RegisterCloseSave,
+  ) =>
     registerCloseCall<RegisterCloseReport>("pelham_staff_register_close_save", {
       p_date: businessDate,
       p_station: station,
@@ -246,11 +317,22 @@ export const retailApi = {
     }),
 
   /** 기간 안의 마감 기록(0065) — (영업일, 서랍)마다 한 줄. 현금 리포트 계정이 아니면 현금 줄이 없다. */
-  getRegisterCloseHistory: async (from: string, to: string): Promise<RegisterCloseHistory> => {
+  getRegisterCloseHistory: async (
+    from: string,
+    to: string,
+  ): Promise<RegisterCloseHistory> => {
     try {
-      return await staffRpc<RegisterCloseHistory>("pelham_staff_register_close_history", { p_from: from, p_to: to });
+      return await staffRpc<RegisterCloseHistory>(
+        "pelham_staff_register_close_history",
+        { p_from: from, p_to: to },
+      );
     } catch (cause) {
-      if (isMissingMigration(cause)) throw new RetailApiError("http", 404, REGISTER_CLOSE_HISTORY_MISSING_MESSAGE);
+      if (isMissingMigration(cause))
+        throw new RetailApiError(
+          "http",
+          404,
+          REGISTER_CLOSE_HISTORY_MISSING_MESSAGE,
+        );
       throw toRetailError(cause);
     }
   },
@@ -298,7 +380,10 @@ function clampInt(value: number, min: number, max: number): number {
  * 이 값은 **결제 전 미리보기 전용**이다. 결제 후에는 서버가 돌려준 `tax`/`total`
  * 을 그대로 표시한다.
  */
-export function computeCartTotals(lines: CartLine[], orderDiscount: Cents): CartTotals {
+export function computeCartTotals(
+  lines: CartLine[],
+  orderDiscount: Cents,
+): CartTotals {
   const lineTotals: Cents[] = [];
   let subtotal = 0;
 
@@ -339,7 +424,11 @@ export function toSaleCreate(
     lines: lines.map((line) => ({
       product_id: line.product.id,
       quantity: clampInt(line.quantity, 1, 9999),
-      discount: clampInt(line.discount, 0, clampInt(line.quantity, 1, 9999) * line.product.price),
+      discount: clampInt(
+        line.discount,
+        0,
+        clampInt(line.quantity, 1, 9999) * line.product.price,
+      ),
     })),
     // `computeCartTotals` 가 소계로 잘라 준 값. 소계를 넘는 주문 할인은 없다.
     discount: totals.discount,

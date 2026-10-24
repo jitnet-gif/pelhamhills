@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * 대사표(0061) — 매출 리포트 · 계산대 마감 · 담당자 마감을 같은 영업일로 나란히 놓고 차이를 보여 준다.
- * `/cash` 의 매출 리포트 아래, 담당자별 마감 위에 붙는다(현금 리포트 계정만).
+ * 대사표(0061) — 매출 리포트 · 계산대 마감을 같은 영업일로 나란히 놓고 차이를 보여 준다.
+ * `/cash` 의 매출 리포트 아래에 붙는다(현금 리포트 계정만).
  *
  * 세 장표는 같은 계산서 장부를 읽지만 숫자가 그대로 같지 않다 — 매출 리포트는 팁을 따로 두고, 계산대 마감
  * 현금에는 시작 잔돈이 있고, 온라인 결제는 마감할 계산대가 없다. 그 식(리포트 + 팁 = 센 돈 − 잔돈 + 온라인)
@@ -148,14 +148,7 @@ function LineCard({ line, uncounted, onOpen }: { line: CashReconcileLine; uncoun
           status={<Diff complete={line.registers.complete && !uncounted} diff={line.registers.diff} />}
           value={line.registers.counted + line.online}
         />
-        {line.staff ? (
-          <Row
-            detail={`${formatMoney(line.staff.counted)} counted + ${formatMoney(line.staff.unassigned)} no cashier`}
-            label="Staff close-outs"
-            status={<Diff complete={line.staff.complete} diff={line.staff.diff} />}
-            value={line.staff.counted + line.staff.unassigned}
-          />
-        ) : null}
+        {/* 담당자별 마감(0010) 줄은 뺐다(2026-10-24) — 현금은 Shift 1·2 서랍 마감으로만 맞춘다. */}
       </dl>
     </section>
   );
@@ -271,15 +264,6 @@ function openItems(report: Report): string[] {
         `${name}: the ${METHOD_LABELS[method].toLowerCase()} slip is not counted yet — enter it on Close Register.`,
       );
     }
-  }
-  if (report.staff.missing.length > 0) {
-    items.push(`Not closed out yet (took cash): ${report.staff.missing.join(", ")}.`);
-  }
-  if (report.staff.stale.length > 0) {
-    items.push(`Sales changed after closing — close again: ${report.staff.stale.join(", ")}.`);
-  }
-  if (report.staff.unassigned_cash > 0) {
-    items.push(`${formatMoney(report.staff.unassigned_cash)} cash is on bills with no cashier name.`);
   }
   return items;
 }

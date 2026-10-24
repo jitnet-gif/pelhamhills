@@ -6,14 +6,15 @@
  * 합계 + 계산서 한 줄씩(`ShiftReportPrint` 에 cashier 를 넘긴다).
  *
  * 숫자는 화면이 받은 계산서에서 센다(`shiftReport.ts` 와 같은 규칙: 환불은 합계에서 빼고 따로 센다).
- * 서버의 담당자별 마감(0010, `StaffCloseout`)은 현금 계정 화면에만 있고 근무시간·팁용이다 — 이 패널은 거래 목록용이다.
+ * 현금 계정(매니저)에게는 사람마다 결제 수단별 합계와 받은 팁도 보인다 — 예전 담당자별 마감 패널(0010)을 없애고(2026-10-24,
+ * 팁은 나누지 않는다) 그 숫자를 여기서 읽기 전용으로 본다. 현금은 Shift 1·2 서랍 마감에서 센다.
  */
 
 import { useMemo, useState } from "react";
 
-import { stationLabel } from "@/lib/retail/receipt";
+import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { cashierKey, saleClock, salePaymentLabel, saleTime } from "@/lib/reports/shiftReport";
-import { formatMoney, type Cents, type Sale } from "@/lib/retail/types";
+import { formatMoney, type Cents, type PaymentMethod, type Sale } from "@/lib/retail/types";
 
 import ShiftReportPrint, { PrinterIcon } from "@/components/reports/ShiftReportPrint";
 import StaffName from "@/components/reports/StaffName";
@@ -29,6 +30,9 @@ type Group = {
   count: number;
   total: Cents;
   refunds: number;
+  /** 결제 수단별 건수·금액(팁 제외)·팁. 환불된 계산서는 빼고. */
+  methods: Map<PaymentMethod, { count: number; amount: Cents; tip: Cents }>;
+  tips: Cents;
 };
 
 function isRefunded(sale: Sale): boolean {
@@ -51,6 +55,8 @@ function groupByCashier(sales: readonly Sale[]): Group[] {
         count: 0,
         total: 0,
         refunds: 0,
+        methods: new Map(),
+        tips: 0,
       };
       groups.set(key, group);
     }
@@ -60,6 +66,14 @@ function groupByCashier(sales: readonly Sale[]): Group[] {
     else {
       group.count += 1;
       group.total += sale.total;
+      for (const payment of sale.payments ?? []) {
+        const row = group.methods.get(payment.method) ?? { count: 0, amount: 0, tip: 0 };
+        row.count += 1;
+        row.amount += payment.amount;
+        row.tip += payment.tip;
+        group.methods.set(payment.method, row);
+        group.tips += payment.tip;
+      }
     }
   }
   // 이름 있는 사람을 첫 거래 순으로, 이름 없는 계산서는 맨 뒤.
@@ -119,6 +133,24 @@ export default function CashierShifts({
                   </Button>
                 </div>
               </div>
+
+              {cash && group.methods.size > 0 ? (
+                <dl className="grid gap-0.5 border-t border-[#e4e4e8] pt-2 text-xs">
+                  {[...group.methods].map(([method, row]) => (
+                    <div className="flex justify-between gap-2 text-[#4b5563]" key={method}>
+                      <dt>
+                        {PAYMENT_LABELS[method]} ×{row.count}
+                        {row.tip ? ` + tip ${formatMoney(row.tip)}` : ""}
+                      </dt>
+                      <dd className="tabular-nums">{formatMoney(row.amount)}</dd>
+                    </div>
+                  ))}
+                  <div className="flex justify-between gap-2">
+                    <dt>Tips taken</dt>
+                    <dd className="tabular-nums">{formatMoney(group.tips)}</dd>
+                  </div>
+                </dl>
+              ) : null}
 
               <details open={group.sales.length <= 8}>
                 <summary className="cursor-pointer text-xs font-bold text-[#4533ff]">

@@ -25,7 +25,6 @@ import {
 
 import { ReceiptPrinterSetup } from "@/components/pos/ReceiptPrinterSetup";
 import SaleDetail from "@/components/reports/SaleDetail";
-import StaffCloseout from "@/components/reports/StaffCloseout";
 import { REGISTER_GUIDE } from "@/lib/nav";
 import { posApi, type Bill, type BillStation } from "@/lib/pos/api";
 import { billActions, useCurrentBill } from "@/lib/pos/currentBill";
@@ -56,7 +55,6 @@ type Dialog =
   | { kind: "refund"; code: string }
   | { kind: "continue" }
   | { kind: "close" }
-  | { kind: "staff" }
   | { kind: "printer" }
   | { kind: "sale"; sale: Sale };
 
@@ -316,20 +314,9 @@ export default function RegisterHome({
             date={today}
             onCancel={() => setDialog(null)}
             blindCash={!cashAccess}
-            onStaffCloseout={cashAccess ? () => setDialog({ kind: "staff" }) : undefined}
             registerName={registerName}
             station={station}
           />
-        </Modal>
-      ) : null}
-
-      {dialog?.kind === "staff" && cashAccess ? (
-        <Modal
-          onClose={() => setDialog(null)}
-          title={`Staff close-out · ${today}`}
-          wide
-        >
-          <StaffCloseout date={today} refreshKey={reloadKey} />
         </Modal>
       ) : null}
 
@@ -344,7 +331,11 @@ export default function RegisterHome({
 
 // ===== Refund: 영수증 찾기 ==============================================
 
-/** 영수증을 쏘거나 번호를 치면 찾고, 아니면 그 날 영수증 목록에서 고른다(기본은 오늘, 지난 날도 고른다). */
+/**
+ * 영수증을 쏘거나 번호를 치면 찾고, 아니면 그 날 영수증 목록에서 고른다(기본은 오늘).
+ * 지난 날 목록은 매니저와 admin@·proshop@·analysis@ 만 고른다(0096). 다른 계정은 오늘 목록만 보고,
+ * 지난 영수증은 종이 영수증을 쏘거나 번호를 쳐서 연다.
+ */
 function RefundLookup({
   date,
   initialCode,
@@ -358,6 +349,7 @@ function RefundLookup({
 }) {
   const [query, setQuery] = useState(initialCode);
   const [day, setDay] = useState(date);
+  const [pastAccess, setPastAccess] = useState(false);
   const [sales, setSales] = useState<Sale[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -388,8 +380,7 @@ function RefundLookup({
       const full = fullReceiptNo(wanted);
       const hits = (list ?? []).filter(
         (sale) =>
-          sale.receipt_no.toUpperCase() === full ||
-          isShortHit(sale, wanted),
+          sale.receipt_no.toUpperCase() === full || isShortHit(sale, wanted),
       );
       if (hits.length === 1) {
         onPick(hits[0]);
@@ -399,7 +390,7 @@ function RefundLookup({
       if (hits.length > 1) return;
       if (SHORT_NUMBER.test(wanted)) {
         setError(
-          `Nothing ${day === date ? "today" : `on ${day}`} with receipt #${wanted} or a card ending ${wanted}. Pick the day of the sale above.`,
+          `Nothing ${day === date ? "today" : `on ${day}`} with receipt #${wanted} or a card ending ${wanted}. ${pastAccess ? "Pick the day of the sale above." : "Type the full receipt number from the paper receipt."}`,
         );
         return;
       }
@@ -415,7 +406,7 @@ function RefundLookup({
         setBusy(false);
       }
     },
-    [date, day, onPick, sales],
+    [date, day, onPick, pastAccess, sales],
   );
 
   // 창이 열릴 때와 날짜를 바꿀 때 읽는다. 홈에서 영수증을 쏘고 열렸으면 첫 목록이 오는 대로 그 영수증으로 간다.
@@ -441,6 +432,19 @@ function RefundLookup({
       cancelled = true;
     };
   }, [day]);
+
+  useEffect(() => {
+    let cancelled = false;
+    retailApi
+      .pastSalesAccess()
+      .then((allowed) => {
+        if (!cancelled) setPastAccess(allowed);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isToday = day === date;
 
@@ -480,21 +484,23 @@ function RefundLookup({
             <p className="text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">
               {isToday ? "Today" : day} · all registers
             </p>
-            <div className="w-40 shrink-0">
-              <TextInput
-                aria-label="Sale date"
-                max={date}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  if (!next || next === day) return;
-                  setSales(null);
-                  setError("");
-                  setDay(next);
-                }}
-                type="date"
-                value={day}
-              />
-            </div>
+            {pastAccess ? (
+              <div className="w-40 shrink-0">
+                <TextInput
+                  aria-label="Sale date"
+                  max={date}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    if (!next || next === day) return;
+                    setSales(null);
+                    setError("");
+                    setDay(next);
+                  }}
+                  type="date"
+                  value={day}
+                />
+              </div>
+            ) : null}
           </div>
           {sales === null && !error ? (
             <SkeletonRows count={3} />

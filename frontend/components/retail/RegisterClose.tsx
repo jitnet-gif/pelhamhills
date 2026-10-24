@@ -90,7 +90,6 @@ export default function RegisterClose({
   station,
   registerName,
   onCancel,
-  onStaffCloseout,
   blindCash,
 }: {
   date: string;
@@ -99,8 +98,6 @@ export default function RegisterClose({
   onCancel: () => void;
   /** 현금 기대 금액·과부족을 가린다(현금 리포트 계정이 아닐 때). */
   blindCash: boolean;
-  /** 담당자별 마감(근무시간·팁)으로. 현금 리포트 계정이 아니면 없다(0046) — 버튼을 그리지 않는다. */
-  onStaffCloseout?: () => void;
 }) {
   const [shift, setShift] = useState<RegisterShift>(guessShift);
   // 근무를 바꾸면 그 근무의 표를 다시 읽는다. 다른 근무의 표는 그리지 않는다.
@@ -160,7 +157,6 @@ export default function RegisterClose({
           shift={shift}
           onCancel={onCancel}
           onSaved={(next) => setLoaded({ shift, report: next, error: "" })}
-          onStaffCloseout={onStaffCloseout}
           registerName={registerName}
           report={report}
         />
@@ -199,7 +195,6 @@ function CloseForm({
   registerName,
   onSaved,
   onCancel,
-  onStaffCloseout,
   blind,
   sales,
   shift: shiftKey,
@@ -211,7 +206,6 @@ function CloseForm({
   registerName: string;
   onSaved: (report: RegisterCloseReport) => void;
   onCancel: () => void;
-  onStaffCloseout?: () => void;
 }) {
   const saved = report.close;
   // 이미 셌으면 그 숫자로 연다(다시 세기).
@@ -452,11 +446,6 @@ function CloseForm({
         <Button disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
-        {onStaffCloseout ? (
-          <Button className="sm:ml-auto" disabled={busy} onClick={onStaffCloseout}>
-            Staff hours &amp; tip split →
-          </Button>
-        ) : null}
       </div>
 
       {showCash ? (

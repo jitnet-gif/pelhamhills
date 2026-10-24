@@ -3,6 +3,7 @@ import "./globals.css";
 
 import ManagerApprovalHost from "@/components/pos/ManagerApprovalHost";
 import VisitTracker from "@/components/site/VisitTracker";
+import I18nHost from "@/lib/i18n/I18nHost";
 
 export const metadata: Metadata = {
   title: {
@@ -63,6 +64,8 @@ export default function RootLayout({
         <ManagerApprovalHost />
         {/* 웹 예약의 유입 경로(0067) — 손님이 들어온 입구를 기억한다. */}
         <VisitTracker />
+        {/* 한/영 화면 전환(2026-10-24) — 직원 화면 머리의 EN / 한 버튼이 바꾼다. */}
+        <I18nHost />
       </body>
     </html>
   );

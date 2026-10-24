@@ -7,6 +7,7 @@
  *   - 고객층 × 주중·주말 × 시간대: 하루 평균 라운드(주중과 주말은 날 수가 달라서 그대로 세면 주중이 커 보인다).
  *   - 매출 구성: 그린피·카트·추가품목·프로샵·스낵바, 고객층별 1인 금액과 주중·주말.
  *   - 유입 경로·프로모 코드·회원권·연락 가능한 사람 수.
+ *   - 회원별 라운드 수(0097): 기간·시즌 누적·마지막 플레이.
  *
  * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, Claude 의 사실·제안, 마케팅 믹스 보드)는 이 화면에 붙는다.
  * 데모 숫자로 내려가지 않는다 — 서버가 안 되면 오류를 보여 준다(옛 Business Intelligence 화면이 고치려던 문제).
@@ -20,6 +21,7 @@ import {
   type DayPart,
   type DayType,
   type MarketingSummary,
+  type MemberRounds,
   type SalesParts,
   type Segment,
 } from "@/lib/aiMarketing/api";
@@ -155,6 +157,7 @@ export default function AiMarketingView() {
       ) : data && !error ? (
         <Summary data={data} />
       ) : null}
+      {data && !error ? <MemberRoundsPanel from={request.from} to={request.to} /> : null}
     </div>
   );
 }
@@ -431,5 +434,104 @@ function SimpleList({ rows, empty }: { rows: string[][]; empty: string }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * 회원별 라운드 수(0097). 요약과 따로 부른다 — 0097 을 아직 실행하지 않았어도 위 요약은 그대로 보이게.
+ */
+function MemberRoundsPanel({ from, to }: { from: string; to: string }) {
+  const key = `${from}|${to}`;
+  const [result, setResult] = useState<{ key: string; data?: MemberRounds; error?: string } | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    aiMarketingApi.memberRounds(from, to).then(
+      (data) => {
+        if (!cancelled) setResult({ key, data });
+      },
+      (cause) => {
+        if (!cancelled) setResult({ key, error: describe(cause) });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [from, to, key]);
+
+  const loading = result?.key !== key;
+  const data = loading ? null : result?.data;
+  const members = data?.members ?? [];
+  const shown = showAll ? members : members.slice(0, 25);
+  const total = members.reduce((sum, row) => sum + row.rounds, 0);
+  const idle = members.filter((row) => row.rounds === 0).length;
+
+  return (
+    <Panel title={data ? `Rounds by member · ${data.season} members` : "Rounds by member"}>
+      {loading ? (
+        <SkeletonRows count={4} />
+      ) : result?.error ? (
+        <ErrorNote>
+          {/function|schema cache|does not exist/i.test(result.error)
+            ? "Rounds by member switches on once 0097_ai_marketing_member_rounds.sql is run in the Supabase SQL Editor."
+            : result.error}
+        </ErrorNote>
+      ) : members.length === 0 ? (
+        <EmptyNote>No active memberships this season.</EmptyNote>
+      ) : (
+        <div className="grid gap-2">
+          <p className="text-xs text-[#6b7280]">
+            {`${members.length} members · ${total} rounds in this period · ${idle} did not play`}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm tabular-nums">
+              <thead>
+                <tr className="text-xs text-[#6b7280]">
+                  <th className="text-left font-bold">Member</th>
+                  <th className="text-left font-bold">Membership</th>
+                  <th className="text-right font-bold">Rounds (period)</th>
+                  <th className="text-right font-bold">Season total</th>
+                  <th className="text-right font-bold">No-shows</th>
+                  <th className="text-right font-bold">Last played</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((row, index) => (
+                  <tr className="border-t border-[#eef0f2]" key={`${row.name}-${index}`}>
+                    <td className="py-1 pr-2" translate="no">
+                      {row.name}
+                      {row.member_number ? <span className="text-xs text-[#6b7280]"> #{row.member_number}</span> : null}
+                    </td>
+                    <td className="py-1 pr-2">
+                      {MEMBERSHIP_LABEL[row.type] ?? row.type}
+                      {row.plan === "spousal" ? " · Spousal" : ""}
+                    </td>
+                    <td className="py-1 text-right font-semibold">{row.linked ? row.rounds : "—"}</td>
+                    <td className="py-1 text-right">{row.linked ? row.season_rounds : "—"}</td>
+                    <td className="py-1 text-right">{row.linked && row.no_shows > 0 ? row.no_shows : ""}</td>
+                    <td className="py-1 text-right">{row.last_played ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {members.length > 25 ? (
+            <div>
+              <Button onClick={() => setShowAll(!showAll)}>{showAll ? "Show top 25" : `Show all ${members.length}`}</Button>
+            </div>
+          ) : null}
+          <p className="text-xs text-[#6b7280]">
+            Season total runs Jan 1 to today. A round counts for a member when the tee sheet player is linked to the
+            member&apos;s customer record; “—” means the membership has no customer record yet.
+          </p>
+          {data && data.unlinked_rounds > 0 ? (
+            <p className="text-xs text-[#7a6320]">
+              {`${data.unlinked_rounds} member-rate rounds in this period are not linked to any membership, so they are not in this table.`}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </Panel>
   );
 }

@@ -56,6 +56,7 @@ import {
   type AdminDivision,
 } from "@/lib/nav";
 import InstallAppHint from "@/components/admin/InstallAppHint";
+import LangToggle from "@/lib/i18n/LangToggle";
 import { useAccountsAccess } from "@/lib/accounts";
 import { useAiMarketingAccess } from "@/lib/aiMarketing/access";
 import { useMarketingAccess } from "@/lib/marketing/access";
@@ -155,6 +156,7 @@ function PosFrame({
               );
             })}
           </nav>
+          <LangToggle className="flex min-h-11 items-center px-2 text-[11px] text-white" />
           <span className="hidden max-w-[180px] shrink-0 truncate text-[11px] text-white/60 md:inline" title={email}>
             {email}
           </span>
@@ -591,6 +593,7 @@ function DesktopHeader({
         ))}
       </span>
 
+      <LangToggle className="border border-[#d4d4d8] px-2 py-1 text-[11px] text-[#1f2328] hover:bg-[#f2f2f4]" />
       {/* 누구로 들어와 있는지 한 번은 보여야 한다 — 프로 샵 컴퓨터는 여러 사람이 쓴다. */}
       <span className="max-w-[180px] shrink-0 truncate text-[11px] text-[#4e5560]" title={email}>
         {email}
@@ -632,6 +635,7 @@ function MobileTopBar({
         </p>
         <h1 className="truncate text-sm font-bold">{title}</h1>
       </div>
+      <LangToggle className="flex h-11 items-center px-2 text-[11px] text-white" />
       {/* 휴대폰에서도 나갈 길은 늘 보여야 한다. 서랍을 열어야만 로그아웃할 수 있으면
           공용 태블릿에 세션이 그대로 남는다. */}
       <SignOutButton
@@ -931,6 +935,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
             &#9670;
           </span>
           {CLUB.shortName} 프로 샵
+          <LangToggle className="ml-auto border border-[#d4d4d8] bg-white px-2 py-1 text-[11px]" />
         </div>
 
         <form className="bg-white p-5 shadow-sm" onSubmit={submit}>

@@ -47,8 +47,27 @@ export type MarketingSummary = {
   };
 };
 
+/** 회원별 라운드 수(0097). */
+export type MemberRounds = {
+  season: number;
+  members: {
+    name: string;
+    type: string;
+    plan: "single" | "spousal";
+    member_number: string | null;
+    linked: boolean;
+    rounds: number;
+    season_rounds: number;
+    no_shows: number;
+    last_played: string | null;
+  }[];
+  unlinked_rounds: number;
+};
+
 export const aiMarketingApi = {
   access: () => staffRpc<boolean>("pelham_staff_ai_marketing_access"),
   summary: (from: string, to: string) =>
     staffRpc<MarketingSummary>("pelham_staff_ai_marketing_summary", { p_from: from, p_to: to }),
+  memberRounds: (from: string, to: string) =>
+    staffRpc<MemberRounds>("pelham_staff_ai_marketing_member_rounds", { p_from: from, p_to: to }),
 };

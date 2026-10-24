@@ -7,13 +7,20 @@
  * 줄마다 무엇이 바뀌었는지(선수별 정정·예약 전체 그린피·카트), 정상가와 받은 값, 차액, 사유, 승인한 매니저를 보여 준다.
  * 선수별 정정의 사유는 티 시트 카드에서 매니저 PIN 을 받기 전에 적은 것이다. 예약 전체 그린피·카트 요금 변경은
  * 사유 칸이 없어서 0024 승인 기록의 매니저만 보인다.
+ *
+ * 결제한(paid) 줄을 누르면 그 선수의 그린피가 들어간 계산서가 Reports 와 같은 영수증 창으로 열린다 —
+ * 카드로 받았으면 거기서 Stripe 결제로 건너간다.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 
+import { posApi } from "@/lib/pos/api";
+import { retailApi, toRetailError } from "@/lib/retail/api";
+import type { Sale } from "@/lib/retail/types";
 import { staffPriceReview } from "@/lib/teeSheet/staffRpc";
 import type { PriceReviewRow } from "@/lib/teeSheet/types";
 
+import SaleDetail from "@/components/reports/SaleDetail";
 import StaffName from "@/components/reports/StaffName";
 import { EmptyNote, ErrorNote, Panel, SkeletonRows } from "@/components/retail/ui";
 
@@ -73,6 +80,57 @@ export default function PriceReview({ date }: { date: string }) {
 
   const total = (rows ?? []).reduce((sum, row) => sum + row.difference, 0);
 
+  const [sale, setSale] = useState<Sale | null>(null);
+  const [opening, setOpening] = useState("");
+  const [openError, setOpenError] = useState("");
+
+  /** 이 선수의 그린피가 들어간 계산서를 연다. 결제 계산서가 없으면 환불된 것이라도. */
+  async function openBill(row: PriceReviewRow) {
+    const key = `${row.bookingId}-${row.playerId}`;
+    setOpening(key);
+    setOpenError("");
+    try {
+      const bills = await posApi.teeBills(row.bookingId);
+      const hasPlayer = (bill: (typeof bills)[number]) =>
+        bill.lines.some(
+          (line) => line.kind === "tee_player" && line.booking_id === row.bookingId && line.player_id === row.playerId,
+        );
+      const bill =
+        bills.find((item) => item.status === "paid" && hasPlayer(item)) ??
+        bills.find((item) => item.status === "refunded" && hasPlayer(item));
+      if (!bill) {
+        setOpenError(`No bill on file for ${row.player} at ${row.time} — it was marked paid without one.`);
+        return;
+      }
+      setSale(await retailApi.getSale(bill.id));
+    } catch (cause) {
+      setOpenError(toRetailError(cause).message);
+    } finally {
+      setOpening((current) => (current === key ? "" : current));
+    }
+  }
+
+  /** 결제한 줄만 누를 수 있다. */
+  const clickable = (row: PriceReviewRow) =>
+    row.paid
+      ? {
+          role: "button",
+          tabIndex: 0,
+          title: "Open the bill",
+          onClick: () => void openBill(row),
+          onKeyDown: (event: KeyboardEvent) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              void openBill(row);
+            }
+          },
+        }
+      : {};
+  const rowTone = (row: PriceReviewRow) =>
+    row.paid
+      ? `cursor-pointer hover:bg-[#f6f5ff] ${opening === `${row.bookingId}-${row.playerId}` ? "opacity-60" : ""}`
+      : "";
+
   return (
     <Panel
       actions={
@@ -92,10 +150,15 @@ export default function PriceReview({ date }: { date: string }) {
         <EmptyNote>Every player paid the rate card price.</EmptyNote>
       ) : (
         <>
+          {openError ? <ErrorNote>{openError}</ErrorNote> : null}
           {/* 모바일: 가로로 밀어야 하는 표 대신 선수 한 명당 카드 한 장. */}
           <ul className="grid gap-2 sm:hidden">
             {rows.map((row) => (
-              <li className="border border-[#ececf0] p-2.5 text-xs" key={`${row.bookingId}-${row.playerId}`}>
+              <li
+                className={`border border-[#ececf0] p-2.5 text-xs ${rowTone(row)}`}
+                key={`${row.bookingId}-${row.playerId}`}
+                {...clickable(row)}
+              >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold">
@@ -159,7 +222,11 @@ export default function PriceReview({ date }: { date: string }) {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr className="border-b border-[#f2f2f4] align-top" key={`${row.bookingId}-${row.playerId}`}>
+                <tr
+                  className={`border-b border-[#f2f2f4] align-top ${rowTone(row)}`}
+                  key={`${row.bookingId}-${row.playerId}`}
+                  {...clickable(row)}
+                >
                   <td className="px-2 py-1.5 tabular-nums">
                     {row.time}
                     <span className="block text-[11px] text-[#6b7280]">
@@ -212,6 +279,7 @@ export default function PriceReview({ date }: { date: string }) {
         </div>
         </>
       )}
+      {sale ? <SaleDetail onClose={() => setSale(null)} onRefunded={setSale} sale={sale} /> : null}
     </Panel>
   );
 }
