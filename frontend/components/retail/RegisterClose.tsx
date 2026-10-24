@@ -169,7 +169,7 @@ export default function RegisterClose({
   );
 }
 
-/** Morning | Dinner. 이미 닫은 근무는 ✓ 와 담당자 이름. */
+/** Shift 1 | Shift 2. 이미 닫은 근무는 ✓ (이름은 넣지 않는다). */
 function ShiftPicker({
   shift,
   shifts,
@@ -181,13 +181,12 @@ function ShiftPicker({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-bold text-[#3f434a]">Shift</span>
-      {(["morning", "dinner"] as const).map((key) => {
+      {(["morning", "dinner"] as const).map((key, index) => {
         const info = shifts?.find((item) => item.shift === key);
         return (
           <Chip active={shift === key} key={key} onClick={() => onPick(key)}>
-            {SHIFT_LABELS[key]}
-            {info?.closed ? ` ✓ ${info.cashier ?? ""}`.trimEnd() : ""}
+            Shift {index + 1}
+            {info?.closed ? " ✓" : ""}
           </Chip>
         );
       })}
