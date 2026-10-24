@@ -43,7 +43,7 @@ import {
 } from "@/lib/retail/types";
 
 import CashierField from "@/components/reports/CashierField";
-import { PrinterIcon, ShiftPreview, ShiftTimes, useTipSplit } from "@/components/reports/ShiftReportPrint";
+import { PrinterIcon, ShiftPreview, ShiftTimes } from "@/components/reports/ShiftReportPrint";
 
 import { Button, ErrorNote, SkeletonRows, TextInput } from "./ui";
 
@@ -167,8 +167,6 @@ function CloseForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [justSaved, setJustSaved] = useState(false);
-  // 그날 팁 나누기 — 마감표에 같이 찍는다. 현금 리포트 계정만(블라인드면 서버가 거절한다).
-  const tipSplit = useTipSplit(report.business_date, !blind);
 
   const cashTotal = useMemo(
     () =>
@@ -222,7 +220,7 @@ function CloseForm({
       const input = { staff: who.name, date: report.business_date, start: who.start, end: who.end };
       const range = shiftWindow(input);
       if (range) {
-        printShiftReport(input, shiftSummary(sales, range), !blind, undefined, tipSplit, { counted: cashTotal, float });
+        printShiftReport(input, shiftSummary(sales, range), !blind, undefined, { counted: cashTotal, float });
       }
     } finally {
       setBusy(false);
@@ -383,7 +381,6 @@ function CloseForm({
           sales={sales}
           staff={cashier}
           start={shiftStart}
-          tipSplit={tipSplit}
         />
       </details>
 

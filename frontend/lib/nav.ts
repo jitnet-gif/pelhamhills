@@ -133,7 +133,6 @@ export const adminNav: NavItem[] = [
   { label: "Lost & Found", href: "/admin/lost-items", glyph: "?" },
   { label: "Reports", href: ADMIN_REPORTS, glyph: "▥" },
   { label: "Business Intelligence", href: "/admin/business-intelligence", glyph: "◧" },
-  { label: "Radar", href: "/admin/radar", glyph: "◎" },
   { label: "Course Map", href: GOLF_GPS_MAP_EDITOR, glyph: "⌖" },
   { label: "Integrations", href: "/admin/integrations", glyph: "⊞" },
   { label: "Settings", href: "/admin/settings", glyph: "⚙" },

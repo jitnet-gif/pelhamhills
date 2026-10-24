@@ -120,7 +120,6 @@ const menuPages = [
   ["/promotions", "Promotions"],
   ["/reports", "Reports"],
   ["/business-intelligence", "Business Intelligence"],
-  ["/radar", "Radar"],
   ["/integrations", "Integrations"],
   ["/settings", "Settings"],
 ];

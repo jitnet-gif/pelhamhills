@@ -17,10 +17,8 @@ import { localBusinessDate } from "@/lib/retail/api";
 import { CLUB_TIME_ZONE, PAYMENT_LABELS, type ReceiptBlock, type ReceiptHeader } from "@/lib/retail/receipt";
 import { divisionOf, type DivisionKey } from "@/lib/retail/divisions";
 import {
-  formatMinutes,
   formatMoney,
   type Cents,
-  type CloseoutReport,
   type PaymentMethod,
   type Sale,
 } from "@/lib/retail/types";
@@ -205,7 +203,7 @@ function clock(value: string): string {
 export type ShiftCashDrop = { counted: Cents; float: Cents };
 
 /**
- * 영수증 한 장의 블록. `tipSplit` 을 주면 그날 팁 나누기(0010, 근무시간 비율)를 덧붙인다. 서버가 현금 리포트 계정에게만 준다(0046).
+ * 영수증 한 장의 블록.
  *
  * `cash` 가 거짓이면 캐셔의 마감표다 — 마감은 현금만(0090). 매출·결제수단·환불 합계는 찍지 않고(카드 매출을 캐셔에게
  * 보이지 않는다), `drop` 을 주면 센 현금·남길 잔돈·넘길 현금만 찍는다.
@@ -217,7 +215,6 @@ export function shiftReportBlocks(
     header: ReceiptHeader;
     cash: boolean;
     transactions?: readonly Sale[];
-    tipSplit?: CloseoutReport | null;
     drop?: ShiftCashDrop;
   },
 ): ReceiptBlock[] {
@@ -293,38 +290,6 @@ export function shiftReportBlocks(
     }
   }
 
-  if (options.tipSplit) blocks.push(...tipSplitBlocks(options.tipSplit));
-
   blocks.push({ kind: "text", text: "Signature: ____________________", align: "left", gap: true });
-  return blocks;
-}
-
-/** 그날 팁 통과 사람별 몫. 시간대가 아니라 하루 전체다 — 팁은 하루 통 하나로 나눈다(0010). */
-function tipSplitBlocks(report: CloseoutReport): ReceiptBlock[] {
-  const shared = report.staff.filter((row) => row.tip_share !== null);
-  const blocks: ReceiptBlock[] = [
-    { kind: "section", title: "TIP SPLIT (WHOLE DAY)" },
-    { kind: "total", label: "Tip pool", amount: formatMoney(report.tip_pool), bold: true },
-  ];
-  if (shared.length === 0) {
-    blocks.push({ kind: "text", text: "No hours entered yet.", align: "left" });
-    return blocks;
-  }
-  for (const row of shared) {
-    blocks.push({
-      kind: "total",
-      label: `${row.name} ${formatMinutes(row.closeout?.minutes_worked ?? 0)}`,
-      amount: formatMoney(row.tip_share ?? 0),
-    });
-  }
-  blocks.push({
-    kind: "total",
-    label: `Total ${formatMinutes(report.total_minutes)}`,
-    amount: formatMoney(shared.reduce((sum, row) => sum + (row.tip_share ?? 0), 0)),
-    bold: true,
-  });
-  if (report.provisional) {
-    blocks.push({ kind: "text", text: "Provisional - not everyone has closed out.", align: "left" });
-  }
   return blocks;
 }
