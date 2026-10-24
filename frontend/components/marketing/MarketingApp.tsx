@@ -175,8 +175,8 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   const [segment, setSegment] = useState<Segment>("all");
   const [minRounds, setMinRounds] = useState(0);
   const [search, setSearch] = useState("");
-  const [pickMode, setPickMode] = useState(false);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  // null = 그룹 전체(모두 체크). 한 명이라도 체크를 풀면 고른 사람 목록(Set)으로 바뀐다.
+  const [picked, setPicked] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -184,10 +184,15 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   const { audience, error: audienceError, loading } = useAudience(channel, segment, minRounds, search);
   const eligible = useMemo(() => (audience?.customers ?? []).filter((c) => c.ok), [audience]);
 
+  const pickMode = picked !== null;
+  const pickedRefs = useMemo(
+    () => (picked ? eligible.filter((c) => picked.has(c.customer_ref)).map((c) => c.customer_ref) : []),
+    [eligible, picked],
+  );
   const recipients = useMemo(() => {
-    if (!pickMode) return audience?.phones ?? 0;
+    if (!picked) return audience?.phones ?? 0;
     return new Set(eligible.filter((c) => picked.has(c.customer_ref)).map((c) => c.phone)).size;
-  }, [pickMode, audience, eligible, picked]);
+  }, [audience, eligible, picked]);
 
   const sender = status?.sms_sender ?? "Pelham Hills Golf";
   const footer = status?.sms_footer ?? "Reply STOP to opt out.";
@@ -200,7 +205,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
 
   const togglePick = (ref: string) =>
     setPicked((current) => {
-      const next = new Set(current);
+      const next = new Set(current ?? eligible.map((c) => c.customer_ref));
       if (next.has(ref)) next.delete(ref);
       else next.add(ref);
       return next;
@@ -220,7 +225,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
           search: search.trim(),
           ...(channel === "sms" && barcode ? { barcode } : {}),
         },
-        customer_refs: pickMode ? [...picked] : undefined,
+        customer_refs: pickMode ? pickedRefs : undefined,
       });
       if (sendNow) {
         try {
@@ -251,7 +256,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
               key={value}
               onClick={() => {
                 setChannel(value);
-                setPicked(new Set());
+                setPicked(null);
               }}
               type="button"
             >
@@ -379,10 +384,27 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
           </p>
         ) : null}
 
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <input checked={pickMode} onChange={(event) => setPickMode(event.target.checked)} type="checkbox" />
-          Pick people one by one instead of the whole group
-        </label>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="mr-auto text-xs text-[#6b7280]">
+            {pickMode ? `${pickedRefs.length} of ${eligible.length} selected` : "Whole group selected — untick anyone to leave them out"}
+          </span>
+          <button
+            className="border border-[#d4d4d8] px-3 py-1 text-xs font-bold disabled:opacity-50"
+            disabled={!pickMode}
+            onClick={() => setPicked(null)}
+            type="button"
+          >
+            Select all
+          </button>
+          <button
+            className="border border-[#d4d4d8] px-3 py-1 text-xs font-bold disabled:opacity-50"
+            disabled={pickMode && pickedRefs.length === 0}
+            onClick={() => setPicked(new Set())}
+            type="button"
+          >
+            Deselect all
+          </button>
+        </div>
 
         <div className="mt-2 max-h-80 overflow-y-auto border border-[#ececf0]">
           <table className="w-full text-left text-xs">
@@ -392,8 +414,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
                   customer={customer}
                   key={customer.customer_ref}
                   onToggle={() => togglePick(customer.customer_ref)}
-                  pickMode={pickMode}
-                  picked={picked.has(customer.customer_ref)}
+                  picked={customer.ok && (!picked || picked.has(customer.customer_ref))}
                 />
               ))}
             </tbody>
@@ -469,22 +490,18 @@ function Stat({ label, value, strong }: { label: string; value: number; strong?:
 
 function AudienceRow({
   customer,
-  pickMode,
   picked,
   onToggle,
 }: {
   customer: AudienceCustomer;
-  pickMode: boolean;
   picked: boolean;
   onToggle: () => void;
 }) {
   return (
     <tr className={`border-b border-[#f0f0f2] ${customer.ok ? "" : "text-[#9ca3af]"}`}>
-      {pickMode ? (
-        <td className="w-8 px-2">
-          <input checked={picked} disabled={!customer.ok} onChange={onToggle} type="checkbox" aria-label={customer.name} />
-        </td>
-      ) : null}
+      <td className="w-8 px-2">
+        <input checked={picked} disabled={!customer.ok} onChange={onToggle} type="checkbox" aria-label={customer.name} />
+      </td>
       <td className="px-2 py-1.5 font-bold">
         {customer.name}
         {customer.is_member ? <span className="ml-1 bg-[#fff4dc] px-1 text-[10px] text-[#8a5a00]">Member</span> : null}
