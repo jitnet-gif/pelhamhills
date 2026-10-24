@@ -26,6 +26,8 @@ export type Drill =
   | { kind: "payment"; method: PaymentMethod }
   // 현금만 담당자(계산서의 Cashier)별로(현금 리포트 계정만, 2026-10-24) — 서랍이 하나라(0062) 계산대별은 뜻이 없다.
   | { kind: "cash" }
+  // Card Sales 칸 — 신용카드와 직불(Interac)을 한 목록으로.
+  | { kind: "cards" }
   | { kind: "product"; productId: number; name: string };
 
 /** 리포트의 `live` 와 같다. 예전 응답에 status 가 없으면 환불 표시로 가른다. */
@@ -76,6 +78,8 @@ function title(drill: Drill) {
       return `Payment — ${PAYMENT_LABELS[drill.method]}`;
     case "cash":
       return "Cash Sales — by cashier";
+    case "cards":
+      return "Card Sales — credit & debit";
     case "product":
       return drill.name;
   }
@@ -137,6 +141,14 @@ export default function SalesDrilldown({
       case "cash":
         // Cash Sales 칸과 같게 팁은 뺀다.
         return cashRows(paid);
+      case "cards":
+        return paid
+          .map((sale) => {
+            const card = paidWith(sale, "card");
+            const debit = paidWith(sale, "debit");
+            return { sale, amount: card === null && debit === null ? null : (card ?? 0) + (debit ?? 0) };
+          })
+          .filter((row): row is BillRow => row.amount !== null);
       default:
         return null;
     }
