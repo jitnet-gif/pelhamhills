@@ -38,6 +38,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 
 import {
   ADMIN_ACCOUNTS,
+  ADMIN_AI_MARKETING,
   ADMIN_DYNAMIC_PRICING,
   ADMIN_HOME,
   ADMIN_MARKETING,
@@ -53,6 +54,7 @@ import {
 } from "@/lib/nav";
 import InstallAppHint from "@/components/admin/InstallAppHint";
 import { useAccountsAccess } from "@/lib/accounts";
+import { useAiMarketingAccess } from "@/lib/aiMarketing/access";
 import { useMarketingAccess } from "@/lib/marketing/access";
 import { useReportsAccess } from "@/lib/reports/access";
 import { ApiError } from "@/lib/teeSheet/api";
@@ -190,6 +192,8 @@ function AdminFrame({
   const accountsAllowed = useAccountsAccess(email) === true;
   // Marketing 도 마케팅 명단(0047) 계정에만 보인다(`lib/marketing/access.ts`).
   const marketingAllowed = useMarketingAccess(email) === true;
+  // AI Manager Marketing Strategies 는 매니저와 admin@ · proshop@ · analysis@ 에게만(0094, `lib/aiMarketing/access.ts`).
+  const aiMarketingAllowed = useAiMarketingAccess(email) === true;
   const shownDivision = useMemo(
     () => ({
       ...division,
@@ -197,10 +201,11 @@ function AdminFrame({
         (item) =>
           (reportsAllowed || (item.href !== ADMIN_REPORTS && item.href !== ADMIN_PRICING && item.href !== ADMIN_DYNAMIC_PRICING)) &&
           (accountsAllowed || item.href !== ADMIN_ACCOUNTS) &&
-          (marketingAllowed || item.href !== ADMIN_MARKETING),
+          (marketingAllowed || item.href !== ADMIN_MARKETING) &&
+          (aiMarketingAllowed || item.href !== ADMIN_AI_MARKETING),
       ),
     }),
-    [division, reportsAllowed, accountsAllowed, marketingAllowed],
+    [division, reportsAllowed, accountsAllowed, marketingAllowed, aiMarketingAllowed],
   );
 
   // 화면을 옮기면 서랍은 닫힌다. 닫지 않으면 새 화면 위에 이전 메뉴가 그대로

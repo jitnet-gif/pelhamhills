@@ -100,6 +100,10 @@ export const ADMIN_REPORTS = "/admin/reports";
  * (`lib/marketing/access.ts`). 로그인이 따로인 사이트라 새 탭으로 연다. */
 export const ADMIN_MARKETING = "/marketing";
 
+/** 고객 분석·마케팅 전략(0094, 옛 Business Intelligence). 매니저(Reports 명단)와 admin@ · proshop@ · analysis@
+ * 에게만 메뉴에 뜬다(`lib/aiMarketing/access.ts`). */
+export const ADMIN_AI_MARKETING = "/admin/ai-marketing";
+
 /** 로그인 계정 관리(0074). 계정 관리자에게만 메뉴에 뜬다(`lib/accounts.ts`). */
 export const ADMIN_ACCOUNTS = "/admin/accounts";
 
@@ -132,7 +136,7 @@ export const adminNav: NavItem[] = [
   { label: "Marketing", href: ADMIN_MARKETING, glyph: "✉" },
   { label: "Lost & Found", href: "/admin/lost-items", glyph: "?" },
   { label: "Reports", href: ADMIN_REPORTS, glyph: "▥" },
-  { label: "Business Intelligence", href: "/admin/business-intelligence", glyph: "◧" },
+  { label: "AI Manager Marketing Strategies", href: ADMIN_AI_MARKETING, glyph: "◧" },
   { label: "Course Map", href: GOLF_GPS_MAP_EDITOR, glyph: "⌖" },
   { label: "Integrations", href: "/admin/integrations", glyph: "⊞" },
   { label: "Settings", href: "/admin/settings", glyph: "⚙" },
