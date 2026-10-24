@@ -17,6 +17,7 @@ import { stationLabel } from "@/lib/retail/receipt";
 import { cashierKey, saleTime } from "@/lib/reports/shiftReport";
 import { formatMoney, type Cents, type RegisterShift, type Sale, type ShiftWindow } from "@/lib/retail/types";
 
+import StaffName from "@/components/reports/StaffName";
 import { EmptyNote, ErrorNote, Modal, SkeletonRows } from "@/components/retail/ui";
 
 export const SHIFT_LABELS: Record<RegisterShift, string> = {
@@ -87,7 +88,9 @@ export function CashByCashier({ rows, onOpenSale }: { rows: readonly CashRow[]; 
         <details className="border border-[#d4d4d8]" key={group.key || "(none)"} open={groups.length <= 3}>
           <summary className="flex cursor-pointer items-baseline justify-between gap-2 px-3 py-2">
             <span className="min-w-0">
-              <span className="block truncate text-sm font-bold">{group.name || "No cashier name"}</span>
+              <span className="block truncate text-sm font-bold">
+                <StaffName date={group.rows[0].sale.business_date} empty="No cashier name" name={group.name} />
+              </span>
               <span className="block text-xs text-[#6b7280]">
                 {saleTime(group.rows[0].sale)} – {saleTime(group.rows[group.rows.length - 1].sale)} ·{" "}
                 {group.rows.length} cash transaction(s)

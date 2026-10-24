@@ -25,6 +25,7 @@ import { formatMoney, type Cents, type Sale, type SalePayment } from "@/lib/reta
 import { saleTime } from "@/lib/reports/shiftReport";
 import { fetchReconcile, type ReconcileReport, type ReconcileRow } from "@/lib/reports/stripeReconcile";
 
+import StaffName from "@/components/reports/StaffName";
 import { Button, EmptyNote, ErrorNote, Modal, Panel } from "@/components/retail/ui";
 
 type Source = "reader" | "online" | "keyed";
@@ -98,7 +99,16 @@ type Detail =
 const SOURCE_LABELS: Record<Source, string> = { reader: "S700 reader", online: "Online", keyed: "Keyed by hand" };
 
 /** 상세 목록의 한 줄. sale 이 있으면 눌러서 영수증을 연다. */
-type Item = { key: string; primary: string; secondary: string; amount: Cents; sale?: Sale; tone?: "warn" | "muted" };
+type Item = {
+  key: string;
+  primary: string;
+  secondary: string;
+  /** 누가 처리했나(`StaffName`). */
+  staff?: ReactNode;
+  amount: Cents;
+  sale?: Sale;
+  tone?: "warn" | "muted";
+};
 
 type PaymentRow = { sale: Sale; pay: SalePayment; refunded: boolean; source: Source };
 
@@ -121,6 +131,7 @@ function paymentItem(row: PaymentRow, amount: Cents, index: number): Item {
   return {
     key: `${sale.id}-${index}`,
     primary: sale.receipt_no,
+    staff: <StaffName date={sale.business_date} name={sale.cashier} />,
     secondary: [
       saleTime(sale),
       PAYMENT_LABELS[pay.method],
@@ -128,7 +139,6 @@ function paymentItem(row: PaymentRow, amount: Cents, index: number): Item {
       pay.card_last4 ? `•••• ${pay.card_last4}` : "",
       pay.tip ? `tip ${formatMoney(pay.tip)}` : "",
       row.refunded ? "refunded" : "",
-      sale.cashier ?? "",
     ]
       .filter(Boolean)
       .join(" · "),
@@ -220,6 +230,7 @@ function differenceItems(
     items.push({
       key: `bill-${id}`,
       primary: sale.receipt_no,
+      staff: <StaffName date={sale.business_date} name={sale.cashier} />,
       secondary: [saleTime(sale), why, ...rows.flatMap((row) => row.issues.map((issue) => issue.message))]
         .filter(Boolean)
         .join(" · "),
@@ -533,7 +544,15 @@ function DetailRow({ item, onOpen }: { item: Item; onOpen?: () => void }) {
     <>
       <span className="min-w-0">
         <span className="block truncate text-sm font-bold">{item.primary}</span>
-        <span className="block text-xs break-words text-[#6b7280]">{item.secondary}</span>
+        <span className="block text-xs break-words text-[#6b7280]">
+          {item.staff ? (
+            <>
+              <span className="font-semibold text-[#3f434a]">{item.staff}</span>
+              {item.secondary ? " · " : ""}
+            </>
+          ) : null}
+          {item.secondary}
+        </span>
       </span>
       <span
         className={`shrink-0 text-sm font-bold tabular-nums ${

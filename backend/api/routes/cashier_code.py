@@ -15,6 +15,10 @@
 - `PELHAM_SHIFT_URL`  — 기본 https://pelham-shift.vercel.app
 - `PELHAM_SHIFT_TEAM` — pelham-shift 워크스페이스 id. 비우면 모든 팀에서 찾는다.
 
+## ID 확인 기록 (0095)
+번호로 이름을 찾으면 (이름, 영업일)을 `pelham_shift_record_check` 로 적는다 — 리포트가 담당자 이름 옆에 "ID ✓" 를
+붙이는 근거다. 번호는 적지 않는다. 0095 가 아직 안 돌았거나 기록이 실패해도 이름 찾기·승인은 그대로 된다.
+
 ## 승인 (0077)
 환불·가격 변경 같은 막힌 일(0024)도 매니저 PIN 대신 그 직원의 ID 로 승인한다 — `POST /pos/approve`.
 번호 확인은 여기서만 할 수 있어서, 승인 줄은 service_role 로 `pelham_shift_approve` 가 남긴다
@@ -97,7 +101,18 @@ def cashier_code(body: CashierCodeIn, request: Request) -> CashierCodeOut:
     name = " ".join(str(found.get("name") or "").split())
     if not name:
         raise HTTPException(status_code=404, detail="No staff member has that Pelham Shift ID.")
+    _record_check(name[:80])
     return CashierCodeOut(name=name[:80])
+
+
+def _record_check(name: str | None) -> None:
+    """그날 이 이름이 Shift ID 로 확인됐다고 적는다(0095). 실패해도 막지 않는다."""
+    if not name:
+        return
+    try:
+        supabase_rest.rpc("pelham_shift_record_check", {"p_name": name})
+    except (supabase_rest.RpcRefused, supabase_rest.SupabaseUnavailable):
+        logger.warning("staff id check not recorded (0095 missing?)")
 
 
 def _staff_id(request: Request) -> str:
@@ -132,4 +147,5 @@ def approve(body: ApproveIn, request: Request) -> dict:
         raise HTTPException(status_code=exc.status, detail=exc.message) from None
     except supabase_rest.SupabaseUnavailable:
         raise HTTPException(status_code=503, detail="Can't save the approval right now. Try again.") from None
+    _record_check(name)
     return result if isinstance(result, dict) else {"approved": False, "message": "Try again."}

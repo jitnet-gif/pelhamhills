@@ -16,6 +16,7 @@ import { cashierKey, saleClock, salePaymentLabel, saleTime } from "@/lib/reports
 import { formatMoney, type Cents, type Sale } from "@/lib/retail/types";
 
 import ShiftReportPrint, { PrinterIcon } from "@/components/reports/ShiftReportPrint";
+import StaffName from "@/components/reports/StaffName";
 import { Button, EmptyNote, Panel } from "@/components/retail/ui";
 
 type Group = {
@@ -97,7 +98,9 @@ export default function CashierShifts({
             <section className="grid min-w-0 gap-2 border border-[#d4d4d8] p-3" key={group.key || "(none)"}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-bold">{group.name || "No cashier name"}</h3>
+                  <h3 className="truncate text-sm font-bold">
+                    <StaffName date={date} empty="No cashier name" name={group.name} />
+                  </h3>
                   <p className="text-xs text-[#6b7280]">
                     {clock(group.first)} – {clock(group.last)} · {group.count} sale(s)
                     {group.refunds ? ` · ${group.refunds} refunded` : ""}

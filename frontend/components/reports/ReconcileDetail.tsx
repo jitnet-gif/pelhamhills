@@ -32,6 +32,7 @@ import {
   type ReconcileRow,
 } from "@/lib/reports/stripeReconcile";
 
+import StaffName from "@/components/reports/StaffName";
 import { Button, ErrorNote, Modal, SkeletonRows, TextArea } from "@/components/retail/ui";
 
 type Choice = "sale" | "refund" | "note";
@@ -221,7 +222,9 @@ function BillFacts({ bill }: { bill: { sale: Sale | null; error: string } | null
   return (
     <Facts title={`Bill ${sale.receipt_no || `#${sale.id}`} · ${when}`}>
       {sale.refund_reason ? <Fact label="Reason">{sale.refund_reason}</Fact> : null}
-      {sale.cashier ? <Fact label="Cashier">{sale.cashier}</Fact> : null}
+      <Fact label="Cashier">
+        <StaffName date={sale.business_date} name={sale.cashier} />
+      </Fact>
       <ul className="grid gap-0.5">
         {sale.lines.map((line, index) => (
           <li className="flex justify-between gap-2" key={line.id ?? index}>

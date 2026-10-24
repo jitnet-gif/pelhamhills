@@ -168,6 +168,12 @@ export const retailApi = {
   /** 그 날(클럽 현지) void 한 계산서(0088). 결제 전이라 영수증 번호·영업일이 없다. */
   listVoidBills: (date: string) => call<VoidBill[]>("pelham_staff_void_bills", { p_date: date }),
 
+  /** 그 기간에 Pelham Shift ID 로 확인된 담당자 이름(0095). 0095 전이면 빈 목록. */
+  listVerifiedCashiers: (from: string, to: string = from) =>
+    call<{ business_date: string; name: string }[]>("pelham_staff_verified_cashiers", { p_from: from, p_to: to }).catch(
+      () => [],
+    ),
+
   getDailyReport: (businessDate: string) =>
     call<RetailDailyReport>("pelham_staff_pos_report_daily", { p_date: businessDate }),
 

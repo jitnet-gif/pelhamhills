@@ -27,6 +27,7 @@ import {
   Modal,
   TextArea,
 } from "@/components/retail/ui";
+import StaffName from "@/components/reports/StaffName";
 
 // ===== 영수증 상세 + 환불 ===============================================
 
@@ -98,7 +99,8 @@ export default function SaleDetail({
               : sale.payment_method
                 ? PAYMENT_LABELS[sale.payment_method]
                 : "No charge"}
-            {sale.cashier ? ` · ${sale.cashier}` : ""}
+            {" · "}
+            <StaffName date={sale.business_date} name={sale.cashier} />
           </p>
         </div>
 

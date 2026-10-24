@@ -40,6 +40,7 @@ import {
   StatCard,
   TextInput,
 } from "@/components/retail/ui";
+import StaffName from "@/components/reports/StaffName";
 
 /**
  * `cash` 가 거짓이면(일반 Reports) 현금 숫자를 그리지 않는다 — By payment 의 Cash 줄과 담당자별 마감
@@ -402,7 +403,8 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
                     <span className="block truncate text-xs text-[#6b7280]">
                       {sale.station ? `${stationLabel(sale.station)} · ` : ""}
                       {(sale.payment_method ? PAYMENT_LABELS[sale.payment_method] : "No charge")} · {sale.lines.length} line(s)
-                      {sale.cashier ? ` · ${sale.cashier}` : ""}
+                      {" · "}
+                      <StaffName date={sale.business_date} name={sale.cashier} />
                     </span>
                   </span>
                   <span

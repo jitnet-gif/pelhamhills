@@ -23,6 +23,7 @@ import { staffBookings } from "@/lib/teeSheet/staffRpc";
 import type { TeeBooking } from "@/lib/teeSheet/types";
 import { clubTime } from "@/lib/reports/stripeReconcile";
 
+import StaffName, { localDateOf } from "@/components/reports/StaffName";
 import { Button, EmptyNote, ErrorNote, Panel, SkeletonRows } from "@/components/retail/ui";
 
 type Loaded<T> = { key: string; rows: T[]; error: string };
@@ -102,6 +103,10 @@ export default function Cancellations({
                     <span className="min-w-0">
                       <span className="block font-semibold">{sale.receipt_no}</span>
                       <span className="block text-xs text-[#6b7280]">
+                        <span className="font-semibold text-[#3f434a]">
+                          <StaffName date={sale.business_date} name={sale.cashier} />
+                        </span>
+                        {" · "}
                         {[
                           clubTime(sale.refunded_at),
                           sale.payment_method ? PAYMENT_LABELS[sale.payment_method] : "",
@@ -141,7 +146,11 @@ export default function Cancellations({
                       <span className="text-xs font-normal text-[#6b7280]">{stationLabel(bill.station)}</span>
                     </span>
                     <span className="block text-xs text-[#6b7280]">
-                      {[clubTime(bill.voided_at), bill.cashier, linesText(bill)].filter(Boolean).join(" · ")}
+                      <span className="font-semibold text-[#3f434a]">
+                        <StaffName date={localDateOf(bill.voided_at)} name={bill.cashier} />
+                      </span>
+                      {" · "}
+                      {[clubTime(bill.voided_at), linesText(bill)].filter(Boolean).join(" · ")}
                     </span>
                   </span>
                   <span className="shrink-0 tabular-nums">{formatMoney(bill.total)}</span>

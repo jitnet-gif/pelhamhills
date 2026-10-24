@@ -23,6 +23,7 @@ import { formatMoney } from "@/lib/retail/types";
 import { ApiError } from "@/lib/teeSheet/api";
 import { addDays } from "@/lib/teeSheet/dates";
 
+import StaffName from "@/components/reports/StaffName";
 import { Chip, EmptyNote, ErrorNote, Field, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 type State = "live" | "redeemed" | "expired" | "void";
@@ -177,7 +178,9 @@ export default function RainChecksReport() {
                       <tr className="border-t border-[#ececf0] align-top" key={row.id}>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <span className="block tabular-nums">{usDate(row.issued_on)}</span>
-                          {row.cashier ? <span className="block text-xs text-[#6b7280]">{row.cashier}</span> : null}
+                          <span className="block text-xs text-[#6b7280]">
+                            <StaffName date={row.issued_on} name={row.cashier} />
+                          </span>
                         </td>
                         <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{row.code}</td>
                         <td className="px-3 py-2">

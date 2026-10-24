@@ -28,6 +28,7 @@ import {
 import { addDays } from "@/lib/teeSheet/dates";
 
 import { CashShiftModal, SHIFT_LABELS } from "@/components/reports/CashTransactions";
+import StaffName from "@/components/reports/StaffName";
 import { EmptyNote, ErrorNote, Field, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 /** 근무마다 남기는 시작 잔돈(`pelham_register_float`). 현금 줄의 expected·now 에 들어 있다. */
@@ -184,9 +185,9 @@ export default function RegisterClosesReport({ cash }: { cash: boolean }) {
                             </span>
                           ) : null}
                           {/* 담당자·근무 시각(0081). 그 전 마감에는 없다. */}
-                          {row.cashier ? (
+                          {row.closed || row.cashier ? (
                             <span className="block text-xs font-bold text-[#1f2328]">
-                              {row.cashier}
+                              <StaffName date={row.business_date} name={row.cashier} />
                               {row.shift_start && row.shift_end ? ` · ${row.shift_start}–${row.shift_end}` : ""}
                             </span>
                           ) : null}

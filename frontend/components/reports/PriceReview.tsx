@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { staffPriceReview } from "@/lib/teeSheet/staffRpc";
 import type { PriceReviewRow } from "@/lib/teeSheet/types";
 
+import StaffName from "@/components/reports/StaffName";
 import { EmptyNote, ErrorNote, Panel, SkeletonRows } from "@/components/retail/ui";
 
 const KIND_LABEL: Record<PriceReviewRow["kind"], string> = {
@@ -132,7 +133,7 @@ export default function PriceReview({ date }: { date: string }) {
                   {row.reason ? <span>{row.reason} · </span> : null}
                   {row.manager ? (
                     <span className="text-[#6b7280]">
-                      {row.manager}
+                      <StaffName date={date} name={row.manager} />
                       {row.approvedAt ? ` · ${clock(row.approvedAt)}` : ""}
                     </span>
                   ) : (
@@ -199,7 +200,7 @@ export default function PriceReview({ date }: { date: string }) {
                   </td>
                   <td className="px-2 py-1.5">{row.reason || <span className="text-[#9aa0a6]">—</span>}</td>
                   <td className="px-2 py-1.5">
-                    {row.manager || <span className="text-[#b42318]">No approval on record</span>}
+                    <StaffName date={date} empty="No approval on record" name={row.manager} />
                     {row.approvedAt ? (
                       <span className="block text-[11px] text-[#6b7280]">{clock(row.approvedAt)}</span>
                     ) : null}

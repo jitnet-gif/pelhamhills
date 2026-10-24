@@ -10,7 +10,7 @@
  * 그래서 펼친 목록의 합은 누른 칸의 숫자와 같아야 한다. 다르면 아래 합계 줄에서 바로 보인다.
  */
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import {
@@ -32,6 +32,7 @@ import {
   groupCashByCashier,
 } from "@/components/reports/CashTransactions";
 import { cashierKey, saleTime } from "@/lib/reports/shiftReport";
+import StaffName from "@/components/reports/StaffName";
 import { EmptyNote, Modal } from "@/components/retail/ui";
 
 export type Drill =
@@ -146,7 +147,7 @@ type LineRow = { sale: Sale; line: SaleLine; category: string };
 /** 요약 한 줄 — 누르면 `next` 로 들어간다. */
 type SummaryRow = {
   key: string;
-  label: string;
+  label: ReactNode;
   detail: string;
   total: Cents;
   next: Drill;
@@ -257,7 +258,7 @@ export default function SalesDrilldown({
     if (drill.kind === "cash" && drill.cashier === undefined) {
       return groupCashByCashier(bills ?? []).map((group) => ({
         key: group.key || "(none)",
-        label: group.name || "No cashier name",
+        label: <StaffName date={group.rows[0].sale.business_date} empty="No cashier name" name={group.name} />,
         detail: `${saleTime(group.rows[0].sale)} – ${saleTime(group.rows[group.rows.length - 1].sale)} · ${group.rows.length} cash transaction(s)`,
         total: group.total,
         next: { kind: "cash", cashier: group.key },
@@ -348,7 +349,7 @@ export default function SalesDrilldown({
                 <RowButton
                   amount={row.total}
                   onClick={() => onChange(row.next)}
-                  primary={`${row.label} ›`}
+                  primary={<>{row.label} ›</>}
                   secondary={row.detail}
                 />
               </li>
@@ -365,6 +366,7 @@ export default function SalesDrilldown({
                       amount={amount}
                       onClick={() => onOpenSale(sale)}
                       primary={sale.receipt_no}
+                      staff={<StaffName date={sale.business_date} name={sale.cashier} />}
                       secondary={[
                         timeOf(sale),
                         sale.station ? stationLabel(sale.station) : "",
@@ -375,7 +377,6 @@ export default function SalesDrilldown({
                           : sale.payment_method
                             ? PAYMENT_LABELS[sale.payment_method]
                             : "No charge",
-                        drill.kind === "cash" ? "" : (sale.cashier ?? ""),
                         drill.kind === "refunded" && sale.refund_reason
                           ? sale.refund_reason
                           : "",
@@ -391,6 +392,7 @@ export default function SalesDrilldown({
                       amount={shown(line.line_total)}
                       onClick={() => onOpenSale(sale)}
                       primary={`${line.quantity}× ${line.name}`}
+                      staff={<StaffName date={sale.business_date} name={sale.cashier} />}
                       secondary={[
                         sale.receipt_no,
                         timeOf(sale),
@@ -400,7 +402,6 @@ export default function SalesDrilldown({
                         line.discount > 0
                           ? `−${formatMoney(line.discount)}`
                           : "",
-                        sale.cashier ?? "",
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -436,11 +437,14 @@ export default function SalesDrilldown({
 function RowButton({
   primary,
   secondary,
+  staff,
   amount,
   onClick,
 }: {
-  primary: string;
+  primary: ReactNode;
   secondary: string;
+  /** 누가 처리했나(`StaffName`). 잘려도 보이게 둘째 줄 맨 앞에. */
+  staff?: ReactNode;
   amount: Cents;
   onClick: () => void;
 }) {
@@ -453,6 +457,12 @@ function RowButton({
       <span className="min-w-0">
         <span className="block truncate text-sm font-bold">{primary}</span>
         <span className="block truncate text-xs text-[#6b7280]">
+          {staff ? (
+            <>
+              <span className="font-semibold text-[#3f434a]">{staff}</span>
+              {secondary ? " · " : ""}
+            </>
+          ) : null}
           {secondary}
         </span>
       </span>

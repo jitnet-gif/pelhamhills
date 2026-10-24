@@ -18,6 +18,7 @@ import {
   type ChangeRow,
 } from "@/lib/reports/changeLog";
 
+import StaffName, { localDateOf } from "@/components/reports/StaffName";
 import { Button, EmptyNote, ErrorNote, Field, Panel, Select, SkeletonRows, TextInput } from "@/components/retail/ui";
 
 const OP_STYLE: Record<ChangeRow["op"], { label: string; className: string }> = {
@@ -167,11 +168,10 @@ function ChangeCard({ row }: { row: ChangeRow }) {
         <span className="min-w-0 truncate text-[#3f434a]">{row.label || row.rowKey || ""}</span>
         <span className="ml-auto text-[#6b7280] tabular-nums">{clock(row.at)}</span>
         <span className="w-full text-[11px] text-[#6b7280] sm:w-auto">
-          {row.cashier ? (
-            <>
-              <span className="font-bold text-[#1f2328]">Cashier {row.cashier}</span> ·{" "}
-            </>
-          ) : null}
+          <span className="font-bold text-[#1f2328]">
+            Cashier <StaffName date={localDateOf(row.at)} name={row.cashier} />
+          </span>{" "}
+          ·{" "}
           by {row.actor}
         </span>
       </header>
