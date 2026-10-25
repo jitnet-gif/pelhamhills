@@ -65,6 +65,19 @@
 | `report_lost_item` | 분실물 접수, 티켓 번호 발급 | "찾았다" 는 절대 말하지 않는다 |
 | `join_waitlist` | 대기자 등록 (손님이 요청했을 때만) | 자리가 나면 15분 잡아 두고 YES 를 기다린다 |
 
+음식 주문 · 현장 문제 · 컴플레인 (2026-10-24 추가, 0099 — **SQL 실행 필요**):
+
+| 도구 | 하는 일 | 주의 |
+|---|---|---|
+| `get_food_menu` | 스낵바 메뉴와 값 | 계산대 상품 중 `Food & Beverage`·판매 중인 것. 메뉴를 프롬프트에 적지 않는다 |
+| `place_food_order` | 음식 주문 → 스낵바 계산대 위에 뜬다 | 값은 서버가 상품 값으로 계산(+HST). 픽업은 스낵바, 결제는 픽업 때 계산대. `SNACK_BAR_HOURS`(없으면 `PRO_SHOP_HOURS`) 밖에는 안 받는다 |
+| `report_problem` | 카트 배터리 방전·고장·코스 문제·부상 접수 | `STAFF_ALERT_NUMBERS` 가 있으면 그 번호들로 즉시 문자. 부상이면 911 먼저 |
+| `file_complaint` | 컴플레인 접수 | 환불·할인·무료를 약속하지 않는다 |
+
+직원 화면: 음식 주문은 Snack Bar 계산대 위(처리 안 된 것만, 30초마다)와 Calls & SMS → Food orders,
+문제·컴플레인은 Calls & SMS → Problems · Complaints. Fly secret(선택):
+`STAFF_ALERT_NUMBERS`, `SNACK_BAR_ALERT_NUMBERS`(쉼표로 여럿), `SNACK_BAR_HOURS="08:00-18:00"`.
+
 실내 골프 (2026-10-06 추가, `voice_sim.py`):
 
 | 도구 | 하는 일 | 주의 |

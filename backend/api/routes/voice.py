@@ -43,6 +43,7 @@ from backend.services import (
     callbacks,
     customer_lookup,
     lost_items,
+    phone_requests,
     supabase_rest,
     tee_waitlist,
     voice_agent,
@@ -115,6 +116,27 @@ MAX_INFO_SMS_PER_CALL = 2
 #: (`request_callback` → `pelham_callback_requests`, Reports 의 Phone callbacks 탭).
 #: 기본값 8:00–18:00 은 클럽 확인 전 값이다. Fly secret `PRO_SHOP_HOURS="08:00-18:00"` 로 바꾼다.
 PRO_SHOP_HOURS = os.getenv("PRO_SHOP_HOURS", "08:00-18:00")
+
+#: 전화 음식 주문을 받는 시간(클럽 현지, 매일). 비어 있으면 `PRO_SHOP_HOURS` 와 같다. 클럽 확인 전이다.
+SNACK_BAR_HOURS = os.getenv("SNACK_BAR_HOURS", "")
+
+#: 문제(카트 배터리 방전 등)를 접수하면 바로 문자를 보낼 직원 번호. 쉼표로 여럿. 비어 있으면 화면에만 뜬다.
+#: Fly secret `STAFF_ALERT_NUMBERS="+19055551234,+19055555678"`.
+STAFF_ALERT_NUMBERS = os.getenv("STAFF_ALERT_NUMBERS", "")
+
+#: 음식 주문이 들어오면 문자를 보낼 스낵바 번호. 비어 있으면 스낵바 화면에만 뜬다.
+SNACK_BAR_ALERT_NUMBERS = os.getenv("SNACK_BAR_ALERT_NUMBERS", "")
+
+#: 한 통화가 넣을 수 있는 음식 주문 · 문제/컴플레인 접수 수. 폭주한 에이전트가 같은 주문을 거듭 넣지 않게.
+MAX_FOOD_ORDERS_PER_CALL = 2
+MAX_REPORTS_PER_CALL = 3
+
+#: 한 주문의 한계. 전화로 이보다 큰 주문(단체 도시락 등)은 사람이 받는다.
+MAX_FOOD_LINES = 15
+MAX_FOOD_QUANTITY = 12
+
+#: 전화로 읽어 줄 메뉴 수. 이보다 많으면 손님이 원하는 것을 먼저 묻는다.
+MAX_MENU_ITEMS = 60
 
 DayPart = Literal["morning", "afternoon", "evening", "any"]
 
@@ -243,6 +265,7 @@ def _check_session_rate(caller: str) -> None:
 class _Session:
     __slots__ = (
         "conversation_id", "created_at", "last_seen", "revealed", "holds", "calls", "info_sms",
+        "food_orders", "reports",
     )
 
     def __init__(self, conversation_id: str) -> None:
@@ -254,6 +277,8 @@ class _Session:
         self.holds: set[str] = set()      # 이 통화가 잡은 홀드 id
         self.calls = 0
         self.info_sms = 0                 # 이 통화가 보낸 안내 문자 수
+        self.food_orders = 0              # 이 통화가 넣은 음식 주문 수
+        self.reports = 0                  # 이 통화가 접수한 문제·컴플레인 수
 
 
 _sessions: dict[str, _Session] = {}
@@ -334,35 +359,58 @@ def resolve_date(value: str) -> str:
     return text
 
 
-def staff_hours() -> tuple[int, int]:
-    """`PRO_SHOP_HOURS` → (여는 분, 닫는 분). 잘못 적혀 있으면 기본값 8:00–18:00."""
-    match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*", PRO_SHOP_HOURS or "")
+def _parse_hours(text: str, name: str) -> tuple[int, int]:
+    """"HH:MM-HH:MM" → (여는 분, 닫는 분). 잘못 적혀 있으면 기본값 8:00–18:00."""
+    match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*", text or "")
     if match:
         open_h, open_m, close_h, close_m = (int(part) for part in match.groups())
         start, end = open_h * 60 + open_m, close_h * 60 + close_m
         if 0 <= start < end <= 24 * 60:
             return start, end
-    logger.warning("PRO_SHOP_HOURS=%r is not HH:MM-HH:MM; using 08:00-18:00", PRO_SHOP_HOURS)
+    logger.warning("%s=%r is not HH:MM-HH:MM; using 08:00-18:00", name, text)
     return 8 * 60, 18 * 60
 
 
-def staff_hours_spoken() -> str:
-    """"8 AM to 6 PM" 꼴. 에이전트가 손님에게 그대로 읽는다."""
+def _hours_spoken(hours: tuple[int, int]) -> str:
     def say(minutes: int) -> str:
         hour, minute = divmod(minutes % (24 * 60), 60)
         suffix = "AM" if hour < 12 else "PM"
         hour12 = hour % 12 or 12
         return f"{hour12} {suffix}" if minute == 0 else f"{hour12}:{minute:02d} {suffix}"
 
-    start, end = staff_hours()
+    start, end = hours
     return f"{say(start)} to {say(end)}"
+
+
+def _within(hours: tuple[int, int], now: datetime | None) -> bool:
+    now = now or club_now()
+    start, end = hours
+    return start <= now.hour * 60 + now.minute < end
+
+
+def staff_hours() -> tuple[int, int]:
+    """`PRO_SHOP_HOURS` → (여는 분, 닫는 분)."""
+    return _parse_hours(PRO_SHOP_HOURS, "PRO_SHOP_HOURS")
+
+
+def staff_hours_spoken() -> str:
+    """"8 AM to 6 PM" 꼴. 에이전트가 손님에게 그대로 읽는다."""
+    return _hours_spoken(staff_hours())
 
 
 def staff_on_duty(now: datetime | None = None) -> bool:
     """지금 프로 샵에 전화를 받을 직원이 있는가."""
-    now = now or club_now()
-    start, end = staff_hours()
-    return start <= now.hour * 60 + now.minute < end
+    return _within(staff_hours(), now)
+
+
+def snack_bar_hours() -> tuple[int, int]:
+    """전화 음식 주문을 받는 시간. `SNACK_BAR_HOURS` 가 없으면 프로 샵 시간과 같다."""
+    text = SNACK_BAR_HOURS.strip()
+    return _parse_hours(text, "SNACK_BAR_HOURS") if text else staff_hours()
+
+
+def snack_bar_open(now: datetime | None = None) -> bool:
+    return _within(snack_bar_hours(), now)
 
 
 def duty_note() -> str:
@@ -675,6 +723,79 @@ class CallbackResponse(BaseModel):
     ok: bool
     ticket: str
     staff_available: bool
+    message: str
+
+
+class FoodLine(BaseModel):
+    item_id: int = Field(..., ge=1, description="The id from get_food_menu.")
+    quantity: int = Field(default=1, ge=1, le=MAX_FOOD_QUANTITY)
+    note: str = Field(default="", max_length=120, description="'no onions', 'extra ketchup' — only if said.")
+
+
+class FoodMenuRequest(_VoiceRequest):
+    pass
+
+
+class FoodMenuItem(BaseModel):
+    item_id: int
+    name: str
+    price: float
+    spoken_price: str
+
+
+class FoodMenuResponse(BaseModel):
+    ok: bool
+    items: list[FoodMenuItem]
+    message: str
+
+
+class FoodOrderRequest(_VoiceRequest):
+    items: list[FoodLine] = Field(..., min_length=1, max_length=MAX_FOOD_LINES)
+    first_name: str = Field(..., min_length=1, max_length=60)
+    last_name: str = Field(default="", max_length=60)
+    pickup_time: str = Field(default="", max_length=80, description="When they will pick it up, as they said it.")
+    notes: str = Field(default="", max_length=200, description="Allergies or requests for the whole order.")
+    phone: str = Field(default="", max_length=40)
+    caller_number: str = Field(default="", max_length=40)
+
+
+class FoodOrderResponse(BaseModel):
+    ok: bool
+    ticket: str
+    subtotal: float
+    tax: float
+    total: float
+    message: str
+
+
+ProblemCategory = Literal["cart_battery", "cart_broken", "course", "injury", "other"]
+
+
+class ProblemRequest(_VoiceRequest):
+    category: ProblemCategory
+    details: str = Field(..., min_length=2, max_length=300, description="What is wrong, in a sentence.")
+    location: str = Field(default="", max_length=80, description="Where they are: 'hole 7', 'parking lot'.")
+    cart_number: str = Field(default="", max_length=20)
+    first_name: str = Field(..., min_length=1, max_length=60)
+    last_name: str = Field(default="", max_length=60)
+    phone: str = Field(default="", max_length=40)
+    caller_number: str = Field(default="", max_length=40)
+
+
+class ComplaintRequest(_VoiceRequest):
+    topic: str = Field(..., min_length=2, max_length=60, description="One or two words: 'slow play', 'food'.")
+    details: str = Field(..., min_length=2, max_length=600, description="What happened, in the caller's words.")
+    first_name: str = Field(..., min_length=1, max_length=60)
+    last_name: str = Field(default="", max_length=60)
+    wants_callback: bool = False
+    phone: str = Field(default="", max_length=40)
+    caller_number: str = Field(default="", max_length=40)
+
+
+class ReportResponse(BaseModel):
+    ok: bool
+    ticket: str
+    staff_alerted: bool
     message: str
 
 
@@ -1892,6 +2013,333 @@ def request_callback(body: CallbackRequest) -> CallbackResponse:
         message=(
             f"Saved. Tell the caller a staff member will call them back {when} at the number ending "
             f"{normalize_phone(phone)[-4:]}. Do not promise an exact time. Do not transfer the call."
+        ),
+    )
+
+
+# ===== 도구 11-c: 스낵바 음식 주문 =====================================
+
+def _spoken_money(cents: int) -> str:
+    return f"${cents / 100:.2f}"
+
+
+def _contact_phone(spoken: str, caller_number: str) -> str:
+    """손님이 다른 번호를 불러 줬으면 그 번호, 아니면 발신번호. 둘 다 못 쓰면 422."""
+    spoken = spoken.strip()
+    phone = spoken if normalize_phone(spoken) else caller_number.strip()
+    if not normalize_phone(phone):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No usable phone number. Ask the caller to say the number digit by digit and send just "
+                "the digits — never a placeholder word."
+            ),
+        )
+    return phone
+
+
+def _alert_numbers(value: str) -> list[str]:
+    return [n for n in (normalize_phone(part) for part in value.split(",")) if n]
+
+
+def _snack_bar_closed() -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail=(
+            f"The snack bar takes phone orders only from {_hours_spoken(snack_bar_hours())}, and it is outside "
+            "those hours now. Tell the caller plainly and do not take the order."
+        ),
+    )
+
+
+@tools_router.post("/voice/tools/food-menu", response_model=FoodMenuResponse)
+def get_food_menu(body: FoodMenuRequest) -> FoodMenuResponse:
+    """스낵바 메뉴 — 계산대의 'Food & Beverage' 상품 중 판매 중인 것과 그 값.
+
+    메뉴를 프롬프트에 적어 두지 않는다. 계산대에서 값을 바꾸거나 품절로 내리면 전화도 바로 따라간다.
+    """
+    _touch_session(body.conversation_id)
+    if not snack_bar_open():
+        raise _snack_bar_closed()
+
+    try:
+        rows = phone_requests.food_menu()
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail="The menu is not reachable right now. Do not take a food order — offer the pro shop instead.",
+        ) from None
+
+    items = [
+        FoodMenuItem(
+            item_id=int(row["id"]),
+            name=str(row["name"]),
+            price=int(row["price"]) / 100,
+            spoken_price=_spoken_money(int(row["price"])),
+        )
+        for row in rows[:MAX_MENU_ITEMS]
+    ]
+    if not items:
+        return FoodMenuResponse(
+            ok=False,
+            items=[],
+            message="There is no menu set up for phone orders. Do not take a food order — offer the pro shop.",
+        )
+    return FoodMenuResponse(
+        ok=True,
+        items=items,
+        message=(
+            "This is everything we can make right now, with prices before HST. Do not read the whole list — "
+            "ask what they would like, then match it to an item here. Never offer anything that is not on it."
+        ),
+    )
+
+
+@tools_router.post("/voice/tools/food-order", response_model=FoodOrderResponse)
+def place_food_order(body: FoodOrderRequest, background: BackgroundTasks) -> FoodOrderResponse:
+    """음식 주문을 넣는다. 스낵바 화면에 바로 뜨고, 픽업은 스낵바, 결제는 픽업 때 계산대에서.
+
+    값은 에이전트가 말한 숫자가 아니라 계산대 상품의 값으로 서버가 계산한다. 메뉴에 없는 id 는 거절한다.
+    """
+    session = _touch_session(body.conversation_id)
+    if not snack_bar_open():
+        raise _snack_bar_closed()
+    if session is not None and session.food_orders >= MAX_FOOD_ORDERS_PER_CALL:
+        raise HTTPException(
+            status_code=429,
+            detail="This call has already placed a food order. Do not place it again — read back the one you have.",
+        )
+    phone = _contact_phone(body.phone, body.caller_number)
+
+    try:
+        menu = {int(row["id"]): row for row in phone_requests.food_menu()}
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail="The snack bar is not reachable right now. Apologise and offer the pro shop instead.",
+        ) from None
+
+    missing = [line.item_id for line in body.items if line.item_id not in menu]
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Some items are not on the menu right now. Call get_food_menu again, tell the caller which "
+                "item we cannot make, and use only item ids from that list."
+            ),
+        )
+
+    lines: list[dict[str, Any]] = []
+    subtotal = 0
+    for line in body.items:
+        product = menu[line.item_id]
+        price = int(product["price"])
+        subtotal += price * line.quantity
+        lines.append({
+            "product_id": line.item_id,
+            "sku": product.get("sku"),
+            "name": product["name"],
+            "quantity": line.quantity,
+            "unit_price": price,
+            **({"note": line.note.strip()} if line.note.strip() else {}),
+        })
+    tax = round(subtotal * TAX_RATE)
+
+    try:
+        row = phone_requests.place_food_order(
+            first_name=body.first_name,
+            last_name=body.last_name,
+            phone=phone,
+            items=lines,
+            subtotal=subtotal,
+            tax=tax,
+            pickup_time=body.pickup_time,
+            notes=body.notes,
+            caller_number=body.caller_number,
+            conversation_id=body.conversation_id or "",
+        )
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail="The order could not be saved. Apologise, do not say it was placed, and offer the pro shop.",
+        ) from None
+    if session is not None:
+        session.food_orders += 1
+
+    ticket = str(row.get("ticket") or "")
+    summary = ", ".join(f"{l['quantity']} {l['name']}" for l in lines)
+    for number in _alert_numbers(SNACK_BAR_ALERT_NUMBERS):
+        background.add_task(
+            send_sms,
+            number,
+            f"Phone order {ticket} for {body.first_name.strip()}: {summary}."
+            + (f" Pickup: {body.pickup_time.strip()}." if body.pickup_time.strip() else "")
+            + (f" Note: {body.notes.strip()}" if body.notes.strip() else ""),
+            template="staff_food_order",
+        )
+
+    return FoodOrderResponse(
+        ok=True,
+        ticket=ticket,
+        subtotal=subtotal / 100,
+        tax=tax / 100,
+        total=(subtotal + tax) / 100,
+        message=(
+            f"Order placed: {summary}. Read the order back, then the total, {_spoken_money(subtotal + tax)} "
+            f"including HST, and the order number one character at a time: {ticket}. Pickup is at the snack "
+            "bar and they pay when they pick it up. Do not promise a ready time."
+        ),
+    )
+
+
+# ===== 도구 11-d: 현장 문제 · 컴플레인 ==================================
+
+_PROBLEM_LABEL = {
+    "cart_battery": "Cart battery dead",
+    "cart_broken": "Cart problem",
+    "course": "Course problem",
+    "injury": "Someone hurt",
+    "other": "Problem",
+}
+
+
+async def _alert_staff(numbers: list[str], text: str, report_id: str) -> None:
+    """직원 번호로 문자를 보내고, 하나라도 나갔으면 접수 줄에 적는다."""
+    sent = False
+    for number in numbers:
+        try:
+            await send_sms(number, text, template="staff_problem_alert")
+            sent = True
+        except Exception:  # noqa: BLE001 — 문자 하나가 실패해도 나머지 번호와 접수는 그대로
+            logger.exception("staff alert text to %s failed", number[-4:])
+    if sent and report_id:
+        try:
+            await asyncio.to_thread(phone_requests.mark_alerted, report_id)
+        except supabase_rest.SupabaseUnavailable:
+            logger.warning("could not mark report %s as alerted", report_id)
+
+
+def _count_report(session: "_Session | None") -> None:
+    if session is not None:
+        if session.reports >= MAX_REPORTS_PER_CALL:
+            raise HTTPException(
+                status_code=429,
+                detail="This call has already filed reports. Do not file another — read back the reference you have.",
+            )
+        session.reports += 1
+
+
+@tools_router.post("/voice/tools/report-problem", response_model=ReportResponse)
+def report_problem(body: ProblemRequest, background: BackgroundTasks) -> ReportResponse:
+    """코스·카트에서 생긴 문제(카트 배터리 방전, 고장, 다친 사람 등)를 접수하고 직원에게 문자로 알린다.
+
+    직원이 Calls & SMS → Problems 에서 보고 "In progress"·"Resolved" 로 바꾼다. 알림 번호
+    (`STAFF_ALERT_NUMBERS`)가 없으면 화면에만 뜬다 — 그때는 업무시간이면 연결을 권한다.
+    """
+    session = _touch_session(body.conversation_id)
+    phone = _contact_phone(body.phone, body.caller_number)
+    _count_report(session)
+
+    try:
+        row = phone_requests.file_report(
+            kind="problem",
+            category=body.category,
+            details=body.details,
+            location=body.location,
+            cart_number=body.cart_number,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            phone=phone,
+            caller_number=body.caller_number,
+            conversation_id=body.conversation_id or "",
+        )
+    except supabase_rest.SupabaseUnavailable:
+        on_duty = staff_on_duty()
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The report could not be saved. "
+                + ("Transfer the caller to the pro shop now." if on_duty
+                   else "Apologise and take a callback with request_callback.")
+            ),
+        ) from None
+
+    ticket = str(row.get("ticket") or "")
+    numbers = _alert_numbers(STAFF_ALERT_NUMBERS)
+    if numbers:
+        where = ", ".join(part for part in (
+            body.location.strip(),
+            f"cart {body.cart_number.strip()}" if body.cart_number.strip() else "",
+        ) if part)
+        background.add_task(
+            _alert_staff,
+            numbers,
+            f"{_PROBLEM_LABEL[body.category]} {ticket}"
+            + (f" at {where}" if where else "")
+            + f": {body.details.strip()} — {body.first_name.strip()} {phone}",
+            str(row.get("id") or ""),
+        )
+
+    on_duty = staff_on_duty()
+    first = "If anyone is badly hurt, tell them to call 911 first. " if body.category == "injury" else ""
+    if numbers and on_duty:
+        then = "Tell the caller staff have been told and someone will come to them or call them back."
+    elif on_duty:
+        then = "Tell the caller it is logged, then offer to put them through to the pro shop so someone can help now."
+    else:
+        then = (
+            f"Staff are not on duty now ({staff_hours_spoken()}). Tell the caller it is logged and staff will "
+            "follow up. Do not promise anyone will come out now."
+        )
+    return ReportResponse(
+        ok=True,
+        ticket=ticket,
+        staff_alerted=bool(numbers),
+        message=f"{first}Logged as {ticket} — read it back one character at a time. {then}",
+    )
+
+
+@tools_router.post("/voice/tools/file-complaint", response_model=ReportResponse)
+def file_complaint(body: ComplaintRequest) -> ReportResponse:
+    """컴플레인을 받아 적는다. 매니저가 Calls & SMS → Complaints 에서 읽고 처리한다.
+
+    에이전트는 환불·보상·할인을 약속하지 않는다 — 판단은 매니저의 몫이다.
+    """
+    session = _touch_session(body.conversation_id)
+    phone = _contact_phone(body.phone, body.caller_number)
+    _count_report(session)
+
+    try:
+        row = phone_requests.file_report(
+            kind="complaint",
+            category=body.topic,
+            details=body.details,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            phone=phone,
+            wants_callback=body.wants_callback,
+            caller_number=body.caller_number,
+            conversation_id=body.conversation_id or "",
+        )
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail="The complaint could not be saved. Apologise and take a callback with request_callback.",
+        ) from None
+
+    ticket = str(row.get("ticket") or "")
+    follow = (
+        f"Tell them a manager will call them back at the number ending {normalize_phone(phone)[-4:]}."
+        if body.wants_callback
+        else "Tell them a manager will read it."
+    )
+    return ReportResponse(
+        ok=True,
+        ticket=ticket,
+        staff_alerted=False,
+        message=(
+            f"Saved as {ticket} — read it back one character at a time. Thank them for telling us. {follow} "
+            "Never promise a refund, a discount or anything free."
         ),
     )
 

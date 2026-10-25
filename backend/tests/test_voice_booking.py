@@ -1153,3 +1153,142 @@ def test_callback_list_down_is_a_message(client, monkeypatch):
     body = callback(client).json()
     assert body["ok"] is False and body["status"] == 503
     assert "business hours" in body["message"]
+
+
+# ===== 음식 주문 · 현장 문제 · 컴플레인 (0099) ===========================
+
+MENU = [
+    {"id": 7, "sku": "FB-HOTDOG", "name": "Hot Dog", "price": 450, "stock": None},
+    {"id": 9, "sku": "FB-COKE", "name": "Coke", "price": 275, "stock": 20},
+]
+
+
+@pytest.fixture()
+def open_hours(monkeypatch):
+    monkeypatch.setattr(voice, "club_now", lambda: FIXED_NOW.replace(hour=11))
+
+
+def order(client, **fields):
+    payload = {"items": [{"item_id": 7, "quantity": 2}, {"item_id": 9, "quantity": 1, "note": "no ice"}],
+               "first_name": "Jin", "pickup_time": "at the turn",
+               "caller_number": "+19058921234", "conversation_id": "c-food"}
+    payload.update(fields)
+    return client.post(f"{API}/voice/tools/food-order", json=payload)
+
+
+def test_food_menu_reads_the_snack_bar_products(client, monkeypatch, open_hours):
+    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
+    body = client.post(f"{API}/voice/tools/food-menu", json={"conversation_id": "c-m"}).json()
+
+    assert body["ok"] is True
+    assert [(i["item_id"], i["name"], i["spoken_price"]) for i in body["items"]] == [
+        (7, "Hot Dog", "$4.50"), (9, "Coke", "$2.75")]
+
+
+def test_food_menu_is_closed_outside_snack_bar_hours(client, monkeypatch):
+    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
+    body = client.post(f"{API}/voice/tools/food-menu", json={"conversation_id": "c-m"}).json()  # 6 AM
+
+    assert body["ok"] is False and body["status"] == 409
+    assert "8 AM to 6 PM" in body["message"]
+
+
+def test_food_order_prices_on_the_server_and_adds_hst(client, monkeypatch, open_hours):
+    seen = {}
+    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
+    monkeypatch.setattr(voice.phone_requests, "place_food_order",
+                        lambda **kw: seen.update(kw) or {"ticket": "FO-0101"})
+    body = order(client).json()
+
+    assert body["ok"] is True and body["ticket"] == "FO-0101"
+    assert seen["subtotal"] == 1175 and seen["tax"] == 153
+    assert body["total"] == 13.28
+    assert "$13.28" in body["message"] and "FO-0101" in body["message"]
+    assert seen["items"][1] == {"product_id": 9, "sku": "FB-COKE", "name": "Coke", "quantity": 1,
+                                "unit_price": 275, "note": "no ice"}
+    assert seen["phone"] == "+19058921234"
+
+
+def test_food_order_refuses_an_item_not_on_the_menu(client, monkeypatch, open_hours):
+    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
+    monkeypatch.setattr(voice.phone_requests, "place_food_order", lambda **kw: pytest.fail("saved"))
+    body = order(client, items=[{"item_id": 99, "quantity": 1}]).json()
+
+    assert body["ok"] is False and body["status"] == 422
+    assert "get_food_menu" in body["message"]
+
+
+def test_food_order_is_placed_once_per_call(client, monkeypatch, open_hours):
+    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
+    monkeypatch.setattr(voice.phone_requests, "place_food_order", lambda **kw: {"ticket": "FO-0101"})
+    for _ in range(voice.MAX_FOOD_ORDERS_PER_CALL):
+        assert order(client).json()["ok"] is True
+    assert order(client).json()["status"] == 429
+
+
+def problem(client, **fields):
+    payload = {"category": "cart_battery", "details": "Cart stopped and will not move", "location": "hole 7",
+               "cart_number": "23", "first_name": "Jin",
+               "caller_number": "+19058921234", "conversation_id": "c-pb"}
+    payload.update(fields)
+    return client.post(f"{API}/voice/tools/report-problem", json=payload)
+
+
+def test_problem_texts_staff_when_numbers_are_set(client, monkeypatch, open_hours):
+    seen, texts, alerted = {}, [], []
+    monkeypatch.setattr(voice, "STAFF_ALERT_NUMBERS", "905 555 0100, nonsense")
+    monkeypatch.setattr(voice.phone_requests, "file_report",
+                        lambda **kw: seen.update(kw) or {"ticket": "PB-0101", "id": "r1"})
+    monkeypatch.setattr(voice.phone_requests, "mark_alerted", alerted.append)
+
+    async def fake_send(to, text, **kw):
+        texts.append((to, text))
+
+    monkeypatch.setattr(voice, "send_sms", fake_send)
+    body = problem(client).json()
+
+    assert body["ok"] is True and body["staff_alerted"] is True
+    assert seen["kind"] == "problem" and seen["category"] == "cart_battery"
+    assert texts == [("9055550100",
+                      "Cart battery dead PB-0101 at hole 7, cart 23: Cart stopped and will not move — Jin +19058921234")]
+    assert alerted == ["r1"]
+    assert "someone will come" in body["message"]
+
+
+def test_problem_without_alert_numbers_offers_a_transfer(client, monkeypatch, open_hours):
+    monkeypatch.setattr(voice, "STAFF_ALERT_NUMBERS", "")
+    monkeypatch.setattr(voice.phone_requests, "file_report", lambda **kw: {"ticket": "PB-0102", "id": "r2"})
+    body = problem(client).json()
+
+    assert body["staff_alerted"] is False
+    assert "put them through" in body["message"]
+
+
+def test_injury_says_911_first(client, monkeypatch):
+    monkeypatch.setattr(voice.phone_requests, "file_report", lambda **kw: {"ticket": "PB-0103", "id": "r3"})
+    body = problem(client, category="injury", details="Fell near the cart path").json()
+
+    assert body["message"].startswith("If anyone is badly hurt, tell them to call 911 first.")
+    assert "Do not promise anyone will come out" in body["message"]  # 6 AM — 직원 없음
+
+
+def test_complaint_is_saved_and_never_promises_money(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(voice.phone_requests, "file_report",
+                        lambda **kw: seen.update(kw) or {"ticket": "CP-0101", "id": "c1"})
+    body = client.post(f"{API}/voice/tools/file-complaint", json={
+        "topic": "slow play", "details": "Waited on every tee", "first_name": "Jin", "wants_callback": True,
+        "caller_number": "+19058921234", "conversation_id": "c-cp"}).json()
+
+    assert body["ok"] is True and body["ticket"] == "CP-0101"
+    assert seen["kind"] == "complaint" and seen["category"] == "slow play" and seen["wants_callback"] is True
+    assert "ending 1234" in body["message"]
+    assert "Never promise a refund" in body["message"]
+
+
+def test_call_outcomes_for_the_new_tools():
+    from backend.api.routes import calls
+
+    assert calls.outcome(["get_food_menu", "place_food_order"]) == "food_order"
+    assert calls.outcome(["report_problem"]) == "problem"
+    assert calls.outcome(["file_complaint", "transfer_to_number"]) == "complaint"

@@ -34,6 +34,9 @@ _OUTCOMES: list[tuple[str, set[str]]] = [
     ("modified", {"modify_booking"}),
     ("cancelled", {"cancel_booking", "cancel_sim_booking"}),
     ("waitlist", {"join_waitlist"}),
+    ("food_order", {"place_food_order"}),
+    ("problem", {"report_problem"}),
+    ("complaint", {"file_complaint"}),
     ("lost_item", {"report_lost_item"}),
     ("transferred", {"transfer_to_number"}),
 ]
