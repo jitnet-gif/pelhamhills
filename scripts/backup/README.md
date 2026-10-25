@@ -31,6 +31,9 @@
 
 ## 복원
 
+복원은 **analysis@pelhamhills.ca 한 계정만** 할 수 있다(0110). 다른 계정은 화면에 복원 칸이 없고, 터미널 복원도 거절된다 —
+터미널로 복원하려면 `~/.pelham-backup.env` 를 analysis@ 로 바꾸거나 그 계정으로 따로 실행한다.
+
 - **화면**: Data Backup → Choose backup folder → 표 고르기 → Merge / Replace → `RESTORE` 입력.
 - **터미널**:
 

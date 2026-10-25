@@ -4,6 +4,7 @@
  * 데이터 백업(Data Backup) — 클럽 데이터를 CSV 폴더로 받고, 그 폴더로 되살린다(0100, `lib/backup.ts`).
  *
  * 매니저(Reports 명단)와 계정 관리자에게만 메뉴가 뜨고, 주소로 들어와도 다른 계정에는 이유만 보인다. 막는 것은 서버다.
+ * 복원은 analysis@pelhamhills.ca 한 계정만 한다(0110) — 다른 계정에는 복원 칸 대신 안내만 보인다.
  * 매일 밤 자동 백업은 사무실 맥이 한다(`scripts/backup/`). 여기 "Recent backups" 에 daily 로 남는다.
  */
 
@@ -84,6 +85,7 @@ function BackupManager() {
   const [version, setVersion] = useState(0);
   // 기록을 읽은 시각 — 자동 백업이 늦었는지 여기에 견준다(그리는 중에 Date.now() 를 부르지 않게).
   const [loadedAt, setLoadedAt] = useState(0);
+  const [canRestore, setCanRestore] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +104,21 @@ function BackupManager() {
       cancelled = true;
     };
   }, [version]);
+
+  useEffect(() => {
+    let cancelled = false;
+    backupApi
+      .canRestore()
+      .then((value) => {
+        if (!cancelled) setCanRestore(value);
+      })
+      .catch(() => {
+        if (!cancelled) setCanRestore(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const refresh = () => setVersion((value) => value + 1);
   const lastDaily = runs?.find((run) => run.kind === "backup" && run.source === "daily") ?? null;
@@ -139,7 +156,14 @@ function BackupManager() {
       {error ? <ErrorNote>{error}</ErrorNote> : null}
 
       <BackupNow onDone={refresh} tables={tables} />
-      <RestorePanel onDone={refresh} tables={tables} />
+      {canRestore ? (
+        <RestorePanel onDone={refresh} tables={tables} />
+      ) : canRestore === false ? (
+        <section className="grid gap-1 border border-[#d4d4d8] bg-white p-3 text-sm">
+          <h2 className="text-base font-bold">Restore from a backup</h2>
+          <p className="text-[#3f434a]">Only analysis@pelhamhills.ca can restore a backup.</p>
+        </section>
+      ) : null}
 
       <section className="grid gap-2 border border-[#d4d4d8] bg-white p-3">
         <h2 className="font-bold">Recent backups and restores</h2>
@@ -264,7 +288,7 @@ function RestorePanel({ tables, onDone }: { tables: BackupTable[] | null; onDone
   const [error, setError] = useState<string | null>(null);
 
   const liveOf = useMemo(() => new Map((tables ?? []).map((table) => [table.table, table])), [tables]);
-  // 권한 명단은 계정 관리자만 복원한다(서버도 막는다). 처음에는 꺼 둔다.
+  // 권한 명단은 처음에는 꺼 둔다 — 고른 사람만 되살린다.
   const restorable = (name: string) => liveOf.has(name) && name !== "pelham_backup_runs";
 
   const load = async (list: FileList | null) => {
@@ -386,7 +410,7 @@ function RestorePanel({ tables, onDone }: { tables: BackupTable[] | null; onDone
                       </td>
                       <td className="px-2 py-1 break-all">
                         {table.table}
-                        {live?.protected ? <span className="ml-2 text-xs text-[#8a5a00]">account manager only</span> : null}
+                        {live?.protected ? <span className="ml-2 text-xs text-[#8a5a00]">permission list</span> : null}
                         {!live ? <span className="ml-2 text-xs text-[#8a1f1f]">not in database</span> : null}
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums">{table.rows.length.toLocaleString()}</td>

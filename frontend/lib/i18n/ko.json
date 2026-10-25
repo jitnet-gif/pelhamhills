@@ -3090,5 +3090,7 @@
  ": every time a manager or Emmeline signs in, the club data is saved as one ZIP in that computer's Downloads folder (and once a day if they stay signed in).": ": 매니저나 Emmeline 이 로그인할 때마다 클럽 데이터가 그 컴퓨터의 다운로드 폴더에 ZIP 하나로 저장됩니다(로그인을 유지하면 하루 한 번).",
  "Generate": "생성",
  "No barcode on the package? Make a club barcode (PH + number)": "포장에 바코드가 없나요? 클럽 바코드(PH + 번호)를 만듭니다",
- "🖨 Print sticker": "🖨 스티커 인쇄"
+ "🖨 Print sticker": "🖨 스티커 인쇄",
+ "permission list": "권한 명단",
+ "Only analysis@pelhamhills.ca can restore a backup.": "백업 복원은 analysis@pelhamhills.ca 계정만 할 수 있습니다."
 }

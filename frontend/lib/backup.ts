@@ -63,6 +63,15 @@ export const backupApi = {
       throw cause;
     }
   },
+  /** 복원은 analysis@ 한 계정만(0110). 함수가 아직 없으면 아무도 못 하는 것으로 본다. */
+  canRestore: async (): Promise<boolean> => {
+    try {
+      return await staffRpc<boolean>("pelham_backup_can_restore");
+    } catch (cause) {
+      if (isMissingFunction(cause)) return false;
+      throw cause;
+    }
+  },
   tables: () => staffRpc<BackupTable[]>("pelham_backup_tables"),
   runs: () => staffRpc<BackupRun[]>("pelham_backup_runs_list"),
   log: (kind: BackupRun["kind"], tables: number, rows: number, note: string, source: BackupRun["source"] = "web") =>
