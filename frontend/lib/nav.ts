@@ -107,6 +107,9 @@ export const ADMIN_AI_MARKETING = "/admin/ai-marketing";
 /** 로그인 계정 관리(0074). 계정 관리자에게만 메뉴에 뜬다(`lib/accounts.ts`). */
 export const ADMIN_ACCOUNTS = "/admin/accounts";
 
+/** 데이터 백업·복원(0100). 매니저(Reports 명단)와 계정 관리자에게만 메뉴에 뜬다(`lib/backup.ts`). */
+export const ADMIN_BACKUP = "/admin/backup";
+
 /** 요금 두 화면. 매니저(Reports 명단, 0046 — 지금은 admin@pelhamhills.ca)에게만 메뉴에 뜬다(2026-10-23). */
 export const ADMIN_PRICING = "/admin/pricing";
 export const ADMIN_DYNAMIC_PRICING = "/admin/dynamic-pricing";
@@ -148,6 +151,7 @@ export const adminNav: NavItem[] = [
   // 1번 티 스타터 폰(Android) 앱 내려받기와 설치 순서(android/starter).
   { label: "Starter Phone App", href: "/admin/starter-app", glyph: "📱" },
   { label: "Account Setup", href: ADMIN_ACCOUNTS, glyph: "👤" },
+  { label: "Data Backup", href: ADMIN_BACKUP, glyph: "⇩" },
   { label: "Staff Guides", href: "/guide", glyph: "▶" },
 ];
 
@@ -227,6 +231,7 @@ export const adminDivisions: AdminDivision[] = [
       pick("Reports"),
       pick("Integrations"),
       pick("Starter Phone App"),
+      pick("Data Backup"),
     ],
   },
   {
@@ -240,6 +245,7 @@ export const adminDivisions: AdminDivision[] = [
       pick("Calls & SMS"),
       pick("Reports"),
       pick("Starter Phone App"),
+      pick("Data Backup"),
     ],
   },
 ];

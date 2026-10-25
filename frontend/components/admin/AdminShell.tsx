@@ -38,6 +38,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 
 import {
   ADMIN_ACCOUNTS,
+  ADMIN_BACKUP,
   ADMIN_AI_MARKETING,
   ADMIN_CALLS,
   ADMIN_DYNAMIC_PRICING,
@@ -58,6 +59,7 @@ import {
 import InstallAppHint from "@/components/admin/InstallAppHint";
 import LangToggle from "@/lib/i18n/LangToggle";
 import { useAccountsAccess } from "@/lib/accounts";
+import { useBackupAccess } from "@/lib/backup";
 import { useAiMarketingAccess } from "@/lib/aiMarketing/access";
 import { useMarketingAccess } from "@/lib/marketing/access";
 import { useReportsAccess } from "@/lib/reports/access";
@@ -233,6 +235,8 @@ function AdminFrame({
   // Tee Times & Pricing 도 매니저 = Reports 명단 계정에게만 보인다. Account Setup 의 Reports 체크로 켜고 끈다.
   // Account Setup 도 계정 관리자(0074)에게만 보인다(`lib/accounts.ts`).
   const accountsAllowed = useAccountsAccess(email) === true;
+  // Data Backup 은 매니저와 계정 관리자에게만(0100, `lib/backup.ts`).
+  const backupAllowed = useBackupAccess(email) === true;
   // Marketing 도 마케팅 명단(0047) 계정에만 보인다(`lib/marketing/access.ts`).
   const marketingAllowed = useMarketingAccess(email) === true;
   // AI Manager Marketing Strategies 는 매니저와 admin@ · proshop@ · analysis@ 에게만(0094, `lib/aiMarketing/access.ts`).
@@ -243,12 +247,13 @@ function AdminFrame({
     (href: string) => {
       if (href === ADMIN_REPORTS || href === ADMIN_PRICING) return reportsAllowed;
       if (href === ADMIN_ACCOUNTS) return accountsAllowed;
+      if (href === ADMIN_BACKUP) return backupAllowed;
       if (href === ADMIN_MARKETING) return marketingAllowed;
       if (href === ADMIN_AI_MARKETING) return aiMarketingAllowed;
       const needs = SCREEN_OF_HREF[href];
       return needs ? canOpen(screenAccess, needs, reportsAllowed) === true : true;
     },
-    [reportsAllowed, accountsAllowed, marketingAllowed, aiMarketingAllowed, screenAccess],
+    [reportsAllowed, accountsAllowed, backupAllowed, marketingAllowed, aiMarketingAllowed, screenAccess],
   );
   const shownDivision = useMemo(
     () => ({ ...division, links: division.links.filter((item) => showHref(item.href)) }),
