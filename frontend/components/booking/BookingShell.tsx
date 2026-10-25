@@ -24,7 +24,8 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import SiteNoticePopup from "@/components/site/SiteNoticePopup";
-import { BOOK_HOME, CLUB, SITE_HOME, bookNav, isActive } from "@/lib/nav";
+import { useMemberSession } from "@/lib/booking/memberSession";
+import { BOOK_HOME, BOOK_LOGIN, CLUB, SITE_HOME, bookNav, isActive } from "@/lib/nav";
 
 type Props = {
   /** 헤더에 찍히는 현재 화면 이름. */
@@ -37,6 +38,7 @@ type Props = {
 export default function BookingShell({ title, subtitle, children }: Props) {
   const pathname = usePathname();
   const onHub = isActive(pathname, BOOK_HOME);
+  const member = useMemberSession();
 
   return (
     <div className="min-h-dvh bg-[#f7f4ed] text-[#182118]">
@@ -86,8 +88,16 @@ export default function BookingShell({ title, subtitle, children }: Props) {
             </ul>
           </nav>
 
+          {/* 회원 로그인(0111). 탭이 아니라 여기 둔다 — 손님 대부분은 로그인 없이 예약한다. */}
+          <Link
+            className="tap-target ml-auto flex min-w-0 max-w-[10rem] items-center rounded-sm border border-[#d8d1c3] bg-white px-3 text-sm font-semibold text-[#214d2f] transition hover:bg-[#ece7da] lg:ml-3"
+            href={BOOK_LOGIN}
+          >
+            <span className="truncate">{member ? member.member.name.split(/\s+/)[0] : "Member sign in"}</span>
+          </Link>
+
           <a
-            className="tap-target ml-auto flex items-center rounded-sm bg-[#214d2f] px-3 text-sm font-bold text-white transition hover:bg-[#163820] lg:ml-3"
+            className="tap-target flex items-center rounded-sm bg-[#214d2f] px-3 text-sm font-bold text-white transition hover:bg-[#163820]"
             href={CLUB.phoneHref}
           >
             <span aria-hidden className="mr-1.5">☎</span>

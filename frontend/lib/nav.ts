@@ -67,6 +67,8 @@ export const BOOK_HOME = "/book";
 export const BOOK_TEE_TIME = "/book/tee-time";
 export const BOOK_INDOOR = "/book/indoor";
 export const BOOK_LOOKUP = "/book/lookup";
+/** 회원 로그인·등록(0111). 탭이 아니라 헤더 오른쪽 단추가 가리킨다. */
+export const BOOK_LOGIN = "/book/login";
 
 export const bookNav: NavItem[] = [
   { label: "Tee Time(Field)", href: BOOK_TEE_TIME, glyph: "⛳" },

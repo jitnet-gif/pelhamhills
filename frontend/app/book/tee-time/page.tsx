@@ -34,9 +34,11 @@ import {
 } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
 import { recordBookingSource } from "@/lib/booking/attribution";
+import { memberSessionExpired, useMemberSession } from "@/lib/booking/memberSession";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
 import { greenFeeFor, nineHoleRule, nineHolesOpen } from "@/lib/greenFee";
-import { CLUB, bookNav, lookupHref } from "@/lib/nav";
+import { BOOK_LOGIN, CLUB, bookNav, lookupHref } from "@/lib/nav";
+import { ApiError } from "@/lib/teeSheet/api";
 import { minutesToTime } from "@/lib/teeSheet/dates";
 import { teeWindow } from "@/lib/teeSheet/sun";
 import type { TeeBooking } from "@/lib/teeSheet/types";
@@ -423,17 +425,24 @@ function BookingForm({
   const { hits } = usePublicMemberSearch(name, nameFocused && member === null);
   const listOpen = nameFocused && member === null && hits.length > 0;
   const activeIndex = activeHit < hits.length ? activeHit : 0;
+  // 로그인한 회원(0111)이면 이름·이메일·전화는 계정 것으로 가고, 위의 회원 찾기는 쓰지 않는다.
+  const session = useMemberSession();
+  const signedIn = session ? session.member : null;
+  const memberBadge = member
+    ? memberLabel(member)
+    : signedIn?.membershipType && signedIn.season
+      ? memberLabel({ membershipType: signedIn.membershipType, season: signedIn.season })
+      : null;
 
   const maxParty = Math.min(4, slot.remaining);
   const size = Math.min(party, maxParty);
   const carts = cart ? Math.ceil(size / 2) : 0;
-  const ready = name.trim().length > 0 && email.trim().length > 0 && !submitting;
+  const ready = (signedIn !== null || (name.trim().length > 0 && email.trim().length > 0)) && !submitting;
   // 9홀은 정해진 시각부터만(0034). 이른 티타임이면 버튼을 끄고 18홀로 둔다.
   const nineOpen = nineHolesOpen(slot);
   const fee = greenFeeFor(slot, holes);
   // 카트는 1인 요금(세전) — 웹 예약은 모두 Public 이다. 진짜 값은 DB(0050·`pelham_tee_cart_fee_on`)가 매긴다.
   const cartFee = cart ? (holes === 9 ? 11.5 : 19.47) : 0;
-  const total = fee * (size - (member ? 1 : 0)) + cartFee * size;
 
   const submit = async () => {
     setSubmitting(true);
@@ -456,12 +465,20 @@ function BookingForm({
         notes: notes.trim(),
       };
       // 회원을 골랐으면 회원 예약으로. 이메일·전화가 회원 기록과 맞는지는 함수가 본다(`memberVerified`).
-      const booking = member
+      const booking = session
+        ? await bookingRpc<TeeBooking>("pelham_tee_book_signed_in", { p, p_token: session.token })
+        : member
         ? await bookingRpc<TeeBooking>("pelham_tee_book_member", { p, p_member: member.ref })
         : await bookingRpc<TeeBooking>("pelham_tee_book", { p });
       recordBookingSource("tee", booking.confirmationCode);
       onBooked(booking);
     } catch (failure) {
+      if (session && failure instanceof ApiError && failure.status === 401) {
+        // 로그인이 지났다. 로그아웃 상태로 돌리면 폼이 손님 입력칸을 다시 보여 준다.
+        memberSessionExpired();
+        setError("Your member sign-in has expired. Sign in again, or book with your details below.");
+        return;
+      }
       const described = describeFailure(failure, "Your tee time could not be booked.");
       if (described.conflict) {
         // 자리가 나간 것은 실패가 아니라 **상태가 변한 것**이다. 폼에 붉은 배너만
@@ -477,7 +494,8 @@ function BookingForm({
 
   const [step, setStep] = useState<"choose" | "details">("choose");
   // 회원 본인 그린피는 회원권 요금제로 서버가 매긴다(대부분 $0). 미리보기는 손님 몫만 더한다.
-  const memberSeats = member ? 1 : 0;
+  const memberSeats = memberBadge ? 1 : 0;
+  const total = fee * (size - memberSeats) + cartFee * size;
   const greenTotal = fee * (size - memberSeats);
   const cartTotal = cartFee * size;
   // 미리보기 HST. 진짜 세금은 결제할 때 서버 견적(PayOnline)이 매긴다.
@@ -605,16 +623,16 @@ function BookingForm({
             </label>
 
             <dl className="mt-5 space-y-2 border-t border-[#e2ddd0] pt-4 text-sm">
-              {member ? (
+              {memberBadge ? (
                 <div className="flex justify-between gap-3">
-                  <dt className="text-[#3d453d]">You ({memberLabel(member)})</dt>
+                  <dt className="text-[#3d453d]">You ({memberBadge})</dt>
                   <dd className="text-[#2f7d4f]">Member rate</dd>
                 </div>
               ) : null}
               {size - memberSeats > 0 ? (
                 <div className="flex justify-between gap-3">
                   <dt className="text-[#3d453d]">
-                    Green Fees ({size - memberSeats} {member ? "Guest" : "Golfer"}
+                    Green Fees ({size - memberSeats} {memberBadge ? "Guest" : "Golfer"}
                     {size - memberSeats === 1 ? "" : "s"} × ${fee.toFixed(2)})
                   </dt>
                   <dd className="tabular-nums">${greenTotal.toFixed(2)}</dd>
@@ -680,6 +698,31 @@ function BookingForm({
         {step === "details" ? (
           <div className="min-w-0 space-y-5 rounded-xl border border-[#d8d1c3] bg-white p-5 lg:col-start-1 lg:row-start-2 lg:self-start">
             <h3 className="font-serif text-xl font-semibold">Your details</h3>
+            {signedIn ? (
+              <div className="rounded-sm border border-[#cfe3d4] bg-[#f2f8f3] p-4">
+                <p className="font-semibold">{signedIn.name}</p>
+                {memberBadge ? (
+                  <p className="mt-1">
+                    <span className="rounded-full bg-[#e3f0e6] px-3 py-0.5 text-sm font-semibold text-[#2f7d4f]">
+                      {memberBadge}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm text-[#8a6f30]">
+                    No active membership today — this books at the regular rate and the pro shop will check.
+                  </p>
+                )}
+                <p className="mt-2 text-sm text-[#5c6459]">
+                  {[signedIn.email, signedIn.phone].filter(Boolean).join(" · ")}
+                </p>
+                <p className="mt-2 text-sm">
+                  <Link className="font-semibold text-[#214d2f] underline" href={BOOK_LOGIN}>
+                    Not you? Sign out
+                  </Link>
+                </p>
+              </div>
+            ) : (
+            <>
             <Field htmlFor="tt-name" label="Name">
               <div className="relative">
                 <input
@@ -749,7 +792,13 @@ function BookingForm({
                   </button>
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-[#5c6459]">Members: start typing your name and pick it from the list.</p>
+                <p className="mt-2 text-xs text-[#5c6459]">
+                  Members:{" "}
+                  <Link className="font-semibold text-[#214d2f] underline" href={BOOK_LOGIN}>
+                    sign in
+                  </Link>{" "}
+                  to book at your member rate, or start typing your name and pick it from the list.
+                </p>
               )}
             </Field>
 
@@ -778,6 +827,8 @@ function BookingForm({
                 value={phone}
               />
             </Field>
+            </>
+            )}
 
             <Field htmlFor="tt-notes" label="Notes (optional)">
               <textarea
