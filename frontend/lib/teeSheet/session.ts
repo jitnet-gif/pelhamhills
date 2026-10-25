@@ -44,12 +44,9 @@ export const PUBLISHABLE_KEY =
 export const CASH_SITE_PATH = "/cash";
 /** 고객 마케팅 사이트(0047). 현금 리포트와 같은 까닭으로 칸이 따로다. */
 export const MARKETING_SITE_PATH = "/marketing";
-/** 비밀번호 숫자만으로 여는 Reports 열람 사이트(0103). 현금 리포트와 같은 까닭으로 칸이 따로다. */
-export const VIEW_SITE_PATH = "/view";
 const STAFF_STORAGE_KEY = "pelham.staff.session";
 const CASH_STORAGE_KEY = "pelham.cash.session";
 const MARKETING_STORAGE_KEY = "pelham.marketing.session";
-const VIEW_STORAGE_KEY = "pelham.view.session";
 
 function onSite(path: string, site: string): boolean {
   return path === site || path.startsWith(`${site}/`);
@@ -60,7 +57,6 @@ function storageKey(): string {
   const path = window.location.pathname;
   if (onSite(path, CASH_SITE_PATH)) return CASH_STORAGE_KEY;
   if (onSite(path, MARKETING_SITE_PATH)) return MARKETING_STORAGE_KEY;
-  if (onSite(path, VIEW_SITE_PATH)) return VIEW_STORAGE_KEY;
   return STAFF_STORAGE_KEY;
 }
 
