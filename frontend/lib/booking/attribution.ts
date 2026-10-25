@@ -30,7 +30,7 @@ const FIRST_DAYS = 30;
 /** 직원 화면에서는 잡지 않는다 — 직원 브라우저의 "Direct" 가 손님 기록에 섞이지 않게. */
 const STAFF_PREFIXES = [
   "/admin", "/teesheet", "/pos", "/cash", "/reports", "/retail", "/snack-bar", "/simulator-sheet", "/scan",
-  "/settings", "/customers", "/marketing", "/calls",
+  "/settings", "/customers", "/marketing", "/calls", "/view",
 ];
 
 function read(storage: () => Storage, key: string): Visit | null {
