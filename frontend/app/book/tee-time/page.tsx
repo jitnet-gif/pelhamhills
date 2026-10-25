@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import BookingShell from "@/components/booking/BookingShell";
 import IdScanUpload from "@/components/booking/IdScanUpload";
+import { MemberLookupList, memberLabel, usePublicMemberSearch, type PublicMember } from "@/components/booking/MemberLookup";
 import PayOnline from "@/components/booking/PayOnline";
 import VoiceBooking from "@/components/booking/VoiceBooking";
 import { TeeTimeGroups } from "@/components/booking/TeeTimeCards";
@@ -415,6 +416,13 @@ function BookingForm({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  // 이름 칸의 회원 찾기(0109). 고른 회원은 이름을 다시 고치면 풀린다 — 다른 이름에 회원이 붙지 않게.
+  const [member, setMember] = useState<PublicMember | null>(null);
+  const [nameFocused, setNameFocused] = useState(false);
+  const [activeHit, setActiveHit] = useState(0);
+  const { hits } = usePublicMemberSearch(name, nameFocused && member === null);
+  const listOpen = nameFocused && member === null && hits.length > 0;
+  const activeIndex = activeHit < hits.length ? activeHit : 0;
 
   const maxParty = Math.min(4, slot.remaining);
   const size = Math.min(party, maxParty);
@@ -425,7 +433,7 @@ function BookingForm({
   const fee = greenFeeFor(slot, holes);
   // 카트는 1인 요금(세전) — 웹 예약은 모두 Public 이다. 진짜 값은 DB(0050·`pelham_tee_cart_fee_on`)가 매긴다.
   const cartFee = cart ? (holes === 9 ? 11.5 : 19.47) : 0;
-  const total = (fee + cartFee) * size;
+  const total = fee * (size - (member ? 1 : 0)) + cartFee * size;
 
   const submit = async () => {
     setSubmitting(true);
@@ -435,20 +443,22 @@ function BookingForm({
       // 요금은 보내지 않는다 — 함수가 그날의 요금을 매긴다. `players` 수만큼 자리를
       // 잡고, 첫 사람이 예약자, 나머지는 Guest 로 만든다. 예약 노트 끝의
       // "Booked online at pelhamhills.com." 도 함수가 붙인다.
-      const booking = await bookingRpc<TeeBooking>("pelham_tee_book", {
-        p: {
-          date,
-          time: slot.time,
-          holes,
-          cartCount: carts,
-          players: size,
-          firstName,
-          lastName,
-          email: email.trim(),
-          phone: phone.trim(),
-          notes: notes.trim(),
-        },
-      });
+      const p = {
+        date,
+        time: slot.time,
+        holes,
+        cartCount: carts,
+        players: size,
+        firstName,
+        lastName,
+        email: email.trim(),
+        phone: phone.trim(),
+        notes: notes.trim(),
+      };
+      // 회원을 골랐으면 회원 예약으로. 이메일·전화가 회원 기록과 맞는지는 함수가 본다(`memberVerified`).
+      const booking = member
+        ? await bookingRpc<TeeBooking>("pelham_tee_book_member", { p, p_member: member.ref })
+        : await bookingRpc<TeeBooking>("pelham_tee_book", { p });
       recordBookingSource("tee", booking.confirmationCode);
       onBooked(booking);
     } catch (failure) {
@@ -466,7 +476,9 @@ function BookingForm({
   };
 
   const [step, setStep] = useState<"choose" | "details">("choose");
-  const greenTotal = fee * size;
+  // 회원 본인 그린피는 회원권 요금제로 서버가 매긴다(대부분 $0). 미리보기는 손님 몫만 더한다.
+  const memberSeats = member ? 1 : 0;
+  const greenTotal = fee * (size - memberSeats);
   const cartTotal = cartFee * size;
   // 미리보기 HST. 진짜 세금은 결제할 때 서버 견적(PayOnline)이 매긴다.
   const tax = Math.round((greenTotal + cartTotal) * 13) / 100;
@@ -593,12 +605,21 @@ function BookingForm({
             </label>
 
             <dl className="mt-5 space-y-2 border-t border-[#e2ddd0] pt-4 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-[#3d453d]">
-                  Green Fees ({size} Golfer{size === 1 ? "" : "s"} × ${fee.toFixed(2)})
-                </dt>
-                <dd className="tabular-nums">${greenTotal.toFixed(2)}</dd>
-              </div>
+              {member ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#3d453d]">You ({memberLabel(member)})</dt>
+                  <dd className="text-[#2f7d4f]">Member rate</dd>
+                </div>
+              ) : null}
+              {size - memberSeats > 0 ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#3d453d]">
+                    Green Fees ({size - memberSeats} {member ? "Guest" : "Golfer"}
+                    {size - memberSeats === 1 ? "" : "s"} × ${fee.toFixed(2)})
+                  </dt>
+                  <dd className="tabular-nums">${greenTotal.toFixed(2)}</dd>
+                </div>
+              ) : null}
               {cartTotal > 0 ? (
                 <div className="flex justify-between gap-3">
                   <dt className="text-[#3d453d]">
@@ -660,15 +681,76 @@ function BookingForm({
           <div className="min-w-0 space-y-5 rounded-xl border border-[#d8d1c3] bg-white p-5 lg:col-start-1 lg:row-start-2 lg:self-start">
             <h3 className="font-serif text-xl font-semibold">Your details</h3>
             <Field htmlFor="tt-name" label="Name">
-              <input
-                autoComplete="name"
-                className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
-                id="tt-name"
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Full name"
-                type="text"
-                value={name}
-              />
+              <div className="relative">
+                <input
+                  aria-activedescendant={listOpen ? `tt-members-${activeIndex}` : undefined}
+                  aria-autocomplete="list"
+                  aria-controls="tt-members"
+                  aria-expanded={listOpen}
+                  autoComplete="name"
+                  className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+                  id="tt-name"
+                  onBlur={() => setNameFocused(false)}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setMember(null);
+                    setActiveHit(0);
+                  }}
+                  onFocus={() => setNameFocused(true)}
+                  onKeyDown={(event) => {
+                    if (!listOpen) return;
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      setActiveHit((activeIndex + 1) % hits.length);
+                    } else if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      setActiveHit((activeIndex - 1 + hits.length) % hits.length);
+                    } else if (event.key === "Enter") {
+                      event.preventDefault();
+                      const hit = hits[activeIndex];
+                      setMember(hit);
+                      setName(hit.name);
+                    } else if (event.key === "Escape") {
+                      setNameFocused(false);
+                    }
+                  }}
+                  placeholder="Full name"
+                  role="combobox"
+                  type="text"
+                  value={name}
+                />
+                {listOpen ? (
+                  <MemberLookupList
+                    active={activeIndex}
+                    hits={hits}
+                    id="tt-members"
+                    onHover={setActiveHit}
+                    onPick={(hit) => {
+                      setMember(hit);
+                      setName(hit.name);
+                    }}
+                  />
+                ) : null}
+              </div>
+              {member ? (
+                <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <span className="rounded-full bg-[#e3f0e6] px-3 py-0.5 font-semibold text-[#2f7d4f]">
+                    {memberLabel(member)}
+                  </span>
+                  <span className="text-[#5c6459]">
+                    Use the email or phone we have on file to book at your member rate.
+                  </span>
+                  <button
+                    className="font-semibold text-[#214d2f] underline"
+                    onClick={() => setMember(null)}
+                    type="button"
+                  >
+                    Not me
+                  </button>
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-[#5c6459]">Members: start typing your name and pick it from the list.</p>
+              )}
             </Field>
 
             <Field htmlFor="tt-email" label="Email">
@@ -684,7 +766,7 @@ function BookingForm({
               />
             </Field>
 
-            <Field htmlFor="tt-phone" label="Phone (optional)">
+            <Field htmlFor="tt-phone" label={member ? "Phone (or use the email on file)" : "Phone (optional)"}>
               <input
                 autoComplete="tel"
                 className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
@@ -756,6 +838,10 @@ function Confirmation({
 }) {
   const players = booking.players.length;
   const cartTotal = booking.players.reduce((sum, p) => sum + (p.cart ? (p.cartFee ?? 0) : 0), 0);
+  // 회원으로 잡힌 첫 사람은 그린피가 다르다(0109) — 선수별 greenFee 가 있으면 그걸 더한다.
+  const greenTotal = booking.players.reduce((sum, p) => sum + (p.greenFee ?? booking.rate), 0);
+  // `pelham_tee_book_member` 만 붙인다. 일반 예약이면 undefined.
+  const memberVerified = (booking as TeeBooking & { memberVerified?: boolean }).memberVerified;
   const code = booking.confirmationCode ?? booking.id;
   // 온라인 결제의 본인 확인도 조회 화면과 같다: 코드 + 예약한 사람의 이메일.
   const email = booking.players.find((p) => p.email)?.email ?? "";
@@ -781,8 +867,18 @@ function Confirmation({
           <p className="mt-1 text-sm text-[#3d453d]">
             {`$${booking.rate.toFixed(2)} per player`}
             {cartTotal > 0 ? ` + cart $${cartTotal.toFixed(2)}` : ""}
-            {` · $${(booking.rate * players + cartTotal).toFixed(2)} total`}
+            {` · $${(greenTotal + cartTotal).toFixed(2)} total`}
           </p>
+          {memberVerified === true ? (
+            <p className="mt-2 text-sm font-semibold text-[#2f7d4f]">
+              Booked as a member — your member rate is applied. Guests pay the regular rate.
+            </p>
+          ) : memberVerified === false ? (
+            <p className="mt-2 text-sm font-semibold text-[#8a6f30]">
+              We couldn&apos;t match your email or phone to our member records, so this is booked at the regular
+              rate. The pro shop will check your membership when you arrive.
+            </p>
+          ) : null}
 
           <div className="mt-4 border-t border-[#d8d1c3] pt-4">
             <p className="text-sm font-semibold text-[#8a6f30]">Confirmation code</p>
