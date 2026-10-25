@@ -494,7 +494,7 @@ test("ESC/POS logo is a GS v 0 raster; transparent pixels stay white", () => {
 
 // ===== ePOS-Print (네트워크 TM-m30III 경로, `lib/retail/eposPrint.ts`) =====
 
-const { normalizePrinterHost, eposPrintUrl, eposPrintEnvelope, eposPrintResult } = await import("../lib/retail/eposPrint.ts");
+const { normalizePrinterHost, eposPrintUrl, eposPrintEnvelope, eposPrintResult, tmPrintAssistantUrl } = await import("../lib/retail/eposPrint.ts");
 
 test("ePOS-Print host accepts pasted URLs and rejects anything else", () => {
   assert.equal(normalizePrinterHost(" 192.168.0.50 "), "192.168.0.50");
@@ -523,4 +523,14 @@ test("ePOS-Print response: success flag and error code", () => {
   // SDK 와 같이 success="1" 도 성공, 등호 주변 공백도 읽는다
   assert.deepEqual(eposPrintResult('<response success = "1" code=""/>'), { ok: true, code: "" });
   assert.deepEqual(eposPrintResult('<response success="false" code = "EX_ENPC_TIMEOUT"/>'), { ok: false, code: "EX_ENPC_TIMEOUT" });
+});
+
+test("TM Print Assistant URL: ePOS-Print XML with the same hex, URL-encoded, optional return page", () => {
+  const url = tmPrintAssistantUrl(Uint8Array.from([0x1b, 0x40, 0x0a]), "https://pos.example.com/printed.html");
+  assert.ok(url.startsWith("tmprintassistant://tmprintassistant.epson.com/print?ver=1&data-type=eposprintxml&reselect=no&error-dialog=yes&data="));
+  const params = new URLSearchParams(url.slice(url.indexOf("?") + 1));
+  assert.equal(params.get("data"), '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"><command>1b400a</command></epos-print>');
+  assert.equal(params.get("success"), "https://pos.example.com/printed.html");
+  assert.ok(!/[<> "]/.test(url));
+  assert.equal(new URLSearchParams(tmPrintAssistantUrl(Uint8Array.of(0)).split("?")[1]).has("success"), false);
 });

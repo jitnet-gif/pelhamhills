@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * 계산대의 영수증 프린터 설정(이 기기에만). 브라우저 인쇄, 블루투스 TM-m30, 또는 네트워크 TM-m30III.
+ * 계산대의 영수증 프린터 설정(이 기기에만). 브라우저 인쇄, 블루투스 TM-m30, 네트워크 TM-m30III,
+ * 또는 iPad 의 Epson TM Print Assistant 앱(블루투스 TM-m30).
  * 계산대 첫 화면(`RegisterHome`)의 Receipt Printer 타일이 창 안에 연다.
  * 연결·전송은 `lib/retail/receiptPrinter.ts`, 설치 절차는 `docs/pro-shop-receipt-printing-2026-09-12.md`.
  */
@@ -16,6 +17,7 @@ import {
   choosePrinter,
   hasChosenPrinter,
   printBluetooth,
+  printEpsonApp,
   printNetwork,
   readReceiptPrinterHost,
   readReceiptPrinterMode,
@@ -31,7 +33,10 @@ const MODE_LABELS: Record<ReceiptPrinterMode, string> = {
   browser: "Print dialog — printer installed on this computer or AirPrint",
   bluetooth: "Bluetooth — Epson TM-m30 paired with this computer",
   network: "Network — Epson TM-m30III on the shop Wi-Fi or Ethernet",
+  app: "iPad — Bluetooth printer through the Epson TM Print Assistant app",
 };
+
+const EPSON_APP_STORE = "https://apps.apple.com/app/id1324935555";
 
 const TEST_SHEET: ReceiptBlock[] = [
   { kind: "logo" },
@@ -111,11 +116,54 @@ export function ReceiptPrinterSetup() {
           ))}
         </Select>
       </Field>
-      {!supported && mode !== "network" ? (
+      {!supported && mode === "browser" ? (
         <p className="text-xs text-[#6b7280]">
-          This browser cannot reach Bluetooth printers. Use Chrome or Edge on a
-          Mac or PC. On iPad, receipts go through the print dialog.
+          On iPad, choose &quot;iPad — Bluetooth printer through the Epson TM
+          Print Assistant app&quot; to print to a Bluetooth receipt printer.
         </p>
+      ) : null}
+      {mode === "app" ? (
+        <>
+          <ol className="list-decimal pl-5 text-xs text-[#6b7280]">
+            <li>
+              Install{" "}
+              <a
+                className="font-bold underline"
+                href={EPSON_APP_STORE}
+                rel="noopener"
+                target="_blank"
+              >
+                Epson TM Print Assistant
+              </a>{" "}
+              from the App Store.
+            </li>
+            <li>
+              Pair the printer in iPad Settings → Bluetooth (PIN is usually
+              0000).
+            </li>
+            <li>
+              Open the Epson app → Printer settings → choose the printer
+              (e.g. &quot;TM-m30III&quot;).
+            </li>
+            <li>
+              Come back here and tap Print test. The first time, Safari asks to
+              open the Epson app — tap Open.
+            </li>
+          </ol>
+          <div className="flex gap-2">
+            <Button
+              disabled={working}
+              onClick={() =>
+                void run(async () => {
+                  await printEpsonApp([TEST_SHEET]);
+                  return "Test page sent to the Epson app. If nothing happened, check the app is installed.";
+                })
+              }
+            >
+              Print test
+            </Button>
+          </div>
+        </>
       ) : null}
       {supported && mode === "bluetooth" ? (
         <>

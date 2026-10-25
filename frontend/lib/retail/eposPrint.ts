@@ -32,15 +32,43 @@ export function eposPrintUrl(host: string): string {
   return `https://${host}/cgi-bin/epos/service.cgi?devid=${DEVICE_ID}&timeout=${EPOS_TIMEOUT_MS}`;
 }
 
-/** ESC/POS 바이트 → ePOS-Print SOAP 본문. */
-export function eposPrintEnvelope(bytes: Uint8Array): string {
+/** ESC/POS 바이트 → `<epos-print>` 요소 하나. 네트워크 프린터와 TM Print Assistant 앱이 같은 것을 받는다. */
+export function eposPrintXml(bytes: Uint8Array): string {
   let hex = "";
   for (const byte of bytes) hex += byte.toString(16).padStart(2, "0");
+  return `<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"><command>${hex}</command></epos-print>`;
+}
+
+/** ESC/POS 바이트 → ePOS-Print SOAP 본문. */
+export function eposPrintEnvelope(bytes: Uint8Array): string {
   return (
     '<?xml version="1.0" encoding="utf-8"?>' +
     '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>' +
-    `<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"><command>${hex}</command></epos-print>` +
+    eposPrintXml(bytes) +
     "</s:Body></s:Envelope>"
+  );
+}
+
+/** TM Print Assistant 가 URL 로 받을 수 있는 최대 길이(Epson 설명서: 200KB). */
+export const TM_PRINT_ASSISTANT_MAX_URL = 200 * 1024;
+
+/**
+ * iPad·iPhone 의 **Epson TM Print Assistant** 앱을 여는 주소. Safari 는 블루투스 프린터에 닿을 수 없지만,
+ * 이 앱은 iPad 에 페어링된 TM-m30(블루투스)에 보낼 수 있다. 같은 ESC/POS 바이트를 ePOS-Print XML 로 넘긴다.
+ * `reselect=no` — 앱에 한 번 골라 둔 프린터로 바로 찍는다. `success` 는 다 찍고 앱이 열어 줄 주소(없으면 앱에 머문다).
+ */
+export function tmPrintAssistantUrl(bytes: Uint8Array, success?: string): string {
+  const params: [string, string][] = [
+    ["ver", "1"],
+    ["data-type", "eposprintxml"],
+    ["reselect", "no"],
+    ["error-dialog", "yes"],
+    ["data", eposPrintXml(bytes)],
+  ];
+  if (success) params.push(["success", success]);
+  return (
+    "tmprintassistant://tmprintassistant.epson.com/print?" +
+    params.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join("&")
   );
 }
 

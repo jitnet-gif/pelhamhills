@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Receipt printed</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #111315; color: #fff; font: 600 18px system-ui, sans-serif; text-align: center; padding: 16px; }
+  p { margin: 8px 0; }
+  small { color: #9ca3af; font-weight: 400; }
+</style>
+</head>
+<body>
+<!-- TM Print Assistant 가 다 찍고 여는 페이지(lib/retail/receiptPrinter.ts 의 printEpsonApp). 스스로 닫혀 계산대 탭으로 돌아간다. -->
+<div>
+  <p>Receipt sent to the printer.</p>
+  <p><small>Close this tab to go back to the register.</small></p>
+</div>
+<script>
+  window.close();
+  setTimeout(function () { if (history.length > 1) history.back(); }, 300);
+</script>
+</body>
+</html>

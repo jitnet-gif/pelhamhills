@@ -145,6 +145,26 @@
 - 코드: 요청 모양은 `frontend/lib/retail/eposPrint.ts`(순수 함수, 아래 `verify-receipt.mjs` 에서 검사),
   보내기는 `receiptPrinter.ts` 의 `printNetwork`, 설정 화면은 `ReceiptPrinterSetup.tsx`.
 
+## iPad 블루투스 프린터 (Epson TM Print Assistant 앱) — 2026-10-25
+
+iPad Safari 는 블루투스 기기를 볼 수 없다(Web Serial·Web Bluetooth 가 없다). 그래서 iPad 에 페어링된 프린터가
+있어도 우리 화면의 프린터 고르기 창에는 안 나온다. 대신 Epson 의 무료 앱 **TM Print Assistant** 가 프린터에 붙고,
+계산대는 `tmprintassistant://` 주소로 그 앱에 영수증을 넘긴다. 내용은 블루투스·네트워크 경로와 **같은 ESC/POS
+바이트**를 ePOS-Print XML `<command>` 에 담은 것이라 로고·바코드·장마다 자르기·현금 결제에만 현금함 열기가 같다.
+
+- **iPad 마다 (한 번)**
+  1. App Store 에서 **Epson TM Print Assistant** 설치.
+  2. iPad 설정 → Bluetooth 에서 TM-m30 페어링(PIN 보통 `0000`). 다른 PC·폰에 붙어 있으면 그쪽을 끊는다.
+  3. Epson 앱을 열어 프린터 설정에서 그 프린터를 고른다.
+  4. 계산대 **Receipt Printer** → `iPad — Bluetooth printer through the Epson TM Print Assistant app` →
+     **Print test**. 처음에 Safari 가 "TM Print Assistant 에서 열까요?" 를 물으면 **열기**.
+- **찍을 때**: 앱이 잠깐 열려 찍고, Safari 탭이면 `/printed.html` 이 열렸다 스스로 닫혀 계산대로 돌아온다.
+  홈 화면 앱(standalone)으로 쓰면 돌아오는 주소를 주지 않는다 — 왼쪽 위 "◀" 로 돌아온다.
+- 결제처럼 서버를 기다린 뒤에는 Safari 가 앱 열기를 막으므로, 화면 아래 **Tap to print receipt** 버튼이 뜬다.
+  한 번 누르면 찍힌다(**Skip** 은 안 찍음).
+- 결과(용지 없음 등)는 우리 화면이 아니라 Epson 앱이 자기 창으로 알린다.
+- 코드: 주소는 `eposPrint.ts` 의 `tmPrintAssistantUrl`, 보내기는 `receiptPrinter.ts` 의 `printEpsonApp`.
+
 ## 계산대에서
 
 - 판매가 끝나면 영수증 화면의 **Print receipt**.

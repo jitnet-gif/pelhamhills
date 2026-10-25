@@ -3,6 +3,7 @@
  * - **브라우저 인쇄**: PC 에 Epson TM-m30III 드라이버가 깔려 있으면 그대로 감열 프린터로 나간다.
  * - **블루투스**: 페어링된 TM-m30 에 ESC/POS 를 직접 보낸다(Chrome·Edge).
  * - **네트워크**: 매장 네트워크의 TM-m30III 에 같은 ESC/POS 를 ePOS-Print 로 보낸다.
+ * - **Epson 앱**(iPad): iPad 에 페어링된 블루투스 TM-m30 에 TM Print Assistant 앱을 거쳐 같은 ESC/POS 를 보낸다.
  * 블루투스·네트워크가 실패하면 브라우저 인쇄로 넘어간다.
  * 설치 절차: `docs/pro-shop-receipt-printing-2026-09-12.md`.
  *
@@ -30,7 +31,7 @@ import {
 } from "./receipt";
 import { inStarterApp } from "@/lib/starter/bridge";
 
-import { printBluetooth, printNetwork, printStarter, readReceiptPrinterMode } from "./receiptPrinter";
+import { printBluetooth, printEpsonApp, printNetwork, printStarter, readReceiptPrinterMode } from "./receiptPrinter";
 import type { Sale } from "./types";
 
 const ROOT_ID = "receipt-print-root";
@@ -142,11 +143,11 @@ function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: 
   }
   const mode = readReceiptPrinterMode();
   if (mode === "browser") return printInBrowser(sheets);
-  const send = mode === "network" ? printNetwork : printBluetooth;
+  const send = mode === "network" ? printNetwork : mode === "app" ? printEpsonApp : printBluetooth;
   send(sheets, options).catch((error: unknown) => {
     // 종이가 안 나오면 직원이 알아야 한다. 인쇄 창으로 넘겨 다른 프린터라도 고를 수 있게 한다.
     const reason = error instanceof Error ? error.message : String(error);
-    const label = mode === "network" ? "Network" : "Bluetooth";
+    const label = mode === "network" ? "Network" : mode === "app" ? "Epson app" : "Bluetooth";
     window.alert(`${label} receipt printer did not print (${reason}) Opening the print dialog instead.`);
     printInBrowser(sheets);
   });

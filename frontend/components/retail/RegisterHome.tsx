@@ -219,7 +219,9 @@ export default function RegisterHome({
               ? "Bluetooth"
               : printerMode === "network"
                 ? "Network"
-                : "Print dialog"
+                : printerMode === "app"
+                  ? "Epson app"
+                  : "Print dialog"
           }
           icon={<PrinterIcon />}
           label="Receipt Printer"

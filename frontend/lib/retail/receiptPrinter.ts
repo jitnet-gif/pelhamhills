@@ -5,7 +5,9 @@
  * - `browser`: 지금까지처럼 `window.print()`. 드라이버가 깔린 USB·네트워크 프린터, iPad 의 AirPrint.
  * - `bluetooth`: 맥·윈도에 **페어링된** Epson TM-m30 계열에 ESC/POS(`escpos.ts`)를 직접 보낸다.
  *   Chrome·Edge 117+ 의 Web Serial 이 블루투스 SPP 포트를 연다. 드라이버도 인쇄 창도 없다.
- *   iPad Safari 에는 Web Serial 이 없다 — iPad 는 `browser` 경로만 된다.
+ *   iPad Safari 에는 Web Serial 이 없다 — iPad 는 아래 `app` 경로를 쓴다.
+ * - `app`: iPad·iPhone. iPad 에 페어링된 블루투스 TM-m30 에 **Epson TM Print Assistant** 앱을 거쳐 같은 ESC/POS 를
+ *   보낸다(`tmprintassistant://` 주소, `eposPrint.ts`). Safari 는 블루투스 기기를 볼 수 없어서 앱이 대신 연결한다.
  * - `network`: 매장 네트워크(이더넷·와이파이)의 TM-m30III 에 같은 ESC/POS 를 ePOS-Print(`eposPrint.ts`)로
  *   보낸다. 프린터 인증서가 자체 서명이라 **기기마다 한 번** `https://프린터주소` 를 열어 허용해야 하고,
  *   Chrome 은 처음에 "로컬 네트워크 접근" 을 묻는다.
@@ -22,13 +24,15 @@ import {
   eposPrintResult,
   eposPrintUrl,
   normalizePrinterHost,
+  TM_PRINT_ASSISTANT_MAX_URL,
+  tmPrintAssistantUrl,
 } from "./eposPrint";
 import { printOnStarter } from "@/lib/starter/bridge";
 
 import { RECEIPT_LOGO } from "./logo";
 import type { ReceiptBlock } from "./receipt";
 
-export type ReceiptPrinterMode = "browser" | "bluetooth" | "network";
+export type ReceiptPrinterMode = "browser" | "bluetooth" | "network" | "app";
 
 /** 블루투스 Serial Port Profile. TM-m30 계열 블루투스 모델이 이 서비스로 받는다. */
 const SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb";
@@ -44,7 +48,7 @@ const listeners = new Set<() => void>();
 export function readReceiptPrinterMode(): ReceiptPrinterMode {
   try {
     const stored = window.localStorage.getItem(MODE_KEY);
-    return stored === "bluetooth" || stored === "network" ? stored : "browser";
+    return stored === "bluetooth" || stored === "network" || stored === "app" ? stored : "browser";
   } catch {
     return modeFallback;
   }
@@ -344,6 +348,67 @@ export function printStarter(
   });
   queue = job.catch(() => undefined);
   return job;
+}
+
+/**
+ * iPad: TM Print Assistant 앱으로 넘긴다. 앱이 열리면 페이지는 뒤로 가므로 결과는 알 수 없다 —
+ * 프린터 오류는 앱이 자기 창으로 알린다(`error-dialog=yes`).
+ *
+ * Safari 는 **방금 누른 손가락** 안에서만 다른 앱을 연다. 결제처럼 서버를 기다린 뒤라 그 순간이 지났으면
+ * 화면 아래에 "Tap to print receipt" 버튼을 띄우고, 그 버튼을 누를 때 연다.
+ */
+export function printEpsonApp(
+  sheets: readonly (readonly ReceiptBlock[])[],
+  options: { openDrawer?: boolean } = {},
+): Promise<void> {
+  const job = queue.then(async () => {
+    const bytes = escposReceipt(sheets, { logo: await receiptLogo(), openDrawer: options.openDrawer });
+    const url = tmPrintAssistantUrl(bytes, epsonAppReturnUrl());
+    if (url.length > TM_PRINT_ASSISTANT_MAX_URL) throw new Error("This receipt is too long for the Epson app.");
+    const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
+    if (activation?.isActive) window.location.href = url;
+    else showEpsonTapButton(url);
+  });
+  queue = job.catch(() => undefined);
+  return job;
+}
+
+/**
+ * 다 찍고 앱이 열어 줄 주소. Safari 탭이면 스스로 닫히는 작은 페이지(`/printed.html`)라 계산대 탭으로 돌아온다.
+ * 홈 화면 앱(standalone)에서는 주소를 주지 않는다 — Safari 에 새 탭이 열려 계산대가 아닌 곳으로 가기 때문.
+ * 그때는 화면 왼쪽 위 "◀" 로 돌아온다.
+ */
+function epsonAppReturnUrl(): string | undefined {
+  const standalone =
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia?.("(display-mode: standalone)").matches;
+  return standalone ? undefined : `${window.location.origin}/printed.html`;
+}
+
+const TAP_ID = "epson-app-print-tap";
+
+function showEpsonTapButton(url: string): void {
+  document.getElementById(TAP_ID)?.remove();
+  const bar = document.createElement("div");
+  bar.id = TAP_ID;
+  bar.style.cssText =
+    "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483647;display:flex;gap:8px;" +
+    "padding:8px;border-radius:14px;background:#111315;box-shadow:0 8px 30px rgba(0,0,0,.35)";
+  const go = document.createElement("button");
+  go.type = "button";
+  go.textContent = "Tap to print receipt";
+  go.style.cssText = "padding:14px 22px;border-radius:10px;background:#1f7a3f;color:#fff;font:700 17px system-ui";
+  go.onclick = () => {
+    bar.remove();
+    window.location.href = url;
+  };
+  const skip = document.createElement("button");
+  skip.type = "button";
+  skip.textContent = "Skip";
+  skip.style.cssText = "padding:14px 16px;border-radius:10px;background:#374151;color:#fff;font:600 15px system-ui";
+  skip.onclick = () => bar.remove();
+  bar.append(go, skip);
+  document.body.appendChild(bar);
 }
 
 // ===== 로고 ============================================================
