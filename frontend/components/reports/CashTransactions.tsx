@@ -1,16 +1,15 @@
 "use client";
 
 /**
- * 현금 거래 — 담당자(계산서의 Cashier 칸)별로 묶어 시각 순으로(2026-10-24). 세 곳이 같이 쓴다:
+ * 현금 거래 — 담당자(계산서의 Cashier 칸)별로 묶어 시각 순으로(2026-10-24). 두 곳이 같이 쓴다:
  * - Close Register 의 Cash 줄 Payments(현금 리포트 계정만) — 그 근무(모닝·디너, 0092)의 현금 거래.
  * - Daily close 의 Cash Sales 칸 — 그날 현금을 담당자별로.
- * - Register closes 탭의 Cash 칸 — 그 근무의 현금 거래(화면이 그날 계산서를 읽어 근무 범위로 거른다).
  *
  * 근무 범위(`ShiftWindow`)는 서버가 정한다(모닝 마감의 끝 시각). 화면은 결제 시각(`created_at`)으로 같은 범위를 고른다.
  * 금액: 마감 표와 맞출 때는 팁까지(서랍에 들어간 돈, `withTips`), Daily close 의 Cash Sales 와 맞출 때는 팁 빼고.
  *
- * 카드·체크카드도 같은 창으로 연다(2026-10-24, `paymentRows`·`method`) — Register closes 의 Card·Debit 칸,
- * 대사표의 Sales report 줄. 서랍 마감과 맞출 때는 온라인 결제를 뺀다(`drawerOnly` — 서랍에 들어오지 않는다).
+ * 카드·체크카드도 같은 창으로 연다(2026-10-24, `paymentRows`·`method`) — 대사표의 Sales report 줄.
+ * 서랍 마감과 맞출 때는 온라인 결제를 뺀다(`drawerOnly` — 서랍에 들어오지 않는다).
  */
 
 import { useEffect, useMemo, useState } from "react";

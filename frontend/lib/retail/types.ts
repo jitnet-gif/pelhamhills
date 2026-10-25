@@ -375,51 +375,6 @@ export type CashReconcile = {
   lines: CashReconcileLine[];
 };
 
-/** 마감 기록 리포트(0065)의 한 줄 = (영업일, 서랍). 금액은 센트, 현금은 시작 잔돈 포함. */
-export type RegisterCloseHistoryLine = {
-  method: PaymentMethod;
-  countable: boolean;
-  /** 마감 순간의 Total Remaining. 마감하지 않았으면 지금 값. */
-  expected: Cents;
-  /** 지금 다시 센 Total Remaining. expected 와 다르면 마감 뒤 결제·환불이 있었다. */
-  now: Cents;
-  /** 센 돈. 마감 전이거나 셀 실물이 없는 수단이면 null. */
-  counted: Cents | null;
-  /** counted − expected. +면 남고 −면 모자람. */
-  diff: Cents | null;
-};
-
-export type RegisterCloseHistoryRow = {
-  business_date: string;
-  drawer: string;
-  /** 0092: 근무마다 한 줄. 모닝은 마감했을 때만 있다 — 모닝 마감이 없으면 디너가 하루 전체다. */
-  shift?: RegisterShift;
-  window?: ShiftWindow;
-  /** 이 서랍에 결제가 들어간 화면들. 2026-10-21 부터 네 화면 모두. */
-  stations: string[];
-  closed: boolean;
-  closed_at: string | null;
-  /** 닫은 계정의 이메일. */
-  closed_by: string | null;
-  /** 마감한 담당자 이름과 근무 시각 `HH:MM`(0081). */
-  cashier?: string | null;
-  shift_start?: string | null;
-  shift_end?: string | null;
-  note: string | null;
-  stale: boolean;
-  has_sales: boolean;
-  /** 현금 리포트 계정이 아니면 cash 줄이 없다. */
-  lines: RegisterCloseHistoryLine[];
-};
-
-export type RegisterCloseHistory = {
-  from: string;
-  to: string;
-  /** 서버가 현금 줄을 보냈는가(0046 현금 리포트 계정). */
-  cash: boolean;
-  rows: RegisterCloseHistoryRow[];
-};
-
 export type RegisterCloseSave = {
   /** 0092. 없으면 서버가 dinner 로 본다. */
   shift?: RegisterShift;
