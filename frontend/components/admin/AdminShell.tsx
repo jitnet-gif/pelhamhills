@@ -62,7 +62,6 @@ import LangToggle from "@/lib/i18n/LangToggle";
 import { useAccountsAccess } from "@/lib/accounts";
 import { reportView } from "@/lib/activityWatch";
 import { useBackupAccess } from "@/lib/backup";
-import { markSignedIn } from "@/lib/backupAuto";
 import { useAiMarketingAccess } from "@/lib/aiMarketing/access";
 import { useMarketingAccess } from "@/lib/marketing/access";
 import { useReportsAccess } from "@/lib/reports/access";
@@ -115,7 +114,7 @@ export default function AdminShell(props: Props) {
   if (gate.state === "out") return <SignInScreen onSignedIn={gate.recheck} />;
   if (gate.state === "denied") return <NotStaffScreen email={gate.email} onSignOut={gate.signOut} />;
   if (props.variant === "starter") return <StarterFrame {...props} onSignOut={gate.signOut} />;
-  // 매니저·계정 관리자가 로그인하면 클럽 데이터를 ZIP 으로 자동 백업한다(`lib/backupAuto.ts`). 스타터 폰은 빼고.
+  // 매니저·계정 관리자 기계마다 하루 한 번 클럽 데이터를 날짜 이름 ZIP 으로 자동 백업한다(`lib/backupAuto.ts`). 스타터 폰은 빼고.
   return (
     <>
       {props.variant === "pos" ? (
@@ -968,8 +967,6 @@ function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
     setError("");
     try {
       await signIn(email, password);
-      // 새로 연 페이지에서 매니저면 자동 백업을 한다 — 로그인할 때마다 항상.
-      markSignedIn();
       // 문을 다시 판정하고 페이지를 새로 연다 — 이유는 `useStaffGate` 의 `reloadPage`.
       // busy 는 풀지 않는다. 새 문서가 뜰 때까지 버튼이 잠겨 있어야 두 번 눌리지 않는다.
       onSignedIn();
