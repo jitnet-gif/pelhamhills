@@ -6,6 +6,7 @@
  */
 
 import { paymentsApiBase } from "@/lib/booking/payments";
+import { bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
 import { accessToken } from "@/lib/teeSheet/session";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
@@ -68,6 +69,20 @@ export type MemberRounds = {
 };
 
 export const aiMarketingApi = {
+  reports: () => staffRpc<ReportRow[]>("pelham_staff_ai_marketing_reports"),
+  report: (id: string) => staffRpc<Strategy>("pelham_staff_ai_marketing_report", { p_id: id }),
+  saveReport: (from: string, to: string, lang: "en" | "ko", focus: string, doc: Strategy, source: "claude" | "browser") =>
+    staffRpc<{ id: string; saved: boolean }>("pelham_staff_ai_marketing_report_save", {
+      p_from: from,
+      p_to: to,
+      p_lang: lang,
+      p_focus: focus,
+      p_doc: doc,
+      p_source: source,
+    }),
+  share: (id: string, on: boolean) =>
+    staffRpc<{ id: string; share_token: string | null }>("pelham_staff_ai_marketing_report_share", { p_id: id, p_on: on }),
+  shared: (token: string) => bookingRpc<SharedReport>("pelham_ai_marketing_shared_report", { p_token: token }),
   access: () => staffRpc<boolean>("pelham_staff_ai_marketing_access"),
   summary: (from: string, to: string) =>
     staffRpc<MarketingSummary>("pelham_staff_ai_marketing_summary", { p_from: from, p_to: to }),
@@ -99,7 +114,28 @@ export type Strategy = {
   narration?: { intro: string; niches: string; plan: string; close: string };
   model: string;
   period: { from: string; to: string };
+  /** 보관함(0113)에 저장된 번호. 0113 을 안 돌렸으면 없다. */
+  report_id?: string | null;
 };
+
+/** 보관함 목록 한 줄(0113). */
+export type ReportRow = {
+  id: string;
+  created_at: string;
+  created_by: string;
+  from: string;
+  to: string;
+  lang: "en" | "ko";
+  focus: string;
+  model: string;
+  source: "claude" | "browser" | "example";
+  headline: string;
+  strategies: number;
+  share_token: string | null;
+};
+
+/** 공유 링크로 읽은 보고서(0113, 로그인 없이). */
+export type SharedReport = { doc: Strategy; lang: "en" | "ko"; from: string; to: string; created_at: string; source: string };
 
 /** 응답 본문의 `detail` 을 오류 글로. */
 async function failure(response: Response, missing: string): Promise<ApiError> {
@@ -131,21 +167,22 @@ export async function askStrategy(from: string, to: string, lang: "en" | "ko", f
   return (await response.json()) as Strategy;
 }
 
-/** 나레이션 한 장면 → mp3 blob 주소. 같은 글은 이 탭에서 한 번만 받는다. */
+/** 나레이션 한 장면 → mp3 blob 주소. 같은 글은 이 탭에서 한 번만 받는다.
+ * `share` 가 있으면 공유 링크 모드 — 로그인 없이 그 보고서의 대본만 읽힌다(서버가 확인한다). */
 const narrationUrls = new Map<string, Promise<string>>();
 
-export function narrationUrl(text: string): Promise<string> {
+export function narrationUrl(text: string, share = ""): Promise<string> {
   const known = narrationUrls.get(text);
   if (known) return known;
   const pending = (async () => {
-    const token = await accessToken();
-    if (!token) throw new ApiError(401, "Sign in again to hear the narrator.");
+    const token = share ? "" : await accessToken();
+    if (!share && !token) throw new ApiError(401, "Sign in again to hear the narrator.");
     let response: Response;
     try {
       response = await fetch(`${paymentsApiBase()}/ai-marketing/narrate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ text }),
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ text, share }),
       });
     } catch {
       throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
