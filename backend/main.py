@@ -85,6 +85,8 @@ include_route_module("backend.api.routes.product_photo", f"{settings.API_V1_STR}
 include_route_module("backend.api.routes.cashier_code", f"{settings.API_V1_STR}", ["Retail"])
 # 손님 개인 QR(0084)을 문자로. QR 그림 주소는 Twilio 가 받아 가는 공개 경로다.
 include_route_module("backend.api.routes.customer_qr", f"{settings.API_V1_STR}", ["Retail"])
+# proshop@ 이 화면을 열거나 내려받으면 analysis@ 등에 메일. 이메일은 토큰으로 Supabase Auth 에 묻는다.
+include_route_module("backend.api.routes.activity_alert", f"{settings.API_V1_STR}", ["Staff"])
 
 if VOICE_ONLY:
     logger.warning(

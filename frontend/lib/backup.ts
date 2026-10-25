@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 
+import { reportDownload } from "@/lib/activityWatch";
 import { ApiError } from "@/lib/teeSheet/api";
 import { makeZip, readZip } from "@/lib/zip";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
@@ -250,6 +251,7 @@ export function downloadSink(folder: string): BackupSink {
       const link = document.createElement("a");
       link.href = url;
       link.download = `${folder}__${name}`;
+      reportDownload(link.download);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -273,6 +275,7 @@ export function zipSink(folder: string): BackupSink {
       const link = document.createElement("a");
       link.href = url;
       link.download = `${folder}.zip`;
+      reportDownload(link.download);
       document.body.appendChild(link);
       link.click();
       link.remove();

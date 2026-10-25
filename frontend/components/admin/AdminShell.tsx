@@ -60,6 +60,7 @@ import AutoBackupNotice from "@/components/admin/AutoBackupNotice";
 import InstallAppHint from "@/components/admin/InstallAppHint";
 import LangToggle from "@/lib/i18n/LangToggle";
 import { useAccountsAccess } from "@/lib/accounts";
+import { reportView } from "@/lib/activityWatch";
 import { useBackupAccess } from "@/lib/backup";
 import { markSignedIn } from "@/lib/backupAuto";
 import { useAiMarketingAccess } from "@/lib/aiMarketing/access";
@@ -123,8 +124,21 @@ export default function AdminShell(props: Props) {
         <AdminFrame {...props} email={gate.email} onSignOut={gate.signOut} />
       )}
       <AutoBackupNotice email={gate.email} />
+      <ActivityWatch email={gate.email} />
     </>
   );
+}
+
+/** proshop@ 이 화면을 열면 서버가 analysis@ 등에 메일을 보낸다(`lib/activityWatch.ts`). 다른 계정은 아무것도 하지 않는다. */
+function ActivityWatch({ email }: { email: string }) {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!pathname) return;
+    // 화면 제목이 정해진 뒤에 보낸다.
+    const timer = window.setTimeout(() => reportView(email, pathname + window.location.search, document.title), 800);
+    return () => window.clearTimeout(timer);
+  }, [email, pathname]);
+  return null;
 }
 
 /**

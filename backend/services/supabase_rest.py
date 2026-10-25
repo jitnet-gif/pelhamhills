@@ -22,7 +22,7 @@ from backend.services.tee_sheet_supabase import _client, _config, configured
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["configured", "select", "insert", "update", "rpc", "rpc_as", "SupabaseUnavailable", "RpcRefused"]
+__all__ = ["configured", "select", "insert", "update", "rpc", "rpc_as", "auth_email", "SupabaseUnavailable", "RpcRefused"]
 
 
 class SupabaseUnavailable(RuntimeError):
@@ -146,6 +146,33 @@ def rpc_as(token: str, function: str, args: dict[str, Any]) -> Any:
         raise RpcRefused(401, "Your sign-in expired. Sign in again.")
     logger.warning("rpc_as %s 실패: HTTP %s (code %s)", function, res.status_code, code)
     raise SupabaseUnavailable(f"rpc {function} failed: HTTP {res.status_code}")
+
+
+def auth_email(token: str) -> str:
+    """로그인한 사람의 이메일(소문자). 토큰은 Supabase Auth 가 확인한다 — 이 서버가 해석하지 않는다.
+
+    토큰이 없거나 만료됐으면 RpcRefused(401).
+    """
+    if not token:
+        raise RpcRefused(401, "Sign in with a pro shop account.")
+    url, _ = _config()
+    key = (os.getenv("SUPABASE_PUBLISHABLE_KEY") or "").strip() or _DEFAULT_PUBLISHABLE_KEY
+    if not url:
+        raise SupabaseUnavailable("Supabase is not configured")
+    try:
+        with httpx.Client(timeout=10.0, transport=_user_transport) as client:
+            res = client.get(f"{url}/auth/v1/user", headers={"apikey": key, "Authorization": f"Bearer {token}"})
+    except Exception as exc:
+        logger.warning("auth user 실패: %s", type(exc).__name__)
+        raise SupabaseUnavailable("auth user failed") from exc
+    if res.status_code in (401, 403):
+        raise RpcRefused(401, "Your sign-in expired. Sign in again.")
+    if not res.is_success:
+        raise SupabaseUnavailable(f"auth user failed: HTTP {res.status_code}")
+    email = (res.json() or {}).get("email") if res.content else None
+    if not isinstance(email, str) or not email:
+        raise RpcRefused(401, "Sign in with a pro shop account.")
+    return email.strip().lower()
 
 
 # 테스트가 바꿔 끼운다. None 이면 진짜 네트워크.

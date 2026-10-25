@@ -5,6 +5,8 @@
  * ExcelJS 는 무겁다(~1MB). 버튼을 누를 때만 불러온다.
  */
 
+import { reportDownload } from "@/lib/activityWatch";
+
 import {
   cellValue,
   FIRST_DATA_ROW,
@@ -114,6 +116,7 @@ function writeRow(target: import("exceljs").Row, row: Row, columns: Workbook["sh
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
+  reportDownload(filename);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
