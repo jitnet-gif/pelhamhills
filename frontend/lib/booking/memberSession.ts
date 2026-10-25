@@ -10,6 +10,8 @@ import { useSyncExternalStore } from "react";
 import { bookingRpc } from "@/lib/booking/rpc";
 
 export type SignedInMember = {
+  /** 회원 등록(0111) 이면 member, 일반 가입(0112) 이면 guest. 0112 전 서버면 없다 — member 로 본다. */
+  kind?: "member" | "guest";
   name: string;
   email: string;
   phone: string;
@@ -119,6 +121,23 @@ export async function memberRegister(input: {
   return accept(
     await bookingRpc<SessionDoc | null>("pelham_member_register", {
       p_member: input.membershipRef,
+      p_email: input.email.trim(),
+      p_phone: input.phone.trim(),
+      p_password: input.password,
+    }),
+  );
+}
+
+/** 일반 가입(0112) — 회원권이 없는 손님. 예약은 일반 요금 그대로다. */
+export async function guestRegister(input: {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+}): Promise<SignedInMember> {
+  return accept(
+    await bookingRpc<SessionDoc | null>("pelham_guest_register", {
+      p_name: input.name.trim(),
       p_email: input.email.trim(),
       p_phone: input.phone.trim(),
       p_password: input.password,

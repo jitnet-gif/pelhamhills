@@ -707,7 +707,7 @@ function BookingForm({
                       {memberBadge}
                     </span>
                   </p>
-                ) : (
+                ) : signedIn.kind === "guest" ? null : (
                   <p className="mt-1 text-sm text-[#8a6f30]">
                     No active membership today — this books at the regular rate and the pro shop will check.
                   </p>

@@ -7,8 +7,11 @@
  * 기록에 있는 이메일 또는 전화로 본인 확인을 하고, 비밀번호를 정한다. 확인은 서버가 한다 —
  * 화면은 회원의 연락처를 받지 않는다(공개 화면이라 이름·회원권 종류만 온다).
  *
- * 로그인하면 티타임 예약 폼이 이름·이메일·전화를 채우고 회원 요금으로 예약한다(`pelham_tee_book_signed_in`).
- * 회원이 아닌 손님은 로그인 없이 예약한다 — 여기는 회원만을 위한 문이다.
+ * 일반 가입(0112)은 회원권 없이 이름·이메일·전화·비밀번호로 만든다. 요금은 일반 그대로이고,
+ * 나중에 같은 이메일로 회원 등록을 하면 그 계정이 회원 계정으로 바뀐다.
+ *
+ * 로그인하면 티타임 예약 폼이 이름·이메일·전화를 채운다(`pelham_tee_book_signed_in`). 회원이면 회원 요금.
+ * 로그인 없이 예약하는 길은 그대로 열려 있다.
  */
 
 import Link from "next/link";
@@ -23,6 +26,7 @@ import {
 } from "@/components/booking/MemberLookup";
 import { describeFailure } from "@/components/booking/availability";
 import {
+  guestRegister,
   memberRegister,
   memberSignIn,
   memberSignOut,
@@ -31,15 +35,23 @@ import {
 import { BOOK_TEE_TIME, CLUB } from "@/lib/nav";
 import { ApiError } from "@/lib/teeSheet/api";
 
-type Tab = "signin" | "register";
+type Tab = "signin" | "register" | "guest";
 
 export default function MemberLoginPage() {
   const session = useMemberSession();
   const [tab, setTab] = useState<Tab>("signin");
+  // 손님 계정으로 로그인한 채 "회원권 연결" 을 눌렀을 때 회원 등록 폼을 연다.
+  const [linking, setLinking] = useState(false);
 
   if (session) {
+    const guest = session.member.kind === "guest";
     return (
-      <BookingShell subtitle="You are signed in as a member." title="Member">
+      <BookingShell
+        subtitle={
+          guest ? "You are signed in." : "You are signed in as a member."
+        }
+        title={guest ? "My Account" : "Member"}
+      >
         <div className="rounded-sm border border-[#d8d1c3] bg-white p-6">
           <p className="text-xl font-semibold">{session.member.name}</p>
           {session.member.membershipType && session.member.season ? (
@@ -50,6 +62,10 @@ export default function MemberLoginPage() {
                   season: session.member.season,
                 })}
               </span>
+            </p>
+          ) : guest ? (
+            <p className="mt-2 text-sm text-[#5c6459]">
+              Guest account — tee times book at the regular rate.
             </p>
           ) : (
             <p className="mt-2 text-sm text-[#8a6f30]">
@@ -73,15 +89,37 @@ export default function MemberLoginPage() {
               Sign out
             </button>
           </div>
+          {guest && !linking ? (
+            <p className="mt-4 text-sm text-[#5c6459]">
+              Are you a member?{" "}
+              <button
+                className="font-semibold text-[#214d2f] underline"
+                onClick={() => setLinking(true)}
+                type="button"
+              >
+                Link your membership
+              </button>{" "}
+              to book at your member rate.
+            </p>
+          ) : null}
         </div>
+        {guest && linking ? (
+          <div className="mt-4 rounded-sm border border-[#d8d1c3] bg-white p-5">
+            <p className="mb-4 text-sm text-[#5c6459]">
+              Use the email {session.member.email} to keep this account — it
+              becomes your member sign-in.
+            </p>
+            <RegisterForm />
+          </div>
+        ) : null}
       </BookingShell>
     );
   }
 
   return (
     <BookingShell
-      subtitle="Members book at their member rate after signing in."
-      title="Member Sign In"
+      subtitle="Sign in to book faster. Members book at their member rate."
+      title="Sign In"
     >
       <div className="mx-auto max-w-lg">
         <div
@@ -91,7 +129,8 @@ export default function MemberLoginPage() {
           {(
             [
               ["signin", "Sign in"],
-              ["register", "Register"],
+              ["register", "Member sign-up"],
+              ["guest", "Guest sign-up"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -115,14 +154,19 @@ export default function MemberLoginPage() {
           {session === undefined ? (
             <p className="text-sm text-[#5c6459]">Checking…</p>
           ) : tab === "signin" ? (
-            <SignInForm onRegister={() => setTab("register")} />
-          ) : (
+            <SignInForm
+              onRegister={() => setTab("register")}
+              onGuest={() => setTab("guest")}
+            />
+          ) : tab === "register" ? (
             <RegisterForm />
+          ) : (
+            <GuestForm onMember={() => setTab("register")} />
           )}
         </div>
 
         <p className="mt-4 text-center text-sm text-[#5c6459]">
-          Not a member? You can{" "}
+          You can also{" "}
           <Link
             className="font-semibold text-[#214d2f] underline"
             href={BOOK_TEE_TIME}
@@ -138,7 +182,13 @@ export default function MemberLoginPage() {
 
 // ===== 로그인 ===========================================================
 
-function SignInForm({ onRegister }: { onRegister: () => void }) {
+function SignInForm({
+  onGuest,
+  onRegister,
+}: {
+  onGuest: () => void;
+  onRegister: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -195,7 +245,15 @@ function SignInForm({ onRegister }: { onRegister: () => void }) {
           onClick={onRegister}
           type="button"
         >
-          Register as a member
+          Member sign-up
+        </button>{" "}
+        or{" "}
+        <button
+          className="font-semibold text-[#214d2f] underline"
+          onClick={onGuest}
+          type="button"
+        >
+          guest sign-up
         </button>
         . Forgot your password? Call the pro shop at {CLUB.phone}.
       </p>
@@ -427,6 +485,120 @@ function RegisterForm() {
           />
         </>
       ) : null}
+    </form>
+  );
+}
+
+// ===== 일반 가입 =========================================================
+
+function GuestForm({ onMember }: { onMember: () => void }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const mismatch = confirm.length > 0 && confirm !== password;
+  const ready =
+    name.trim().length >= 2 &&
+    email.trim().length > 0 &&
+    password.length >= 8 &&
+    confirm === password &&
+    !busy;
+
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await guestRegister({ name, email, phone, password });
+      window.location.assign(BOOK_TEE_TIME);
+    } catch (failure) {
+      setError(failureText(failure, "Sign-up failed."));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (ready) void submit();
+      }}
+    >
+      <p className="rounded-sm bg-[#f3ead2] p-3 text-sm text-[#5c4a1c]">
+        Have a membership?{" "}
+        <button
+          className="font-semibold underline"
+          onClick={onMember}
+          type="button"
+        >
+          Use member sign-up
+        </button>{" "}
+        to get your member rate.
+      </p>
+      <Field htmlFor="mg-name" label="Full name">
+        <input
+          autoComplete="name"
+          className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+          id="mg-name"
+          onChange={(event) => setName(event.target.value)}
+          type="text"
+          value={name}
+        />
+      </Field>
+      <Field htmlFor="mg-email" label="Email (your sign-in)">
+        <input
+          autoComplete="email"
+          className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+          id="mg-email"
+          inputMode="email"
+          onChange={(event) => setEmail(event.target.value)}
+          type="email"
+          value={email}
+        />
+      </Field>
+      <Field htmlFor="mg-phone" label="Phone (optional)">
+        <input
+          autoComplete="tel"
+          className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+          id="mg-phone"
+          inputMode="tel"
+          onChange={(event) => setPhone(event.target.value)}
+          placeholder="(905) 123-4567"
+          type="tel"
+          value={phone}
+        />
+      </Field>
+      <Field htmlFor="mg-password" label="Password (8 or more characters)">
+        <input
+          autoComplete="new-password"
+          className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+          id="mg-password"
+          onChange={(event) => setPassword(event.target.value)}
+          type="password"
+          value={password}
+        />
+      </Field>
+      <Field htmlFor="mg-confirm" label="Password again">
+        <input
+          autoComplete="new-password"
+          className="w-full rounded-sm border border-[#d8d1c3] px-4 py-3 text-base"
+          id="mg-confirm"
+          onChange={(event) => setConfirm(event.target.value)}
+          type="password"
+          value={confirm}
+        />
+      </Field>
+      {mismatch ? (
+        <p className="text-sm text-[#8a2f2f]">
+          The two passwords are different.
+        </p>
+      ) : null}
+      {error ? <ErrorBox message={error} /> : null}
+      <SubmitButton busy={busy} label="Create account" ready={ready} />
     </form>
   );
 }
