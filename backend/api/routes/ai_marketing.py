@@ -1,6 +1,7 @@
 """AI Manager Marketing Strategies — **Claude 의 마케팅 전략 제안**. 화면은 `/admin/ai-marketing`.
 
 POST /ai-marketing/strategy   기간 요약(0094) + 골프장 주변 상권(아래 `REGION`) → 전략·전개 방법(JSON)
+POST /ai-marketing/narrate    전략 프레젠테이션 한 장면의 나레이션 → mp3 (ElevenLabs, Hope 목소리)
 
 ## 순서
 1. `pelham_staff_ai_marketing_summary` 를 **직원의 토큰으로** 부른다 — 명단(0094) 밖 계정은 SQL 이 PT403.
@@ -8,6 +9,11 @@ POST /ai-marketing/strategy   기간 요약(0094) + 골프장 주변 상권(아�
 2. 요약에는 개인정보가 없다(인원·금액·코드 집계뿐). 회원별 라운드(0097, 이름이 있다)는 보내지 않는다.
 3. Claude 가 JSON 으로 돌려준다 — 사실(숫자 근거), 전략, 상권별 니치, 30·60·90일 실행표, 주의할 점.
    보내는 것은 화면이 정한다(문자·전화는 /marketing). 이 경로는 제안만 한다.
+
+## 프레젠테이션
+화면이 결과를 장면(요약 → 전략마다 → 지역 니치 → 30·60·90일 → 주의할 점)으로 넘겨 보여 준다. Claude 가 장면마다
+읽을 대본(`narration`, 각 전략의 `narration`)도 함께 쓴다. 소리는 장면을 틀 때 `/narrate` 가 만든다 —
+같은 글은 이 서버가 기억해 두었다가 다시 쓴다(ElevenLabs 요금을 두 번 내지 않게).
 
 ## 상권
 `REGION` 은 2021 인구조사 기준 대략의 숫자와 클럽(196 Webber Rd, Welland)에서의 대략 운전 시간이다.
@@ -17,13 +23,15 @@ Claude 에게도 "대략"이라고 말하게 한다. 새 인구조사가 나오�
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request
+import httpx
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from zoneinfo import ZoneInfo
 
@@ -37,6 +45,10 @@ router = APIRouter(prefix="/ai-marketing", tags=["Marketing"])
 MODEL = os.getenv("AI_MARKETING_MODEL", "claude-opus-5-5").strip()
 
 UNAVAILABLE = "Claude's strategy is not available right now. Try again in a minute."
+
+#: 사용자가 고른 ElevenLabs "Hope" 목소리(AI 전화 시뮬레이터와 같다). 한국어·영어 모두 multilingual_v2.
+NARRATOR_VOICE = os.getenv("AI_MARKETING_VOICE_ID", "tnSpp4vdxKPjI9w0GnoV").strip()
+NARRATOR_MODEL = "eleven_multilingual_v2"
 
 REGION = """\
 Club: Pelham Hills Golf Club, 196 Webber Road, Welland, Ontario (Niagara Region), on the Welland / Pelham line.
@@ -97,6 +109,11 @@ For each give the approximate population, the drive time, why they would come, a
 season (season passes for next year, gift cards, early-bird memberships, winter simulator or events if any), \
 spring is opening.
 - cautions: data gaps and risks (for example low linked-rounds share, small sample, CASL consent for email and texts).
+- narration: the managers watch this as a narrated presentation, one scene per part. Write what the narrator \
+says for each scene: `narration.intro` (headline and the key facts), each strategy's own `narration`, \
+`narration.niches`, `narration.plan` and `narration.close` (cautions and the first thing to do). Two to four \
+spoken sentences each, plain words, no lists, symbols or abbreviations; say amounts and percentages the way a \
+speaker reads them aloud.
 
 Rules:
 - Use only numbers from the summary or the trade area. Never invent club numbers. Trade-area numbers are \
@@ -134,9 +151,10 @@ OUTPUT_SCHEMA: dict[str, Any] = {
                     "steps": {"type": "array", "items": {"type": "string"}},
                     "kpi": {"type": "string"},
                     "budget": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "narration": {"type": "string"},
                 },
                 "required": ["title", "target_group", "time_slot", "area", "why", "offer", "channels", "steps",
-                             "kpi", "budget"],
+                             "kpi", "budget", "narration"],
                 "additionalProperties": False,
             },
         },
@@ -168,8 +186,19 @@ OUTPUT_SCHEMA: dict[str, Any] = {
             },
         },
         "cautions": {"type": "array", "items": {"type": "string"}},
+        "narration": {
+            "type": "object",
+            "properties": {
+                "intro": {"type": "string"},
+                "niches": {"type": "string"},
+                "plan": {"type": "string"},
+                "close": {"type": "string"},
+            },
+            "required": ["intro", "niches", "plan", "close"],
+            "additionalProperties": False,
+        },
     },
-    "required": ["headline", "facts", "strategies", "niche_markets", "plan", "cautions"],
+    "required": ["headline", "facts", "strategies", "niche_markets", "plan", "cautions", "narration"],
     "additionalProperties": False,
 }
 
@@ -180,6 +209,10 @@ class StrategyIn(BaseModel):
     lang: Literal["en", "ko"] = "en"
     #: 매니저가 덧붙이는 요청(예: "평일 오후를 채우고 싶다"). 비워도 된다.
     focus: str = Field(default="", max_length=500)
+
+
+class NarrateIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1500)
 
 
 # ===== Claude ============================================================
@@ -275,3 +308,52 @@ async def strategy(body: StrategyIn, request: Request) -> dict[str, Any]:
         logger.warning("마케팅 전략 실패: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail=UNAVAILABLE) from None
     return {**answer, "model": MODEL, "period": {"from": body.from_date, "to": body.to_date}}
+
+
+# ===== 나레이션 ===========================================================
+
+#: 글(sha256) → mp3. 장면을 다시 틀거나 다른 매니저가 같은 결과를 틀어도 ElevenLabs 를 다시 부르지 않는다.
+_audio_cache: dict[str, bytes] = {}
+AUDIO_CACHE_MAX = 200
+
+
+def _require_viewer(request: Request) -> None:
+    """AI 마케팅 명단(0094) 계정인가. 아니면 SQL 이 false 를 돌려준다."""
+    try:
+        allowed = supabase_rest.rpc_as(_token(request), "pelham_staff_ai_marketing_access", {})
+    except supabase_rest.RpcRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from None
+    except supabase_rest.SupabaseUnavailable:
+        raise HTTPException(status_code=503, detail="The narrator is not available right now.") from None
+    if allowed is not True:
+        raise HTTPException(status_code=403, detail="This account cannot open AI Marketing.")
+
+
+@router.post("/narrate")
+async def narrate(body: NarrateIn, request: Request) -> Response:
+    await asyncio.to_thread(_require_viewer, request)
+    key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(status_code=503, detail="The narrator is not set up on the server yet.")
+    text = body.text.strip()
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    audio = _audio_cache.get(digest)
+    if audio is None:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                res = await client.post(
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{NARRATOR_VOICE}",
+                    json={"text": text, "model_id": NARRATOR_MODEL},
+                    headers={"xi-api-key": key, "Accept": "audio/mpeg"},
+                )
+        except Exception as exc:
+            logger.warning("나레이션 실패: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="The narrator is not available right now.") from None
+        if not res.is_success:
+            logger.warning("나레이션 실패: ElevenLabs HTTP %s", res.status_code)
+            raise HTTPException(status_code=503, detail="The narrator is not available right now.")
+        audio = res.content
+        if len(_audio_cache) >= AUDIO_CACHE_MAX:
+            _audio_cache.pop(next(iter(_audio_cache)))
+        _audio_cache[digest] = audio
+    return Response(content=audio, media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=86400"})

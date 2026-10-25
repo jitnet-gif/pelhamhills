@@ -90,13 +90,29 @@ export type Strategy = {
     steps: string[];
     kpi: string;
     budget: "low" | "medium" | "high";
+    /** 프레젠테이션에서 이 전략 장면의 나레이션. 이 기능 전에 받은 결과에는 없다. */
+    narration?: string;
   }[];
   niche_markets: { area: string; population: string; drive: string; why: string; hook: string }[];
   plan: { window: "30" | "60" | "90"; actions: string[] }[];
   cautions: string[];
+  narration?: { intro: string; niches: string; plan: string; close: string };
   model: string;
   period: { from: string; to: string };
 };
+
+/** 응답 본문의 `detail` 을 오류 글로. */
+async function failure(response: Response, missing: string): Promise<ApiError> {
+  let message = `${response.status} ${response.statusText}`.trim();
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body?.detail === "string" && body.detail) message = body.detail;
+  } catch {
+    // JSON 이 아닌 오류 본문.
+  }
+  if (response.status === 404) message = missing;
+  return new ApiError(response.status, message);
+}
 
 export async function askStrategy(from: string, to: string, lang: "en" | "ko", focus: string): Promise<Strategy> {
   const token = await accessToken();
@@ -111,16 +127,34 @@ export async function askStrategy(from: string, to: string, lang: "en" | "ko", f
   } catch {
     throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
   }
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`.trim();
-    try {
-      const body = (await response.json()) as { detail?: unknown };
-      if (typeof body?.detail === "string" && body.detail) message = body.detail;
-    } catch {
-      // JSON 이 아닌 오류 본문.
-    }
-    if (response.status === 404) message = "Claude's strategy is not on the server yet. Deploy the API (Fly) first.";
-    throw new ApiError(response.status, message);
-  }
+  if (!response.ok) throw await failure(response, "Claude's strategy is not on the server yet. Deploy the API (Fly) first.");
   return (await response.json()) as Strategy;
+}
+
+/** 나레이션 한 장면 → mp3 blob 주소. 같은 글은 이 탭에서 한 번만 받는다. */
+const narrationUrls = new Map<string, Promise<string>>();
+
+export function narrationUrl(text: string): Promise<string> {
+  const known = narrationUrls.get(text);
+  if (known) return known;
+  const pending = (async () => {
+    const token = await accessToken();
+    if (!token) throw new ApiError(401, "Sign in again to hear the narrator.");
+    let response: Response;
+    try {
+      response = await fetch(`${paymentsApiBase()}/ai-marketing/narrate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text }),
+      });
+    } catch {
+      throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
+    }
+    if (!response.ok) throw await failure(response, "The narrator is not on the server yet. Deploy the API (Fly) first.");
+    return URL.createObjectURL(await response.blob());
+  })();
+  narrationUrls.set(text, pending);
+  // 실패한 것은 기억하지 않는다 — 다시 누르면 다시 받는다.
+  pending.catch(() => narrationUrls.delete(text));
+  return pending;
 }

@@ -9,18 +9,20 @@
  *   - 유입 경로·프로모 코드·회원권·연락 가능한 사람 수.
  *   - 회원별 라운드 수(0097): 기간·시즌 누적·마지막 플레이.
  *   - Claude 의 전략 제안(Fly `/ai-marketing/strategy`): 같은 기간 요약 + 골프장 주변·해밀턴 경계 상권으로
- *     사실·전략·니치 시장·30/60/90일 실행표. 누를 때만 부른다(1–2분, 유료). 마지막 결과는 기간별로 이 브라우저에 둔다.
+ *     사실·전략·니치 시장·30/60/90일 실행표. 누를 때만 부른다(1–2분, 유료). 결과는 기간 × 언어별로 이 브라우저에 둔다.
+ *     받으면 나레이션(ElevenLabs Hope, Fly `/ai-marketing/narrate`) 프레젠테이션으로 보여 준다.
  *
  * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, 마케팅 믹스 보드)는 이 화면에 붙는다.
  * 데모 숫자로 내려가지 않는다 — 서버가 안 되면 오류를 보여 준다(옛 Business Intelligence 화면이 고치려던 문제).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, Chip, EmptyNote, ErrorNote, Field, Panel, SkeletonCards, SkeletonRows, StatCard, TextArea, TextInput } from "@/components/retail/ui";
 import {
   aiMarketingApi,
   askStrategy,
+  narrationUrl,
   type Strategy,
   type DayPart,
   type DayType,
@@ -29,7 +31,7 @@ import {
   type SalesParts,
   type Segment,
 } from "@/lib/aiMarketing/api";
-import { getLang } from "@/lib/i18n/engine";
+import { getLang, type Lang, onLangChange, setLang } from "@/lib/i18n/engine";
 import { localBusinessDate } from "@/lib/retail/api";
 import { ApiError } from "@/lib/teeSheet/api";
 import { addDays } from "@/lib/teeSheet/dates";
@@ -558,25 +560,36 @@ function storedStrategy(key: string): Strategy | null {
 
 /**
  * Claude 의 전략 제안. 누를 때만 서버를 부른다 — 1–2분 걸리고 부를 때마다 API 요금이 든다.
- * 마지막 결과는 기간별로 이 브라우저(localStorage)에 둔다. 없어져도 다시 누르면 된다.
- * Claude 가 쓴 글은 화면 언어로 오므로 사전에 걸리지 않는다. 제목·라벨만 사전(ko.json)으로 바뀐다.
+ * 결과는 기간 × 언어별로 이 브라우저(localStorage)에 둔다. 없어져도 다시 누르면 된다.
+ * Claude 가 쓴 글은 그 언어로 오므로 사전에 걸리지 않는다. 제목·라벨만 사전(ko.json)으로 바뀐다.
+ * EN/한 을 바꾸면 그 언어로 받아 둔 결과를 보여 준다(없으면 그 언어로 다시 요청하게 한다).
+ *
+ * 결과는 먼저 **프레젠테이션**(장면 넘기기 + Hope 목소리 나레이션)으로 보이고, "Full text" 로 전체 글을 본다.
  */
 function StrategyPanel({ from, to }: { from: string; to: string }) {
-  const key = `pelham-ai-strategy:${from}|${to}`;
-  // 기간이 바뀌면 부모가 key 로 새로 만든다 — 그 기간의 마지막 결과로 시작한다.
-  const [strategy, setStrategy] = useState<Strategy | null>(() => storedStrategy(key));
+  const [lang, setLangState] = useState<Lang>(() => getLang());
+  useEffect(() => onLangChange(setLangState), []);
+  const key = `pelham-ai-strategy:${from}|${to}|${lang}`;
+  // 이번에 받은 결과. 없으면 이 브라우저에 둔 것.
+  const [fresh, setFresh] = useState<Record<string, { strategy: Strategy; version: number }>>({});
+  const stored = useMemo(() => storedStrategy(key), [key]);
+  const strategy = fresh[key]?.strategy ?? stored;
+  const version = fresh[key]?.version ?? 0;
+  const [view, setView] = useState<"deck" | "text">("deck");
   const [focus, setFocus] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const ask = async () => {
+    const askedKey = key;
     setBusy(true);
     setError("");
     try {
-      const next = await askStrategy(from, to, getLang(), focus);
-      setStrategy(next);
+      const next = await askStrategy(from, to, lang, focus);
+      setFresh((all) => ({ ...all, [askedKey]: { strategy: next, version: (all[askedKey]?.version ?? 0) + 1 } }));
+      setView("deck");
       try {
-        localStorage.setItem(key, JSON.stringify(next));
+        localStorage.setItem(askedKey, JSON.stringify(next));
       } catch {
         // 저장 못 해도 화면에는 보인다.
       }
@@ -588,7 +601,17 @@ function StrategyPanel({ from, to }: { from: string; to: string }) {
   };
 
   return (
-    <Panel title="Claude's marketing strategy">
+    <Panel
+      actions={
+        strategy ? (
+          <div className="flex gap-1">
+            <Chip active={view === "deck"} onClick={() => setView("deck")}>Presentation</Chip>
+            <Chip active={view === "text"} onClick={() => setView("text")}>Full text</Chip>
+          </div>
+        ) : null
+      }
+      title="Claude's marketing strategy"
+    >
       <div className="grid gap-3">
         <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <Field label="Anything to focus on? (optional)">
@@ -605,13 +628,325 @@ function StrategyPanel({ from, to }: { from: string; to: string }) {
         </div>
         <p className="text-xs text-[#6b7280]">
           Sends this period&apos;s totals (no names, emails or phone numbers) and the trade area to Claude. Written in the
-          language the page is set to (EN / 한).
+          language the page is set to (EN / 한), then shown as a narrated presentation.
         </p>
         {error ? <ErrorNote>{error}</ErrorNote> : null}
         {busy && !strategy ? <SkeletonRows count={5} /> : null}
-        {strategy ? <StrategyBody strategy={strategy} /> : null}
+        {!strategy && !busy && (fresh[otherKey(key)] || storedStrategy(otherKey(key))) ? (
+          <EmptyNote>
+            {lang === "ko"
+              ? "No Korean version for this period yet. Press Ask Claude for a strategy to get one."
+              : "No English version for this period yet. Press Ask Claude for a strategy to get one."}
+          </EmptyNote>
+        ) : null}
+        {strategy && view === "deck" ? <StrategyDeck key={`${key}#${version}`} lang={lang} strategy={strategy} /> : null}
+        {strategy && view === "text" ? <StrategyBody strategy={strategy} /> : null}
       </div>
     </Panel>
+  );
+}
+
+function otherKey(key: string): string {
+  return key.endsWith("|ko") ? `${key.slice(0, -3)}|en` : `${key.slice(0, -3)}|ko`;
+}
+
+type Scene = { label: string; title: string; say: string; body: ReactNode };
+
+/** 결과 → 장면들. 나레이션이 없는 옛 결과는 글에서 대본을 만든다. */
+function strategyScenes(strategy: Strategy): Scene[] {
+  const plan = [...strategy.plan].sort((a, b) => Number(a.window) - Number(b.window));
+  const facts = strategy.facts.map((fact) => fact.fact);
+  const scenes: Scene[] = [
+    {
+      label: "Summary",
+      title: strategy.headline,
+      say: strategy.narration?.intro || [strategy.headline, ...facts.slice(0, 3)].join(" "),
+      body: (
+        <ul className="grid gap-2 text-sm">
+          {strategy.facts.map((fact, index) => (
+            <li className="grid grid-cols-[22px_minmax(0,1fr)] gap-2" key={index}>
+              <span className="font-mono text-xs text-[#1a7f4b]">{index + 1}</span>
+              <span>
+                {fact.fact} <span className="text-xs text-[#6b7280]">— {fact.evidence}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ),
+    },
+  ];
+  strategy.strategies.forEach((item, index) => {
+    scenes.push({
+      label: `Strategy ${index + 1}`,
+      title: item.title,
+      say: item.narration || [item.title, item.why, item.offer].join(" "),
+      body: (
+        <div className="grid gap-3 text-sm md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+          <div className="grid content-start gap-2">
+            <p className="flex flex-wrap gap-1 text-xs">
+              {[item.target_group, item.time_slot, item.area, BUDGET_LABEL[item.budget] ?? item.budget].map((tag, tagIndex) => (
+                <span className="bg-[#eef0f2] px-1.5 py-0.5" key={tagIndex}>
+                  {tag}
+                </span>
+              ))}
+            </p>
+            <p>{item.why}</p>
+            <div className="border border-[#1a7f4b] bg-[#e8f4ec] p-2">
+              <b>Offer:</b> {item.offer}
+            </div>
+            <p>
+              <b>Channels:</b> {item.channels.join(" · ")}
+            </p>
+            <p className="text-[#1a7f4b]">
+              <b>Measure:</b> {item.kpi}
+            </p>
+          </div>
+          <ol className="grid list-decimal content-start gap-1 pl-5">
+            {item.steps.map((step, stepIndex) => (
+              <li key={stepIndex}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      ),
+    });
+  });
+  scenes.push({
+    label: "Local niches",
+    title: "Local niches — Niagara to the Hamilton boundary",
+    say: strategy.narration?.niches || strategy.niche_markets.map((row) => `${row.area}: ${row.hook}`).join(" "),
+    body: (
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-sm">
+          <thead>
+            <tr className="text-left text-xs text-[#6b7280]">
+              <th className="font-bold">Area</th>
+              <th className="font-bold">People</th>
+              <th className="font-bold">Drive</th>
+              <th className="font-bold">Hook</th>
+            </tr>
+          </thead>
+          <tbody>
+            {strategy.niche_markets.map((row, index) => (
+              <tr className="border-t border-[#eef0f2] align-top" key={index}>
+                <td className="py-1 pr-2 font-semibold">{row.area}</td>
+                <td className="py-1 pr-2 whitespace-nowrap">{row.population}</td>
+                <td className="py-1 pr-2 whitespace-nowrap">{row.drive}</td>
+                <td className="py-1">{row.hook}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ),
+  });
+  scenes.push({
+    label: "Rollout",
+    title: "Rollout — next 30, 60 and 90 days",
+    say: strategy.narration?.plan || plan.map((step) => step.actions[0] ?? "").join(" "),
+    body: (
+      <div className="grid gap-2 md:grid-cols-3">
+        {plan.map((step) => (
+          <div className="border border-[#d4d4d8] p-3 text-sm" key={step.window}>
+            <h4 className="mb-1 font-bold">{`Next ${step.window} days`}</h4>
+            <ul className="grid list-disc gap-1 pl-5">
+              {step.actions.map((action, index) => (
+                <li key={index}>{action}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    ),
+  });
+  if (strategy.cautions.length > 0 || strategy.narration?.close) {
+    scenes.push({
+      label: "Watch out",
+      title: "Watch out",
+      say: strategy.narration?.close || strategy.cautions.join(" "),
+      body: (
+        <ul className="grid list-disc gap-1 pl-5 text-sm text-[#7a6320]">
+          {strategy.cautions.map((caution, index) => (
+            <li key={index}>{caution}</li>
+          ))}
+        </ul>
+      ),
+    });
+  }
+  return scenes;
+}
+
+const SPEEDS = [0.85, 1, 1.2, 1.4];
+
+/**
+ * 전략 프레젠테이션 — 장면 칩, 무대, 어두운 나레이션 띠, 재생 막대. 나레이션 소리는 장면을 틀 때
+ * Fly(`/ai-marketing/narrate`, ElevenLabs Hope)가 만든다. 다음 장면은 미리 받아 둔다.
+ * 가 / Aa 는 화면 전체 언어(EN/한)를 바꾼다 — 그 언어로 받은 결과로 바뀐다.
+ */
+function StrategyDeck({ strategy, lang }: { strategy: Strategy; lang: Lang }) {
+  const scenes = useMemo(() => strategyScenes(strategy), [strategy]);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  // 소리가 실제로 나기 시작한 장면. playing 인데 index 와 다르면 아직 준비 중이다.
+  const [sounding, setSounding] = useState(-1);
+  const [progress, setProgress] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [error, setError] = useState("");
+  const scene = scenes[Math.min(index, scenes.length - 1)];
+  const preparing = playing && sounding !== index;
+
+  useEffect(() => {
+    const player = audio.current;
+    if (!player) return;
+    if (!playing) {
+      player.pause();
+      return;
+    }
+    let cancelled = false;
+    narrationUrl(scene.say).then(
+      (url) => {
+        if (cancelled) return;
+        player.src = url;
+        player.playbackRate = speed;
+        player.play().then(
+          () => {
+            if (!cancelled) setSounding(index);
+          },
+          () => {
+            if (!cancelled) setPlaying(false);
+          },
+        );
+      },
+      (cause) => {
+        if (cancelled) return;
+        setError(describe(cause));
+        setPlaying(false);
+      },
+    );
+    const next = scenes[index + 1];
+    if (next) narrationUrl(next.say).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // speed 는 아래 effect 가 바꾼다 — 속도를 바꿨다고 장면을 처음부터 다시 틀지 않게.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, index, scene.say, scenes]);
+
+  useEffect(() => {
+    if (audio.current) audio.current.playbackRate = speed;
+  }, [speed]);
+
+  const go = (next: number) => {
+    setIndex(Math.max(0, Math.min(scenes.length - 1, next)));
+    setProgress(0);
+  };
+  const onEnded = () => {
+    setProgress(1);
+    if (index < scenes.length - 1) go(index + 1);
+    else setPlaying(false);
+  };
+
+  return (
+    <div className="grid min-w-0 gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1">
+          {scenes.map((item, sceneIndex) => (
+            <button
+              aria-current={sceneIndex === index}
+              className={`border px-2 py-1 text-xs font-semibold ${
+                sceneIndex === index ? "border-[#1a7f4b] bg-[#e8f4ec]" : "border-[#d4d4d8] bg-white"
+              }`}
+              key={sceneIndex}
+              onClick={() => go(sceneIndex)}
+              type="button"
+            >
+              <span className="mr-1 font-mono text-[#6b7280]">{sceneIndex + 1}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div aria-label="Language" className="inline-flex border border-[#d4d4d8]" role="group" translate="no">
+          {(["ko", "en"] as const).map((code) => (
+            <button
+              aria-pressed={lang === code}
+              className={`inline-flex min-h-9 items-center gap-1 px-2.5 text-xs font-bold ${
+                lang === code ? "bg-[#1f2328] text-white" : "bg-white text-[#1f2328]"
+              }`}
+              key={code}
+              onClick={() => setLang(code)}
+              type="button"
+            >
+              <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24">
+                <path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                <text fill="currentColor" fontFamily="sans-serif" fontSize="8" fontWeight="700" textAnchor="middle" x="12" y="13.5">
+                  {code === "ko" ? "가" : "Aa"}
+                </text>
+              </svg>
+              {code === "ko" ? "한국어" : "English"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section className="grid min-h-[260px] content-start gap-3 border border-[#d4d4d8] bg-white p-4">
+        <p className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">{`${index + 1} / ${scenes.length} · ${scene.label}`}</p>
+        <h3 className="text-lg leading-snug font-bold [text-wrap:balance]">{scene.title}</h3>
+        {scene.body}
+      </section>
+
+      <section aria-live="polite" className="grid gap-1 bg-[#14201a] px-4 py-3 text-[#e9f2ec]">
+        <span className="text-[11px] tracking-wide text-[#9fb5a8] uppercase">Narration · Hope</span>
+        <p className="text-[15px] leading-relaxed">{scene.say}</p>
+      </section>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button aria-label="Previous scene" disabled={index === 0} onClick={() => go(index - 1)}>
+          ◀
+        </Button>
+        <Button
+          className="min-w-[120px]"
+          onClick={() => {
+            setError("");
+            setPlaying(!playing);
+          }}
+          tone="primary"
+        >
+          {preparing ? "Preparing voice…" : playing ? "❚❚ Pause" : "▶ Play"}
+        </Button>
+        <Button aria-label="Next scene" disabled={index === scenes.length - 1} onClick={() => go(index + 1)}>
+          ▶
+        </Button>
+        <div aria-hidden="true" className="relative h-1.5 min-w-[120px] flex-1 bg-[#e5e7eb]">
+          <span className="absolute inset-y-0 left-0 bg-[#1a7f4b]" style={{ width: `${Math.round(progress * 100)}%` }} />
+        </div>
+        <label className="flex items-center gap-1 text-xs text-[#6b7280]">
+          Speed
+          <select
+            className="border border-[#d4d4d8] bg-white px-1 py-1 text-xs"
+            onChange={(event) => setSpeed(Number(event.target.value))}
+            value={speed}
+          >
+            {SPEEDS.map((value) => (
+              <option key={value} value={value}>{`${value}×`}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {error ? <ErrorNote>{error}</ErrorNote> : null}
+      <audio
+        onEnded={onEnded}
+        onTimeUpdate={(event) => {
+          const player = event.currentTarget;
+          if (player.duration > 0) setProgress(player.currentTime / player.duration);
+        }}
+        preload="auto"
+        ref={audio}
+      />
+      <p className="text-xs text-[#6b7280]">
+        {strategy.period.from} → {strategy.period.to} · {strategy.model} · Narration by ElevenLabs (Hope). Population and drive
+        times are approximate (2021 Census).
+      </p>
+    </div>
   );
 }
 
