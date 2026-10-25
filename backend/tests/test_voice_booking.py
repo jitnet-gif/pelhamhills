@@ -1158,72 +1158,109 @@ def test_callback_list_down_is_a_message(client, monkeypatch):
 # ===== 음식 주문 · 현장 문제 · 컴플레인 (0099) ===========================
 
 MENU = [
-    {"id": 7, "sku": "FB-HOTDOG", "name": "Hot Dog", "price": 450, "stock": None},
-    {"id": 9, "sku": "FB-COKE", "name": "Coke", "price": 275, "stock": 20},
+    {"id": "11111111-aaaa", "name": "Hot Dog", "category": "Grill", "price_cents": 450},
+    {"id": "22222222-bbbb", "name": "Coke", "category": "Drinks", "price_cents": 275},
 ]
+SETTINGS = {"open": "08:00", "close": "19:00", "lead_minutes": 20, "slot_minutes": 10, "enabled": True}
+
+
+@pytest.fixture()
+def gps_food(monkeypatch):
+    """GPS 앱의 메뉴·설정·place_food_order 가짜. 넣은 payload 는 placed 에 남는다."""
+    placed = []
+    monkeypatch.setattr(voice, "club_now", lambda: FIXED_NOW.replace(hour=11, minute=3))
+    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
+    monkeypatch.setattr(voice.phone_requests, "food_order_settings", lambda: dict(SETTINGS))
+
+    def fake_place(payload):
+        placed.append(payload)
+        return {"code": "K7PQ2M", "total_cents": 1175,
+                "items": [{"name": "Coke", "quantity": 1}, {"name": "Hot Dog", "quantity": 2}]}
+
+    monkeypatch.setattr(voice.phone_requests, "place_food_order", fake_place)
+    return placed
+
+
+def order(client, **fields):
+    payload = {"items": [{"item_id": "11111111-aaaa", "quantity": 2},
+                         {"item_id": "22222222-bbbb", "quantity": 1, "note": "no ice"}],
+               "first_name": "Jin", "caller_number": "+19058921234", "conversation_id": "c-food"}
+    payload.update(fields)
+    return client.post(f"{API}/voice/tools/food-order", json=payload)
+
+
+def test_food_menu_reads_the_gps_menu_and_earliest_pickup(client, gps_food):
+    body = client.post(f"{API}/voice/tools/food-menu", json={"conversation_id": "c-m"}).json()
+
+    assert body["ok"] is True
+    assert [(i["item_id"], i["name"], i["spoken_price"]) for i in body["items"]] == [
+        ("11111111-aaaa", "Hot Dog", "$4.50"), ("22222222-bbbb", "Coke", "$2.75")]
+    assert body["earliest_pickup"] == "11:30"  # 11:03 + 20분 → 10분 단위로 올림
+
+
+def test_food_menu_is_closed_after_the_gps_closing_time(client, gps_food, monkeypatch):
+    monkeypatch.setattr(voice, "club_now", lambda: FIXED_NOW.replace(hour=22, minute=30))
+    body = client.post(f"{API}/voice/tools/food-menu", json={"conversation_id": "c-m"}).json()
+
+    assert body["ok"] is False and body["status"] == 409
+    assert "8 AM to 7 PM" in body["message"]
+
+
+def test_food_menu_is_closed_when_the_club_turns_orders_off(client, gps_food, monkeypatch):
+    monkeypatch.setattr(voice.phone_requests, "food_order_settings", lambda: {**SETTINGS, "enabled": False})
+    body = client.post(f"{API}/voice/tools/food-menu", json={"conversation_id": "c-m"}).json()
+    assert body["status"] == 409
+
+
+def test_food_order_goes_into_the_gps_orders(client, gps_food):
+    body = order(client, pickup_time="12:15", hole=7, notes="peanut allergy").json()
+
+    assert body["ok"] is True and body["code"] == "K7PQ2M"
+    assert body["total"] == 11.75 and body["pickup_time"] == "12:20"  # 10분 단위로 올림
+    sent = gps_food[0]
+    assert sent["name"] == "Jin" and sent["phone"] == "+19058921234" and sent["hole"] == 7
+    assert sent["items"] == [{"id": "11111111-aaaa", "quantity": 2}, {"id": "22222222-bbbb", "quantity": 1}]
+    assert sent["note"] == "peanut allergy · #2: no ice · Phone order"
+    assert sent["pickup_at"] == FIXED_NOW.replace(hour=12, minute=20).astimezone(timezone.utc).isoformat()
+    assert "K7PQ2M" in body["message"] and "$11.75" in body["message"]
+
+
+def test_food_order_too_early_moves_to_the_earliest_time(client, gps_food):
+    body = order(client, pickup_time="11:05").json()
+
+    assert body["pickup_time"] == "11:30"
+    assert "earliest" in body["message"]
+
+
+def test_food_order_with_no_time_is_as_soon_as_possible(client, gps_food):
+    assert order(client).json()["pickup_time"] == "11:30"
+
+
+def test_food_order_after_closing_is_refused(client, gps_food):
+    body = order(client, pickup_time="19:30").json()
+    assert body["status"] == 422 and "7 PM" in body["message"]
+    assert gps_food == []
+
+
+def test_food_order_refusal_from_gps_is_read_to_the_agent(client, gps_food, monkeypatch):
+    def refuse(payload):
+        raise voice.supabase_rest.RpcRefused(409, "Something in your order has just sold out. Please check the menu.")
+
+    monkeypatch.setattr(voice.phone_requests, "place_food_order", refuse)
+    body = order(client).json()
+    assert body["ok"] is False and body["status"] == 409
+    assert "sold out" in body["message"] and "get_food_menu" in body["message"]
+
+
+def test_food_order_is_placed_at_most_twice_per_call(client, gps_food):
+    for _ in range(voice.MAX_FOOD_ORDERS_PER_CALL):
+        assert order(client).json()["ok"] is True
+    assert order(client).json()["status"] == 429
 
 
 @pytest.fixture()
 def open_hours(monkeypatch):
     monkeypatch.setattr(voice, "club_now", lambda: FIXED_NOW.replace(hour=11))
-
-
-def order(client, **fields):
-    payload = {"items": [{"item_id": 7, "quantity": 2}, {"item_id": 9, "quantity": 1, "note": "no ice"}],
-               "first_name": "Jin", "pickup_time": "at the turn",
-               "caller_number": "+19058921234", "conversation_id": "c-food"}
-    payload.update(fields)
-    return client.post(f"{API}/voice/tools/food-order", json=payload)
-
-
-def test_food_menu_reads_the_snack_bar_products(client, monkeypatch, open_hours):
-    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
-    body = client.post(f"{API}/voice/tools/food-menu", json={"conversation_id": "c-m"}).json()
-
-    assert body["ok"] is True
-    assert [(i["item_id"], i["name"], i["spoken_price"]) for i in body["items"]] == [
-        (7, "Hot Dog", "$4.50"), (9, "Coke", "$2.75")]
-
-
-def test_food_menu_is_closed_outside_snack_bar_hours(client, monkeypatch):
-    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
-    body = client.post(f"{API}/voice/tools/food-menu", json={"conversation_id": "c-m"}).json()  # 6 AM
-
-    assert body["ok"] is False and body["status"] == 409
-    assert "8 AM to 6 PM" in body["message"]
-
-
-def test_food_order_prices_on_the_server_and_adds_hst(client, monkeypatch, open_hours):
-    seen = {}
-    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
-    monkeypatch.setattr(voice.phone_requests, "place_food_order",
-                        lambda **kw: seen.update(kw) or {"ticket": "FO-0101"})
-    body = order(client).json()
-
-    assert body["ok"] is True and body["ticket"] == "FO-0101"
-    assert seen["subtotal"] == 1175 and seen["tax"] == 153
-    assert body["total"] == 13.28
-    assert "$13.28" in body["message"] and "FO-0101" in body["message"]
-    assert seen["items"][1] == {"product_id": 9, "sku": "FB-COKE", "name": "Coke", "quantity": 1,
-                                "unit_price": 275, "note": "no ice"}
-    assert seen["phone"] == "+19058921234"
-
-
-def test_food_order_refuses_an_item_not_on_the_menu(client, monkeypatch, open_hours):
-    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
-    monkeypatch.setattr(voice.phone_requests, "place_food_order", lambda **kw: pytest.fail("saved"))
-    body = order(client, items=[{"item_id": 99, "quantity": 1}]).json()
-
-    assert body["ok"] is False and body["status"] == 422
-    assert "get_food_menu" in body["message"]
-
-
-def test_food_order_is_placed_once_per_call(client, monkeypatch, open_hours):
-    monkeypatch.setattr(voice.phone_requests, "food_menu", lambda: MENU)
-    monkeypatch.setattr(voice.phone_requests, "place_food_order", lambda **kw: {"ticket": "FO-0101"})
-    for _ in range(voice.MAX_FOOD_ORDERS_PER_CALL):
-        assert order(client).json()["ok"] is True
-    assert order(client).json()["status"] == 429
 
 
 def problem(client, **fields):

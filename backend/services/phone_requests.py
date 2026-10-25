@@ -1,10 +1,10 @@
-"""전화 비서가 받는 음식 주문·현장 문제·컴플레인 (0099).
+"""전화 비서가 받는 음식 주문·현장 문제·컴플레인.
 
-  `pelham_food_orders`   — 스낵바 음식 주문. 메뉴는 계산대 상품 중 'Food & Beverage' 이고 판매 중인 것.
-  `pelham_phone_reports` — kind = problem(카트 배터리 방전 등) · complaint.
+  음식 주문            — GPS 앱의 `menu_items` · `place_food_order`(같은 Supabase). GPS 운영 관리의 주문 탭에 뜬다.
+  `pelham_phone_reports` — kind = problem(카트 배터리 방전 등) · complaint (0099).
 
-번호(`FO-0101`, `PB-0101`, `CP-0101`)는 DB 가 만든다 — 분실물(`lost_items.py`)과 같은 이유다.
-처리(준비됨·가져감·해결)는 직원 화면의 일이다(0099 의 직원 함수).
+번호(`PB-0101`, `CP-0101`)는 DB 가 만든다 — 분실물(`lost_items.py`)과 같은 이유다.
+처리(해결)는 직원 화면의 일이다(0099 의 직원 함수).
 """
 
 from __future__ import annotations
@@ -14,64 +14,38 @@ from typing import Any
 
 from backend.services import supabase_rest as rest
 
-PRODUCTS = "pelham_retail_products"
-FOOD_ORDERS = "pelham_food_orders"
 REPORTS = "pelham_phone_reports"
 
-#: 계산대(`RETAIL_CATEGORIES`)와 같은 글자. 스낵바 화면도 이 분류로 좁힌다.
-FOOD_CATEGORY = "Food & Beverage"
+__all__ = ["food_menu", "food_order_settings", "place_food_order", "file_report", "mark_alerted"]
 
-__all__ = ["FOOD_CATEGORY", "food_menu", "place_food_order", "file_report", "mark_alerted"]
 
+# ----- 음식 주문: GPS 앱(golf-gps-pelhamhills-seven 0012)의 표와 함수를 그대로 쓴다 -----
 
 def food_menu() -> list[dict[str, Any]]:
-    """판매 중인 음식·음료. 이름순. 재고를 세는 상품은 0개면 뺀다(못 파는 것을 받지 않게)."""
-    rows = rest.select(
-        PRODUCTS,
+    """GPS 메뉴 중 지금 있는 것. GPS 앱 화면과 같은 순서(분류 → 정렬 → 이름)."""
+    return rest.select(
+        "menu_items",
         {
-            "select": "id,sku,name,price,stock",
-            "category": f"eq.{FOOD_CATEGORY}",
-            "is_active": "eq.true",
-            "order": "name.asc",
+            "select": "id,name,category,price_cents",
+            "is_available": "eq.true",
+            "order": "category.asc,sort_order.asc,name.asc",
         },
     )
-    return [row for row in rows if row.get("stock") is None or int(row["stock"]) > 0]
 
 
-def place_food_order(
-    *,
-    first_name: str,
-    last_name: str,
-    phone: str,
-    items: list[dict[str, Any]],
-    subtotal: int,
-    tax: int,
-    pickup_time: str = "",
-    notes: str = "",
-    caller_number: str = "",
-    conversation_id: str = "",
-) -> dict[str, Any]:
-    """새 음식 주문. `ticket` 과 `id` 가 채워진 줄을 돌려준다."""
-    row: dict[str, Any] = {
-        "first_name": first_name.strip(),
-        "last_name": last_name.strip(),
-        "phone": phone.strip(),
-        "items": items,
-        "subtotal": subtotal,
-        "tax": tax,
-        "total": subtotal + tax,
-        "status": "new",
-    }
-    if pickup_time.strip():
-        row["pickup_time"] = pickup_time.strip()
-    if notes.strip():
-        row["notes"] = notes.strip()
-    if caller_number.strip():
-        row["caller_number"] = caller_number.strip()
-    if conversation_id.strip():
-        row["conversation_id"] = conversation_id.strip()
-    return rest.insert(FOOD_ORDERS, row)
+def food_order_settings() -> dict[str, Any]:
+    """GPS 운영 관리에서 고치는 주문 시간 설정(open·close·lead_minutes·slot_minutes·enabled)."""
+    value = rest.rpc("food_order_settings", {})
+    return value if isinstance(value, dict) else {}
 
+
+def place_food_order(payload: dict[str, Any]) -> dict[str, Any]:
+    """GPS 의 `place_food_order(p)`. 값·품절·시간은 그 함수가 다시 확인하고, 거절은 RpcRefused 로 온다.
+    성공하면 {code, items, total_cents, pickup_at, status}. 직원 푸시도 그 함수가 보낸다."""
+    return rest.rpc("place_food_order", {"p": payload})
+
+
+# ----- 현장 문제 · 컴플레인 (0099) -----
 
 def file_report(
     *,

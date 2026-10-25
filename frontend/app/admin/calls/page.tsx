@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Calls & SMS — AI 전화 예약 통화 기록(ElevenLabs), 전화로 받은 음식 주문·문제·컴플레인(0099,
- * `components/admin/PhoneRequests.tsx`), 문자 기록(0058), 수신 거부(STOP) 번호.
+ * Calls & SMS — AI 전화 예약 통화 기록(ElevenLabs), 전화로 받은 현장 문제·컴플레인(0099,
+ * `components/admin/PhoneRequests.tsx`. 음식 주문은 GPS 앱의 주문 탭으로 간다), 문자 기록(0058), 수신 거부(STOP) 번호.
  * 통화 원본은 ElevenLabs(`lib/calls/api.ts`), 문자 탭은 `components/admin/SmsLog.tsx`.
  *
  * 줄을 누르면:
@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
-import { PhoneFoodOrders, PhoneReports } from "@/components/admin/PhoneRequests";
+import { PhoneReports } from "@/components/admin/PhoneRequests";
 import { SmsLog, SmsOptOuts } from "@/components/admin/SmsLog";
 import {
   type CallDetail,
@@ -45,11 +45,10 @@ const OUTCOME_TONE: Record<CallRow["outcome"], string> = {
   info: "bg-[#f0f1f3] text-[#4e5560]",
 };
 
-type Tab = "calls" | "food" | "problems" | "complaints" | "sms" | "optouts";
+type Tab = "calls" | "problems" | "complaints" | "sms" | "optouts";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "calls", label: "Calls" },
-  { id: "food", label: "Food orders" },
   { id: "problems", label: "Problems" },
   { id: "complaints", label: "Complaints" },
   { id: "sms", label: "Texts" },
@@ -182,8 +181,8 @@ export default function CallsPage() {
       <section className="border-b border-[#d4d4d8] bg-white px-4 py-4">
         <p className="max-w-4xl text-sm leading-6 text-[#4e5560]">
           AI phone booking calls (ElevenLabs). Click a call that made a booking to open it on the tee sheet;
-          other calls show the summary, transcript and recording. Food orders, Problems and Complaints are what the
-          assistant took down on calls. The Texts tab keeps every text sent to and received from guests.
+          other calls show the summary, transcript and recording. Problems and Complaints are what the assistant took
+          down on calls; phone food orders go to the Orders screen of the GPS app, with the app orders. The Texts tab keeps every text sent to and received from guests.
         </p>
         <div className="mt-3 flex gap-1" role="tablist">
           {TABS.map((t) => (
@@ -203,11 +202,6 @@ export default function CallsPage() {
         </div>
       </section>
 
-      {tab === "food" ? (
-        <section className="grid gap-4 p-4">
-          <PhoneFoodOrders refreshKey={smsRefresh} />
-        </section>
-      ) : null}
       {tab === "problems" || tab === "complaints" ? (
         <section className="grid gap-4 p-4">
           <PhoneReports kind={tab === "problems" ? "problem" : "complaint"} refreshKey={smsRefresh} />

@@ -23,7 +23,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
-import { PhoneFoodOrders } from "@/components/admin/PhoneRequests";
 import ProductsTab from "@/components/retail/ProductsTab";
 import RegisterHome from "@/components/retail/RegisterHome";
 import RegisterTab, { RECEIPT_NO } from "@/components/retail/RegisterTab";
@@ -183,8 +182,6 @@ export default function RetailWorkspace({ title, category, startWithCamera, posA
       {/* 문서형 화면이라 `fill` 을 쓰지 않는다. pb-safe 로 홈 인디케이터를 피한다. */}
       <div className="grid min-w-0 gap-3 p-3 pb-safe">
         {offline ? <OfflineBanner demo detail={detail} /> : null}
-        {/* 전화 비서가 받은 음식 주문(0099). 처리 안 된 것이 있을 때만 보인다. */}
-        {category === "Food & Beverage" && !demo ? <PhoneFoodOrders compact /> : null}
         {refreshError ? (
           <ErrorNote>목록을 새로 읽지 못했습니다 — 화면의 값이 최신이 아닐 수 있습니다. {refreshError}</ErrorNote>
         ) : null}

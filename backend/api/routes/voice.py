@@ -117,21 +117,16 @@ MAX_INFO_SMS_PER_CALL = 2
 #: 기본값 8:00–18:00 은 클럽 확인 전 값이다. Fly secret `PRO_SHOP_HOURS="08:00-18:00"` 로 바꾼다.
 PRO_SHOP_HOURS = os.getenv("PRO_SHOP_HOURS", "08:00-18:00")
 
-#: 전화 음식 주문을 받는 시간(클럽 현지, 매일). 비어 있으면 `PRO_SHOP_HOURS` 와 같다. 클럽 확인 전이다.
-SNACK_BAR_HOURS = os.getenv("SNACK_BAR_HOURS", "")
-
 #: 문제(카트 배터리 방전 등)를 접수하면 바로 문자를 보낼 직원 번호. 쉼표로 여럿. 비어 있으면 화면에만 뜬다.
 #: Fly secret `STAFF_ALERT_NUMBERS="+19055551234,+19055555678"`.
 STAFF_ALERT_NUMBERS = os.getenv("STAFF_ALERT_NUMBERS", "")
-
-#: 음식 주문이 들어오면 문자를 보낼 스낵바 번호. 비어 있으면 스낵바 화면에만 뜬다.
-SNACK_BAR_ALERT_NUMBERS = os.getenv("SNACK_BAR_ALERT_NUMBERS", "")
 
 #: 한 통화가 넣을 수 있는 음식 주문 · 문제/컴플레인 접수 수. 폭주한 에이전트가 같은 주문을 거듭 넣지 않게.
 MAX_FOOD_ORDERS_PER_CALL = 2
 MAX_REPORTS_PER_CALL = 3
 
-#: 한 주문의 한계. 전화로 이보다 큰 주문(단체 도시락 등)은 사람이 받는다.
+#: 한 주문의 한계. 전화로 이보다 큰 주문(단체 도시락 등)은 사람이 받는다. 개수는 GPS 의
+#: `place_food_order` 가 1~20 으로 다시 자른다.
 MAX_FOOD_LINES = 15
 MAX_FOOD_QUANTITY = 12
 
@@ -371,15 +366,17 @@ def _parse_hours(text: str, name: str) -> tuple[int, int]:
     return 8 * 60, 18 * 60
 
 
-def _hours_spoken(hours: tuple[int, int]) -> str:
-    def say(minutes: int) -> str:
-        hour, minute = divmod(minutes % (24 * 60), 60)
-        suffix = "AM" if hour < 12 else "PM"
-        hour12 = hour % 12 or 12
-        return f"{hour12} {suffix}" if minute == 0 else f"{hour12}:{minute:02d} {suffix}"
+def _say_minutes(minutes: int) -> str:
+    """하루의 몇 분째 → "7:30 PM"."""
+    hour, minute = divmod(minutes % (24 * 60), 60)
+    suffix = "AM" if hour < 12 else "PM"
+    hour12 = hour % 12 or 12
+    return f"{hour12} {suffix}" if minute == 0 else f"{hour12}:{minute:02d} {suffix}"
 
+
+def _hours_spoken(hours: tuple[int, int]) -> str:
     start, end = hours
-    return f"{say(start)} to {say(end)}"
+    return f"{_say_minutes(start)} to {_say_minutes(end)}"
 
 
 def _within(hours: tuple[int, int], now: datetime | None) -> bool:
@@ -401,16 +398,6 @@ def staff_hours_spoken() -> str:
 def staff_on_duty(now: datetime | None = None) -> bool:
     """지금 프로 샵에 전화를 받을 직원이 있는가."""
     return _within(staff_hours(), now)
-
-
-def snack_bar_hours() -> tuple[int, int]:
-    """전화 음식 주문을 받는 시간. `SNACK_BAR_HOURS` 가 없으면 프로 샵 시간과 같다."""
-    text = SNACK_BAR_HOURS.strip()
-    return _parse_hours(text, "SNACK_BAR_HOURS") if text else staff_hours()
-
-
-def snack_bar_open(now: datetime | None = None) -> bool:
-    return _within(snack_bar_hours(), now)
 
 
 def duty_note() -> str:
@@ -727,7 +714,7 @@ class CallbackResponse(BaseModel):
 
 
 class FoodLine(BaseModel):
-    item_id: int = Field(..., ge=1, description="The id from get_food_menu.")
+    item_id: str = Field(..., min_length=1, max_length=64, description="The item_id from get_food_menu.")
     quantity: int = Field(default=1, ge=1, le=MAX_FOOD_QUANTITY)
     note: str = Field(default="", max_length=120, description="'no onions', 'extra ketchup' — only if said.")
 
@@ -737,8 +724,9 @@ class FoodMenuRequest(_VoiceRequest):
 
 
 class FoodMenuItem(BaseModel):
-    item_id: int
+    item_id: str
     name: str
+    category: str
     price: float
     spoken_price: str
 
@@ -746,6 +734,7 @@ class FoodMenuItem(BaseModel):
 class FoodMenuResponse(BaseModel):
     ok: bool
     items: list[FoodMenuItem]
+    earliest_pickup: str = ""
     message: str
 
 
@@ -753,7 +742,11 @@ class FoodOrderRequest(_VoiceRequest):
     items: list[FoodLine] = Field(..., min_length=1, max_length=MAX_FOOD_LINES)
     first_name: str = Field(..., min_length=1, max_length=60)
     last_name: str = Field(default="", max_length=60)
-    pickup_time: str = Field(default="", max_length=80, description="When they will pick it up, as they said it.")
+    pickup_time: str = Field(
+        default="", max_length=10,
+        description="Clock time today as HH:MM (24-hour). Leave out for as soon as possible.",
+    )
+    hole: Optional[int] = Field(default=None, ge=1, le=18, description="The hole they are on, if they said.")
     notes: str = Field(default="", max_length=200, description="Allergies or requests for the whole order.")
     phone: str = Field(default="", max_length=40)
     caller_number: str = Field(default="", max_length=40)
@@ -761,10 +754,9 @@ class FoodOrderRequest(_VoiceRequest):
 
 class FoodOrderResponse(BaseModel):
     ok: bool
-    ticket: str
-    subtotal: float
-    tax: float
+    code: str
     total: float
+    pickup_time: str
     message: str
 
 
@@ -2017,7 +2009,11 @@ def request_callback(body: CallbackRequest) -> CallbackResponse:
     )
 
 
-# ===== 도구 11-c: 스낵바 음식 주문 =====================================
+# ===== 도구 11-c: 음식 주문 (GPS 앱의 주문과 같은 표) =====================
+# 메뉴(`menu_items`)·주문(`food_orders`)·영업시간(`app_settings.food_orders`)은 GPS 앱
+# (golf-gps-pelhamhills-seven, 0012)의 것이고 같은 Supabase 에 있다. 전화 주문도 그 앱의
+# `place_food_order` 로 넣는다 — 그래야 GPS 운영 관리의 주문 탭에 앱 주문과 함께 뜨고, 직원 알림
+# (푸시)도 그 함수가 보낸다. 값·품절·시간 검사도 그 함수가 한다. 표를 따로 두면 주문 화면이 둘이 된다.
 
 def _spoken_money(cents: int) -> str:
     return f"${cents / 100:.2f}"
@@ -2042,27 +2038,64 @@ def _alert_numbers(value: str) -> list[str]:
     return [n for n in (normalize_phone(part) for part in value.split(",")) if n]
 
 
-def _snack_bar_closed() -> HTTPException:
+def _clock(text: str, default: int) -> int:
+    match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*", str(text or ""))
+    if not match:
+        return default
+    return int(match.group(1)) * 60 + int(match.group(2))
+
+
+def _food_window() -> tuple[dict[str, Any], int, int, int, int]:
+    """GPS 의 주문 설정 → (설정, 여는 분, 닫는 분, 준비 분, 단위 분). 기본값은 0012 와 같다."""
+    settings_row = phone_requests.food_order_settings()
+    open_min = _clock(settings_row.get("open"), 8 * 60)
+    close_min = _clock(settings_row.get("close"), 19 * 60)
+    lead = int(settings_row.get("lead_minutes") or 20)
+    slot = max(1, int(settings_row.get("slot_minutes") or 10))
+    return settings_row, open_min, close_min, lead, slot
+
+
+def _earliest_pickup(now: datetime) -> datetime | None:
+    """오늘 가장 이른 픽업 시각(단위로 올림). 오늘 더는 못 받으면 None."""
+    settings_row, open_min, close_min, lead, slot = _food_window()
+    if settings_row.get("enabled") is False:
+        return None
+    ready = now + timedelta(minutes=lead)
+    minutes = max(ready.hour * 60 + ready.minute + (1 if ready.second or ready.microsecond else 0), open_min)
+    minutes = -(-minutes // slot) * slot
+    if ready.date() != now.date() or minutes > close_min:
+        return None
+    return now.replace(hour=minutes // 60, minute=minutes % 60, second=0, microsecond=0)
+
+
+def _say_clock(at: datetime) -> str:
+    return _say_minutes(at.hour * 60 + at.minute)
+
+
+def _food_closed() -> HTTPException:
+    try:
+        _, open_min, close_min, _, _ = _food_window()
+        hours = _hours_spoken((open_min, close_min))
+    except supabase_rest.SupabaseUnavailable:
+        hours = ""
     return HTTPException(
         status_code=409,
         detail=(
-            f"The snack bar takes phone orders only from {_hours_spoken(snack_bar_hours())}, and it is outside "
-            "those hours now. Tell the caller plainly and do not take the order."
+            "The snack bar is not taking orders right now"
+            + (f" — orders are taken for pickup from {hours}" if hours else "")
+            + ". Tell the caller plainly and do not take the order."
         ),
     )
 
 
 @tools_router.post("/voice/tools/food-menu", response_model=FoodMenuResponse)
 def get_food_menu(body: FoodMenuRequest) -> FoodMenuResponse:
-    """스낵바 메뉴 — 계산대의 'Food & Beverage' 상품 중 판매 중인 것과 그 값.
-
-    메뉴를 프롬프트에 적어 두지 않는다. 계산대에서 값을 바꾸거나 품절로 내리면 전화도 바로 따라간다.
-    """
+    """GPS 앱의 메뉴(`menu_items`) 중 지금 있는 것과 값, 가장 이른 픽업 시각."""
     _touch_session(body.conversation_id)
-    if not snack_bar_open():
-        raise _snack_bar_closed()
-
     try:
+        earliest = _earliest_pickup(club_now())
+        if earliest is None:
+            raise _food_closed()
         rows = phone_requests.food_menu()
     except supabase_rest.SupabaseUnavailable:
         raise HTTPException(
@@ -2072,10 +2105,11 @@ def get_food_menu(body: FoodMenuRequest) -> FoodMenuResponse:
 
     items = [
         FoodMenuItem(
-            item_id=int(row["id"]),
+            item_id=str(row["id"]),
             name=str(row["name"]),
-            price=int(row["price"]) / 100,
-            spoken_price=_spoken_money(int(row["price"])),
+            category=str(row.get("category") or ""),
+            price=int(row["price_cents"]) / 100,
+            spoken_price=_spoken_money(int(row["price_cents"])),
         )
         for row in rows[:MAX_MENU_ITEMS]
     ]
@@ -2083,27 +2117,27 @@ def get_food_menu(body: FoodMenuRequest) -> FoodMenuResponse:
         return FoodMenuResponse(
             ok=False,
             items=[],
-            message="There is no menu set up for phone orders. Do not take a food order — offer the pro shop.",
+            message="Nothing on the menu is available right now. Do not take a food order — offer the pro shop.",
         )
     return FoodMenuResponse(
         ok=True,
         items=items,
+        earliest_pickup=earliest.strftime("%H:%M"),
         message=(
-            "This is everything we can make right now, with prices before HST. Do not read the whole list — "
-            "ask what they would like, then match it to an item here. Never offer anything that is not on it."
+            f"This is everything available now. The earliest pickup is {_say_clock(earliest)}. Do not read the "
+            "whole list — ask what they would like, then match it to an item here. Never offer anything that "
+            "is not on it."
         ),
     )
 
 
 @tools_router.post("/voice/tools/food-order", response_model=FoodOrderResponse)
-def place_food_order(body: FoodOrderRequest, background: BackgroundTasks) -> FoodOrderResponse:
-    """음식 주문을 넣는다. 스낵바 화면에 바로 뜨고, 픽업은 스낵바, 결제는 픽업 때 계산대에서.
+def place_food_order(body: FoodOrderRequest) -> FoodOrderResponse:
+    """GPS 앱의 `place_food_order` 로 주문을 넣는다. 픽업은 프로 샵(스낵바), 결제는 픽업 때.
 
-    값은 에이전트가 말한 숫자가 아니라 계산대 상품의 값으로 서버가 계산한다. 메뉴에 없는 id 는 거절한다.
+    손님이 말한 시각이 가장 이른 시각보다 이르면 가장 이른 시각으로 넣고 그렇게 말하게 한다.
     """
     session = _touch_session(body.conversation_id)
-    if not snack_bar_open():
-        raise _snack_bar_closed()
     if session is not None and session.food_orders >= MAX_FOOD_ORDERS_PER_CALL:
         raise HTTPException(
             status_code=429,
@@ -2111,53 +2145,45 @@ def place_food_order(body: FoodOrderRequest, background: BackgroundTasks) -> Foo
         )
     phone = _contact_phone(body.phone, body.caller_number)
 
+    now = club_now()
     try:
-        menu = {int(row["id"]): row for row in phone_requests.food_menu()}
+        earliest = _earliest_pickup(now)
     except supabase_rest.SupabaseUnavailable:
-        raise HTTPException(
-            status_code=503,
-            detail="The snack bar is not reachable right now. Apologise and offer the pro shop instead.",
-        ) from None
+        earliest = None
+    if earliest is None:
+        raise _food_closed()
+    pickup = earliest
+    wanted = _clock(body.pickup_time, -1)
+    if wanted >= 0:
+        _, _, close_min, _, slot = _food_window()
+        wanted = -(-wanted // slot) * slot
+        if wanted > close_min:
+            raise HTTPException(
+                status_code=422,
+                detail=f"That pickup time is after the snack bar closes ({_say_minutes(close_min)}). Ask for an earlier time.",
+            )
+        if wanted > earliest.hour * 60 + earliest.minute:
+            pickup = now.replace(hour=wanted // 60, minute=wanted % 60, second=0, microsecond=0)
 
-    missing = [line.item_id for line in body.items if line.item_id not in menu]
-    if missing:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Some items are not on the menu right now. Call get_food_menu again, tell the caller which "
-                "item we cannot make, and use only item ids from that list."
-            ),
-        )
-
-    lines: list[dict[str, Any]] = []
-    subtotal = 0
-    for line in body.items:
-        product = menu[line.item_id]
-        price = int(product["price"])
-        subtotal += price * line.quantity
-        lines.append({
-            "product_id": line.item_id,
-            "sku": product.get("sku"),
-            "name": product["name"],
-            "quantity": line.quantity,
-            "unit_price": price,
-            **({"note": line.note.strip()} if line.note.strip() else {}),
-        })
-    tax = round(subtotal * TAX_RATE)
-
+    notes = [body.notes.strip()] if body.notes.strip() else []
+    notes += [f"#{i + 1}: {line.note.strip()}" for i, line in enumerate(body.items) if line.note.strip()]
+    notes.append("Phone order")
+    payload = {
+        "name": f"{body.first_name} {body.last_name}".strip()[:60],
+        "phone": phone,
+        "note": " · ".join(notes)[:500],
+        "hole": body.hole,
+        "pickup_at": pickup.astimezone(timezone.utc).isoformat(),
+        "items": [{"id": line.item_id, "quantity": line.quantity} for line in body.items],
+    }
     try:
-        row = phone_requests.place_food_order(
-            first_name=body.first_name,
-            last_name=body.last_name,
-            phone=phone,
-            items=lines,
-            subtotal=subtotal,
-            tax=tax,
-            pickup_time=body.pickup_time,
-            notes=body.notes,
-            caller_number=body.caller_number,
-            conversation_id=body.conversation_id or "",
-        )
+        row = phone_requests.place_food_order(payload)
+    except supabase_rest.RpcRefused as refused:
+        raise HTTPException(
+            status_code=409 if refused.status == 409 else 422,
+            detail=f"The order was not placed: {refused.message} Tell the caller and, if it is about the menu, "
+            "call get_food_menu again.",
+        ) from None
     except supabase_rest.SupabaseUnavailable:
         raise HTTPException(
             status_code=503,
@@ -2166,28 +2192,21 @@ def place_food_order(body: FoodOrderRequest, background: BackgroundTasks) -> Foo
     if session is not None:
         session.food_orders += 1
 
-    ticket = str(row.get("ticket") or "")
-    summary = ", ".join(f"{l['quantity']} {l['name']}" for l in lines)
-    for number in _alert_numbers(SNACK_BAR_ALERT_NUMBERS):
-        background.add_task(
-            send_sms,
-            number,
-            f"Phone order {ticket} for {body.first_name.strip()}: {summary}."
-            + (f" Pickup: {body.pickup_time.strip()}." if body.pickup_time.strip() else "")
-            + (f" Note: {body.notes.strip()}" if body.notes.strip() else ""),
-            template="staff_food_order",
-        )
-
+    code = str(row.get("code") or "")
+    total = int(row.get("total_cents") or 0)
+    summary = ", ".join(f"{item.get('quantity')} {item.get('name')}" for item in row.get("items") or [])
+    moved = pickup == earliest and wanted >= 0 and wanted < earliest.hour * 60 + earliest.minute
     return FoodOrderResponse(
         ok=True,
-        ticket=ticket,
-        subtotal=subtotal / 100,
-        tax=tax / 100,
-        total=(subtotal + tax) / 100,
+        code=code,
+        total=total / 100,
+        pickup_time=pickup.strftime("%H:%M"),
         message=(
-            f"Order placed: {summary}. Read the order back, then the total, {_spoken_money(subtotal + tax)} "
-            f"including HST, and the order number one character at a time: {ticket}. Pickup is at the snack "
-            "bar and they pay when they pick it up. Do not promise a ready time."
+            f"Order placed: {summary}. Read the order back, then the total, {_spoken_money(total)}, the pickup "
+            f"time, {_say_clock(pickup)}"
+            + (" (the earliest we can have it ready — say so)" if moved else "")
+            + f", and the order code one character at a time: {code}. They pick it up at the pro shop and "
+            "pay there."
         ),
     )
 
