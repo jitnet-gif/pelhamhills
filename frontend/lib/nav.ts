@@ -226,6 +226,7 @@ export const adminDivisions: AdminDivision[] = [
       { label: "Staff Guides", href: GUIDE_HOME, glyph: "▶" },
       pick("Reports"),
       pick("Integrations"),
+      pick("Starter Phone App"),
     ],
   },
   {
@@ -238,6 +239,7 @@ export const adminDivisions: AdminDivision[] = [
       pick("Customers"),
       pick("Calls & SMS"),
       pick("Reports"),
+      pick("Starter Phone App"),
     ],
   },
 ];
