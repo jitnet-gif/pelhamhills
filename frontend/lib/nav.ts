@@ -145,6 +145,8 @@ export const adminNav: NavItem[] = [
   { label: "Course Map", href: GOLF_GPS_MAP_EDITOR, glyph: "⌖" },
   { label: "Integrations", href: "/admin/integrations", glyph: "⊞" },
   { label: "Settings", href: "/admin/settings", glyph: "⚙" },
+  // 1번 티 스타터 폰(Android) 앱 내려받기와 설치 순서(android/starter).
+  { label: "Starter Phone App", href: "/admin/starter-app", glyph: "📱" },
   { label: "Account Setup", href: ADMIN_ACCOUNTS, glyph: "👤" },
   { label: "Staff Guides", href: "/guide", glyph: "▶" },
 ];

@@ -15,6 +15,8 @@ android {
         versionCode = 1
         versionName = "1.0"
         // 앱이 띄우는 화면. 바꾸려면 여기만(로컬 시험: http://10.0.2.2:3000/teesheet/mobile).
+        // 요즘 Android 폰은 전부 arm64. 다른 CPU 용 Stripe 라이브러리를 빼서 APK 를 줄인다(어드민에서 내려받는다).
+        ndk { abiFilters += "arm64-v8a" }
         buildConfigField("String", "START_URL", "\"https://pelhamhills-golf.vercel.app/teesheet/mobile\"")
     }
 
