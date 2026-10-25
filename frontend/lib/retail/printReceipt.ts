@@ -28,7 +28,9 @@ import {
   type ReceiptDoc,
   type ReceiptHeader,
 } from "./receipt";
-import { printBluetooth, printNetwork, readReceiptPrinterMode } from "./receiptPrinter";
+import { inStarterApp } from "@/lib/starter/bridge";
+
+import { printBluetooth, printNetwork, printStarter, readReceiptPrinterMode } from "./receiptPrinter";
 import type { Sale } from "./types";
 
 const ROOT_ID = "receipt-print-root";
@@ -131,6 +133,13 @@ export function printShiftReport(
 
 function printSheets(sheets: readonly ReceiptBlock[][], options: { openDrawer?: boolean } = {}): void {
   if (typeof window === "undefined") return;
+  if (inStarterApp()) {
+    // 스타터 앱(1번 티 폰)은 인쇄 창이 없다. 실패하면 이유만 알린다 — 문자 영수증은 이미 갔다.
+    printStarter(sheets, options).catch((error: unknown) => {
+      window.alert(`The receipt printer did not print (${error instanceof Error ? error.message : String(error)}).`);
+    });
+    return;
+  }
   const mode = readReceiptPrinterMode();
   if (mode === "browser") return printInBrowser(sheets);
   const send = mode === "network" ? printNetwork : printBluetooth;

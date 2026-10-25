@@ -44,6 +44,8 @@ UNAVAILABLE = "The card terminal service is not available right now. Enter the a
 NOT_SENT_AFTER = 60
 # 리더가 우리 거래를 더 이상 들고 있지 않은데 결과도 없으면, 이만큼 지난 뒤 취소된 것으로 본다(초).
 VANISHED_AFTER = 20
+# 폰 탭 결제는 리더 상태가 없다. 손님이 카드를 꺼내고 앱이 결과를 알릴 때까지 이만큼 기다린 뒤 취소한다(초).
+PHONE_WAIT = 5 * 60
 
 
 # ===== 공통 ============================================================
@@ -152,6 +154,15 @@ def _refresh_sale(row: dict[str, Any]) -> dict[str, Any]:
         return _final_from_payment(row, p)
     if p.status == "canceled":
         return _final(row, approved=False, result="canceled", message="Cancelled.")
+    if not row.get("reader_id"):
+        # 폰 탭 결제(`/terminal/phone/sale`). 계산대 판매는 언제나 리더가 있다. 카드를 읽고 확정하는 것은
+        # 폰 앱의 Stripe SDK 라 물어볼 리더가 없다 — PaymentIntent 만 보고, 오래 끝나지 않으면 취소한다.
+        if _age_seconds(row) > PHONE_WAIT:
+            if _try_cancel_intent(pi):
+                return _final(row, approved=False, result="canceled", message="The phone payment timed out.")
+            p = sg.payment_intent(pi)
+            return _final_from_payment(row, p) if p.status == "succeeded" else row
+        return row
     action = _reader_action(row.get("reader_id"))
     mine = (action.get("type") == "process_payment_intent"
             and (action.get("process_payment_intent") or {}).get("payment_intent") == pi)
@@ -330,23 +341,33 @@ def register(body: RegisterBody, request: Request) -> dict[str, Any]:
             "status": r.get("status")}
 
 
+def _receipt_phone(raw: str | None) -> str | None:
+    if not (raw or "").strip():
+        return None
+    phone = normalize_phone(raw)
+    if not phone:
+        raise HTTPException(status_code=422, detail="Enter a 10-digit phone number for the receipt text.")
+    return phone
+
+
+def _note_receipt_phone(row: dict[str, Any], phone: str | None) -> None:
+    if not phone:
+        return
+    try:
+        supabase_rest.rpc("pelham_payment_text_phone", {"p_txn": row["id"], "p_phone": phone})
+    except Exception as exc:
+        # 문자 번호 때문에 결제를 막지 않는다. 그러면 예약 번호로 가거나 안 간다.
+        logger.warning("승인 문자 번호를 적지 못함: txn=%s (%s)", row.get("id"), type(exc).__name__)
+
+
 @router.post("/terminal/sale")
 def sale(body: SaleBody, request: Request) -> dict[str, Any]:
     """판매: 리더에 금액을 띄운다. 돌려주는 줄은 pending — 화면이 `/terminal/txn/{id}` 로 결과를 묻는다."""
     _require_stripe()
-    receipt_phone = None
-    if (body.receipt_phone or "").strip():
-        receipt_phone = normalize_phone(body.receipt_phone)
-        if not receipt_phone:
-            raise HTTPException(status_code=422, detail="Enter a 10-digit phone number for the receipt text.")
+    receipt_phone = _receipt_phone(body.receipt_phone)
     row = _as_staff(request, "pelham_staff_terminal_begin", {"p": {
         "kind": "sale", "bill_id": body.bill_id, "amount": body.amount, "reader_id": body.reader_id}})
-    if receipt_phone:
-        try:
-            supabase_rest.rpc("pelham_payment_text_phone", {"p_txn": row["id"], "p_phone": receipt_phone})
-        except Exception as exc:
-            # 문자 번호 때문에 결제를 막지 않는다. 그러면 예약 번호로 가거나 안 간다.
-            logger.warning("승인 문자 번호를 적지 못함: txn=%s (%s)", row.get("id"), type(exc).__name__)
+    _note_receipt_phone(row, receipt_phone)
     pi_id = ""
     try:
         pi = sg.create_terminal_intent(amount_cents=body.amount, txn_id=int(row["id"]),
@@ -365,6 +386,51 @@ def sale(body: SaleBody, request: Request) -> dict[str, Any]:
             message = "The reader is offline. Check that it is on and connected to the internet."
         return _final(row, approved=False, result="failed", message=message, code=exc.code)
     return row
+
+
+# ===== 폰 탭 결제 (Tap to Pay, 1번 티 스타터 앱) ===========================
+# 폰 앱(`android/starter`)의 Stripe Terminal SDK 가 폰을 리더로 붙이고, 카드를 읽고, PaymentIntent 를 확정한다.
+# 이 서버는 S700 과 같은 순서로 장부 줄과 PaymentIntent 를 만들어 client_secret 을 넘길 뿐이다 — 결과 확인
+# (`/terminal/txn/{id}`)·취소·웹훅·승인 문자·계산서 결제(terminal_txn)는 계산대와 같다. 장부 줄에 reader_id 가
+# 없는 판매가 폰 결제다(`_refresh_sale`).
+
+class PhoneSaleBody(BaseModel):
+    bill_id: int
+    amount: int = Field(gt=0)
+    receipt_phone: Optional[str] = Field(default=None, max_length=40)
+
+
+@router.post("/terminal/connection_token")
+def connection_token(request: Request) -> dict[str, Any]:
+    """SDK 가 Stripe 에 붙을 일회용 토큰과 Location. 직원만."""
+    _require_stripe()
+    _require_staff(request)
+    try:
+        return {**sg.connection_token(), "environment": sg.environment()}
+    except sg.StripeError as exc:
+        raise HTTPException(status_code=502, detail=exc.message) from None
+
+
+@router.post("/terminal/phone/sale")
+def phone_sale(body: PhoneSaleBody, request: Request) -> dict[str, Any]:
+    """폰 판매: pending 줄 + PaymentIntent. 돌려주는 줄의 `client_secret` 을 앱이 SDK 에 넘긴다."""
+    _require_stripe()
+    receipt_phone = _receipt_phone(body.receipt_phone)
+    row = _as_staff(request, "pelham_staff_terminal_begin", {"p": {
+        "kind": "sale", "bill_id": body.bill_id, "amount": body.amount}})
+    _note_receipt_phone(row, receipt_phone)
+    pi_id = ""
+    try:
+        pi = sg.create_terminal_intent(amount_cents=body.amount, txn_id=int(row["id"]),
+                                       reference=str(row["reference"]), bill_id=body.bill_id,
+                                       description=f"Pelham Hills tap to pay bill {body.bill_id}")
+        pi_id = str(pi.get("id") or "")
+        row = _service("pelham_terminal_settle", {"p": {"id": row["id"], "payment_intent": pi_id}})
+    except sg.StripeError as exc:
+        if pi_id:
+            _try_cancel_intent(pi_id)
+        return _final(row, approved=False, result="failed", message=exc.message, code=exc.code)
+    return {**row, "client_secret": str(pi.get("client_secret") or "")}
 
 
 @router.get("/terminal/txn/{txn_id}")

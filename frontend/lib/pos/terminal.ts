@@ -21,6 +21,7 @@
 import { useSyncExternalStore } from "react";
 
 import { paymentsApiBase } from "@/lib/booking/payments";
+import { onStarterRequest, tapToPay } from "@/lib/starter/bridge";
 import { ApiError } from "@/lib/teeSheet/api";
 import { accessToken } from "@/lib/teeSheet/session";
 import { withManagerApproval } from "@/lib/teeSheet/managerApproval";
@@ -198,6 +199,19 @@ export function terminalConfig(): Promise<{ enabled: boolean; environment: "test
   return configPromise;
 }
 
+/**
+ * 스타터 앱의 SDK 가 Stripe 연결 토큰을 달라고 하면 직원 로그인으로 서버에서 받아 넘긴다.
+ * 앱은 폰을 리더로 붙일 때(화면을 열 때)와 결제 직전에 묻는다. 여러 번 불러도 한 번만 건다.
+ */
+let tokensServed = false;
+export function serveStarterTokens(): void {
+  if (tokensServed) return;
+  tokensServed = true;
+  onStarterRequest("connectionToken", () =>
+    post<{ secret: string; location: string; environment: "test" | "live" }>("/terminal/connection_token"),
+  );
+}
+
 // ===== 결과 기다리기 ===================================================
 
 const POLL_MS = 1500;
@@ -277,6 +291,34 @@ export const terminal = {
     });
     options.onStarted?.(started);
     return waitFor(started, options.onStatus);
+  },
+
+  /**
+   * 폰 탭 결제(1번 티 스타터 앱). 서버가 pending 줄과 PaymentIntent 를 만들고, 앱의 Stripe SDK 가 폰으로
+   * 카드를 읽어 확정한다. 결과는 계산대와 같이 서버 기록으로 받는다 — 앱의 "승인" 만 믿지 않는다.
+   * 앱에서 거절·취소되면 서버의 PaymentIntent 도 취소하고 그 줄을 돌려준다(그 사이 승인됐으면 승인된 줄).
+   */
+  async phoneSale(bill: number, amount: Cents, options: RunOptions = {}): Promise<TerminalRecord> {
+    serveStarterTokens();
+    options.onStatus?.("Starting the payment…");
+    const started = await post<TerminalRecord & { client_secret?: string }>("/terminal/phone/sale", {
+      bill_id: bill,
+      amount,
+      receipt_phone: options.receiptPhone?.trim() || null,
+    });
+    if (!started.pending) return started;
+    options.onStarted?.(started);
+    options.onStatus?.("Hold the card or phone to the back of this phone…");
+    let tapped: Awaited<ReturnType<typeof tapToPay>>;
+    try {
+      tapped = await tapToPay(started.client_secret ?? "", amount);
+    } catch (error) {
+      tapped = { status: "failed", message: error instanceof Error ? error.message : String(error) };
+    }
+    if (tapped.status === "succeeded") return waitFor(started, options.onStatus);
+    const after = await terminal.cancel(started.id).catch(() => started);
+    if (after.approved || !tapped.message) return after;
+    return { ...after, pending: false, host_message: tapped.message };
   },
 
   /** 진행 중인 거래를 계산대에서 취소. 손님이 이미 승인을 받았으면 취소되지 않는다. */

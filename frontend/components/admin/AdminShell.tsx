@@ -81,7 +81,7 @@ type Props = {
    * "pos" 면 관리자 메뉴 없이 계산대 머리 한 줄만 그린다. 설치형 계산대 앱(`/pos`) 전용 —
    * 그 앱의 범위(scope)는 `/pos` 라서, 어드민 메뉴로 나가면 앱 창에 주소 표시줄이 뜬다.
    */
-  variant?: "admin" | "pos";
+  variant?: "admin" | "pos" | "starter";
   /**
    * Account Setup 의 화면 권한(0098)으로 여는 화면이면 그 이름. 권한이 없는 계정에는 본문 대신 이유만 보인다.
    * 주소로 바로 들어와도 같다 — 메뉴만 가리면 북마크로 열린다.
@@ -110,7 +110,31 @@ export default function AdminShell(props: Props) {
   if (gate.state === "out") return <SignInScreen onSignedIn={gate.recheck} />;
   if (gate.state === "denied") return <NotStaffScreen email={gate.email} onSignOut={gate.signOut} />;
   if (props.variant === "pos") return <PosFrame {...props} email={gate.email} onSignOut={gate.signOut} />;
+  if (props.variant === "starter") return <StarterFrame {...props} onSignOut={gate.signOut} />;
   return <AdminFrame {...props} email={gate.email} onSignOut={gate.signOut} />;
+}
+
+/**
+ * 1번 티 스타터 폰(`/teesheet/mobile`)의 껍데기. 한 손으로 쓰는 폰 화면이라 메뉴가 없다 — 제목, 한영 전환,
+ * 로그아웃만. 햇빛 아래에서 보이도록 진한 초록 바탕에 흰 글자.
+ */
+function StarterFrame({ title, actions, children, onSignOut }: Props & { onSignOut: () => void }) {
+  return (
+    <div className="min-h-[100dvh] bg-[#f4f6f3] text-[#1f2328]">
+      <header className="pt-safe bg-[#1e5a3f] text-white">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-lg leading-tight font-bold">{title}</h1>
+            <p className="text-[11px] text-white/75">{CLUB.shortName} · 1st tee</p>
+          </div>
+          <LangToggle className="flex min-h-11 items-center rounded-full border border-white/50 px-3 text-xs font-bold text-white" />
+          <SignOutButton className="flex min-h-11 items-center px-2 text-xs font-bold text-white/80" onSignOut={onSignOut} />
+        </div>
+        {actions}
+      </header>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
 }
 
 /** 계산대 앱에서 오갈 수 있는 곳. 이 둘 말고는 링크를 두지 않는다. */

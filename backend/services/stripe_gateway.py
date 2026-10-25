@@ -422,6 +422,14 @@ def terminal_location() -> str:
     return str(created.get("id") or "")
 
 
+def connection_token() -> dict[str, Any]:
+    """폰 탭 결제(Tap to Pay) 앱의 Stripe Terminal SDK 가 Stripe 에 붙을 때 쓰는 일회용 토큰.
+    리더를 등록하는 Location 과 같은 곳으로 묶는다 — 앱이 폰을 리더로 붙일 때 이 Location 을 쓴다."""
+    location = terminal_location()
+    token = _request("POST", "/terminal/connection_tokens", {"location": location})
+    return {"secret": str(token.get("secret") or ""), "location": location}
+
+
 def register_reader(registration_code: str, label: str) -> dict[str, Any]:
     """리더 등록. 테스트 모드에서는 `simulated-s700` 으로 가상 리더를 만든다."""
     return _request("POST", "/terminal/readers", {

@@ -23,6 +23,8 @@ import {
   eposPrintUrl,
   normalizePrinterHost,
 } from "./eposPrint";
+import { printOnStarter } from "@/lib/starter/bridge";
+
 import { RECEIPT_LOGO } from "./logo";
 import type { ReceiptBlock } from "./receipt";
 
@@ -323,6 +325,22 @@ export function printNetwork(
     }
     const result = eposPrintResult(await response.text().catch(() => ""));
     if (!result.ok) throw new Error(eposPrintErrorMessage(result.code || `HTTP ${response.status}`));
+  });
+  queue = job.catch(() => undefined);
+  return job;
+}
+
+/**
+ * 1번 티 스타터 앱 안: 같은 ESC/POS 를 앱으로 넘기고, 앱이 자기 설정의 프린터(블루투스 또는 와이파이)로 보낸다.
+ * WebView 에는 Web Serial 이 없고 프린터 인증서도 허용할 수 없어서, 앱 안에서는 늘 이 길이다.
+ */
+export function printStarter(
+  sheets: readonly (readonly ReceiptBlock[])[],
+  options: { openDrawer?: boolean } = {},
+): Promise<void> {
+  const job = queue.then(async () => {
+    const bytes = escposReceipt(sheets, { logo: await receiptLogo(), openDrawer: options.openDrawer });
+    await printOnStarter(bytes);
   });
   queue = job.catch(() => undefined);
   return job;

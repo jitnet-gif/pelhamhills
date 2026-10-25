@@ -76,7 +76,8 @@ class FakeStripe:
         pid = self._id("pi")
         self.intents[pid] = {"id": pid, "object": "payment_intent", "amount": amount, "status": status,
                              "amount_received": amount if status == "succeeded" else 0, "metadata": metadata,
-                             "kind": kind, "tip": tip, "last_payment_error": None}
+                             "kind": kind, "tip": tip, "last_payment_error": None,
+                             "client_secret": f"{pid}_secret_test"}
         return self.intents[pid]
 
     def succeed(self, pid: str, *, interac: bool = False, tip: int = 0) -> None:
@@ -182,6 +183,10 @@ class FakeStripe:
             return httpx.Response(200, json=cfg)
         if path == "/terminal/readers" and m == "GET":
             return httpx.Response(200, json={"data": list(self.readers.values())})
+        if path == "/terminal/locations" and m == "GET":
+            return httpx.Response(200, json={"data": [{"id": "tml_TEST"}]})
+        if path == "/terminal/connection_tokens" and m == "POST":
+            return httpx.Response(200, json={"secret": "pst_test_abc", "location": form.get("location")})
         if path.startswith("/test_helpers/terminal/readers/"):
             r = self.readers[path.split("/")[4]]
             act = r["action"]
@@ -305,7 +310,7 @@ class FakeSql:
         if p["kind"] == "sale":
             row = {"id": tid, "kind": "sale", "bill_id": p["bill_id"], "reference": f"REF{tid:09d}",
                    "result": "pending", "approved": False, "requested_amount": p["amount"], "tip": 0,
-                   "total_amount": 0, "payment_intent": None, "reader_id": p["reader_id"],
+                   "total_amount": 0, "payment_intent": None, "reader_id": p.get("reader_id"),
                    "card_type": None, "created_at": _now_iso()}
         else:
             o = self.txns[p["refund_of"]]
@@ -864,6 +869,53 @@ def test_terminal_readers_list(env):
     assert body["environment"] == "test"
     assert body["readers"][0] == {"id": READER, "label": "Pro shop", "device_type": "simulated_stripe_s700",
                                   "status": "online", "simulated": True}
+
+
+# ===== 폰 탭 결제 =====================================================
+
+def _phone_sale(client, amount: int = 1130) -> dict[str, Any]:
+    res = client.post(f"{TERM}/phone/sale", json={"bill_id": 7, "amount": amount}, headers=STAFF)
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+def test_phone_connection_token_needs_staff(env):
+    client, gw, sql = env
+    assert client.post(f"{TERM}/connection_token").status_code == 401
+    body = client.post(f"{TERM}/connection_token", headers=STAFF).json()
+    assert body == {"secret": "pst_test_abc", "location": "tml_TEST", "environment": "test"}
+    assert gw.posts("/terminal/connection_tokens")[0]["location"] == "tml_TEST"
+
+
+def test_phone_sale_hands_client_secret_and_skips_reader(env):
+    client, gw, sql = env
+    row = _phone_sale(client)
+    assert row["pending"] is True and row["reader_id"] is None
+    assert row["client_secret"] == f"{row['payment_intent']}_secret_test"
+    assert gw.posts("/payment_intents")[0]["metadata[terminal_txn]"] == str(row["id"])
+    assert not [r for r in gw.requests if r[1].startswith("/terminal/readers")]
+    # 손님이 카드를 꺼내는 동안은 리더가 없어도 취소하지 않는다(계산대는 20초).
+    sql.txns[row["id"]]["created_at"] = _now_iso(60)
+    assert client.get(f"{TERM}/txn/{row['id']}", headers=STAFF).json()["pending"] is True
+    assert gw.intents[row["payment_intent"]]["status"] != "canceled"
+    gw.succeed(row["payment_intent"])
+    done = client.get(f"{TERM}/txn/{row['id']}", headers=STAFF).json()
+    assert done["approved"] is True and done["card_last4"] == "4242"
+
+
+def test_phone_sale_times_out(env):
+    client, gw, sql = env
+    row = _phone_sale(client)
+    sql.txns[row["id"]]["created_at"] = _now_iso(terminal.PHONE_WAIT + 5)
+    done = client.get(f"{TERM}/txn/{row['id']}", headers=STAFF).json()
+    assert done["result"] == "canceled" and gw.intents[row["payment_intent"]]["status"] == "canceled"
+
+
+def test_phone_sale_cancel_from_phone(env):
+    client, gw, sql = env
+    row = _phone_sale(client)
+    done = client.post(f"{TERM}/txn/{row['id']}/cancel", headers=STAFF).json()
+    assert done["result"] == "canceled" and done["approved"] is False
 
 
 # ===== 회원권 카드 결제(0042) ============================================
