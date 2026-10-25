@@ -20,6 +20,15 @@
 백업은 `~/PelhamBackups/pelhamhills-backup-YYYY-MM-DD_HHMM/` 에 쌓이고 30일이 지나면 지워진다.
 어드민 **Data Backup** 화면의 "Recent backups" 에 매일 밤 `Nightly` 로 한 줄씩 남는다. 하루 넘게 없으면 화면에 빨간 경고가 뜬다.
 
+## 로그인 자동 백업
+
+매니저(Reports)나 Emmeline(계정 관리자)이 어드민에 **로그인할 때마다** 그 컴퓨터의 다운로드 폴더에
+`pelhamhills-backup-YYYY-MM-DD_HHMM.zip` 이 하나 저장된다. 로그인이 남아 있어 로그인 화면을 거치지 않는 날은 그날 처음
+어드민을 열 때 한 번 받는다. 화면 구석에 진행 상황이 뜨고, 기록에는 `At sign-in` 으로 남는다(0101 필요).
+크롬이 처음 한 번 "여러 파일 다운로드 허용" 을 물을 수 있다 — 허용을 누른다.
+
+이 ZIP 은 Data Backup 화면의 "Choose ZIP or CSV files" 로 바로 복원된다. 터미널 복원은 ZIP 을 더블클릭해 풀어서 그 폴더로 한다.
+
 ## 복원
 
 - **화면**: Data Backup → Choose backup folder → 표 고르기 → Merge / Replace → `RESTORE` 입력.

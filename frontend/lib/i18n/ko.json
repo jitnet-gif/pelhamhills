@@ -3068,6 +3068,12 @@
  "No daily backup has run yet.": "아직 자동 백업이 실행된 적이 없습니다.",
  "Choose a folder on this computer — a new dated folder is made inside it.": "이 컴퓨터의 폴더를 고르세요 — 그 안에 날짜 폴더가 새로 만들어집니다.",
  "This browser can't choose a folder, so each CSV is downloaded to Downloads. Chrome or Edge can save into a folder.": "이 브라우저는 폴더를 고를 수 없어 CSV 를 하나씩 다운로드 폴더에 받습니다. 크롬·엣지는 폴더에 바로 저장할 수 있습니다.",
- "Pick a backup folder (a daily one from PelhamBackups, or one saved here). Nothing changes until you press Restore. Back up now first so you can undo a restore.": "백업 폴더를 고르세요(PelhamBackups 의 매일 백업, 또는 여기서 저장한 폴더). 복원 버튼을 누르기 전에는 아무것도 바뀌지 않습니다. 되돌릴 수 있게 먼저 \"지금 백업\"을 하세요.",
- "The daily backup hasn't run in the last day. Check that the office Mac is on (see scripts/backup/README.md).": "지난 하루 동안 자동 백업이 실행되지 않았습니다. 사무실 맥이 켜져 있는지 확인하세요(scripts/backup/README.md)."
+ "The daily backup hasn't run in the last day. Check that the office Mac is on (see scripts/backup/README.md).": "지난 하루 동안 자동 백업이 실행되지 않았습니다. 사무실 맥이 켜져 있는지 확인하세요(scripts/backup/README.md).",
+ "Pick a backup folder (a daily one from PelhamBackups, or one saved here) or a sign-in backup ZIP from Downloads. Nothing changes until you press Restore. Back up now first so you can undo a restore.": "백업 폴더(PelhamBackups 의 매일 백업, 또는 여기서 저장한 폴더)나 다운로드 폴더의 로그인 백업 ZIP 을 고르세요. 복원 버튼을 누르기 전에는 아무것도 바뀌지 않습니다. 되돌릴 수 있게 먼저 \"지금 백업\"을 하세요.",
+ "Choose ZIP or CSV files": "ZIP 또는 CSV 파일 선택",
+ "At sign-in": "로그인 시",
+ "Backing up club data…": "클럽 데이터 백업 중…",
+ "Backup saved:": "백업 저장됨:",
+ "Automatic backup failed:": "자동 백업 실패:",
+ ": every time a manager or Emmeline signs in, the club data is saved as one ZIP in that computer's Downloads folder (and once a day if they stay signed in).": ": 매니저나 Emmeline 이 로그인할 때마다 클럽 데이터가 그 컴퓨터의 다운로드 폴더에 ZIP 하나로 저장됩니다(로그인을 유지하면 하루 한 번)."
 }

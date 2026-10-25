@@ -115,6 +115,10 @@ function BackupManager() {
           file per table, plus <b>manifest.json</b>. Sign-in passwords are not included.
         </p>
         <p>
+          <b>At sign-in</b>: every time a manager or Emmeline signs in, the club data is saved as one ZIP in that
+          computer&apos;s Downloads folder (and once a day if they stay signed in).
+        </p>
+        <p>
           <b>Daily backup</b> runs every night on the office Mac and keeps 30 days in <b>PelhamBackups</b>.{" "}
           {lastDaily ? (
             <>
@@ -161,7 +165,7 @@ function BackupManager() {
                   <tr className="border-t border-[#ececef]" key={run.id}>
                     <td className="py-1 pr-3 whitespace-nowrap">{clubDateTime(run.created_at)}</td>
                     <td className="py-1 pr-3 whitespace-nowrap">
-                      {run.kind === "backup" ? "Backup" : "Restore"} · {run.source === "daily" ? "Nightly" : run.source === "web" ? "This site" : "Script"}
+                      {run.kind === "backup" ? "Backup" : "Restore"} · {run.source === "daily" ? "Nightly" : run.source === "login" ? "At sign-in" : run.source === "web" ? "This site" : "Script"}
                     </td>
                     <td className="py-1 pr-3 break-all">{run.email}</td>
                     <td className="py-1 pr-3 text-right tabular-nums">{run.tables}</td>
@@ -302,7 +306,7 @@ function RestorePanel({ tables, onDone }: { tables: BackupTable[] | null; onDone
     <section className="grid gap-2 border border-[#d4d4d8] bg-white p-3 text-sm">
       <h2 className="text-base font-bold">Restore from a backup</h2>
       <p className="text-[#3f434a]">
-        Pick a backup folder (a daily one from PelhamBackups, or one saved here). Nothing changes until you press Restore.
+        Pick a backup folder (a daily one from PelhamBackups, or one saved here) or a sign-in backup ZIP from Downloads. Nothing changes until you press Restore.
         Back up now first so you can undo a restore.
       </p>
       <div className="flex flex-wrap gap-2">
@@ -310,7 +314,7 @@ function RestorePanel({ tables, onDone }: { tables: BackupTable[] | null; onDone
           Choose backup folder
         </Button>
         <Button disabled={busy} onClick={() => filesInput.current?.click()}>
-          Choose CSV files
+          Choose ZIP or CSV files
         </Button>
         <input
           {...FOLDER_INPUT}
@@ -324,7 +328,7 @@ function RestorePanel({ tables, onDone }: { tables: BackupTable[] | null; onDone
           type="file"
         />
         <input
-          accept=".csv,.json"
+          accept=".csv,.json,.zip"
           className="hidden"
           multiple
           onChange={(event) => {

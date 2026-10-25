@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiError } from "@/lib/teeSheet/api";
+import { makeZip, readZip } from "@/lib/zip";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
 export type BackupColumn = { name: string; type: string; generated: boolean };
@@ -30,7 +31,8 @@ export type BackupTable = {
 export type BackupRun = {
   id: number;
   kind: "backup" | "restore";
-  source: "web" | "daily" | "script";
+  /** login = 계정 관리자가 로그인할 때 하루 한 번 자동으로(0101). */
+  source: "web" | "daily" | "script" | "login";
   email: string;
   tables: number;
   rows: number;
@@ -62,8 +64,8 @@ export const backupApi = {
   },
   tables: () => staffRpc<BackupTable[]>("pelham_backup_tables"),
   runs: () => staffRpc<BackupRun[]>("pelham_backup_runs_list"),
-  log: (kind: BackupRun["kind"], tables: number, rows: number, note: string) =>
-    staffRpc<void>("pelham_backup_log", { p_kind: kind, p_source: "web", p_tables: tables, p_rows: rows, p_note: note }),
+  log: (kind: BackupRun["kind"], tables: number, rows: number, note: string, source: BackupRun["source"] = "web") =>
+    staffRpc<void>("pelham_backup_log", { p_kind: kind, p_source: source, p_tables: tables, p_rows: rows, p_note: note }),
   exportPage: (table: string, offset: number) =>
     staffRpc<ExportPage>("pelham_backup_export", { p_table: table, p_offset: offset, p_limit: EXPORT_PAGE }),
   restore: (table: string, columns: string[], rows: (string | null)[][]) =>
@@ -204,7 +206,12 @@ export function backupFolderName(now = new Date()): string {
 }
 
 /** 파일을 쓰는 곳. 폴더를 고를 수 있는 브라우저(크롬·엣지)는 폴더에, 아니면 파일마다 내려받기. */
-export type BackupSink = { write: (name: string, text: string) => Promise<void>; where: string };
+export type BackupSink = {
+  write: (name: string, text: string) => Promise<void>;
+  /** 다 쓴 뒤 한 번(ZIP 은 여기서 내려받는다). */
+  finish?: () => Promise<void>;
+  where: string;
+};
 
 type DirHandle = {
   name: string;
@@ -253,10 +260,32 @@ export function downloadSink(folder: string): BackupSink {
   };
 }
 
+/** 파일을 모아 ZIP 하나로 내려받는다. 로그인 자동 백업이 쓴다 — 클릭 없이 폴더를 고를 수는 없어서. */
+export function zipSink(folder: string): BackupSink {
+  const files: { name: string; text: string }[] = [];
+  return {
+    where: `Downloads/${folder}.zip`,
+    write: async (name, text) => {
+      files.push({ name: `${folder}/${name}`, text });
+    },
+    finish: async () => {
+      const url = URL.createObjectURL(makeZip(files));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${folder}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+  };
+}
+
 export async function runBackup(
   sink: BackupSink,
   email: string,
   onProgress: (p: Progress) => void,
+  source: BackupRun["source"] = "web",
 ): Promise<{ tables: number; rows: number }> {
   const tables = await backupApi.tables();
   const manifest: Manifest = { app: "pelhamhills", version: 1, created_at: new Date().toISOString(), by: email, tables: [] };
@@ -279,8 +308,9 @@ export async function runBackup(
   }
 
   await sink.write("manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+  await sink.finish?.();
   onProgress({ done: tables.length, total: tables.length, label: "manifest.json" });
-  await backupApi.log("backup", tables.length, total, sink.where).catch(() => undefined);
+  await backupApi.log("backup", tables.length, total, sink.where, source).catch(() => undefined);
   return { tables: tables.length, rows: total };
 }
 
@@ -294,25 +324,40 @@ export type LoadedTable = {
 
 export type LoadedBackup = { createdAt: string | null; by: string | null; tables: LoadedTable[] };
 
-/** 고른 파일들(폴더 통째로 또는 CSV 몇 개)을 읽는다. 다운로드 대체 방식의 `<폴더>__표.csv` 이름도 알아본다. */
+type BackupEntry = { name: string; dir: string; text: () => Promise<string> };
+
+/** 고른 파일들(폴더 통째로, CSV 몇 개, 또는 로그인 자동 백업 ZIP)을 읽는다. 다운로드 대체 방식의 `<폴더>__표.csv` 이름도 알아본다. */
 export async function loadBackupFiles(files: File[]): Promise<LoadedBackup> {
-  const named = files.map((file) => ({ file, name: (file.name.split("__").pop() ?? file.name).toLowerCase() }));
-  // PelhamBackups 를 통째로 고르면 날짜 폴더들의 같은 표가 겹친다. 날짜 폴더 하나만 받는다.
-  const folders = new Set(files.map((file) => file.webkitRelativePath.split("/").slice(0, -1).join("/")));
-  if (folders.size > 1) throw new Error("Pick one dated backup folder (pelhamhills-backup-…), not the folder that holds them.");
-  const manifestFile = named.find((item) => item.name === "manifest.json")?.file;
-  const manifest = manifestFile ? (JSON.parse(await manifestFile.text()) as Manifest) : null;
+  const entries: BackupEntry[] = [];
+  for (const file of files) {
+    if (file.name.toLowerCase().endsWith(".zip")) {
+      for (const item of await readZip(file)) {
+        const parts = item.path.split("/");
+        if (parts[0] === "__MACOSX") continue;
+        entries.push({ name: parts.pop() ?? "", dir: `${file.name}/${parts.join("/")}`, text: async () => item.text });
+      }
+    } else {
+      const dir = file.webkitRelativePath.split("/").slice(0, -1).join("/");
+      entries.push({ name: file.name, dir, text: () => file.text() });
+    }
+  }
+  const named = entries.map((entry) => ({ entry, name: (entry.name.split("__").pop() ?? entry.name).toLowerCase() }));
+  // PelhamBackups 를 통째로 고르면 날짜 폴더들의 같은 표가 겹친다. 날짜 폴더(또는 ZIP) 하나만 받는다.
+  const folders = new Set(named.filter((item) => /\.(csv|json)$/.test(item.name)).map((item) => item.entry.dir));
+  if (folders.size > 1) throw new Error("Pick one dated backup folder or ZIP (pelhamhills-backup-…), not several.");
+  const manifestEntry = named.find((item) => item.name === "manifest.json")?.entry;
+  const manifest = manifestEntry ? (JSON.parse(await manifestEntry.text()) as Manifest) : null;
   if (manifest && manifest.app !== "pelhamhills") throw new Error("This folder isn't a Pelham Hills backup.");
 
   const tables: LoadedTable[] = [];
-  for (const { file, name } of named) {
+  for (const { entry, name } of named) {
     if (!name.endsWith(".csv")) continue;
     const table = name.slice(0, -4);
     if (!/^pelham_[a-z0-9_]+$/.test(table)) continue;
-    const parsed = parseCsv(await file.text());
+    const parsed = parseCsv(await entry.text());
     tables.push({ table, columns: parsed.columns, rows: parsed.rows });
   }
-  if (tables.length === 0) throw new Error("No pelham_*.csv files found. Pick the backup folder.");
+  if (tables.length === 0) throw new Error("No pelham_*.csv files found. Pick the backup folder or ZIP.");
   return { createdAt: manifest?.created_at ?? null, by: manifest?.by ?? null, tables };
 }
 
