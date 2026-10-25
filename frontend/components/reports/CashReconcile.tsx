@@ -8,7 +8,7 @@
  * 현금에는 시작 잔돈이 있고, 온라인 결제는 마감할 계산대가 없다. 그 식(리포트 + 팁 = 센 돈 − 잔돈 + 온라인)
  * 과 차이는 **서버가** 계산한다. 여기서는 그리기만 한다.
  *
- * 아직 닫지 않은 계산대·사람이 있거나 닫은 뒤 숫자가 바뀌었으면 차이를 확정하지 않고 "Not final" 로 둔다.
+ * 아직 닫지 않은 계산대·사람이 있거나 닫은 뒤 숫자가 바뀌었으면 차이를 확정하지 않고 상태 표시 없이 둔다.
  * 계산대 마감은 다른 화면(계산대 홈)에서 하므로 Refresh 로 다시 읽는다.
  *
  * 수단마다 Sales report 줄을 누르면 그날 그 수단의 결제를 담당자별 요약 → 거래로 본다(2026-10-24, `CashShiftModal`).
@@ -191,9 +191,8 @@ function Row({
 }
 
 function Diff({ diff, complete }: { diff: Cents; complete: boolean }) {
-  if (!complete) {
-    return <span className="bg-[#fff1cc] px-1.5 py-0.5 text-[11px] font-bold text-[#8a5a00]">Not final</span>;
-  }
+  // 아직 확정 전이면 아무것도 안 띄운다(2026-10-25 요청 — "Not final" 표시 뺌).
+  if (!complete) return null;
   if (diff === 0) {
     return <span className="bg-[#e3f4e8] px-1.5 py-0.5 text-[11px] font-bold text-[#1f6b3a]">Matches</span>;
   }
@@ -258,12 +257,6 @@ function openItems(report: Report): string[] {
     if (row.has_sales && !row.closed) items.push(`${registerName(row)} register is not closed yet.`);
     else if (row.stale) items.push(`${registerName(row)} changed after it was closed — close it again.`);
   }
-  for (const method of ["card", "debit"] as const) {
-    for (const name of uncountedSlips(report, method)) {
-      items.push(
-        `${name}: the ${METHOD_LABELS[method].toLowerCase()} slip is not counted yet — enter it on Close Register.`,
-      );
-    }
-  }
+  // 카드·체크카드 전표 안 셌다는 줄은 안 띄운다(2026-10-25 요청).
   return items;
 }
