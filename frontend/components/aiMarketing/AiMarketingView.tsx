@@ -8,16 +8,20 @@
  *   - 매출 구성: 그린피·카트·추가품목·프로샵·스낵바, 고객층별 1인 금액과 주중·주말.
  *   - 유입 경로·프로모 코드·회원권·연락 가능한 사람 수.
  *   - 회원별 라운드 수(0097): 기간·시즌 누적·마지막 플레이.
+ *   - Claude 의 전략 제안(Fly `/ai-marketing/strategy`): 같은 기간 요약 + 골프장 주변·해밀턴 경계 상권으로
+ *     사실·전략·니치 시장·30/60/90일 실행표. 누를 때만 부른다(1–2분, 유료). 마지막 결과는 기간별로 이 브라우저에 둔다.
  *
- * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, Claude 의 사실·제안, 마케팅 믹스 보드)는 이 화면에 붙는다.
+ * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, 마케팅 믹스 보드)는 이 화면에 붙는다.
  * 데모 숫자로 내려가지 않는다 — 서버가 안 되면 오류를 보여 준다(옛 Business Intelligence 화면이 고치려던 문제).
  */
 
 import { useEffect, useMemo, useState } from "react";
 
-import { Button, Chip, EmptyNote, ErrorNote, Field, Panel, SkeletonCards, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
+import { Button, Chip, EmptyNote, ErrorNote, Field, Panel, SkeletonCards, SkeletonRows, StatCard, TextArea, TextInput } from "@/components/retail/ui";
 import {
   aiMarketingApi,
+  askStrategy,
+  type Strategy,
   type DayPart,
   type DayType,
   type MarketingSummary,
@@ -25,6 +29,7 @@ import {
   type SalesParts,
   type Segment,
 } from "@/lib/aiMarketing/api";
+import { getLang } from "@/lib/i18n/engine";
 import { localBusinessDate } from "@/lib/retail/api";
 import { ApiError } from "@/lib/teeSheet/api";
 import { addDays } from "@/lib/teeSheet/dates";
@@ -126,7 +131,8 @@ export default function AiMarketingView() {
     <div className="grid min-w-0 gap-3 p-4">
       <p className="text-sm text-[#4e5560]">
         Who plays when, what they spend, and where they come from — real numbers from tee sheet bookings and paid bills.
-        Forecast, Claude&apos;s facts &amp; ideas and the marketing mix board come next on this page.
+        Claude reads the same numbers plus the trade area around the club (Welland, Pelham, Niagara and the Hamilton
+        boundary) and writes a marketing strategy. Forecast and the marketing mix board come next on this page.
       </p>
 
       <div className="flex flex-wrap items-end gap-2">
@@ -155,7 +161,10 @@ export default function AiMarketingView() {
           <SkeletonRows count={6} />
         </>
       ) : data && !error ? (
-        <Summary data={data} />
+        <>
+          <StrategyPanel from={request.from} key={requestKey} to={request.to} />
+          <Summary data={data} />
+        </>
       ) : null}
       {data && !error ? <MemberRoundsPanel from={request.from} to={request.to} /> : null}
     </div>
@@ -533,5 +542,189 @@ function MemberRoundsPanel({ from, to }: { from: string; to: string }) {
         </div>
       )}
     </Panel>
+  );
+}
+
+const BUDGET_LABEL: Record<Strategy["strategies"][number]["budget"], string> = { low: "Low budget", medium: "Medium budget", high: "High budget" };
+
+function storedStrategy(key: string): Strategy | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as Strategy) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Claude 의 전략 제안. 누를 때만 서버를 부른다 — 1–2분 걸리고 부를 때마다 API 요금이 든다.
+ * 마지막 결과는 기간별로 이 브라우저(localStorage)에 둔다. 없어져도 다시 누르면 된다.
+ * Claude 가 쓴 글은 화면 언어로 오므로 사전에 걸리지 않는다. 제목·라벨만 사전(ko.json)으로 바뀐다.
+ */
+function StrategyPanel({ from, to }: { from: string; to: string }) {
+  const key = `pelham-ai-strategy:${from}|${to}`;
+  // 기간이 바뀌면 부모가 key 로 새로 만든다 — 그 기간의 마지막 결과로 시작한다.
+  const [strategy, setStrategy] = useState<Strategy | null>(() => storedStrategy(key));
+  const [focus, setFocus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const ask = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const next = await askStrategy(from, to, getLang(), focus);
+      setStrategy(next);
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        // 저장 못 해도 화면에는 보인다.
+      }
+    } catch (cause) {
+      setError(describe(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel title="Claude's marketing strategy">
+      <div className="grid gap-3">
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <Field label="Anything to focus on? (optional)">
+            <TextArea
+              maxLength={500}
+              onChange={(event) => setFocus(event.target.value)}
+              placeholder="e.g. fill weekday afternoons, bring Hamilton golfers, sell next year's memberships"
+              value={focus}
+            />
+          </Field>
+          <Button disabled={busy} onClick={ask} tone="primary">
+            {busy ? "Claude is writing… (1–2 min)" : strategy ? "Ask again" : "Ask Claude for a strategy"}
+          </Button>
+        </div>
+        <p className="text-xs text-[#6b7280]">
+          Sends this period&apos;s totals (no names, emails or phone numbers) and the trade area to Claude. Written in the
+          language the page is set to (EN / 한).
+        </p>
+        {error ? <ErrorNote>{error}</ErrorNote> : null}
+        {busy && !strategy ? <SkeletonRows count={5} /> : null}
+        {strategy ? <StrategyBody strategy={strategy} /> : null}
+      </div>
+    </Panel>
+  );
+}
+
+function StrategyBody({ strategy }: { strategy: Strategy }) {
+  const plan = [...strategy.plan].sort((a, b) => Number(a.window) - Number(b.window));
+  return (
+    <div className="grid min-w-0 gap-3">
+      <p className="border-l-4 border-[#6d28d9] bg-[#f5f3ff] px-3 py-2 text-sm font-semibold">{strategy.headline}</p>
+
+      <section className="grid gap-1">
+        <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">What the numbers say</h3>
+        <ul className="grid gap-1 text-sm">
+          {strategy.facts.map((fact, index) => (
+            <li key={index}>
+              {fact.fact} <span className="text-xs text-[#6b7280]">— {fact.evidence}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="grid gap-2">
+        <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Strategies</h3>
+        <div className="grid gap-2 lg:grid-cols-2">
+          {strategy.strategies.map((item, index) => (
+            <article className="grid content-start gap-1.5 border border-[#d4d4d8] p-3 text-sm" key={index}>
+              <h4 className="font-bold">
+                {index + 1}. {item.title}
+              </h4>
+              <p className="flex flex-wrap gap-1 text-xs">
+                {[item.target_group, item.time_slot, item.area, BUDGET_LABEL[item.budget] ?? item.budget].map((tag, tagIndex) => (
+                  <span className="bg-[#eef0f2] px-1.5 py-0.5" key={tagIndex}>
+                    {tag}
+                  </span>
+                ))}
+              </p>
+              <p>{item.why}</p>
+              <p>
+                <b>Offer:</b> {item.offer}
+              </p>
+              <p>
+                <b>Channels:</b> {item.channels.join(" · ")}
+              </p>
+              <ol className="list-decimal pl-5">
+                {item.steps.map((step, stepIndex) => (
+                  <li key={stepIndex}>{step}</li>
+                ))}
+              </ol>
+              <p className="text-xs text-[#1a7f4b]">
+                <b>Measure:</b> {item.kpi}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-1">
+        <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Local niches — Niagara to the Hamilton boundary</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead>
+              <tr className="text-left text-xs text-[#6b7280]">
+                <th className="font-bold">Area</th>
+                <th className="font-bold">People</th>
+                <th className="font-bold">Drive</th>
+                <th className="font-bold">Why they&apos;d come</th>
+                <th className="font-bold">Hook</th>
+              </tr>
+            </thead>
+            <tbody>
+              {strategy.niche_markets.map((row, index) => (
+                <tr className="border-t border-[#eef0f2] align-top" key={index}>
+                  <td className="py-1 pr-2 font-semibold">{row.area}</td>
+                  <td className="py-1 pr-2 whitespace-nowrap">{row.population}</td>
+                  <td className="py-1 pr-2 whitespace-nowrap">{row.drive}</td>
+                  <td className="py-1 pr-2">{row.why}</td>
+                  <td className="py-1">{row.hook}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="grid gap-1">
+        <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Rollout</h3>
+        <div className="grid gap-2 md:grid-cols-3">
+          {plan.map((step) => (
+            <div className="border border-[#d4d4d8] p-3 text-sm" key={step.window}>
+              <h4 className="mb-1 font-bold">{`Next ${step.window} days`}</h4>
+              <ul className="grid list-disc gap-1 pl-5">
+                {step.actions.map((action, index) => (
+                  <li key={index}>{action}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {strategy.cautions.length > 0 ? (
+        <section className="grid gap-1">
+          <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Watch out</h3>
+          <ul className="grid list-disc gap-1 pl-5 text-sm text-[#7a6320]">
+            {strategy.cautions.map((caution, index) => (
+              <li key={index}>{caution}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <p className="text-xs text-[#6b7280]">
+        {strategy.period.from} → {strategy.period.to} · {strategy.model} · Population and drive times are approximate (2021
+        Census).
+      </p>
+    </div>
   );
 }

@@ -5,6 +5,9 @@
  * 금액은 모두 센트, 세전. 고객층·시간대 나누는 규칙은 0094 머리 주석에 있다.
  */
 
+import { paymentsApiBase } from "@/lib/booking/payments";
+import { ApiError } from "@/lib/teeSheet/api";
+import { accessToken } from "@/lib/teeSheet/session";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
 export type Segment = "member" | "public" | "golfnow" | "junior_senior" | "league" | "tour" | "staff";
@@ -71,3 +74,53 @@ export const aiMarketingApi = {
   memberRounds: (from: string, to: string) =>
     staffRpc<MemberRounds>("pelham_staff_ai_marketing_member_rounds", { p_from: from, p_to: to }),
 };
+
+/** Claude 의 마케팅 전략(Fly `POST /ai-marketing/strategy`). 서버가 위 요약 + 주변 상권으로 쓴다. */
+export type Strategy = {
+  headline: string;
+  facts: { fact: string; evidence: string }[];
+  strategies: {
+    title: string;
+    target_group: string;
+    time_slot: string;
+    area: string;
+    why: string;
+    offer: string;
+    channels: string[];
+    steps: string[];
+    kpi: string;
+    budget: "low" | "medium" | "high";
+  }[];
+  niche_markets: { area: string; population: string; drive: string; why: string; hook: string }[];
+  plan: { window: "30" | "60" | "90"; actions: string[] }[];
+  cautions: string[];
+  model: string;
+  period: { from: string; to: string };
+};
+
+export async function askStrategy(from: string, to: string, lang: "en" | "ko", focus: string): Promise<Strategy> {
+  const token = await accessToken();
+  if (!token) throw new ApiError(401, "Sign in again to ask Claude.");
+  let response: Response;
+  try {
+    response = await fetch(`${paymentsApiBase()}/ai-marketing/strategy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ from, to, lang, focus }),
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
+  }
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`.trim();
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body?.detail === "string" && body.detail) message = body.detail;
+    } catch {
+      // JSON 이 아닌 오류 본문.
+    }
+    if (response.status === 404) message = "Claude's strategy is not on the server yet. Deploy the API (Fly) first.";
+    throw new ApiError(response.status, message);
+  }
+  return (await response.json()) as Strategy;
+}

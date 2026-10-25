@@ -87,6 +87,8 @@ include_route_module("backend.api.routes.cashier_code", f"{settings.API_V1_STR}"
 include_route_module("backend.api.routes.customer_qr", f"{settings.API_V1_STR}", ["Retail"])
 # proshop@ 이 화면을 열거나 내려받으면 analysis@ 등에 메일. 이메일은 토큰으로 Supabase Auth 에 묻는다.
 include_route_module("backend.api.routes.activity_alert", f"{settings.API_V1_STR}", ["Staff"])
+# AI Manager Marketing Strategies — 기간 요약(0094)으로 Claude 가 전략을 쓴다. 명단 확인은 SQL 이 한다.
+include_route_module("backend.api.routes.ai_marketing", f"{settings.API_V1_STR}", ["Marketing"])
 
 if VOICE_ONLY:
     logger.warning(
