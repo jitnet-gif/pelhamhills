@@ -85,6 +85,24 @@ export function houseBarcode(productId: number): string {
   return `PH${String(productId).padStart(6, "0")}`;
 }
 
+/**
+ * 상품 창의 Generate 버튼이 넣는 바코드. 있는 상품은 `houseBarcode(id)` 그대로(목록의 일괄 생성과 같은 값),
+ * 새 상품은 아직 id 가 없으므로 지금 가장 큰 id·PH 번호 다음 번호에서 시작한다. 이미 누가 쓰면 1씩 올린다.
+ * `taken` 은 소문자로 정리한 SKU·바코드 집합이다.
+ */
+export function nextHouseBarcode(productId: number | null, catalog: { id: number; barcode?: string | null }[], taken: Set<string>): string {
+  let next = productId;
+  if (next === null) {
+    const numbers = catalog.flatMap((item) => {
+      const code = (item.barcode ?? "").trim();
+      return [item.id, isHouseBarcode(code) ? Number(code.slice(2)) : 0];
+    });
+    next = Math.max(0, ...numbers) + 1;
+  }
+  while (taken.has(houseBarcode(next).toLowerCase())) next += 1;
+  return houseBarcode(next);
+}
+
 /** 클럽이 만든 바코드인가. 이런 상품은 포장에 바코드가 없으니 화면·인쇄 시트에 그려 준다. */
 export function isHouseBarcode(code: string | null | undefined): boolean {
   return /^PH\d{6,}$/i.test((code ?? "").trim());

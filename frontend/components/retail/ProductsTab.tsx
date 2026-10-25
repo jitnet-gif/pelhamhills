@@ -15,7 +15,7 @@ import CameraScanner, { type ScanOutcome } from "@/components/pos/CameraScanner"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 
 import retailApi, { toRetailError } from "@/lib/retail/api";
-import { code128Svg, houseBarcode, isHouseBarcode } from "@/lib/retail/barcode";
+import { code128Svg, houseBarcode, isHouseBarcode, nextHouseBarcode } from "@/lib/retail/barcode";
 import { LABEL_LAYOUTS, printBarcodeLabels, type LabelLayout } from "@/lib/retail/barcodeLabels";
 import { menuGroupSuggestions } from "@/lib/retail/menuGroups";
 import { setProductPhoto, uploadProductPhoto } from "@/lib/retail/productPhoto";
@@ -656,6 +656,7 @@ function ProductDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
   // 사진(0068). 있는 상품은 고르는 즉시 올린다. 새 상품은 id 가 없으므로 들고 있다가 저장 뒤에 올린다.
   const [photoUrl, setPhotoUrl] = useState<string | null>(product?.photo_url ?? null);
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
@@ -746,6 +747,17 @@ function ProductDialog({
     return { ok: true, message: code };
   }
 
+  // 바코드 없는 상품(음식·렌탈·로고 상품)에 클럽 바코드를 바로 붙인다. 다른 상품의 SKU·바코드와 겹치지 않는 값만 고른다.
+  function generateBarcode() {
+    const taken = new Set(
+      catalog
+        .filter((item) => item.id !== product?.id)
+        .flatMap((item) => [item.sku, item.barcode ?? ""])
+        .map((code) => code.trim().toLowerCase()),
+    );
+    set("barcode", nextHouseBarcode(product?.id ?? null, catalog, taken));
+  }
+
   // `parseMoney` 는 쓰레기 입력을 조용히 0 으로 떨어뜨린다. 그러면 "$0.00 짜리
   // Pro V1" 이 만들어지고 아무도 모른다 — 저장 버튼을 켜기 전에 직접 본다.
   const priceCents = parseMoney(form.price);
@@ -765,6 +777,28 @@ function ProductDialog({
     if (bySku) return { field: "SKU", value: sku, owner: bySku };
     return null;
   }, [catalog, product?.id, form.barcode, sku]);
+
+  // 칸의 바코드를 그린다. Code 128 B 는 인쇄 가능한 ASCII 만 담는다 — 한글 등이 섞이면 그리지도 찍지도 않는다.
+  const barcodeText = form.barcode.trim();
+  const barcodeSvg = useMemo(() => {
+    if (!barcodeText) return null;
+    try {
+      return code128Svg(barcodeText);
+    } catch {
+      return null;
+    }
+  }, [barcodeText]);
+  // 스티커 인쇄 창에 넘기는 상품. 저장 전이라도 지금 칸의 이름·가격·바코드로 찍는다.
+  const labelItem: Product = {
+    ...(product ?? { sku, cost: 0, stock: null, reorder_point: 0, is_active: true, created_at: "", updated_at: "" }),
+    id: product?.id ?? 0,
+    sku,
+    barcode: barcodeText,
+    name: form.name.trim() || barcodeText,
+    category: form.category,
+    menu_group: form.menuGroup.trim() || null,
+    price: priceCents,
+  };
 
   async function save() {
     if (!valid || clash) return;
@@ -810,7 +844,7 @@ function ProductDialog({
   return (
     <>
       {/* 카메라가 떠 있을 때 Esc 는 카메라만 닫는다. 이 창까지 닫히면 적던 것이 날아간다. */}
-      <Modal onClose={cameraOpen ? () => undefined : onClose} title={product ? "Edit product" : "Add product"}>
+      <Modal onClose={cameraOpen || labelsOpen ? () => undefined : onClose} title={product ? "Edit product" : "Add product"}>
         <div className="grid gap-3">
           <Field hint="Scan the product's barcode — works wherever the cursor is" label="Barcode">
             <div className="flex min-w-0 gap-2">
@@ -833,7 +867,25 @@ function ProductDialog({
                   value={form.barcode}
                 />
               </div>
+              <button
+                className="inline-flex min-h-11 shrink-0 items-center justify-center border border-[#d4d4d8] bg-white px-3 text-sm font-bold hover:bg-[#f2f2f4]"
+                onClick={generateBarcode}
+                title="No barcode on the package? Make a club barcode (PH + number)"
+                type="button"
+              >
+                Generate
+              </button>
             </div>
+            {barcodeSvg ? (
+              <div className="mt-2 flex items-center gap-3">
+                <span className="block w-[170px] shrink-0 bg-white text-center">
+                  {/* code128Svg 는 막대(rect)만 그린 SVG 다. 사람이 입력한 글자는 들어가지 않는다. */}
+                  <span className="block h-10 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
+                  <span className="block font-mono text-[10px] tracking-wider text-[#3f434a]">{barcodeText}</span>
+                </span>
+                <Button onClick={() => setLabelsOpen(true)}>🖨 Print sticker</Button>
+              </div>
+            ) : null}
           </Field>
 
           <Field hint="For items without a barcode — the register camera finds the product from this photo" label="Photo">
@@ -1010,6 +1062,7 @@ function ProductDialog({
           summary={<span className="text-sm font-bold">Scan the product&apos;s barcode</span>}
         />
       ) : null}
+      {labelsOpen ? <LabelDialog items={[labelItem]} onClose={() => setLabelsOpen(false)} /> : null}
     </>
   );
 }
