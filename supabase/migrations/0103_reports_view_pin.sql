@@ -6,7 +6,7 @@
 -- 하는 일
 -- 1. 계정이 없으면 만든다(이메일 확인 끝난 상태). 있으면 비밀번호만 바꾼다 — 숫자를 바꿀 때 이 파일을 새 숫자로 다시 실행한다.
 -- 2. 이메일 로그인 identity 를 맞춘다(없으면 GoTrue 가 로그인을 거절한다).
--- 3. Reports 명단(0046)에 넣는다 — 현금까지 보인다.
+-- 3. 직원 명단(scorecard_admins)과 Reports 명단(0046)에 넣는다 — Reports 함수는 둘 다 요구한다. 현금까지 보인다.
 -- 4. 데이터 백업(0100)에서는 뺀다 — 0102 의 pelham_is_backup_manager 에 이 계정을 더한다(proshop@ 도 그대로 막는다).
 --
 -- 숫자: 저장소가 공개라 여기 적지 않는다. 붙여 넣은 뒤 아래 'PIN_HERE' 를 실제 숫자로 바꿔 실행한다. 그대로 실행하면 막는다.
@@ -55,6 +55,8 @@ begin
             now(), now(), now());
   end if;
 
+  -- Reports 함수는 직원(pelham_is_staff, 0004)이면서 명단에 있는 계정만 받는다(0046) — 둘 다 넣는다.
+  insert into public.scorecard_admins (user_id) values (v_id) on conflict do nothing;
   insert into public.pelham_cash_viewers (email) values (v_email) on conflict do nothing;
 end;
 $$;
@@ -78,11 +80,14 @@ revoke all on function public.pelham_is_backup_manager() from public, anon, auth
 
 notify pgrst, 'reload schema';
 
--- 확인: 'auth user' · 'identity' · 'reports list' 세 줄이 나와야 한다.
+-- 확인: 'auth user' · 'identity' · 'reports list' · 'staff list' 네 줄이 나와야 한다.
 select 'auth user' as what, email from auth.users where lower(email) = 'reports-view@pelhamhills.ca'
 union all
 select 'identity', i.identity_data->>'email' from auth.identities i
   join auth.users u on u.id = i.user_id
  where lower(u.email) = 'reports-view@pelhamhills.ca' and i.provider = 'email'
 union all
-select 'reports list', email from public.pelham_cash_viewers where lower(email) = 'reports-view@pelhamhills.ca';
+select 'reports list', email from public.pelham_cash_viewers where lower(email) = 'reports-view@pelhamhills.ca'
+union all
+select 'staff list', u.email from public.scorecard_admins s join auth.users u on u.id = s.user_id
+ where lower(u.email) = 'reports-view@pelhamhills.ca';
