@@ -1,0 +1,795 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GolfNow-Style Tee Times</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* GolfNow-style guest screen mock — keeps a light look in both themes */
+.gn{--g:#214d2f;--gd:#163820;--gi:#1F2328;--gm:#6B7280;--gl:#DADDE1;--gs:#F4F6F5;--tw:#9C7424;background:#f7f4ed;color:#182118;border:1px solid var(--gl);border-radius:10px;overflow:hidden;font-size:12.5px}
+.gn .urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#ECEEF0;border-bottom:1px solid var(--gl);font-family:var(--mono);font-size:10.5px;color:var(--gm);min-width:0}
+.gn .urlbar i{width:8px;height:8px;border-radius:50%;background:#C9CDD2;flex:none}
+.gn .urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gnbar{display:flex;gap:12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--gl);font-size:11.5px;color:var(--gm);flex-wrap:wrap}
+.gnbar b{color:var(--g);font-size:14px;margin-right:auto;font-family:Georgia,serif}
+.gnbody{padding:10px 12px 14px;display:grid;gap:8px}
+.flt{display:grid;gap:8px}
+.dates{display:flex;gap:6px;overflow:hidden}
+.dc{flex:1;min-width:0;border:1px solid var(--gl);border-radius:6px;text-align:center;padding:4px 0;line-height:1.15}
+.dc small{display:block;font-size:9.5px;color:var(--gm);text-transform:uppercase}
+.dc b{font-size:14px}
+.dc.on{background:var(--g);border-color:var(--g);color:#fff}.dc.on small{color:#D4E6DB}
+.flt .row{display:flex;align-items:center;gap:8px}
+.lab{font-size:11px;font-weight:700;color:var(--gm)}
+.seg2{display:inline-flex;border:1px solid var(--gl);border-radius:6px;overflow:hidden}
+.seg2 span{padding:5px 12px;font-weight:700;border-left:1px solid var(--gl)}
+.seg2 span:first-child{border-left:0}
+.seg2 span.on{background:#2f8a4f;color:#fff}
+.seg2.wide{display:flex}.seg2.wide span{flex:1;text-align:center;padding:7px 0}
+.hot{outline:2.5px solid #F2A33A;outline-offset:2px;border-radius:6px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(242,163,58,.25)}}
+.sunrow{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--tw);background:#FBF4E4;border-radius:6px;padding:5px 8px}
+.gt{margin:6px 0 0;font-size:13.5px;color:var(--gi);padding:2px 4px}
+.gt small{font-weight:500;color:var(--gm);font-size:10.5px;margin-left:4px}
+.gg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.gc{position:relative;border:1px solid var(--gl);border-radius:6px;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.gc .gh{background:var(--g);color:#fff;text-align:center;font-weight:700;font-size:13px;padding:5px 0}
+.gc sup{font-size:.55em;margin-left:1px;vertical-align:.6em}
+.gc .gb{text-align:center;padding:6px 2px 7px;line-height:1.3}
+.gc .gp{font-size:17px;font-weight:700}
+.gc .gl{font-size:10px;color:var(--gm)}.gc .gl em{font-style:normal;color:var(--tw);font-weight:700}
+.gc .gm{font-size:10.5px;display:flex;justify-content:center;align-items:center;gap:2px}
+.gc .i{width:10px;height:10px;fill:currentColor}
+.gc.off{opacity:.38;filter:grayscale(1)}
+.gc.hot{outline-offset:1px}
+.gnote{position:absolute;top:-1px;right:-1px;background:#F2A33A;color:#2a1a00;font-size:9px;font-weight:800;padding:1px 5px;border-radius:0 6px 0 6px}
+.more{display:flex;align-items:center;justify-content:center;border:1px dashed var(--gl);border-radius:6px;color:var(--gm);font-size:11px;min-height:60px}
+.gbadge{justify-self:start;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px}
+.gbadge.sand{background:#F5EDDC;color:#7A5A16}.gbadge.green{background:#E1EDE5;color:#1E5A3F}
+.oldgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.oc{border:1px solid #d8d1c3;border-radius:2px;text-align:center;padding:4px 0;line-height:1.2;background:#fff}
+.oc b{display:block;font-size:11px}.oc small{font-size:9.5px;color:var(--gm)}
+.oc.full{background:#efece3;color:#a8a698}
+.zoom{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:6px 0}
+.zoom .gc .gh{font-size:16px;padding:8px 0}.zoom .gc .gp{font-size:22px}
+.legend{margin:4px 0 0;padding:0;list-style:none;display:grid;gap:5px}
+.legend li{display:flex;gap:8px;align-items:baseline;font-size:12px}
+.legend b{min-width:96px;color:var(--g)}.legend sup{font-size:.6em}
+.det{display:grid;gap:10px}
+.dl .photo{border-radius:8px;overflow:hidden;aspect-ratio:16/7;background:#cfd8cf}
+.dl .photo img{width:100%;height:100%;object-fit:cover;display:block}
+.dl h3{margin:8px 0 2px;font-size:16px}.addr{margin:0;color:var(--gm);font-size:11px}
+.tee{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}
+.tee th{background:var(--g);color:#fff;padding:4px;font-weight:700}
+.tee td{text-align:center;padding:4px;border-bottom:1px solid var(--gl);color:var(--gm)}
+.ask{margin:4px 0 0;font-size:10.5px;color:#B5471C;font-weight:700}
+.dp{border:1px solid var(--gl);border-radius:10px;padding:10px 12px;display:grid;gap:7px}
+.kv3{display:grid;grid-template-columns:1.6fr 1fr .6fr;gap:6px}
+.kv3 small{display:block;font-size:9.5px;color:var(--gm)}.kv3 b{font-size:13.5px}
+.tags{display:flex;gap:5px;flex-wrap:wrap}
+.tags span{border:1px solid var(--gi);border-radius:99px;padding:1px 8px;font-size:10px}
+.tags .tw{border-color:var(--tw);color:var(--tw)}
+.gsum{display:grid;gap:4px;border-top:1px solid var(--gl);padding-top:7px}
+.gsum div{display:flex;justify-content:space-between;gap:8px}.gsum span{color:var(--gm)}
+.gsum .tot{border-top:1px solid var(--gl);padding-top:5px;font-size:14px}.gsum .tot span{color:var(--gi);font-weight:700}
+.cta{background:#2f8a4f;color:#fff;text-align:center;font-weight:800;border-radius:99px;padding:8px}
+.fine{margin:0;font-size:10px;color:var(--gm);text-align:center}
+.form{display:grid;gap:7px}.form h3,.ok h3{margin:0;font-size:15px}
+.inp{border:1px solid var(--gl);border-radius:6px;padding:8px 10px;color:var(--gi)}
+.ok{text-align:center;display:grid;gap:6px;padding:10px 0}
+.ok .ck{font-size:30px;color:#2F9E55}.ok p{margin:0}
+.ok .code{font-family:var(--mono);font-weight:800;letter-spacing:.15em;color:var(--g);font-size:16px}
+.plan{display:grid;gap:4px;font-size:13px}
+.plan h3{margin:8px 0 2px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.plan code{font-family:var(--mono);font-size:11.5px;background:var(--sunk);padding:1px 4px;border-radius:4px}
+.plan .q li{color:var(--flag);font-weight:600}
+.lc.lcdim{opacity:.5}.lc.lcon{border-color:var(--green)}
+
+.gnbar span.act{background:var(--g);color:#fff;border-radius:4px;padding:3px 7px;font-weight:700}
+.gnbar{background:#f7f4ed}.gnbar b{color:#182118}
+.ph1 h3{margin:0;font-family:Georgia,serif;font-size:19px}.ph1 p{margin:2px 0 0;color:var(--gm);font-size:11px}
+.two{display:grid;grid-template-columns:1fr 1.2fr;gap:8px}
+.pl{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.pl span{background:#fff;border:1px solid #d8d1c3;border-radius:2px;text-align:center;padding:6px 0;font-weight:700}
+.pl span.on{background:var(--g);border-color:var(--g);color:#fff}
+.sunrow{background:#f3ead2;border:1px solid #d6c28f;color:#5c4a1c;padding:6px 8px;border-radius:2px;justify-content:flex-start}
+.dc{background:#fff;border-radius:2px}.dc small{font-size:9px}
+.dh{display:flex;justify-content:space-between;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:4px}
+.dh b{font-family:Georgia,serif;font-size:14px}.dh span{font-size:10.5px;color:var(--gm)}
+.gt{font-family:Georgia,serif}
+.dp{background:#fff;border-color:#d8d1c3}
+.pp b{font-size:15px}.pp small{font-size:10px;color:var(--gm);font-weight:700}
+.ck{display:flex;gap:8px;align-items:flex-start;padding:2px}
+.ck .box{width:16px;height:16px;border-radius:3px;border:1.5px solid #8a8f88;flex:none;display:grid;place-items:center;font-size:11px;color:#fff;font-weight:800}
+.ck .box.on{background:#2563eb;border-color:#2563eb}
+.ck small{display:block;font-size:10px;color:var(--gm)}
+.form{background:#fff;border:1px solid #d8d1c3;border-radius:10px;padding:10px 12px}
+.form h3{font-family:Georgia,serif}
+.inp.dim2{color:var(--gm)}
+.dl h3{font-family:Georgia,serif}
+.okscr{background:#fff;border:1px solid #d8d1c3;border-radius:6px;text-align:center;display:grid;gap:5px;padding:16px 10px}
+.okscr .ckm{font-size:28px;color:var(--g)}.okscr h3{margin:0;font-family:Georgia,serif;color:var(--g)}.okscr p{margin:0}
+.okscr .big{font-size:24px;font-weight:800}.okscr .code{font-family:var(--mono);font-weight:800;letter-spacing:.15em;color:var(--g)}
+.okc{color:var(--ok)}
+.gg{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+.bub{width:18px;height:15px;margin-right:4px;vertical-align:-3px}
+</style></head><body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Vercel · Supabase RPC</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const L=(ko,en)=>({ko,en});
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 손님 웹 티타임 예약 · 배포 완료 2026-10-20",
+  h1:"GolfNow처럼 고르는 <b>티타임 예약</b>, 만들었어요",
+  lede:"손님용 예약 화면(/book/tee-time)이 이렇게 바뀌었어요. 시간대별 카드, 해 있는 시간만, 상세 화면의 인원·카트·금액 패널, 그리고 예약까지 아홉 장면으로 보여 드려요. 왼쪽은 손님 화면, 가운데는 뒤에서 오가는 요청, 오른쪽은 만든 것과 남은 것이에요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 9장면",laneScreen:"손님 화면",laneLog:"뒤에서 일어나는 일",laneLedger:"만든 것",
+  ledgerSub:"커밋 2562f54 · Vercel 배포됨",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 요청이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"화면은 커밋 2562f54(2026-10-20)로 pelhamhills-golf.vercel.app 에 배포됐어요. 카드의 시간·남은 자리는 10월 20일에 받은 10/22(목) 실제 목록이고, 요금은 가을 숄더 평일 요금표예요. 이름·확인 코드는 예시예요. 예약을 끝까지 넣어 보는 확인은 실제 예약이 생겨서 하지 않았어요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Guest web tee times · deployed 2026-10-20",
+  h1:"<b>Tee time booking</b>, picked like GolfNow — built",
+  lede:"This is how the guest booking page (/book/tee-time) works now, in nine scenes: tee times grouped into cards, daylight-only times, a detail page with golfers, cart and the total, then booking. Left: the guest screen. Middle: the requests behind it. Right: what was built and what's left.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 9 scenes",laneScreen:"Guest screen",laneLog:"Behind the scenes",laneLedger:"Built",
+  ledgerSub:"Commit 2562f54 · deployed on Vercel",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Requests appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"The screens shipped in commit 2562f54 (2026-10-20) to pelhamhills-golf.vercel.app. Card times and seats are the real list for Thursday 10/22 as read on October 20; rates are the fall shoulder weekday card. Names and the confirmation code are examples. A full booking was not placed end to end, because it would create a real reservation."}
+};
+
+/* ---------- 10/22 (목) 실제 목록 · 10/20 에 받음 · weekday_shoulder ---------- */
+const RAW=[[457, 4], [463, 0], [472, 2], [481, 0], [490, 2], [499, 2], [508, 1], [517, 0], [526, 1], [535, 0], [544, 2], [553, 0], [562, 0], [571, 1], [580, 2], [589, 4], [598, 0], [607, 0], [616, 0], [625, 0], [634, 0], [643, 2], [652, 4], [661, 0], [670, 0], [679, 4], [688, 4], [697, 4], [706, 4], [715, 4], [724, 4], [733, 4], [742, 4], [751, 4], [760, 4], [769, 4], [778, 0], [787, 0], [796, 0], [805, 0], [814, 4], [823, 4], [832, 4], [841, 4], [850, 4], [859, 4], [868, 4], [877, 4], [886, 4], [895, 4], [904, 4], [913, 4], [922, 4], [931, 4], [940, 4], [949, 4], [958, 4], [967, 4], [976, 4], [985, 4]];
+const SLOTS=RAW.map(([m,rem])=>({m,rem}));
+const RATE=40.71, TWI=35.40, R9=28.31, NINE_FROM=600, TWI_FROM=840, CART18=19.47, CART9=11.5;
+const hm=m=>{const h=Math.floor(m/60),mm=m%60;return {t:(h%12||12)+":"+String(mm).padStart(2,"0"),ap:h<12?"AM":"PM"}};
+const clock=m=>{const x=hm(m);return x.t+" "+x.ap};
+const rateAt=m=>m>=TWI_FROM?TWI:RATE;
+const money=v=>"$"+v.toFixed(2);
+const PICK=679; // 11:19 AM · 4 left
+
+const ICF='<svg class="i" viewBox="0 0 16 16"><path d="M4 1h1.4v14H4zM5.4 1.5l7 2.8-7 2.8z"/></svg>';
+const ICP='<svg class="i" viewBox="0 0 16 16"><circle cx="5.5" cy="5" r="2.3"/><circle cx="11" cy="5.5" r="2"/><path d="M1 13c0-2.6 2-4.4 4.5-4.4S10 10.4 10 13zM10.6 13c0-1.6-.5-2.9-1.5-3.8.6-.3 1.2-.5 1.9-.5 2.2 0 3.9 1.6 3.9 4.3z"/></svg>';
+
+function gcard(s,party,o){
+  o=o||{};const x=hm(s.m);const r=rateAt(s.m);const [d,c]=r.toFixed(2).split(".");
+  const off=s.rem<party;const nine=s.m>=NINE_FROM;const tw=s.m>=TWI_FROM;
+  return '<div class="gc'+(off?" off":"")+(o.hot?" hot":"")+'"><div class="gh">'+x.t+'<sup>'+x.ap+'</sup></div><div class="gb">'+
+    '<div class="gp">$'+d+'<sup>'+c+'</sup></div>'+
+    '<div class="gl">'+(tw?'<em>Twilight</em> · ':'')+'18 Holes</div>'+
+    '<div class="gm">'+ICF+(nine?'18·9':'18')+' / '+ICP+(s.rem===1?"1":"1-"+s.rem)+'</div></div>'+
+    (o.note?'<span class="gnote">'+o.note+'</span>':'')+'</div>';
+}
+function browser(path,body){return '<div class="gn"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app'+path+'</span></div><div class="gnbar"><b>Pelham Hills</b><span class="act">Tee Time(Field)</span><span>Simulator(Indoor)</span><span>My Booking</span></div><div class="gnbody">'+body+'</div></div>'}
+function head(title,sub){return '<div class="ph1"><h3>'+title+'</h3><p>'+sub+'</p></div>'}
+function filters(party,o){o=o||{};
+  const days=[["Today","20"],["Wed","21"],["Thu","22"],["Fri","23"],["Sat","24"],["Sun","25"]].map(([w,n])=>'<span class="dc'+(n==="22"?" on":"")+'"><small>'+w+'</small><b>'+n+'</b><small>Oct</small></span>').join("");
+  return '<div class="flt"><div class="lab">Date</div><div class="dates">'+days+'</div>'+
+    '<div class="two"><div><div class="lab">Players</div><div class="pl">'+[1,2,3,4].map(n=>'<span class="'+(n===party?"on":"")+(o.hotParty&&n===party?" hot":"")+'">'+n+'</span>').join("")+'</div></div>'+
+    '<div><div class="lab">Daylight</div><div class="sunrow'+(o.hotSun?" hot":"")+'">☀ First tee 7:37 AM &nbsp; Last tee 4:25 PM</div></div></div></div>';
+}
+function dayHead(party){const n=SLOTS.filter(s=>s.rem>=party).length;return '<div class="dh"><b>Thursday, October 22, 2026</b><span>'+n+' tee times open for '+party+' players</span></div>'}
+const GR=[["Morning","Before 11 AM",0,660],["Mid-day","11 AM – 2 PM",660,840],["Afternoon","From 2 PM · twilight",840,1440]];
+function groups(party,o){o=o||{};const per=o.per||6;let h="";
+  GR.forEach(([g,hint,from,until])=>{
+    if(o.only&&o.only!==g)return;
+    const list=SLOTS.filter(s=>s.rem>0&&s.m>=from&&s.m<until);
+    const show=o.tail?list.slice(-per):list.slice(0,per);
+    h+='<h4 class="gt'+(o.hotGroup===g?" hot":"")+'">'+g+' Tee Times <small>'+hint+'</small></h4><div class="gg">'+
+      show.map(s=>gcard(s,party,{hot:o.hotM===s.m,note:o.notes&&o.notes[s.m]})).join("")+
+      (list.length>show.length?'<div class="more">+'+(list.length-show.length)+' more</div>':'')+'</div>';
+  });return h;
+}
+function oldPage(){
+  const chips=SLOTS.slice(0,16).map(s=>'<span class="oc'+(s.rem===0?" full":"")+'"><b>'+clock(s.m)+'</b><small>'+(s.rem===0?"Full":s.rem+" left")+'</small></span>').join("");
+  return '<div class="gbadge sand">어제까지 · Before</div><div class="oldgrid">'+chips+'</div>';
+}
+function detail(o){o=o||{};const n=o.n||2;const holes=o.holes||18;const cart=o.cart!==false;
+  const fee=holes===9?R9:rateAt(PICK);const cf=cart?(holes===9?CART9:CART18):0;
+  const gf=fee*n,ct=cf*n;const tax=Math.round((gf+ct)*13)/100;const tot=gf+ct+tax;
+  const left=o.noLeft?'':'<div class="dl"><div class="photo"><img src="course.jpg" alt=""></div><h3>Pelham Hills Golf Club</h3><p class="addr">196 Webber Road, Welland, ON L3B 5N8</p><p class="addr">Please arrive 15 minutes before your tee time. Check in at the pro shop.</p></div>';
+  const seg=(arr,cur,hot)=>'<div class="seg2 wide">'+arr.map(k=>'<span class="'+(k===cur?"on":"")+(k===cur&&hot?" hot":"")+'">'+k+'</span>').join("")+'</div>';
+  const panel='<div class="dp'+(o.hotPanel?" hot":"")+'"><div class="kv3"><div><small>Date</small><b>Thu, Oct 22, 2026</b></div><div><small>Time</small><b>11:19 AM</b></div><div><small>Holes</small><b>'+holes+'</b></div></div>'+
+    '<div class="tags"><span>9 or 18 holes</span><span>'+(cart?"Power cart":"Walking")+'</span></div>'+
+    '<div class="lab">Holes</div>'+seg([9,18],holes,o.hotHoles)+
+    '<div class="pp"><b>'+money(fee)+'</b> <small>CAD / golfer</small></div><div class="lab">Number of Golfers</div>'+seg([1,2,3,4],n,o.hotN)+
+    '<div class="ck'+(o.hotCart?" hot":"")+'"><span class="box'+(cart?" on":"")+'">'+(cart?"✓":"")+'</span><span><b>Power cart</b><small>'+(cart?Math.ceil(n/2)+' cart held for your group — '+money(holes===9?CART9:CART18)+' per player.':'Walking. Tell us if that changes.')+'</small></span></div>'+
+    '<div class="gsum"><div><span>Green Fees ('+n+' Golfer'+(n>1?"s":"")+' × '+money(fee)+')</span><b>'+money(gf)+'</b></div>'+(ct>0?'<div><span>Power cart ('+n+' × '+money(cf)+')</span><b>'+money(ct)+'</b></div>':'')+'<div><span>Estimated HST 13%</span><b>'+money(tax)+'</b></div><div class="tot"><span>Total</span><b>'+money(tot)+' CAD</b></div></div>'+
+    '<div class="cta'+(o.hotCta?" hot":"")+'">'+(o.ctaText||"Continue to Book")+'</div><p class="fine">No booking fee. Pay online right after booking, or at the pro shop.</p></div>';
+  return '<div class="det">'+left+panel+(o.form||"")+'</div>';
+}
+const FORM='<div class="form"><h3>Your details</h3><div class="inp">Alex Morgan</div><div class="inp">alex@example.com</div><div class="inp">(905) 555-0142</div><div class="inp dim2">Notes (optional)</div></div>';
+
+const S=[
+ {a:"ov",ph:"done",ko:"어제와 오늘",en:"Before and after",
+  screen:(l,p)=>browser("/book/tee-time",p<.4?head("Tee Times","Pick a day, tell us how many are playing, and choose a time.")+oldPage():head("Tee Times","Pick a day, tell us how many are playing, and choose a time.")+filters(2)+dayHead(2)+groups(2,{only:"Morning",per:6})),
+  log:[{at:.1,tag:"ui",name:"어제: 시간 칩 + 남은 자리",ep:"SlotGrid (removed)",why:L("가격은 시간을 누른 뒤에야 보였어요.","The price only showed after a time was picked.")},
+       {at:.45,tag:"ui",name:"오늘: 시간대별 카드",ep:"TeeTimeCards.tsx",why:L("카드마다 가격·홀·인원이 바로 보여요.","Every card shows price, holes and golfers up front.")},
+       {at:.75,tag:"ui",name:"git push → Vercel",ep:"2562f54 · success"}],
+  focus:["cards"]},
+ {a:"groups",ph:"list",ko:"시간대 세 묶음",en:"Three time groups",
+  screen:(l,p)=>browser("/book/tee-time?date=2026-10-22",dayHead(2)+groups(2,{per:4,hotGroup:p<.35?"Morning":p<.65?"Mid-day":"Afternoon"})),
+  log:[{at:.12,tag:"rpc",name:"pelham_tee_availability",ep:"p_date: 2026-10-22",body:{date:"2026-10-22",times:"[ 60 slots, 7:37 AM – 4:25 PM ]"}},
+       {at:.35,tag:"ui",name:"Morning",ep:"< 11:00 AM"},{at:.55,tag:"ui",name:"Mid-day",ep:"11:00 AM – 1:59 PM"},
+       {at:.75,tag:"ui",name:"Afternoon",ep:"≥ 2:00 PM · twilight",why:L("트와일라잇(0041)이 2시부터라 경계를 거기에 맞췄어요.","Twilight (0041) starts at 2 PM, so the boundary sits there.")}],
+  focus:["cards"]},
+ {a:"card",ph:"list",ko:"카드 한 장 읽기",en:"Reading one card",
+  screen:(l,p)=>browser("/book/tee-time?date=2026-10-22",'<div class="zoom">'+gcard({m:457,rem:4},2)+gcard({m:679,rem:4},2,{hot:p>.45})+gcard({m:841,rem:4},2,{hot:p>.7})+'</div>'+
+    '<ul class="legend"><li><b>7:37<sup>AM</sup></b> '+(l==="ko"?"티타임":"tee time")+'</li><li><b>$40<sup>71</sup></b> '+(l==="ko"?"1인 그린피 (세전)":"per golfer, before tax")+'</li><li><b>18·9</b> '+(l==="ko"?"10시부터는 9홀도 가능":"9 holes too, from 10 AM")+'</li><li><b>1-4</b> '+(l==="ko"?"한 번에 잡을 수 있는 인원":"golfers you can book")+'</li><li><b>Twilight $35<sup>40</sup></b> '+(l==="ko"?"오후 2시부터":"from 2 PM")+'</li></ul>'),
+  log:[{at:.15,tag:"rpc",name:"times[i]",ep:"already sent",body:{time:"11:19 AM",minutes:679,rate:40.71,rate9:28.31,nineFrom:600,twilight:false,remaining:4}},
+       {at:.6,tag:"ui",name:"그대로 카드에 그림",ep:"no new field",why:L("DB는 바꾸지 않았어요. 화면만 바뀌었어요.","No database change — only the screen.")}],
+  focus:["cards"]},
+ {a:"sun",ph:"list",ko:"해 있는 시간만",en:"Daylight only",
+  screen:(l,p)=>browser("/book/tee-time?date=2026-10-22",filters(2,{hotSun:true})+(p<.5?groups(2,{only:"Morning",per:3,notes:{457:l==="ko"?"첫 티":"first"}}):groups(2,{only:"Afternoon",per:3,tail:true,notes:{985:l==="ko"?"마지막":"last"}}))),
+  log:[{at:.15,tag:"rpc",name:"teeWindow(2026-10-22)",ep:"sun.ts · same as SQL",body:{sunrise:"7:37 AM",sunset:"6:25 PM",lastTee:"sunset − 2 h"}},
+       {at:.4,tag:"ui",name:"First tee 7:37 AM",ep:"sunrise slot"},
+       {at:.7,tag:"ui",name:"Last tee 4:25 PM",ep:"pelham_tee_window",why:L("서버 규칙이 일몰 2시간 전까지만 받아요. 그 뒤 칸은 목록에 없어요.","The server only takes tee times up to two hours before sunset.")}],
+  focus:["sun"]},
+ {a:"party",ph:"list",ko:"인원으로 거르기",en:"Filter by golfers",
+  screen:(l,p)=>{const n=p<.4?2:4;return browser("/book/tee-time?date=2026-10-22",filters(n,{hotParty:p>=.4})+dayHead(n)+groups(n,{only:"Morning",per:9}))},
+  log:[{at:.4,tag:"key",name:"Players = 4",ep:"on screen only"},
+       {at:.55,tag:"ui",name:"remaining < 4",ep:"card greyed",why:L("자리가 모자란 카드는 흐려지고 누를 수 없어요. 꽉 찬 시간은 처음부터 안 보여요.","Cards without enough seats grey out. Full times never show.")}],
+  focus:["cards"]},
+ {a:"detail",ph:"book",ko:"상세 화면",en:"Detail page",
+  screen:(l,p)=>browser(p<.25?"/book/tee-time?date=2026-10-22":"/book/tee-time?date=2026-10-22&time=11:19 AM",p<.25?groups(2,{only:"Mid-day",per:3,hotM:PICK}):detail({n:2})),
+  log:[{at:.1,tag:"key",name:"11:19 AM 카드 누름",ep:"pushState ?date&time"},
+       {at:.35,tag:"ui",name:"사진 · 클럽 · 주소",ep:"hero-course.png"},
+       {at:.6,tag:"rpc",name:"링크로 바로 열기",ep:"same availability call",why:L("주소만으로 열어도 그 시각의 요금과 남은 자리를 다시 받아 같은 화면을 열어요. 그 사이 꽉 찼으면 목록에 남아요.","Opening the link alone re-reads that slot and opens the same page; if it filled up, the list stays.")}],
+  focus:["detail"]},
+ {a:"price",ph:"book",ko:"인원·카트·금액",en:"Golfers, cart and total",
+  screen:(l,p)=>browser("/book/tee-time?date=2026-10-22&time=11:19 AM",p<.6?detail({noLeft:true,n:2,hotN:p>=.15,hotPanel:p>=.35}):detail({noLeft:true,n:2,cart:false,hotCart:true})),
+  log:[{at:.15,tag:"key",name:"Number of Golfers = 2",ep:"1–4, up to seats left"},
+       {at:.3,tag:"ui",name:"81.42 + 38.94 + 15.65",ep:"= $136.01",why:L("그린피, 카트비(0050), 예상 HST 13%를 더해요.","Green fees, cart (0050) and estimated HST 13%.")},
+       {at:.6,tag:"key",name:"Power cart off",ep:"walking"},
+       {at:.7,tag:"ui",name:"81.42 + 10.58",ep:"= $92.00",why:L("미리보기예요. 결제할 때는 서버가 다시 계산해요.","A preview — the server prices the real payment.")}],
+  focus:["panel"]},
+ {a:"book",ph:"book",ko:"예약 · 결제",en:"Book and pay",
+  screen:(l,p)=>browser("/book/tee-time?date=2026-10-22&time=11:19 AM",p<.6?detail({noLeft:true,n:2,ctaText:"Book 11:19 AM",hotCta:p>.35,form:FORM}):
+    '<div class="okscr"><div class="ckm">✓</div><h3>Your tee time is reserved</h3><p>Thursday, October 22, 2026</p><p class="big">11:19 AM</p><p>2 players · 18 holes · 1 cart</p><p class="code">PH-EXAMPLE</p><div class="cta">Pay online</div></div>'),
+  log:[{at:.1,tag:"key",name:"Continue to Book",ep:"opens Your details"},
+       {at:.4,tag:"rpc",name:"pelham_tee_book",ep:"unchanged",body:{date:"2026-10-22",time:"11:19 AM",holes:18,cartCount:1,players:2,firstName:"Alex"}},
+       {at:.55,tag:"rpc",name:"409 → 목록으로",ep:"if the slot went"},
+       {at:.7,tag:"stripe",name:"Confirmation + PayOnline",ep:"unchanged"}],
+  focus:["book"]},
+ {a:"status",ph:"done",ko:"배포 · 남은 것",en:"Shipped and what's left",
+  screen:(l,p)=>'<div class="plan"><h3>'+(l==="ko"?"배포됨":"Shipped")+'</h3><ul><li><code>2562f54</code> → main → Vercel <b class="okc">success</b></li><li><code>app/book/tee-time/page.tsx</code></li><li><code>components/booking/TeeTimeCards.tsx</code> '+(l==="ko"?"새로":"new")+'</li><li><code>components/booking/availability.ts</code> + twilight</li></ul><h3>'+(l==="ko"?"그대로":"Unchanged")+'</h3><ul><li>Supabase SQL · RPC · '+(l==="ko"?"트리거 — 실행할 SQL 없음":"triggers — no SQL to run")+'</li><li>pelham_tee_book · Confirmation · PayOnline</li></ul><h3>'+(l==="ko"?"남은 것":"Left to do")+'</h3><ul class="q"><li>'+(l==="ko"?"티 정보 표 (파·야드·레이팅·슬로프) — 숫자를 주시면 넣어요":"Tee details table — send the numbers")+'</li><li>'+(l==="ko"?"끝까지 예약해 보기 — 실제 예약이 생겨서 아직 안 함":"A full test booking — not done, it creates a real reservation")+'</li></ul></div>',
+  log:[{at:.15,tag:"ui",name:"next build",ep:"passed"},{at:.35,tag:"ui",name:"git push origin main",ep:"2562f54"},{at:.55,tag:"rpc",name:"Vercel",ep:"success"},{at:.75,tag:"ui",name:"live page checked",ep:"/book/tee-time"}],
+  focus:["cards","sun","detail","panel","book"]}
+];
+S.forEach(s=>{s.ledger=s.ledger||[{at:0}]});
+
+const PH={done:{ko:"배포",en:"Shipped"},list:{ko:"목록",en:"List"},book:{ko:"예약",en:"Book"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"DEVICE",stripe:"STRIPE",key:"INPUT"};
+
+const ITEMS=[
+ {id:"cards",src:L("시간대별 카드","Grouped cards"),sub:"TeeTimeCards.tsx",st:["ok",L("만듦","Built")],rows:["Morning · Mid-day · Afternoon","$ · 18·9 · 1-n · Twilight"]},
+ {id:"sun",src:L("해 있는 시간만","Daylight only"),sub:"sun.ts · teeWindow",st:["ok",L("안내 추가","Shown")],rows:["First tee 7:37 AM","Last tee 4:25 PM"]},
+ {id:"detail",src:L("상세 화면","Detail page"),sub:"page.tsx · ?date&time",st:["wait",L("티 표 빠짐","No tee table")],rows:[L("사진 · 클럽 · 주소","Photo · club · address"),L("링크·새로고침 그대로","Link & refresh reopen it")]},
+ {id:"panel",src:L("인원·카트·금액","Golfers, cart, total"),sub:"page.tsx · BookingForm",st:["ok",L("만듦","Built")],rows:["Green fees × n + cart × n","Estimated HST 13% · Total"]},
+ {id:"book",src:L("정보 · 확정 · 결제","Details · confirm · pay"),sub:"pelham_tee_book · PayOnline",st:["wait",L("끝까지는 안 해 봄","Not run end to end")],rows:["Continue to Book → Your details","Stripe · unchanged"]}
+];
+function renderLedger(p){
+  const k=LANG;const f=new Set(S[SC].focus||[]);
+  $("ledger").innerHTML=ITEMS.map(it=>'<div class="lc'+(f.has(it.id)?" flash lcon":" lcdim")+'"><div class="r1"><span class="src">'+esc(it.src[k])+'<em>'+esc(it.sub)+'</em></span><span class="pill '+it.st[0]+'">'+esc(it.st[1][k])+'</span></div><div class="lrows">'+it.rows.map(r=>'<div><span>'+esc(typeof r==="string"?r:r[k])+'</span><span></span></div>').join("")+'</div></div>').join("");
+}
+
+const DUR={"ov": {"ko": 15.5, "en": 15.7}, "groups": {"ko": 15.9, "en": 14.1}, "card": {"ko": 17.4, "en": 16.1}, "sun": {"ko": 13.5, "en": 15.1}, "party": {"ko": 11.7, "en": 10.7}, "detail": {"ko": 13.4, "en": 12.7}, "price": {"ko": 19.8, "en": 19.7}, "book": {"ko": 14.0, "en": 15.1}, "status": {"ko": 13.9, "en": 14.1}};
+const NARR={"ko": {"ov": "손님용 티타임 예약 화면을 GolfNow처럼 바꿔서 사이트에 올렸어요. 어제까지는 시간과 남은 자리만 적힌 작은 칩이라 가격은 시간을 누른 뒤에야 보였어요. 이제는 시간대별로 묶인 카드에 가격과 홀 수, 인원이 한눈에 보여요.", "groups": "티타임은 세 묶음으로 나와요. 오전 열한 시 전은 Morning, 열한 시부터 오후 두 시 전까지는 Mid-day, 오후 두 시부터는 Afternoon이에요. 두 시는 트와일라잇 요금이 시작되는 시각이라, Afternoon 카드는 모두 35달러 40센트예요.", "card": "카드 위 초록 띠에는 티타임, 가운데 큰 글씨는 한 사람 그린피, 그 아래는 홀 수와 한 번에 잡을 수 있는 인원이에요. 오전 열 시부터는 9홀도 되니까 18·9로 표시돼요. 값은 원래 서버가 보내 주던 그대로라서, 데이터베이스는 바꾸지 않았어요.", "sun": "인원 버튼 옆에 그날의 첫 티와 마지막 티가 나와요. 10월 22일은 해 뜨는 7시 37분이 첫 티이고, 마지막 티는 4시 25분이에요. 서버 규칙이 해 지기 두 시간 전까지만 받기 때문이에요.", "party": "인원을 네 명으로 바꾸면, 자리가 네 개 안 남은 카드는 흐려지고 누를 수 없어요. 위의 숫자도 두 명일 때 마흔 개에서 서른네 개로 바뀌어요. 꽉 찬 시간은 처음부터 보이지 않아요.", "detail": "카드를 누르면 상세 화면이 열려요. 왼쪽에는 코스 사진과 클럽 주소, 오른쪽에는 요약 패널이 있어요. 주소창에 날짜와 시간이 들어가서, 링크를 보내거나 새로고침해도 같은 티타임이 다시 열려요.", "price": "패널에서 홀 수와 인원, 파워 카트를 고르면 합계가 바로 바뀌어요. 두 명이 카트를 타면 그린피 81달러 42센트, 카트 38달러 94센트, 예상 HST 15달러 65센트, 합계 136달러 1센트예요. 카트를 끄면 92달러가 돼요.", "book": "Continue to Book을 누르면 이름, 이메일, 전화번호 칸이 열리고, Book 버튼으로 예약해요. 여기부터는 원래 쓰던 예약 함수와 확정 화면, Stripe 온라인 결제를 그대로 써요. 그 사이 자리가 나가면 목록으로 돌아가요.", "status": "커밋 2562f54로 main에 올렸고, Vercel 배포가 성공해서 실제 사이트에서 열리는 것도 확인했어요. 실행할 SQL은 없어요. 남은 건 티 정보 표에 넣을 숫자, 그리고 끝까지 예약해 보는 확인이에요."}, "en": {"ov": "The guest tee time page now works like GolfNow, and it's live on the site. Until yesterday it was a row of small chips with a time and seats left, so the price only showed after picking one. Now cards grouped by time of day show price, holes and golfers at a glance.", "groups": "Tee times come in three groups. Before 11 AM is Morning, 11 AM to 2 PM is Mid-day, and from 2 PM it's Afternoon. Two o'clock is when the twilight rate starts, so every Afternoon card shows 35.40.", "card": "The green band has the tee time, the big number is the green fee per golfer, and below are the holes and how many golfers can book. From 10 AM nine holes are allowed too, so it reads eighteen and nine. These values were already sent by the server, so the database didn't change.", "sun": "Next to the player buttons, the page shows the day's first and last tee. On October 22nd the first tee is sunrise at 7:37, and the last tee is 4:25, because the server only takes tee times up to two hours before sunset.", "party": "Switch to four players, and cards with fewer than four seats left grey out and can't be tapped. The count at the top drops from forty to thirty-four. Full times never appear.", "detail": "Tapping a card opens the detail page, with the course photo and club address on the left and the summary panel on the right. The date and time are in the address, so a shared link or a refresh opens the same tee time again.", "price": "In the panel, choosing holes, golfers and the power cart updates the total right away. Two golfers with a cart pay 81.42 in green fees, 38.94 for the cart and 15.65 estimated HST, for 136.01 in total. Without the cart, it's 92 dollars.", "book": "Continue to Book opens the name, email and phone fields, and the Book button reserves it. From here on, the existing booking function, confirmation screen and Stripe online payment are used as before. If the seats go in the meantime, the guest is sent back to the list.", "status": "It went to main as commit 2562f54, the Vercel deploy succeeded, and the live page was checked. There's no SQL to run. What's left is the numbers for the tee details table, and a full end-to-end test booking."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phgn-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phgn-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phgn-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phgn-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script></body></html>
+</body></html>

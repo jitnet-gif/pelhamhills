@@ -1,0 +1,636 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>카트 충전 보드 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: change board (3 before→after cards) + presenter bar + narration, over a three-lane stage — cart line · live cart board · saved record. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#5B3FD0; --violet-soft:#ECE7FF; --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6; --bad:#B4372A; --bad-soft:#F8E1DD;
+  --c-ready:#2f9e44; --c-ready-soft:#e2f4e5; --c-half:#087e6d; --c-red:#c8432f; --c-orange:#e8820c; --c-blue:#2463d6; --c-blue-soft:#e3ecfc; --c-edge:#8fa29e; --c-on:#ffffff;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-line:#2E3F35;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#AE9BFF; --violet-soft:#261F3D; --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222; --bad:#F0877A; --bad-soft:#3A1C18;
+    --c-ready:#5fd27a; --c-ready-soft:#1d3f26; --c-half:#3fb39e; --c-red:#ff6f58; --c-orange:#ffa53d; --c-blue:#6fa3ff; --c-blue-soft:#1d2f50; --c-edge:#5d7069; --c-on:#10201e;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#AE9BFF; --violet-soft:#261F3D; --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222; --bad:#F0877A; --bad-soft:#3A1C18;
+  --c-ready:#5fd27a; --c-ready-soft:#1d3f26; --c-half:#3fb39e; --c-red:#ff6f58; --c-orange:#ffa53d; --c-blue:#6fa3ff; --c-blue-soft:#1d2f50; --c-edge:#5d7069; --c-on:#10201e;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mono{font-family:var(--mono)}
+.top{display:grid;gap:4px}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--green)}
+.top .lede{color:var(--muted);max-width:76ch;font-size:13.5px}
+
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.chg{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px;align-content:start;opacity:.55;transition:opacity .3s,border-color .3s,box-shadow .3s}
+.chg.on{opacity:1}
+.chg.pulse{border-color:var(--flag);box-shadow:0 0 0 3px var(--flag-soft)}
+.chg .hd{display:flex;align-items:center;gap:8px}
+.chg .num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--paper);background:var(--green);border-radius:5px;padding:1px 6px}
+.chg h3{font-size:14.5px;font-weight:700}
+.ba{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center}
+.ba .was,.ba .now{border-radius:8px;padding:6px 9px;font-size:12.5px;min-width:0}
+.ba .was{background:var(--sunk);color:var(--muted);text-decoration:line-through;text-decoration-color:var(--flag)}
+.ba .now{background:var(--green-soft);color:var(--ink);font-weight:600}
+.ba .arr{color:var(--flag);font-weight:700}
+.chg small{font-size:11.5px;color:var(--muted)}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip small{font-weight:400;color:var(--muted);font-size:11.5px}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no,.chip[aria-pressed="true"] small{color:var(--paper);opacity:.85}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:118px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--mono);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.elb{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--sand-soft);color:var(--sand);font-family:var(--mono);white-space:nowrap}
+.elb.on{background:var(--violet-soft);color:var(--violet)}
+details.voices{font-size:13px;position:relative}
+details.voices summary{cursor:pointer;list-style:none;color:var(--muted);font-weight:600;padding:6px 8px;border-radius:6px}
+details.voices summary::-webkit-details-marker{display:none}
+details.voices[open] summary{color:var(--ink)}
+.vbox{position:absolute;right:0;z-index:5;width:min(340px,calc(100vw - 32px));display:grid;gap:8px;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.cm{display:grid;grid-template-columns:10px minmax(0,1fr);gap:8px;align-items:start}
+.cm b{font-size:12.5px;display:block}.cm small{font-size:11.5px;color:var(--muted)}
+.cdot{width:10px;height:10px;border-radius:50%;margin-top:4px}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.cap .stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.55;min-height:1.55em}
+.cap .who{display:block;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+.timer{display:grid;gap:3px;min-width:190px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600;color:var(--term-ink)}
+#tmScen{color:var(--term-key)}
+.prog{height:4px;border-radius:2px;background:var(--term-line);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:18px;height:6px;border-radius:3px;border:0;background:var(--term-line);cursor:pointer;padding:0}
+.dot.k-tap,.dot.k-sheet{background:#27405A}
+.dot.k-tap.done,.dot.k-sheet.done{background:#5E8FC0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key)!important;transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr) minmax(0,.85fr);gap:12px;height:clamp(560px,72vh,760px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.callhead{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border-bottom:1px solid var(--line)}
+.orb{width:54px;height:54px;border-radius:50%;background:var(--sunk);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;gap:3px}
+.orb i{width:3px;height:8px;border-radius:2px;background:var(--muted);display:block}
+.orb[data-who="staff"],.orb[data-who="nr"]{border-color:var(--violet);background:var(--violet-soft)}
+.orb[data-who="staff"] i,.orb[data-who="nr"] i{background:var(--violet);animation:eq .7s ease-in-out infinite}
+.orb[data-who="cu"],.orb[data-who="co"]{border-color:var(--green);background:var(--green-soft)}
+.orb[data-who="cu"] i,.orb[data-who="co"] i{background:var(--green);animation:eq .7s ease-in-out infinite}
+.orb i:nth-child(2){animation-delay:.12s}.orb i:nth-child(3){animation-delay:.24s}.orb i:nth-child(4){animation-delay:.36s}.orb i:nth-child(5){animation-delay:.18s}
+@keyframes eq{0%,100%{height:6px}50%{height:24px}}
+.caller b{display:block;font-size:15px}
+.caller span{font-size:12px;color:var(--muted)}
+.cstat{display:grid;justify-items:end;gap:3px}
+.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.live{background:var(--ok-soft);color:var(--ok)}
+.pill.ended{background:var(--flag-soft);color:var(--flag)}
+.chat{display:grid;gap:8px;padding:14px;align-content:start}
+.msg{max-width:88%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
+.msg small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;margin-bottom:2px;opacity:.8}
+.msg.staff{background:var(--violet-soft);border-top-left-radius:3px}
+.msg.staff small{color:var(--violet)}
+.msg.cu,.msg.co{background:var(--green-soft);justify-self:end;border-top-right-radius:3px}
+.msg.cu small,.msg.co small{color:var(--green);text-align:right}
+.msg.sysline{justify-self:center;background:transparent;color:var(--muted);font-size:11.5px;padding:2px 10px;border:1px dashed var(--line);border-radius:999px}
+.msg.speaking{box-shadow:0 0 0 2px var(--violet)}
+.msg.cu.speaking,.msg.co.speaking{box-shadow:0 0 0 2px var(--green)}
+.act{border:1px dashed var(--c-blue);background:var(--c-blue-soft);border-radius:10px;padding:8px 12px;font-size:13px;display:grid;gap:2px}
+.act .pk{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--c-blue)}
+.act.err{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.act.err .pk{color:var(--bad)}
+.act.cur{box-shadow:0 0 0 2px var(--flag)}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ── 가운데: 카트 보드 ── */
+.cb{position:relative;display:flex;flex-direction:column;gap:10px;padding:12px 14px;min-height:100%}
+.cline{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--c-blue-soft);min-height:56px}
+.cline b{color:var(--c-blue);font-size:12.5px;white-space:nowrap;display:flex;flex-direction:column;line-height:1.2}
+.cline b small{font-family:var(--mono);font-weight:600;font-size:11px}
+.cline .cells{display:flex;gap:12px;overflow-x:auto;padding:6px 8px 8px 2px;flex:1;min-width:0}
+.cline .none{font-size:12px;color:var(--muted)}
+.cline .mode{margin-left:auto;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;border:1px solid var(--c-blue);color:var(--c-blue);white-space:nowrap}
+.cline .mode.on{background:var(--c-blue);color:var(--c-on)}
+.cchips{display:flex;gap:6px;flex-wrap:wrap}
+.cchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);background:var(--paper);font-weight:600}
+.cchip b{font-family:var(--mono)}
+.cchip i{width:10px;height:10px;border-radius:2px;border:1.5px solid var(--c-edge)}
+.cchip.r i{border-color:var(--c-ready);background:var(--c-ready-soft)}
+.cchip.h i{border-color:var(--c-half);background:linear-gradient(to top right,var(--c-half) 50%,transparent 50%)}
+.cchip.e i{border-color:var(--c-red);background:var(--c-red)}
+.cchip.c i{border-color:var(--c-orange);background:var(--c-orange)}
+.cgrid{display:grid;gap:7px;grid-template-columns:repeat(var(--cols,10),minmax(0,1fr));transition:max-width .4s}
+.cgrid[data-cols="5"]{max-width:300px;margin-inline:auto}
+.cgrid[data-cols="12"]{max-width:none}
+.cell{position:relative;aspect-ratio:1;border:2px solid var(--c-edge);border-radius:9px;background:var(--paper);
+  background-image:linear-gradient(to top right,transparent calc(50% - 1px),var(--line) calc(50% - 1px),var(--line) calc(50% + 1px),transparent calc(50% + 1px))}
+.cell .no{position:absolute;top:1px;left:4px;font-size:10.5px;font-weight:700;font-family:var(--mono);line-height:1.1;z-index:1}
+.cell svg{position:absolute;inset:0;margin:auto;width:46%;height:46%}
+.cell.r{border-color:var(--c-ready);background:var(--c-ready-soft)}
+.cell.r .no{color:var(--c-ready)} .cell.r svg{fill:var(--c-ready)}
+.cell.h{border-color:var(--c-half);background:linear-gradient(to top right,var(--c-half) 50%,var(--paper) 50%)}
+.cell.e{border-color:var(--c-red);background:var(--c-red);color:var(--c-on)}
+.cell.e svg{fill:none;stroke:var(--c-on);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.cell.c{border-color:var(--c-orange);background:var(--c-orange);color:var(--c-on)}
+.cell.c svg{fill:var(--c-on)}
+.cell.p{background:var(--paper)}
+.cell.p svg{width:38%;height:38%;top:-16%}
+.cell .g{position:absolute;left:12%;right:12%;bottom:10%;height:13%;display:flex;gap:6%}
+.cell .g i{flex:1;border:1px solid var(--c-ready);border-radius:1px;background:var(--paper)}
+.cell .g i.on{background:var(--c-ready)}
+.cell.m::after{content:"";position:absolute;top:-2px;right:-2px;width:13px;height:13px;border-top-right-radius:8px;background:linear-gradient(225deg,var(--ink) 50%,transparent 50%);z-index:2}
+.cell.l{outline:2.5px solid var(--c-blue);outline-offset:2px}
+.cell .o{position:absolute;right:-7px;bottom:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:var(--c-blue);color:var(--c-on);font:700 10.5px/18px var(--mono);text-align:center;box-shadow:0 0 0 2px var(--paper);z-index:3}
+.cell.tapped{box-shadow:0 0 0 4px var(--flag-soft),0 0 0 6px var(--flag);z-index:4}
+.cell.tapped::before{content:"";position:absolute;inset:-4px;border-radius:12px;border:2px solid var(--flag);animation:ping 1s ease-out infinite}
+@keyframes ping{from{transform:scale(1);opacity:.9}to{transform:scale(1.35);opacity:0}}
+.cline .cell{width:38px;flex:none}
+.ctoast{align-self:center;display:flex;gap:12px;align-items:center;background:var(--ink);color:var(--bg);border-radius:9px;padding:8px 12px;font-size:12.5px}
+.ctoast u{text-decoration:none;font-weight:700;color:var(--term-key)}
+.ctoast.err{background:var(--bad)}
+.sheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(300px,86%);background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 48px rgba(0,0,0,.25);padding:16px;display:grid;gap:10px;z-index:6}
+.sheet h4{margin:0;font-size:14px}
+.sheet .lv{display:flex;gap:6px}
+.sheet .lv span{flex:1;height:30px;border:1.5px solid var(--c-ready);border-radius:6px;display:grid;place-items:center;font:700 12px var(--mono)}
+.sheet .lv span.on{background:var(--c-ready);color:var(--c-on)}
+.sheet .st{font-size:12.5px;font-weight:600;color:var(--c-ready)}
+.sheet .st.p{color:var(--c-orange)}
+.sheet .memo{font-size:12.5px;background:var(--sunk);border-radius:8px;padding:7px 9px;min-height:32px}
+.sheet .go{border-radius:8px;padding:9px;text-align:center;font-weight:700;color:var(--c-on);font-size:13px}
+.sheet .go.ch{background:var(--c-orange)} .sheet .go.dn{background:var(--c-ready)}
+.devtag{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ── 오른쪽: 기록 ── */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent.cur{border-color:var(--c-blue)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;white-space:nowrap}
+.tag.cmd{background:var(--c-blue-soft);color:var(--c-blue)}
+.tag.no{background:var(--bad-soft);color:var(--bad)}
+.tag.note{background:var(--flag-soft);color:var(--flag)}
+.tag.end{background:var(--ok-soft);color:var(--ok)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.json.req{border-bottom:1px dashed var(--term-line)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:540px}
+  .col.mid{grid-column:1 / -1;height:auto;min-height:480px;order:-1}
+}
+@media (max-width:860px){ .board{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:470px}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .cgrid{--cols:5!important;max-width:320px;margin-inline:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow">Pelham Hills Golf Club · 카트 60대 · 2026-10-09</div>
+    <h1>카트 충전 보드 <b>시뮬레이터</b></h1>
+    <p class="lede">카트를 내보낼 때마다 칸을 한 번 누르면, 두 번 나간 카트는 빨갛게 잠기고 충전을 기다려요. 여섯 장면을 한 단계씩 틀어 보면서 카트 출발 지점의 대화, 보드 화면, 서버에 남는 기록을 같이 볼게요.</p>
+  </header>
+
+  <section class="board" aria-label="바뀐 점">
+    <article class="chg" id="c1">
+      <div class="hd"><span class="num">1</span><h3>칸 하나가 카트 한 대</h3></div>
+      <div class="ba"><div class="was">종이에 바를 정(正) 표시</div><span class="arr">→</span><div class="now">누르면 반 칸 → 빨간 칸</div></div>
+      <small>두 번 나간 카트는 잠겨서, 충전 안 된 카트가 손님에게 갈 일이 없어요.</small>
+    </article>
+    <article class="chg" id="c2">
+      <div class="hd"><span class="num">2</span><h3>충전은 시작과 완료로</h3></div>
+      <div class="ba"><div class="was">꽂았는지, 다 찼는지 기억으로</div><span class="arr">→</span><div class="now">주황 번개 → 녹색 번개 + 게이지</div></div>
+      <small>덜 찼으면 게이지와 메모를 남기고, 그 카트는 한 번만 나가요.</small>
+    </article>
+    <article class="chg" id="c3">
+      <div class="hd"><span class="num">3</span><h3>라인업과 되돌리기</h3></div>
+      <div class="ba"><div class="was">어느 카트가 다음인지 말로</div><span class="arr">→</span><div class="now">파란 테두리 + 순서 번호</div></div>
+      <small>잘못 누르면 2분 안에 되돌리고, 누가 언제 눌렀는지 남아요.</small>
+    </article>
+  </section>
+
+  <nav class="scen" id="scen" aria-label="장면"></nav>
+
+  <div class="bar" role="toolbar" aria-label="재생 제어">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" title="이전 단계 (←)" aria-label="이전 단계"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" title="다음 단계 (→)" aria-label="다음 단계"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button">처음부터</button>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl">속도</span>
+    <div class="seg" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.1">1.1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.2">1.2×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tTalk" checked> 대화 음성</label>
+    <label class="tog"><input type="checkbox" id="tNarr" checked> 한국어 해설 음성</label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> 6개 연속 재생</label>
+    <span class="spacer"></span>
+    <span class="elb" id="elBadge">음성 파일 0 / 0</span>
+    <details class="voices">
+      <summary>캐스팅 · 음성 ▾</summary>
+      <div class="vbox">
+        <div class="cm"><span class="cdot" style="background:var(--violet)"></span><div><b>해설 · 직원 · Hope</b><small>ElevenLabs 경쾌한 여성 목소리. 한국어 해설과 카트 담당 직원 대사를 같은 목소리로 읽어요.</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--green)"></span><div><b>Daniel Kim · Chris</b><small>단골 · 카트를 두 번 쓰는 날</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--flag)"></span><div><b>Megan Lee · Matilda</b><small>완충 안 된 카트로 9홀</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--sand)"></span><div><b>Connor · Will</b><small>함께 일하는 직원 · 충전과 되돌리기</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--c-blue)"></span><div><b>Olivia Park · Sarah</b><small>라인업에서 카트를 받는 손님</small></div></div>
+      </div>
+    </details>
+  </div>
+
+  <div class="cap">
+    <span class="stepno" id="stepno">1 / 1</span>
+    <p id="capText" aria-live="polite"></p>
+    <div class="timer" aria-label="진행 시간">
+      <div class="tline"><span class="tl">이 장면</span><span class="tv" id="tmScen">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl">전체 6개</span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-label="카트 출발 지점">
+      <div class="callhead">
+        <div class="orb" id="orb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="caller"><b id="cName"></b><span id="cWhere"></span></div>
+        <div class="cstat"><span class="pill" id="cStat">대기</span></div>
+      </div>
+      <div class="scroll" id="chatWrap"><div class="chat" id="chat"></div></div>
+    </section>
+    <section class="col mid" aria-label="카트 보드">
+      <div class="head"><h2>카트 보드 · 60대</h2><span class="devtag" id="devTag">아이패드 · 10칸</span></div>
+      <div class="scroll"><div class="cb" id="cb"></div></div>
+    </section>
+    <section class="col" aria-label="서버에 남는 기록">
+      <div class="head"><h2>서버에 남는 기록</h2><span class="mono" style="color:var(--muted);font-size:11px">/api/workspace</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>명령 이름과 규칙은 실제 코드(lib/operations.ts 의 cartUse · cartCharge · cartDone · cartLineup · cartUndo, app/cart-board.tsx)를 따릅니다. 손님 이름과 카트 번호는 예시입니다.</p>
+    <p>단축키: Space 재생·일시정지, ← → 단계 이동, 1–5 속도.</p>
+  </footer>
+</div>
+
+<script type="application/json" id="deck">{"voices":{"hope":"tnSpp4vdxKPjI9w0GnoV","chris":"iP95p4xoKVk53GoZ742B","matilda":"XrExE9yKIg1WjnnlVkGX","will":"bIHbv24MWmeRgasZH58o","sarah":"EXAVITQu4vr4xnSDxMaL"},
+"coworker":{"name":"Connor","voice":"will"},
+"scenarios":[
+{"ko":"카트 내보내기","en":"Send out","hl":[1],"where":"1번 티 · 오전 7:40","who":{"name":"Daniel Kim","short":"Daniel","voice":"chris"},
+ "init":{"half":[3,9,17,24,31,46,52],"red":[8,27,41],"ch":[15,36]},
+ "steps":[
+ {"k":"ring","n":"첫 장면은 가장 흔한 경우예요. 단골 다니엘 님이 아침 일찍 18홀을 치러 와서 카트를 받아요."},
+ {"k":"staff","t":"Morning, Daniel! You're in cart twelve, right out front."},
+ {"k":"cu","t":"Perfect, thanks. Is it charged?"},
+ {"k":"tap","no":12,"act":"use","pulse":1,"n":"직원이 보드에서 12번 칸을 한 번 눌러요. 녹색 번개였던 칸이 사선 아래 반만 차요. 한 번 나갔다는 뜻이에요."},
+ {"k":"staff","t":"Fully charged. It's good for two rounds today."},
+ {"k":"note","name":"1회만 쓴 카트","res":{"cart":12,"uses":"1 / 2","charge":"not yet"},"n":"한 번만 쓴 카트는 충전하지 않아요. 돌아오면 그대로 한 번 더 내보내요."},
+ {"k":"ring","sys":"오후 1:15 · 다니엘 님 오후 라운드","n":"오후에 다니엘 님이 한 번 더 왔어요. 같은 12번 카트를 다시 내보내요."},
+ {"k":"tap","no":12,"act":"use","pulse":1,"n":"두 번째로 누르면 칸이 꽉 찬 빨간색이 되고, 플러그 표시가 떠요. 이제 이 카트는 충전해야 해요."},
+ {"k":"tap","no":12,"act":"use","pulse":1,"n":"빨간 칸은 잠겨 있어서 횟수가 더 올라가지 않아요. 누르면 충전 시작 창이 대신 떠요. 충전 안 된 카트가 손님에게 나갈 일이 없어요."},
+ {"k":"end","name":"12번 · 충전 필요","res":{"cart":12,"uses":"2 / 2","state":"locked until charged"}}]},
+{"ko":"충전 시작 · 완료","en":"Charge","hl":[2],"where":"카트 창고 · 오후 5:30","who":{"name":"Connor","short":"Connor","voice":"will","coworker":true},
+ "init":{"half":[3,9,24,46],"red":[8,12,27,41,52],"ch":[15]},
+ "steps":[
+ {"k":"ring","n":"두 번째는 저녁 카트 창고예요. 오늘 두 번 나간 카트들이 빨간 칸으로 모여 있어요."},
+ {"k":"co","t":"Twelve is back. I'm plugging it in now."},
+ {"k":"sheet","no":12,"mode":"charge","n":"직원이 빨간 12번 칸을 누르면 충전 시작 창이 떠요. 충전기에 꽂았으면 충전 시작을 눌러요."},
+ {"k":"tap","no":12,"act":"charge","pulse":2,"n":"칸이 주황 번개로 바뀌었어요. 충전중이라는 뜻이고, 충전이 끝날 때까지 이 카트도 잠겨요."},
+ {"k":"ring","sys":"다음 날 오전 6:50 · 충전기에서 빼는 시간"},
+ {"k":"staff","t":"Morning, Connor. Twelve is full, I'm taking it off the charger."},
+ {"k":"sheet","no":12,"mode":"done","level":5,"n":"주황 칸을 누르면 충전 완료 창이 떠요. 얼마나 찼는지 게이지 다섯 칸 중에서 골라요. 다 찼으면 다섯 칸 그대로예요."},
+ {"k":"tap","no":12,"act":"done","level":5,"pulse":2,"n":"완충이에요. 깨끗한 녹색 번개 칸이 되고, 오늘도 두 번 나갈 수 있어요."},
+ {"k":"note","name":"한 대씩","res":{"finish_all_button":"none","why":"each cart gets its own gauge"},"n":"충전 완료는 카트마다 한 대씩 눌러요. 한꺼번에 완료하는 버튼은 일부러 두지 않았어요. 카트마다 게이지를 따로 적어야 하니까요."},
+ {"k":"end","name":"12번 · 완충","res":{"cart":12,"uses":"0 / 2","gauge":"5 / 5"}}]},
+{"ko":"완충 안 됨","en":"Partial","hl":[2],"where":"1번 티 · 오전 7:05","who":{"name":"Megan Lee","short":"Megan","voice":"matilda"},
+ "init":{"half":[3,9,24],"red":[8,27,41,52],"ch":[15,33]},
+ "steps":[
+ {"k":"ring","n":"세 번째는 이른 아침이에요. 메건 님이 9홀만 치러 왔는데, 33번 카트는 밤새 충전이 다 안 됐어요."},
+ {"k":"sheet","no":33,"mode":"done","level":3,"memo":"Pulled early, charger B-6 slow","n":"직원이 33번의 충전 완료를 누르면서 게이지를 세 칸으로 골라요. 이유는 메모에 짧게 남겨요. 메모는 쓰고 싶을 때만 써요."},
+ {"k":"tap","no":33,"act":"done","level":3,"memo":"Pulled early, charger B-6 slow","pulse":2,"n":"녹색 번개 아래에 게이지 세 칸이 붙고, 오른쪽 위 모서리가 접혀요. 엑셀 메모처럼 메모가 있다는 표시예요."},
+ {"k":"cu","t":"Is that one okay for nine holes?"},
+ {"k":"staff","t":"Yes, it's good for one round. Enjoy, Megan!"},
+ {"k":"tap","no":33,"act":"use","pulse":2,"n":"완충이 안 된 카트는 한 번만 나가요. 그래서 한 번 누르자마자 반 칸을 건너뛰고 바로 빨간 칸이 돼요."},
+ {"k":"note","name":"게이지 규칙","res":{"gauge_5":"2 rounds","gauge_1_to_4":"1 round","memo":"optional"}},
+ {"k":"end","name":"33번 · 충전 필요","res":{"cart":33,"gauge":"3 / 5","rounds":"1 used"}}]},
+{"ko":"라인업","en":"Lineup","hl":[3],"where":"출발 지점 · 오전 8:00 단체","who":{"name":"Olivia Park","short":"Olivia","voice":"sarah"},
+ "init":{"half":[3,24],"red":[8,27,41,52],"ch":[15]},
+ "steps":[
+ {"k":"ring","n":"네 번째는 아침 단체 손님이에요. 손님이 오기 전에 내줄 카트를 미리 줄 세워 둬요."},
+ {"k":"tap","no":5,"act":"lineup","pulse":3,"n":"직원이 라인업 세우기를 켜고 5번을 눌러요. 칸에 파란 테두리와 1번이 붙고, 위쪽 다음 손님 줄에 들어가요."},
+ {"k":"tap","no":6,"act":"lineup"},
+ {"k":"tap","no":7,"act":"lineup"},
+ {"k":"tap","no":3,"act":"lineup","n":"반 칸인 3번도 세울 수 있어요. 한 번 더 나갈 수 있는 카트니까요. 칸 모양이 그대로 보여서 한 번 남은 걸 바로 알아요."},
+ {"k":"tap","no":8,"act":"lineup","n":"빨간 8번은 세울 수 없어요. 나갈 수 없는 카트는 라인업에서 막혀요. 줄은 최대 스무 대까지예요."},
+ {"k":"cu","t":"Hi! We're the eight o'clock group."},
+ {"k":"staff","t":"Welcome, Olivia! Your cart is number five, first in line."},
+ {"k":"tap","no":5,"act":"use","pulse":3,"n":"다음 손님 줄의 1번을 누르면 한 번 나간 걸로 적히고 줄에서 빠져요. 남은 카트 번호가 하나씩 앞당겨져요."},
+ {"k":"end","name":"라인업 3대 남음","res":{"line":"6 → 7 → 3","max":20}}]},
+{"ko":"되돌리기","en":"Undo","hl":[3],"where":"출발 지점 · 오전 9:20","who":{"name":"Connor","short":"Connor","voice":"will","coworker":true},
+ "init":{"half":[3,9,24,46],"red":[8,27,41],"ch":[15]},
+ "steps":[
+ {"k":"ring","n":"다섯 번째는 실수했을 때예요. 직원이 20번을 누르려다 21번을 눌렀어요."},
+ {"k":"tap","no":21,"act":"use","n":"21번이 반 칸이 되고, 화면 아래에 되돌리기 알림이 잠깐 떠요."},
+ {"k":"staff","t":"Oops, wrong cart. Undo."},
+ {"k":"tap","no":21,"act":"undo","pulse":3,"n":"되돌리기를 누르면 21번이 바로 전 모습으로 돌아가요. 누른 사람이 2분 안에, 그 사이 아무도 손대지 않았을 때만 돼요."},
+ {"k":"tap","no":20,"act":"use"},
+ {"k":"co","t":"I just sent out twenty too. Did it count twice?"},
+ {"k":"tap","no":20,"act":"stale","n":"두 직원이 거의 동시에 같은 카트를 눌러도 두 번 세지 않아요. 서버가 보고 있던 횟수를 확인하고, 늦게 누른 쪽에는 다시 누르라고 알려 줘요."},
+ {"k":"note","name":"누가 언제","res":{"recent":"09:21 #20 · Hope","activity_log":"every tap saved"},"n":"누가 언제 눌렀는지는 오른쪽 최근 기록과 활동 로그에 남아요."},
+ {"k":"end","name":"한 번만 셈","res":{"cart_20":"1 / 2","cart_21":"0 / 2"}}]},
+{"ko":"기기별 화면","en":"Devices","hl":[1,2,3],"where":"핸드폰 · 아이패드 · 랩탑","who":{"name":"Pelham Hills","short":"Team","voice":"chris"},
+ "init":{"half":[3,9,17,24,31,46,52],"red":[8,27,41,57],"ch":[15,36],"part":{"23":[4,"Out early for shotgun"]},"line":[6,13,1]},
+ "steps":[
+ {"k":"ring","n":"마지막은 화면 크기예요. 같은 육십 칸이 기기에 맞춰 배치만 바뀌어요."},
+ {"k":"view","cols":5,"dev":"핸드폰 · 5칸","n":"핸드폰은 다섯 칸씩 열두 줄이에요. 한 손으로 누르기 좋게 칸을 크게 두고, 위로 넘기며 봐요."},
+ {"k":"view","cols":10,"dev":"아이패드 · 10칸","n":"아이패드는 열 칸씩 여섯 줄이라 육십 대가 한 화면에 다 들어와요. 카운터에 세워 두기 좋아요."},
+ {"k":"view","cols":12,"dev":"랩탑 · 12칸 + 목록","n":"랩탑은 열두 칸에, 오른쪽에 충전 필요, 충전중, 완충 안 됨 목록과 최근 기록이 붙어요."},
+ {"k":"end","name":"정리","res":{"1":"두 번 나가면 빨간 칸, 잠김","2":"충전 시작 → 완료 + 게이지","3":"라인업 20대 · 2분 되돌리기"},"n":"정리하면, 카트를 내보낼 때마다 한 번 누르고, 빨간 칸은 충전 시작, 주황 칸은 충전 완료예요. 덜 찼으면 게이지를 남기고 한 번만 내보내요. 메뉴의 카트에서 바로 써 보세요."}]}
+]}</script>
+
+<script>
+(function(){
+"use strict";
+const D=JSON.parse(document.getElementById("deck").textContent);
+const S=D.scenarios;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const clipId=(si,j,narr)=>"s"+pad(si+1)+"-"+pad(j+1)+(narr?"-n":"");
+const talk=st=>st.k==="staff"||st.k==="cu"||st.k==="co";
+
+/* ---------- audio ---------- */
+const CLIPS=new Map(), DUR=new Map();
+let total=0; S.forEach(s=>s.steps.forEach(st=>{ if(talk(st)) total++; if(st.n) total++; }));
+function badge(){ const b=$("elBadge"); b.textContent="음성 파일 "+CLIPS.size+" / "+total; b.classList.toggle("on",CLIPS.size>0); }
+function probe(id,url){ const a=new Audio(); a.preload="metadata"; a.src=url; a.addEventListener("loadedmetadata",()=>{ if(isFinite(a.duration)){DUR.set(id,a.duration); timers();} }); }
+(async function(){ try{ const r=await fetch("audio/manifest.json"); if(r.ok){ const m=await r.json(); (m.clips||[]).forEach(c=>{CLIPS.set(c.id,"audio/"+c.file); probe(c.id,"audio/"+c.file);}); } }catch(e){} badge(); timers(); })();
+
+let VOICES=[];
+function loadVoices(){ try{ VOICES=speechSynthesis.getVoices()||[]; }catch(e){ VOICES=[]; } }
+if("speechSynthesis" in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function pick(lang){ const pool=VOICES.filter(v=>v.lang&&v.lang.toLowerCase().startsWith(lang)); return pool[0]||null; }
+
+let speed=1, token=0, curAudio=null;
+function stopAudio(){ if(curAudio){ curAudio.pause(); curAudio=null; } try{ speechSynthesis.cancel(); }catch(e){} }
+function est(t,role){ return role==="nr"? t.length/7.5+.4 : t.length/15+.4; }
+function say(id,text,role,my){
+  return new Promise(res=>{
+    if(my!==token) return res();
+    const url=CLIPS.get(id);
+    if(url){ const a=new Audio(url); a.playbackRate=speed; curAudio=a; a.onended=a.onerror=()=>res(); a.play().catch(()=>res()); return; }
+    if(!("speechSynthesis" in window)) return setTimeout(res,est(text,role)*1000/speed);
+    const u=new SpeechSynthesisUtterance(text), ko=role==="nr";
+    u.lang=ko?"ko-KR":"en-US"; const v=pick(ko?"ko":"en"); if(v) u.voice=v; u.rate=Math.min(2,1.05*speed);
+    let done=false; const fin=()=>{ if(!done){done=true;res();} };
+    u.onend=fin; u.onerror=fin; setTimeout(fin,(est(text,role)*1.8+3)*1000/speed);
+    speechSynthesis.speak(u);
+  });
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms/speed));
+
+/* ---------- durations ---------- */
+function base(st){ return st.k==="tap"?1300:st.k==="sheet"?1500:st.k==="view"?1400:st.k==="note"?1100:st.k==="ring"?900:st.k==="end"?900:350; }
+function stepDur(si,j){
+  const st=S[si].steps[j]; let d=0;
+  if(talk(st)&&$("tTalk").checked) d+=DUR.get(clipId(si,j))||est(st.t,"en");
+  if(st.n&&$("tNarr").checked) d+=DUR.get(clipId(si,j,1))||est(st.n,"nr");
+  return (d+base(st)/1000)/speed;
+}
+const scenDur=si=>S[si].steps.reduce((a,_,j)=>a+stepDur(si,j),0);
+const fmt=s=>{ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+":"+pad(s%60); };
+function timers(){
+  const all=S.reduce((a,_,i)=>a+scenDur(i),0);
+  let doneScen=0; for(let j=0;j<step;j++) doneScen+=stepDur(SC,j);
+  let before=0; for(let i=0;i<SC;i++) before+=scenDur(i);
+  $("tmScen").textContent=fmt(doneScen)+" / "+fmt(scenDur(SC));
+  $("tmAll").textContent=fmt(before+doneScen)+" / "+fmt(all);
+  $("tmBar").style.width=(all?((before+doneScen)/all*100):0)+"%";
+}
+
+/* ---------- cart model (same rules as lib/operations.ts) ---------- */
+const st8=c=>c.ch?"c":c.u>=c.m?"e":c.u>0?"h":"r";
+const NAME={r:"충전 완료",h:"1회 사용",e:"충전 필요",c:"충전중"};
+function initBoard(sc){
+  const b={}, I=sc.init||{}; let seq=0;
+  for(let n=1;n<=60;n++) b[n]={u:0,m:2};
+  (I.half||[]).forEach(n=>b[n].u=1);
+  (I.red||[]).forEach(n=>b[n].u=2);
+  (I.ch||[]).forEach(n=>{b[n].u=2;b[n].ch=true;});
+  Object.entries(I.part||{}).forEach(([n,[lv,memo]])=>Object.assign(b[n],{u:0,m:1,lv,memo}));
+  (I.line||[]).forEach(n=>b[n].ln=++seq);
+  return {b,seq,prev:{}};
+}
+// 한 단계를 적용하고, 기록 칸에 남길 명령과 결과를 돌려줍니다.
+function apply(B,s){
+  const c=B.b[s.no], was=st8(c), snap=JSON.parse(JSON.stringify(c));
+  const cmd={use:"cartUse",charge:"cartCharge",done:"cartDone",lineup:"cartLineup",undo:"cartUndo",stale:"cartUse"}[s.act];
+  const req={no:s.no};
+  let ok=true,msg="",res={};
+  if(s.act==="use"){ req.uses=c.u;
+    if(was==="e"||was==="c"){ ok=false; msg=s.no+"번 카트는 "+(was==="e"?"충전해야 합니다.":"충전중입니다."); }
+    else { B.prev[s.no]=snap; c.u++; delete c.ln; res={uses:c.u+" / "+c.m,state:NAME[st8(c)]}; } }
+  if(s.act==="stale"){ req.uses=c.u-1; ok=false; msg=s.no+"번 카트는 방금 다른 직원이 바꿨습니다. 다시 누르세요."; }
+  if(s.act==="charge"){ if(was!=="e"){ok=false;msg="아직 충전할 차례가 아닙니다.";} else { B.prev[s.no]=snap; c.ch=true; delete c.ln; res={state:"충전중"}; } }
+  if(s.act==="done"){ req.level=s.level; if(s.memo) req.memo=s.memo;
+    B.prev[s.no]=snap; const full=s.level===5; c.u=0; c.m=full?2:1; delete c.ch; if(full){delete c.lv;delete c.memo;} else {c.lv=s.level; if(s.memo) c.memo=s.memo; else delete c.memo;}
+    res={rounds:full?2:1,gauge:s.level+" / 5"}; }
+  if(s.act==="lineup"){ req.on=true;
+    if(was==="e"||was==="c"){ ok=false; msg=s.no+"번 카트는 나갈 수 없어 라인업에 세울 수 없습니다."; }
+    else { B.prev[s.no]=snap; c.ln=++B.seq; res={order:lineup(B).indexOf(s.no)+1}; } }
+  if(s.act==="undo"){ const p=B.prev[s.no]; if(p){ B.b[s.no]=p; delete B.prev[s.no]; res={restored:NAME[st8(p)]}; } }
+  return {cmd,req,ok,msg,res};
+}
+const lineup=B=>Object.keys(B.b).map(Number).filter(n=>B.b[n].ln).sort((a,b)=>B.b[a].ln-B.b[b].ln);
+
+const BOLT='<svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
+const PLUG='<svg viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg>';
+function cell(n,c,order,tapped){
+  const s=st8(c), part=s==="r"&&c.lv;
+  let h='<div class="cell '+s+(part?' p':'')+(c.memo&&s!=="c"?' m':'')+(order?' l':'')+(tapped?' tapped':'')+'" title="'+n+'번 · '+NAME[s]+(c.memo?' · '+esc(c.memo):'')+'"><span class="no">'+n+'</span>';
+  if(s==="r"||s==="c") h+=BOLT; if(s==="e") h+=PLUG;
+  if(part){ h+='<span class="g">'; for(let i=0;i<5;i++) h+='<i'+(i<c.lv?' class="on"':'')+'></i>'; h+='</span>'; }
+  if(order) h+='<span class="o">'+order+'</span>';
+  return h+'</div>';
+}
+
+/* ---------- rendering ---------- */
+let SC=0, step=0, playing=false;
+function json(o){
+  return esc(JSON.stringify(o,null,1)).replace(/&quot;([^&]+?)&quot;:/g,(m,k)=>'<span class="k">"'+k+'"</span>:')
+    .replace(/: &quot;(.*?)&quot;/g,(m,v)=>': <span class="s">"'+v+'"</span>')
+    .replace(/[{}\[\]]/g,c=>'<span class="d">'+c+'</span>');
+}
+function render(){
+  const sc=S[SC], who=sc.who, cur=sc.steps[step], seen=sc.steps.slice(0,step+1);
+  [...$("scen").children].forEach((c,i)=>c.setAttribute("aria-pressed",i===SC));
+  [1,2,3].forEach(n=>{ $("c"+n).classList.toggle("on",sc.hl.includes(n)); $("c"+n).classList.toggle("pulse",!!(cur&&cur.pulse===n)); });
+  $("cName").textContent=who.name; $("cWhere").textContent=sc.where;
+  const ended=seen.some(s=>s.k==="end"), stp=$("cStat");
+  stp.className="pill "+(ended?"ended":"live"); stp.textContent=ended?"끝":"진행 중";
+
+  const B=initBoard(sc); let chat="",log="",cols=10,dev="아이패드 · 10칸",toast="",sheet="",tapped=0;
+  seen.forEach((s,j)=>{
+    const isCur=j===step, nw=isCur?" new":"";
+    if(s.k==="ring") chat+='<div class="msg sysline'+nw+'">'+esc(s.sys||sc.where)+'</div>';
+    if(talk(s)){ const lab=s.k==="staff"?"직원 · Hope":s.k==="co"?D.coworker.name+" · 직원":esc(who.short)+" · 손님";
+      chat+='<div class="msg '+s.k+nw+(isCur&&playing?' speaking':'')+'"><small>'+lab+'</small>'+esc(s.t)+'</div>'; }
+    if(s.k==="view"){ cols=s.cols; dev=s.dev; }
+    if(s.k==="sheet"&&isCur){
+      const c=B.b[s.no];
+      sheet=s.mode==="charge"
+        ?'<div class="sheet"><h4>'+s.no+'번 카트 충전 시작</h4><p style="font-size:12.5px;color:var(--muted)">충전기에 꽂았으면 충전 시작을 누르세요. 끝날 때까지 잠깁니다.</p><div class="go ch">충전 시작</div></div>'
+        :'<div class="sheet"><h4>'+s.no+'번 카트 충전 완료</h4><div class="lv">'+[1,2,3,4,5].map(i=>'<span'+(i<=s.level?' class="on"':'')+'>'+i+'</span>').join("")+'</div><div class="st'+(s.level<5?' p':'')+'">'+s.level+'/5 · '+(s.level<5?'완충 안 됨 · 한 번만 나갑니다':'완충 · 두 번 나갑니다')+'</div><div class="memo">'+(s.memo?esc(s.memo):'<span style="color:var(--muted)">메모 (선택)</span>')+'</div><div class="go dn">충전 완료 저장</div></div>';
+      tapped=s.no;
+      chat+='<div class="act'+nw+(isCur?' cur':'')+'"><span class="pk">직원 조작</span>'+s.no+'번 칸 누름 → '+(s.mode==="charge"?"충전 시작 창":"충전 완료 창")+'</div>';
+    }
+    if(s.k==="tap"){
+      const r=apply(B,s);
+      if(isCur) tapped=s.no;
+      const act={use:"내보내기",charge:"충전 시작",done:"충전 완료 저장",lineup:"라인업에 세우기",undo:"되돌리기",stale:"내보내기 (동시에)"}[s.act];
+      chat+='<div class="act'+(r.ok?'':' err')+nw+(isCur?' cur':'')+'"><span class="pk">'+(r.ok?'직원 조작':'막힘')+'</span>'+s.no+'번 · '+act+(r.ok?'':'<small>'+esc(r.msg)+'</small>')+'</div>';
+      log+='<div class="ent'+nw+(isCur?' cur':'')+'"><div class="eh"><span class="tag '+(r.ok?'cmd':'no')+'">'+(r.ok?'POST':'거절')+'</span><span class="tn">'+r.cmd+'</span></div><div class="json'+(r.ok?' req':'')+'">'+json(r.req)+'</div>'+(r.ok?'<div class="json">'+json(r.res)+'</div>':'<div class="json">'+json({error:r.msg})+'</div>')+'</div>';
+      if(isCur){ toast=r.ok?(s.act==="use"?'<div class="ctoast">'+s.no+'번 · 1회 기록<u>되돌리기</u></div>':s.act==="undo"?'<div class="ctoast">'+s.no+'번 · 되돌렸습니다</div>':''):'<div class="ctoast err">'+esc(r.msg)+'</div>'; }
+    }
+    if(s.k==="note"||s.k==="end"){
+      log+='<div class="ent'+nw+(isCur?' cur':'')+'"><div class="eh"><span class="tag '+(s.k==="end"?"end":"note")+'">'+(s.k==="end"?"END":"참고")+'</span><span class="tn">'+esc(s.name)+'</span></div><div class="json">'+json(s.res)+'</div></div>';
+      if(s.k==="end") chat+='<div class="msg sysline'+nw+'">'+esc(s.name)+'</div>';
+    }
+  });
+  $("chat").innerHTML=chat||'<div class="empty">재생을 누르면 시작해요</div>';
+  $("log").innerHTML=log||'<div class="empty">아직 저장된 기록이 없어요</div>';
+  ["chatWrap","logWrap"].forEach(id=>{ const el=$(id); el.scrollTop=el.scrollHeight; });
+
+  const line=lineup(B), ord=new Map(line.map((n,i)=>[n,i+1]));
+  const cnt={r:0,h:0,e:0,c:0}; for(let n=1;n<=60;n++) cnt[st8(B.b[n])]++;
+  const lineMode=sc.steps.slice(0,step+1).some(s=>s.act==="lineup")&&!(cur.k==="tap"&&cur.act==="use");
+  let grid=''; for(let n=1;n<=60;n++) grid+=cell(n,B.b[n],ord.get(n),tapped===n);
+  $("cb").innerHTML=
+    '<div class="cline"><b>다음 손님<small>'+line.length+'/20</small></b>'+(line.length?'<div class="cells">'+line.map((n,i)=>cell(n,B.b[n],i+1,false)).join("")+'</div>':'<span class="none">라인업에 세운 카트가 없어요</span>')+'<span class="mode'+(lineMode?' on':'')+'">라인업 세우기'+(lineMode?' 켜짐':'')+'</span></div>'+
+    '<div class="cchips"><span class="cchip r"><i></i>충전 완료 <b>'+cnt.r+'</b></span><span class="cchip h"><i></i>1회 사용 <b>'+cnt.h+'</b></span><span class="cchip e"><i></i>충전 필요 <b>'+cnt.e+'</b></span><span class="cchip c"><i></i>충전중 <b>'+cnt.c+'</b></span></div>'+
+    '<div class="cgrid" data-cols="'+cols+'" style="--cols:'+cols+'">'+grid+'</div>'+toast+sheet;
+  $("devTag").textContent=dev;
+
+  $("stepno").textContent=(step+1)+" / "+sc.steps.length;
+  const cap=cur.n?cur.n:talk(cur)?cur.t:cur.k==="tap"?cur.no+"번 칸":cur.k==="ring"?(cur.sys||sc.where):cur.k==="end"?cur.name:cur.name||"";
+  const whoLbl=cur.n?"해설":cur.k==="staff"?"직원":cur.k==="cu"?"손님":cur.k==="co"?"직원":"보드";
+  $("capText").innerHTML='<span class="who">'+whoLbl+'</span>'+esc(cap);
+  $("dots").innerHTML=sc.steps.map((s,j)=>'<button type="button" class="dot k-'+s.k+(j<step?' done':'')+(j===step?' now':'')+'" data-j="'+j+'" aria-label="'+(j+1)+'단계"></button>').join("");
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>일시정지':'<svg viewBox="0 0 16 16"><path d="M3 2v12l11-6z"/></svg>재생';
+  timers();
+}
+function orb(who){ const o=$("orb"); if(who) o.dataset.who=who; else delete o.dataset.who; }
+
+/* ---------- playback ---------- */
+async function runStep(my){
+  const st=S[SC].steps[step];
+  render();
+  if(talk(st)&&$("tTalk").checked){ orb(st.k); await say(clipId(SC,step),st.t,st.k,my); }
+  if(my!==token) return;
+  if(st.n&&$("tNarr").checked){ orb("nr"); $("capText").innerHTML='<span class="who">해설</span>'+esc(st.n); await say(clipId(SC,step,1),st.n,"nr",my); }
+  orb(null);
+  if(my!==token) return;
+  await wait(base(st));
+}
+async function loop(){
+  const my=++token; playing=true; render();
+  while(my===token){
+    await runStep(my);
+    if(my!==token) return;
+    if(step<S[SC].steps.length-1) step++;
+    else if($("tAll").checked&&SC<S.length-1){ SC++; step=0; }
+    else { playing=false; token++; render(); return; }
+  }
+}
+function pause(){ token++; playing=false; stopAudio(); orb(null); render(); }
+function go(si,j){ const was=playing; token++; stopAudio(); SC=si; step=Math.max(0,Math.min(j,S[si].steps.length-1)); playing=false; render(); if(was) loop(); }
+
+$("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" data-i="'+i+'"><span class="no">'+pad(i+1)+'</span>'+esc(s.ko)+'<small>'+esc(s.en)+'</small></button>').join("");
+$("scen").addEventListener("click",e=>{ const b=e.target.closest(".chip"); if(b) go(+b.dataset.i,0); });
+$("dots").addEventListener("click",e=>{ const b=e.target.closest(".dot"); if(b) go(SC,+b.dataset.j); });
+$("bPlay").addEventListener("click",()=>playing?pause():loop());
+$("bPrev").addEventListener("click",()=>{ if(step>0) go(SC,step-1); else if(SC>0) go(SC-1,S[SC-1].steps.length-1); });
+$("bNext").addEventListener("click",()=>{ if(step<S[SC].steps.length-1) go(SC,step+1); else if(SC<S.length-1) go(SC+1,0); });
+$("bRestart").addEventListener("click",()=>go(0,0));
+$("speed").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; speed=+b.dataset.v; [...$("speed").children].forEach(x=>x.setAttribute("aria-checked",x===b)); if(curAudio) curAudio.playbackRate=speed; timers(); });
+["tTalk","tNarr"].forEach(id=>$(id).addEventListener("change",timers));
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea,summary")) return;
+  if(e.key===" "){ e.preventDefault(); playing?pause():loop(); }
+  else if(e.key==="ArrowRight") $("bNext").click();
+  else if(e.key==="ArrowLeft") $("bPrev").click();
+  else if(/^[1-5]$/.test(e.key)) $("speed").children[+e.key-1].click();
+});
+render();
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,762 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cash Reconcile Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* Pro shop admin mock — keeps a light look in both themes */
+.ad{--ai:#1F2328;--am:#6B7280;--al:#D4D4D8;--as:#F2F2F4;--av:#4533FF;background:#F2F2F4;color:var(--ai);border:1px solid var(--al);border-radius:10px;overflow:hidden;font-size:12px}
+.ad .urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#E4E4E8;border-bottom:1px solid var(--al);font-family:var(--mono);font-size:10.5px;color:var(--am);min-width:0}
+.ad .urlbar i{width:8px;height:8px;border-radius:50%;background:#C9CDD2;flex:none}
+.ad .urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#111315;color:#fff;padding:7px 12px;font-size:12px;font-weight:700}
+.adbar small{color:rgba(255,255,255,.6);font-weight:500;font-size:10.5px}
+.adbody{padding:10px;display:grid;gap:8px;min-width:0}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chips span{border:1px solid var(--al);background:#fff;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap}
+.chips span.on{background:#111315;color:#fff;border-color:#111315}
+.box{background:#fff;border:1px solid var(--al);padding:10px;display:grid;gap:6px;min-width:0}
+.box h5{margin:0;font-size:13px}
+.box p{margin:0;color:var(--am);font-size:11px;line-height:1.5}
+.eyeb{font-size:9.5px;font-weight:800;letter-spacing:.12em;color:var(--am);text-transform:uppercase}
+.pw{height:34px;border:1px solid var(--al);display:flex;align-items:center;padding:0 10px;font-family:var(--mono);letter-spacing:.2em;font-size:13px}
+.btnp{background:var(--av);color:#fff;text-align:center;font-weight:800;padding:8px}
+.errn{border:1px solid #F0B4B4;background:#FDF0F0;color:#8A1F1F;padding:6px 8px;font-size:11px}
+.cc{background:#fff;border:1px solid var(--al);min-width:0}
+.cch{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;border-bottom:1px solid #ECECF0;padding:6px 8px;font-size:11px}
+.cch .t{margin-left:auto;color:var(--am);font-variant-numeric:tabular-nums}
+.cch .by{width:100%;color:var(--am);font-size:10.5px}
+.op{font-size:10px;font-weight:800;padding:1px 6px}
+.op.ins{background:#E3F4E8;color:#1F6B3A}.op.upd{background:#FFF1CC;color:#8A5A00}.op.del{background:#FDE2E2;color:#8A1F1F}
+.ccb{padding:6px 8px;display:grid;gap:5px}
+.hist{margin:0;padding:0;list-style:none;font-size:11px}
+.dt{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}
+.dt th{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--am);text-align:left;padding:3px 4px;border-bottom:1px solid #ECECF0}
+.dt td{padding:3px 4px;border-bottom:1px solid #F2F2F4;vertical-align:top;word-break:break-all}
+.dt td.f{font-family:var(--mono);font-size:9.5px;color:#3F434A}
+.dt td.b{color:#8A1F1F}.dt td.b s{text-decoration-thickness:1px}.dt td.a{color:#1F6B3A}
+.dt tr.hot td{background:#FFF6DD}
+.hot{outline:2.5px solid #F2A33A;outline-offset:2px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(242,163,58,.25)}}
+.tee{background:#fff;border:1px solid var(--al);padding:8px;display:grid;gap:4px}
+.tee .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}
+.tee .pl{display:flex;gap:4px;flex-wrap:wrap}
+.tee .pl span{border:1px solid var(--al);padding:2px 6px;font-weight:700;font-size:11px}
+.tee .pl span.gone{opacity:.35;text-decoration:line-through}
+.tee .hl{border-top:1px dashed var(--al);padding-top:4px;font-size:10.5px;color:var(--am)}
+.vanish{opacity:.25;filter:grayscale(1)}
+.xmark{color:#B42318;font-weight:800;font-size:12px}
+.flow{display:grid;gap:6px}
+.fstep{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--al);padding:7px 9px;font-size:11.5px}
+.fstep b{font-family:var(--mono);font-size:10.5px}
+.fstep .n{flex:none;width:20px;height:20px;border-radius:50%;background:#111315;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800}
+.fstep.on{border-color:var(--av);box-shadow:0 0 0 2px rgba(69,51,255,.15)}
+.tbls{display:flex;flex-wrap:wrap;gap:4px}
+.tbls span{font-family:var(--mono);font-size:9.5px;background:#fff;border:1px solid var(--al);padding:2px 5px}
+.tbls span.on{background:#E3F4E8;border-color:#9BD2AE}
+.who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.who div{background:#fff;border:1px solid var(--al);padding:8px;text-align:center;font-size:11px}
+.who div b{display:block;font-size:13px}
+.who div.no{opacity:.45}
+.ad .plan{background:#fff;border:1px solid var(--al);padding:10px}
+.plan .done li{color:var(--ok)}
+.lc.lcdim{opacity:.5}.lc.lcon{border-color:var(--green)}
+.plan{display:grid;gap:4px;font-size:13px;color:#1F2328}
+.plan h3{margin:8px 0 2px;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.plan code{font-family:var(--mono);font-size:11.5px;background:#F2F2F4;padding:1px 4px;border-radius:4px}
+.plan .q li{color:#B5461F;font-weight:600}
+.plan .done li{color:#1F6B3A}
+/* phone call mock */
+.pc{background:#0F1A14;color:#E8F0EA;border-radius:14px;padding:10px;display:grid;gap:6px;font-size:11.5px;min-width:0}
+.pc .top{display:flex;justify-content:space-between;font-size:10.5px;color:#9FB8A8}
+.pc .b{max-width:88%;padding:6px 9px;border-radius:10px;line-height:1.45}
+.pc .b.ag{background:#1E3326;justify-self:start}
+.pc .b.us{background:#E8F0EA;color:#14231A;justify-self:end}
+.pc .tc{justify-self:center;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid #3A5A46;color:#BFD6C6}
+.pc .tc.x{border-color:#E06A5A;color:#FFB3A8;background:rgba(224,106,90,.12)}
+.pc .tc.ok{border-color:#5BC08A;color:#A9EBC5;background:rgba(91,192,138,.12)}
+.pc .dim{opacity:.35}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal div{background:#fff;border:1px solid var(--al);text-align:center;padding:4px 0;font-size:10.5px;font-variant-numeric:tabular-nums}
+.cal div.in{background:#E3F4E8;border-color:#9BD2AE}
+.cal div.td{background:#111315;color:#fff}
+.cal div.edge{outline:2px solid #1F6B3A}
+.cal div.ask{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F;font-weight:800}
+.cal div.hd{background:transparent;border:0;color:var(--am);font-size:9.5px}
+.js{font-family:var(--mono);font-size:10.5px;background:#fff;border:1px solid var(--al);padding:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.js .k{color:#6B7280}.js .bad{color:#B42318;font-weight:700}.js .good{color:#1F6B3A;font-weight:700}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.two h6{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--am)}
+.rows{display:grid;gap:3px}
+.rows div{display:flex;justify-content:space-between;gap:6px;background:#fff;border:1px solid var(--al);padding:4px 7px;font-size:10.5px}
+.rows div b{font-family:var(--mono);font-weight:600}
+.rows div.w{background:#FFF1CC;border-color:#F2C46A}
+.rows div.x{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F}
+.rows div.n{background:#E3F4E8;border-color:#9BD2AE}
+.big{font-size:20px;font-weight:800;font-family:var(--mono)}
+@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}}
+.h6d{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6B7280)}
+.fstep.bad{border-color:#E06A5A;box-shadow:0 0 0 2px rgba(224,106,90,.18)}
+
+.bub{width:18px;height:15px;margin-right:4px;vertical-align:-3px}
+</style></head><body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Supabase · 계산서 장부</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const L=(ko,en)=>({ko,en});
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · /cash · 대사표 (0061)",
+  h1:"<b>대사표</b>는 이렇게 돌아가요",
+  lede:"현금 리포트 화면에 새로 붙은 Reconcile 패널이에요. 서버 함수 하나가 매출 리포트, 계산대 마감, 담당자 마감을 같은 날짜로 읽어서 식을 맞추고 차이까지 계산해요. 화면은 그 결과를 그리기만 해요. 왼쪽은 화면, 가운데는 뒤에서 일어나는 일, 오른쪽은 진행 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"화면",laneLog:"뒤에서",laneLedger:"진행 상태",
+  ledgerSub:"배포 완료 · SQL 실행은 남음 · 금액은 예시",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 기록이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"근거: supabase/migrations/0061_cash_reconcile.sql(pelham_staff_cash_reconcile), frontend/components/reports/CashReconcile.tsx · SalesReport.tsx · StaffCloseout.tsx, lib/retail/api.ts · types.ts, 커밋 c9de897(Vercel success). 테스트는 로컬 Postgres 에 0010·0023 의 실제 정의를 올려 돌렸어요. 실제 /cash 화면은 0061 실행 뒤에 확인해야 해요."},
+ en:{eyebrow:"Pelham Hills Golf Club · /cash · Reconcile (0061)",
+  h1:"How the <b>reconcile panel</b> works",
+  lede:"A new Reconcile panel on the cash report. One server function reads the sales report, register closes and staff close-outs for the same day, applies the formula and works out the over/short. The screen only draws the result. Left: the screen. Middle: what happens behind. Right: progress.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Screen",laneLog:"Behind the scenes",laneLedger:"Progress",
+  ledgerSub:"Deployed · SQL still to run · amounts are examples",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Records appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Sources: supabase/migrations/0061_cash_reconcile.sql (pelham_staff_cash_reconcile), frontend/components/reports/CashReconcile.tsx · SalesReport.tsx · StaffCloseout.tsx, lib/retail/api.ts · types.ts, commit c9de897 (Vercel success). Tests ran on local Postgres with the real 0010 and 0023 definitions. The live /cash screen still needs checking after 0061 runs."}
+};
+
+function box(h,inner,o){o=o||{};return '<div class="box'+(o.hot?" hot":"")+'">'+(o.eyeb?'<span class="eyeb">'+o.eyeb+'</span>':'')+(h?'<h5>'+h+'</h5>':'')+inner+'</div>'}
+function rows(list){return '<div class="rows">'+list.map(r=>'<div class="'+(r[2]||"")+'"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join("")+'</div>'}
+function shell(url,bar,sub,inner){return '<div class="ad"><div class="urlbar"><i></i><span>'+url+'</span></div><div class="adbar"><span>'+bar+'</span><small>'+(sub||"")+'</small></div><div class="adbody">'+inner+'</div></div>'}
+const k=l=>(ko,en)=>l==="ko"?ko:en;
+function badge(kind,txt){const c={ok:"#E3F4E8;color:#1F6B3A",bad:"#FDE2E2;color:#8A1F1F",wait:"#FFF1CC;color:#8A5A00"}[kind];return '<span style="background:'+c+';padding:1px 6px;font-size:10px;font-weight:800">'+txt+'</span>'}
+function line(t,title,rws){return '<div class="box"><h5>'+title+'</h5><div class="rows">'+rws.map(r=>'<div class="'+(r[3]||"")+'"><span>'+r[0]+'</span><b>'+r[1]+(r[2]?' '+r[2]:'')+'</b></div>').join("")+'</div></div>'}
+
+const S=[
+ {a:"ov",ph:"what",ko:"대사표가 하는 일",en:"What the panel does",
+  screen:(l,p)=>{const t=k(l);return shell("/cash","Cash report",t("현금 계정만","cash account only"),
+    rows([[t("매출 리포트","Sales report"),"Net · By payment",p<.3?"n":""]])+
+    box("Reconcile — 2026-10-20",'<p>'+t("세 장표를 같은 날짜로 나란히 놓고 차이를 보여 줘요.","Puts the three sheets side by side and shows the gap.")+'</p>',{hot:p>=.3&&p<.75,eyeb:t("새로 생김","new")})+
+    rows([["Close out by staff",t("담당자 마감","per person"),p>=.75?"n":""]]))},
+  log:[{at:.1,tag:"ui",name:"SalesReport cash=true",ep:"/cash only"},
+       {at:.35,tag:"ui",name:"CashReconcile",ep:"between report and close-outs",why:L("매출 리포트 아래, 담당자 마감 위에 붙어요.","Sits below the sales report, above staff close-outs.")},
+       {at:.6,tag:"rpc",name:"pelham_staff_cash_reconcile",ep:"one call · read only",why:L("아무것도 바꾸지 않고 읽기만 해요. 0046 명단 계정만 부를 수 있어요.","It changes nothing, only reads. Only 0046 listed accounts may call it.")}],
+  focus:["sql","ui"]},
+
+ {a:"read",ph:"server",ko:"서버가 읽는 세 곳",en:"Three things the server reads",
+  screen:(l,p)=>{const t=k(l);const st=p<.3?1:p<.6?2:3;return '<div class="ad"><div class="adbody"><div class="flow">'+
+    [["pelham_bills · bill_payments",t("그날 결제된 계산서 — 수단별 금액·팁·온라인","paid bills that day — amount, tip, online by method")],
+     ["pelham_register_closes",t("계산대 4곳 — 센 금액·시작 잔돈·마감 순간 숫자","4 registers — counted, float, snapshot")],
+     ["pelham_staff_closeouts",t("사람별 — 센 현금·마감 순간 숫자","per person — counted cash, snapshot")]]
+    .map((s,i)=>'<div class="fstep'+(i+1===st?" on":"")+(i+1>st?" vanish":"")+'"><span class="n">'+(i+1)+'</span><span><b>'+s[0]+'</b><br>'+s[1]+'</span></div>').join("")+'</div>'+
+    (p>.85?rows([["p_date","2026-10-20","n"],[t("환불된 계산서","Refunded bills"),t("셋 다 뺌","excluded everywhere"),"n"]]):'')+'</div></div>'},
+  log:[{at:.1,tag:"local",name:"bill_payments",ep:"status = paid"},
+       {at:.4,tag:"local",name:"register_expected()",ep:"0023 helper · amount + tip"},
+       {at:.7,tag:"local",name:"closeout_figures()",ep:"0010 helper · per Cashier",why:L("계산대·담당자 숫자는 원래 마감 화면이 쓰는 함수를 그대로 불러요. 그래서 마감 화면과 숫자가 같아요.","It calls the same helpers the close screens use, so the figures agree with them.")}],
+  focus:["sql"]},
+
+ {a:"cash",ph:"server",ko:"현금 식",en:"The cash formula",
+  screen:(l,p)=>{const t=k(l);return '<div class="ad"><div class="adbody">'+
+    line(t,t("현금","Cash"),[
+      [t("매출 리포트 = Cash + 현금 팁","Sales report = Cash + cash tips"),"$600 + $40 = $640","",p<.3?"n":""],
+      [t("계산대 = Σ(센 현금 − $200)","Registers = Σ(counted − $200)"),"$450 + $185 = $635",p>=.3?badge("bad","Short $5"):"",p>=.3&&p<.65?"w":""],
+      [t("담당자 = Σ 센 현금 + 이름 없음","Staff = Σ counted + no cashier"),"$610 + $30 = $640",p>=.65?badge("ok","Matches"):"",p>=.65?"n":""]])+'</div></div>'},
+  log:[{at:.1,tag:"rpc",name:"report.total",ep:"amount + tip"},
+       {at:.35,tag:"rpc",name:"registers.diff",ep:"counted − float − report",why:L("스낵바에서 $5를 덜 센 예시예요. 차이는 서버가 계산해요.","An example where the snack bar counted $5 short. The server does the math.")},
+       {at:.7,tag:"rpc",name:"staff.diff",ep:"counted + unassigned − report",why:L("이름 없는 계산서의 현금은 누구 서랍에도 없으니 따로 더해요.","Cash on bills with no cashier is in nobody's count, so it's added separately.")}],
+  focus:["sql","formula"]},
+
+ {a:"card",ph:"server",ko:"카드·체크카드 식",en:"Card and debit",
+  screen:(l,p)=>{const t=k(l);return '<div class="ad"><div class="adbody">'+
+    line(t,t("카드","Card"),[
+      [t("매출 리포트 = Card + 카드 팁","Sales report = Card + card tips"),"$1,250 + $60 = $1,310","",""],
+      [t("계산대 = 센 카드 + 온라인","Registers = counted card + online"),"$960 + $350 = $1,310",p>.45?badge("ok","Matches"):"",p>.3?"n":""]])+
+    (p>.65?rows([[t("온라인 결제","Online payments"),t("마감할 계산대가 없어 계산대 쪽에 더함","no register, so added to the register side"),"w"],[t("체크카드","Debit"),t("0이면 카드를 숨김","card hidden when all zero"),""]]):'')+'</div></div>'},
+  log:[{at:.15,tag:"rpc",name:"card · debit",ep:"same rule"},
+       {at:.45,tag:"local",name:"station = online",ep:"amount + tip",why:L("온라인 예약 결제는 Stripe에서 바로 들어와서 서랍이 없어요.","Online booking payments come straight from Stripe and have no drawer.")},
+       {at:.75,tag:"ui",name:"Debit card",ep:"hidden if 0 / 0"}],
+  focus:["sql","formula"]},
+
+ {a:"final",ph:"server",ko:"Not final — 아직 확정 못 함",en:"Not final yet",
+  screen:(l,p)=>{const t=k(l);return shell("/cash","Reconcile","",
+    '<ul style="margin:0;padding:8px 12px 8px 26px;background:#FFF8E1;color:#5B4708;font-size:11px;display:grid;gap:3px">'+
+    [[t("Pro Shop register is not closed yet.","Pro Shop register is not closed yet."),0],
+     [t("Not closed out yet (took cash): Mia.","Not closed out yet (took cash): Mia."),.25],
+     [t("Sales changed after closing — close again: Jin.","Sales changed after closing — close again: Jin."),.5],
+     ["$30.00 cash is on bills with no cashier name.",.72]].map(x=>'<li'+(p<x[1]?' style="opacity:.25"':'')+'>'+x[0]+'</li>').join("")+'</ul>'+
+    rows([["Registers","$635.00 "+badge("wait","Not final"),"w"],["Staff close-outs","$610.00 "+badge("wait","Not final"),"w"]]))},
+  log:[{at:.1,tag:"stripe",name:"has_sales && !closed",ep:"register not closed"},
+       {at:.3,tag:"stripe",name:"staff.missing",ep:"took cash, no count"},
+       {at:.55,tag:"stripe",name:"stale",ep:"snapshot ≠ now",why:L("마감 순간 숫자와 지금 숫자를 0010·0023과 똑같이 비교해요.","Compares the close-time snapshot with now, exactly as 0010 and 0023 do.")},
+       {at:.8,tag:"ui",name:"complete = false",ep:"no Over/Short shown",why:L("덜 닫힌 상태에서 차이를 보여 주면 틀린 숫자를 믿게 되니까 Not final로 둬요.","Showing a gap before everything is closed would mislead, so it stays Not final.")}],
+  focus:["sql","ui"]},
+
+ {a:"screen",ph:"screen",ko:"화면 읽는 법",en:"Reading the screen",
+  screen:(l,p)=>{const t=k(l);return shell("/cash","Reconcile — 2026-10-20",'<span style="border:1px solid #fff;padding:1px 6px'+(p>.75?';background:#4533FF':'')+'">Refresh</span>',
+    '<div class="two"><div>'+line(t,"Cash",[["Sales report","$640.00","",""],["Registers","$635.00",badge("bad","Short $5.00"),p<.35?"x":""],["Staff close-outs","$640.00",badge("ok","Matches"),""]])+'</div>'+
+    '<div>'+line(t,"Card",[["Sales report","$1,310.00","",""],["Registers","$1,310.00",badge("ok","Matches"),""]])+'</div></div>'+
+    '<table class="dt'+(p>=.35&&p<.75?" hot":"")+'"><tr><th>Register</th><th>Cash exp / counted</th><th>Card</th><th>Status</th></tr><tr><td>Pro Shop</td><td>$450 / $450</td><td>$960 / $960</td><td>Closed</td></tr><tr><td>Snack Bar</td><td>$190 / $185</td><td>$0 / $0</td><td>Closed</td></tr></table>')},
+  log:[{at:.1,tag:"ui",name:"Matches · Over · Short",ep:"server diff"},
+       {at:.45,tag:"ui",name:"register table",ep:"find which drawer",why:L("어느 계산대에서 어긋났는지 아래 표로 찾아요. 현금은 시작 잔돈을 뺀 값이에요.","Use the table to find which drawer is off. Cash is shown without the float.")},
+       {at:.8,tag:"key",name:"Refresh",ep:"after a register close",why:L("담당자 마감 저장·환불은 자동으로 다시 읽어요. 계산대 마감은 다른 화면이라 Refresh를 눌러요.","Staff saves and refunds reload it automatically. Register close is another screen, so press Refresh.")}],
+  focus:["ui"]},
+
+ {a:"test",ph:"check",ko:"어떻게 확인했나",en:"How it was checked",
+  screen:(l,p)=>{const t=k(l);return '<div class="ad"><div class="adbody">'+box(t("로컬 Postgres — 0010·0023 실제 정의 + 0061","Local Postgres — real 0010/0023 definitions + 0061"),
+    rows([[t("예시 숫자 그대로","Deck example figures"),t("현금 $640 · 카드 차이 0","cash $640 · card diff 0"),p>.05?"n":""],
+      [t("스낵바 $5 덜 셈","Snack bar $5 short"),"Short $5",p>.2?"n":""],
+      [t("환불된 $50 계산서","Refunded $50 bill"),t("제외됨","excluded"),p>.35?"n":""],
+      [t("Mia 마감 전 → 후","Mia before → after"),"Not final → Matches",p>.5?"n":""],
+      [t("마감 뒤 $10 결제","$10 sale after closing"),"stale: Jin · Pro Shop",p>.65?"n":""],
+      [t("명단 밖 계정","Unlisted account"),t("거절","refused"),p>.8?"n":""]]),{eyeb:"6 / 6"})+
+    (p>.9?rows([["npm run build",t("통과","passed"),"n"]]):'')+'</div></div>'},
+  log:[{at:.1,tag:"local",name:"pg 55433",ep:"stub + real helpers"},{at:.5,tag:"rpc",name:"reconcile('2026-10-20')",ep:"all cases as expected"},
+       {at:.85,tag:"stripe",name:"403",ep:"pelham_require_cash_viewer"},{at:.92,tag:"local",name:"next build",ep:"ok"}],
+  focus:["test"]},
+
+ {a:"status",ph:"check",ko:"지금 상태",en:"Where it stands",
+  screen:(l,p)=>{const t=k(l);return '<div class="ad"><div class="plan">'+
+   '<h3>'+t("끝난 것","Done")+'</h3><ul class="done"><li>'+t("0061 SQL · CashReconcile 화면 작성","0061 SQL and CashReconcile screen written")+'</li><li>'+t("커밋 <code>c9de897</code> → main 푸시 → Vercel success","Commit <code>c9de897</code> → pushed to main → Vercel success")+'</li></ul>'+
+   '<h3>'+t("해 주셔야 할 것","For you")+'</h3><ul class="q"><li'+(p>.3&&p<.7?' class="hot"':'')+'>'+t("Supabase SQL Editor 에 <code>0061_cash_reconcile.sql</code> 붙여 한 번 실행","Paste <code>0061_cash_reconcile.sql</code> into the Supabase SQL Editor and run once")+'</li></ul>'+
+   '<h3>'+t("아직 확인 못 한 것","Not checked yet")+'</h3><ul><li>'+t("실제 /cash 화면 모양 — SQL 실행 전엔 '0061 을 실행해 주세요' 안내만 보여요","The live /cash panel — until the SQL runs it shows only 'run 0061'")+'</li><li>'+t("GitHub Lint & Test 실패는 이전 커밋부터 있던 것","GitHub Lint & Test failure predates this commit")+'</li></ul></div></div>'},
+  log:[{at:.15,tag:"local",name:"c9de897",ep:"main"},{at:.3,tag:"rpc",name:"Vercel",ep:"success"},
+       {at:.5,tag:"key",name:"0061_cash_reconcile.sql",ep:"you run it"},{at:.8,tag:"ui",name:"/cash",ep:"then open and check"}],
+  focus:["sql","ui","test","deploy","run"]}
+];
+
+S.forEach(s=>{s.ledger=s.ledger||[{at:0}]});
+const PH={what:{ko:"한눈에",en:"Overview"},server:{ko:"서버",en:"Server"},screen:{ko:"화면",en:"Screen"},check:{ko:"확인",en:"Check"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"DATA",stripe:"GUARD",key:"ACTION"};
+
+const ITEMS=[
+ {id:"sql",src:L("서버 함수","Server function"),sub:"0061 · pelham_staff_cash_reconcile",st:["ok",L("작성됨","Written")],rows:[[L("읽기만 · 현금 계정만","read only · cash account"),""]]},
+ {id:"formula",src:L("식과 차이","Formula and gap"),sub:"report · registers · staff",st:["ok",L("서버가 계산","Server-side")],rows:[[L("팁 · $200 · 온라인 반영","tips · $200 · online"),""]]},
+ {id:"ui",src:L("Reconcile 패널","Reconcile panel"),sub:"CashReconcile.tsx",st:["ok",L("작성됨","Written")],rows:[[L("Matches / Over / Short / Not final","Matches / Over / Short / Not final"),""]]},
+ {id:"test",src:L("테스트","Tests"),sub:"local Postgres · next build",st:["ok",L("통과","Passed")],rows:[[L("6가지 경우","6 cases"),""]]},
+ {id:"deploy",src:L("배포","Deploy"),sub:"c9de897 · Vercel",st:["ok",L("완료","Done")],rows:[[L("main 푸시","pushed to main"),""]]},
+ {id:"run",src:L("SQL 실행","Run the SQL"),sub:"Supabase SQL Editor",st:["wait",L("직접 해 주세요","Your step")],rows:[[L("그 뒤 /cash 확인","then check /cash"),""]]}
+];
+function renderLedger(p){
+  const k=LANG;const f=new Set(S[SC].focus||[]);
+  $("ledger").innerHTML=ITEMS.map(it=>'<div class="lc'+(f.has(it.id)?" flash lcon":" lcdim")+'"><div class="r1"><span class="src">'+esc(it.src[k])+'<em>'+esc(it.sub)+'</em></span><span class="pill '+it.st[0]+'">'+esc(it.st[1][k])+'</span></div><div class="lrows">'+it.rows.map(r=>'<div><span>'+esc(typeof r[0]==="string"?r[0]:r[0][k])+'</span><span></span></div>').join("")+'</div></div>').join("");
+}
+
+const DUR={"ov": {"ko": 16.5, "en": 13.1}, "read": {"ko": 22.0, "en": 15.7}, "cash": {"ko": 22.0, "en": 20.6}, "card": {"ko": 18.6, "en": 14.9}, "final": {"ko": 18.0, "en": 18.0}, "screen": {"ko": 18.0, "en": 15.2}, "test": {"ko": 17.4, "en": 19.4}, "status": {"ko": 20.8, "en": 19.1}};
+const NARR={"ko": {"ov": "현금 리포트 화면, 슬래시 캐시에 Reconcile 패널이 새로 생겼어요. 매출 리포트 아래, 담당자 마감 위에 있어요. 이 패널은 서버 함수 하나를 불러요. 그 함수는 아무것도 바꾸지 않고 읽기만 하고, 현금 리포트 명단 계정만 부를 수 있어요.", "read": "서버는 세 곳을 같은 날짜로 읽어요. 첫째, 그날 결제된 계산서에서 수단별 금액과 팁, 온라인 결제를 읽어요. 둘째, 계산대 네 곳의 마감 기록을 읽어요. 셋째, 사람별 담당자 마감을 읽어요. 계산대와 담당자 숫자는 원래 마감 화면이 쓰는 함수를 그대로 불러서, 마감 화면과 숫자가 같아요.", "cash": "현금은 세 줄로 맞춰요. 매출 리포트 쪽은 현금에 현금 팁을 더해 육백사십 달러예요. 계산대 쪽은 센 현금에서 시작 잔돈 이백 달러씩을 뺀 합이에요. 이 예시에서는 스낵바가 오 달러 덜 세서 Short 오 달러가 떠요. 담당자 쪽은 센 현금에 이름 없는 계산서 현금을 더하고, 여기서는 Matches예요.", "card": "카드와 체크카드도 같은 방식이에요. 매출 리포트의 카드에 카드 팁을 더한 값과, 계산대에서 센 카드에 온라인 결제를 더한 값을 비교해요. 온라인 예약 결제는 서랍이 없어서 계산대 쪽에 더해요. 체크카드가 하루 종일 0이면 그 칸은 숨겨요.", "final": "아직 닫지 않은 계산대나 사람이 있으면 차이를 확정하지 않아요. 결제가 있는데 안 닫은 계산대, 현금을 받았는데 안 닫은 사람, 닫은 뒤 숫자가 바뀐 것, 이름 없는 계산서 현금을 노란 칸에 적어 줘요. 이게 남아 있으면 Over나 Short 대신 Not final이 떠요.", "screen": "화면은 이렇게 읽어요. 수단별 카드에서 Matches, Over, Short를 봐요. 어긋났으면 아래 계산대 표에서 어느 서랍인지 찾아요. 현금은 시작 잔돈을 뺀 값이에요. 담당자 마감 저장이나 환불은 자동으로 다시 읽고, 계산대 마감은 다른 화면이라 Refresh를 눌러요.", "test": "로컬 Postgres에 원래 마감 함수 정의와 이번 함수를 올려서 여섯 가지를 확인했어요. 예시 숫자, 오 달러 부족, 환불 제외, Mia 마감 전과 후, 마감 뒤에 들어온 결제, 명단 밖 계정 거절까지 모두 기대대로 나왔어요. 화면 빌드도 통과했어요.", "status": "지금 상태예요. 코드는 커밋해서 main에 올렸고, Vercel 배포도 성공했어요. 남은 건 하나예요. Supabase SQL Editor에 영영육일 파일을 붙여 한 번 실행해 주세요. 그 전에는 화면에 SQL을 실행하라는 안내만 보여요. 실행한 뒤 슬래시 캐시에서 실제 화면을 같이 확인하면 돼요."}, "en": {"ov": "The cash report at slash cash has a new Reconcile panel, below the sales report and above staff close-outs. It calls one server function. That function changes nothing, only reads, and only accounts on the cash report list can call it.", "read": "The server reads three things for the same day. First, the day's paid bills: amount, tips and online payments by method. Second, the four registers' close records. Third, each person's close-out. Register and staff figures come from the same helpers the close screens use, so they agree.", "cash": "Cash is checked on three lines. The sales report side is cash plus cash tips, six forty. The register side is counted cash minus the two hundred dollar float at each register. In this example the snack bar counted five dollars short, so it shows Short five dollars. The staff side is counted cash plus cash on bills with no cashier, and here it Matches.", "card": "Card and debit work the same way. Report card plus card tips is compared with card counted at the registers plus online payments. Online booking payments have no drawer, so they're added on the register side. If debit is zero all day, its card is hidden.", "final": "If a register or a person hasn't closed, the gap isn't final. The yellow box lists registers with sales that aren't closed, people who took cash and haven't closed, anything changed after closing, and cash with no cashier name. While any of that remains, it says Not final instead of Over or Short.", "screen": "Here's how to read it. Each method card shows Matches, Over or Short. If something's off, the register table below shows which drawer. Cash there is without the float. Staff saves and refunds reload it automatically; register close is another screen, so press Refresh.", "test": "I loaded the real close-out helpers and the new function into local Postgres and checked six cases: the example figures, a five dollar short, refunds excluded, Mia before and after closing, a sale after closing, and an unlisted account being refused. All came out as expected, and the build passed.", "status": "Where it stands: the code is committed to main and the Vercel deploy succeeded. One step is left. Paste file zero zero six one into the Supabase SQL Editor and run it once. Until then the screen only asks for that SQL. After that, we can check the live panel on slash cash together."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phrx-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phrx-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phrx-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phrx-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script></body></html>
+</body></html>

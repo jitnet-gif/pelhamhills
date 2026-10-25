@@ -1,0 +1,1044 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>펠햄힐스 AI 전화응대 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenario + controls + narration) over a three-lane stage — call · system · screens. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --blue:#2D5E8C; --blue-soft:#E2ECF5; --violet:#5B3FD0; --violet-soft:#ECE7FF;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --c-mem:#EBC6DB; --c-guest:#FFE066; --c-ai:#D6CCFF; --c-aig:#EEE9FF; --c-ink:#1D1D1F;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --c-mem:#5A3048; --c-guest:#5E4E10; --c-ai:#3B2F78; --c-aig:#2A2450; --c-ink:#EDEBF5;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --c-mem:#5A3048; --c-guest:#5E4E10; --c-ai:#3B2F78; --c-aig:#2A2450; --c-ink:#EDEBF5;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mono{font-family:var(--mono)}
+
+/* top */
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:12px}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--green)}
+.top .lede{color:var(--muted);max-width:70ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip small{font-weight:400;color:var(--muted);font-size:11.5px}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no,.chip[aria-pressed="true"] small{color:var(--paper);opacity:.8}
+
+/* controls */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:118px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.sel{height:34px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);padding:0 8px;font-size:13px;max-width:100%}
+.lbl{font-size:12px;color:var(--muted)}
+details.voices{font-size:13px;position:relative}
+details.voices summary{cursor:pointer;list-style:none;color:var(--muted);font-weight:600;padding:6px 8px;border-radius:6px}
+details.voices summary::-webkit-details-marker{display:none}
+details.voices[open] summary{color:var(--ink)}
+.vbox{display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--sunk);min-width:0}
+.vrow{display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;align-items:center}
+.vbox .note{font-size:11.5px;color:var(--muted)}
+.spacer{flex:1}
+.pitch{display:inline-flex;align-items:center;gap:6px}
+.pitch input{width:92px;accent-color:var(--violet)}
+#pCu{accent-color:var(--green)}
+.pitch output{font-family:var(--mono);font-size:12px;font-weight:700;min-width:30px;text-align:right;font-variant-numeric:tabular-nums}
+.elb{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--sand-soft);color:var(--sand);font-family:var(--mono);white-space:nowrap}
+.elb.on{background:var(--violet-soft);color:var(--violet)}
+details.voices .vbox{position:absolute;right:0;z-index:5;width:min(360px,calc(100vw - 32px));box-shadow:0 8px 24px rgba(0,0,0,.12);background:var(--paper)}
+.cast{display:grid;gap:6px}
+.cm{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:8px;align-items:start}
+.pv{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--paper);cursor:pointer;font-size:11px;color:var(--violet)}
+.pv[aria-pressed="true"]{background:var(--violet);color:#fff;border-color:var(--violet)}
+.cm b{font-size:12.5px;display:block}.cm small{font-size:11.5px;color:var(--muted)}
+.cdot{width:10px;height:10px;border-radius:50%;margin-top:4px}
+.up{font-size:12.5px;font-weight:700;color:var(--violet)}
+#fAudio{font-size:12px;max-width:100%}
+details.fb summary{cursor:pointer;font-size:12px;color:var(--muted)}
+details.fb{display:grid;gap:6px}
+
+/* narration caption */
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.cap .stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.55;min-height:1.55em}
+.cap .who{display:block;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+.timer{display:grid;gap:3px;min-width:190px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600;color:var(--term-ink)}
+#tmScen{color:var(--term-key)}
+.prog{height:4px;border-radius:2px;background:#2E3F35;overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.tsub{font-family:var(--sans);font-size:11px;color:var(--term-dim);text-align:right}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--mono);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.chip .dur{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:500}
+.chip[aria-pressed="true"] .dur{color:var(--paper);opacity:.85}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:18px;height:6px;border-radius:3px;border:0;background:#2E3F35;cursor:pointer;padding:0}
+.dot.k-tool,.dot.k-kb{background:#27405A}
+.dot.k-sms{background:#5A3A24}
+.dot.done{background:var(--term-dim)}
+.dot.k-tool.done,.dot.k-kb.done{background:#5E8FC0}
+.dot.k-sms.done{background:#D08A5A}
+.dot.now{background:var(--term-key)!important;transform:scaleY(1.5)}
+
+/* stage */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr) minmax(0,1.15fr);gap:12px;height:clamp(560px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.col.split{background:transparent;border:0;border-radius:0;gap:12px}
+.pane{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.pane.grow{flex:1.35}
+.pane.sms{flex:1}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--ok)}
+.live::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.25}}
+
+/* call */
+.callhead{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border-bottom:1px solid var(--line)}
+.orb{width:54px;height:54px;border-radius:50%;background:var(--sunk);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;gap:3px}
+.orb i{width:3px;height:8px;border-radius:2px;background:var(--muted);display:block}
+.orb[data-who="ai"]{border-color:var(--violet);background:var(--violet-soft)}
+.orb[data-who="ai"] i{background:var(--violet);animation:eq .7s ease-in-out infinite}
+.orb[data-who="cu"]{border-color:var(--green);background:var(--green-soft)}
+.orb[data-who="cu"] i{background:var(--green);animation:eq .7s ease-in-out infinite}
+.orb[data-who="ko"] i{background:var(--flag)}
+.orb i:nth-child(2){animation-delay:.12s}.orb i:nth-child(3){animation-delay:.24s}.orb i:nth-child(4){animation-delay:.36s}.orb i:nth-child(5){animation-delay:.18s}
+@keyframes eq{0%,100%{height:6px}50%{height:24px}}
+.caller b{display:block;font-size:15px}
+.caller span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cstat{display:grid;justify-items:end;gap:3px}
+.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.ringing{background:var(--sand-soft);color:var(--sand)}
+.pill.live{background:var(--ok-soft);color:var(--ok)}
+.pill.ended{background:var(--flag-soft);color:var(--flag)}
+.clock{font-family:var(--mono);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.chat{display:grid;gap:8px;padding:14px;align-content:start}
+.msg{max-width:88%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.5}
+.msg small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;margin-bottom:2px;opacity:.75}
+.msg.ai{background:var(--violet-soft);border-top-left-radius:3px}
+.msg.ai small{color:var(--violet)}
+.msg.cu{background:var(--green-soft);justify-self:end;border-top-right-radius:3px}
+.msg.cu small{color:var(--green);text-align:right}
+.msg.sysline{justify-self:center;background:transparent;color:var(--muted);font-size:11.5px;padding:2px 8px;border:1px dashed var(--line);border-radius:999px}
+.msg.speaking{box-shadow:0 0 0 2px var(--violet)}
+.msg.cu.speaking{box-shadow:0 0 0 2px var(--green)}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* system log */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.ent .lat{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ok);font-variant-numeric:tabular-nums}
+.ent .lat.wait{color:var(--sand)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em}
+.tag.tool{background:var(--blue-soft);color:var(--blue)}
+.tag.kb{background:var(--sand-soft);color:var(--sand)}
+.tag.sms{background:var(--flag-soft);color:var(--flag)}
+.tag.hook{background:var(--violet-soft);color:var(--violet)}
+.tag.time{background:var(--line);color:var(--ink)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.json.req{border-bottom:1px dashed #2E3F35}
+.spin{display:inline-block;width:10px;height:10px;border:2px solid var(--sand);border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* screen: tee sheet */
+.sheet{display:grid;font-size:11.5px;color:var(--c-ink)}
+.sh-h{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;background:var(--sunk);border-bottom:1px solid var(--line);color:var(--ink);font-size:12px;flex-wrap:wrap}
+.sh-h b{font-family:var(--mono)}
+.srow{display:grid;grid-template-columns:52px repeat(4,minmax(0,1fr)) 44px;border-bottom:1px solid var(--line);min-height:36px;position:relative}
+.srow > div{display:flex;align-items:center;padding:0 6px;min-width:0;border-right:1px solid var(--line);gap:4px}
+.srow > div:last-child{border-right:0;justify-content:center;color:var(--flag);font-weight:600;white-space:nowrap;padding:0 2px}
+.srow .tt{font-family:var(--mono);font-weight:600;color:var(--ink);background:var(--sunk)}
+.srow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-open{color:var(--muted)}
+.c-open::before{content:"+";width:14px;height:14px;border:1px solid var(--line);border-radius:50%;display:inline-grid;place-items:center;font-size:10px;margin:0 auto}
+.c-mem{background:var(--c-mem)}
+.c-guest{background:var(--c-guest);font-style:italic}
+.c-ai{background:var(--c-ai);font-weight:600}
+.c-aig{background:var(--c-aig);font-style:italic}
+.b-ai{font-size:9px;font-weight:800;background:var(--violet);color:#fff;border-radius:3px;padding:0 4px;flex:0 0 auto}
+.b-sms{font-size:9px;font-weight:800;background:var(--ok);color:#fff;border-radius:3px;padding:0 4px;margin-left:auto;flex:0 0 auto}
+.b-wl{position:absolute;right:50px;top:50%;transform:translateY(-50%);font-size:9.5px;font-weight:800;border:1px solid var(--violet);color:var(--violet);background:var(--paper);border-radius:3px;padding:0 5px}
+.srow .span{grid-column:2 / span 4;font-weight:700;background:repeating-linear-gradient(135deg,var(--flag-soft) 0 8px,var(--paper) 8px 16px);color:var(--flag)}
+.srow .span.offer{background:repeating-linear-gradient(135deg,var(--violet-soft) 0 8px,var(--paper) 8px 16px);color:var(--violet)}
+.srow.opt{box-shadow:inset 3px 0 0 var(--blue)}
+.srow.opt .tt{background:var(--blue-soft);color:var(--blue)}
+.srow.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:inset 0 0 0 2px var(--violet)}100%{box-shadow:inset 0 0 0 0 transparent}}
+.legend{display:flex;flex-wrap:wrap;gap:10px;padding:8px 12px;font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:9px;border-radius:2px;margin-right:4px;vertical-align:0}
+
+/* screen: KB */
+.kb{display:grid;gap:4px;padding:10px 12px}
+.kbl{display:flex;gap:8px;align-items:baseline;padding:5px 8px;border-radius:6px;font-size:12.5px;color:var(--muted);transition:background .25s,color .25s}
+.kbl .kid{font-family:var(--mono);font-size:10.5px;flex:0 0 52px;opacity:.8}
+.kbl.hi{background:var(--sand-soft);color:var(--ink);box-shadow:inset 3px 0 0 var(--sand)}
+.ex{font-size:9.5px;font-weight:700;border:1px dashed var(--sand);color:var(--sand);border-radius:3px;padding:0 4px;margin-left:auto;flex:0 0 auto}
+
+/* screen: lost & food */
+.cards{display:grid;gap:8px;padding:12px}
+.card{border:1px solid var(--line);border-radius:9px;padding:9px 11px;display:grid;gap:3px;background:var(--sunk)}
+.card .r1{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.card .id{font-family:var(--mono);font-weight:600;font-size:12.5px}
+.card .it{font-size:13px;font-weight:600}
+.card .mt{font-size:11.5px;color:var(--muted)}
+.st{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px}
+.st.searching,.st.prep{background:var(--sand-soft);color:var(--sand)}
+.st.found,.st.ready{background:var(--ok-soft);color:var(--ok)}
+.st.returned{background:var(--line);color:var(--muted)}
+.st.newo{background:var(--flag);color:#fff}
+.card.fresh{border-color:var(--violet);background:var(--violet-soft)}
+.kds{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:12px}
+.kds .card ul{margin:2px 0 0;padding-left:16px;font-size:12px}
+
+/* sms phone */
+.phone{display:grid;gap:8px;padding:12px;align-content:start}
+.bub{background:var(--sunk);border:1px solid var(--line);border-radius:14px;border-bottom-left-radius:4px;padding:8px 11px;font-size:12.5px;max-width:95%}
+.bub .to{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:var(--muted);margin-bottom:2px;font-family:var(--mono)}
+.bub.other{border-style:dashed}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:560px}
+  .col.split{grid-column:1 / -1;flex-direction:row;height:auto}
+  .col.split .pane{height:440px;flex:1}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:480px}
+  .col.split{flex-direction:column}
+  .col.split .pane{height:420px}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .vrow{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div style="display:grid;gap:4px;min-width:0">
+      <div class="eyebrow">Pelham Hills Golf Club · ElevenLabs 음성 에이전트 · 통화 시뮬레이션</div>
+      <h1>AI 전화응대 <b>시뮬레이터</b></h1>
+      <p class="lede">고객 전화 10가지를 한 단계씩 틀어볼게요. 대화는 목소리로 들려드리고, 그 뒤에서 어떤 도구가 불리고 티시트랑 문자가 어떻게 바뀌는지도 같이 보여드려요.</p>
+    </div>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="시나리오"></nav>
+
+  <div class="bar" role="toolbar" aria-label="재생 제어">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" title="이전 단계 (←)" aria-label="이전 단계"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" title="다음 단계 (→)" aria-label="다음 단계"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" title="처음부터">처음부터</button>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl">속도</span>
+    <div class="seg" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.1">1.1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.2">1.2×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <div class="pitch"><label class="lbl" for="pAi">직원 톤</label><input type="range" id="pAi" min="-6" max="6" step="0.5" value="0"><output id="pAiV" for="pAi">0</output></div>
+    <div class="pitch"><label class="lbl" for="pCu">고객 톤</label><input type="range" id="pCu" min="-6" max="6" step="0.5" value="0"><output id="pCuV" for="pCu">0</output></div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tTalk" checked> 대화 음성</label>
+    <label class="tog"><input type="checkbox" id="tNarr"> 한국어 해설 음성</label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> 10개 연속 재생</label>
+    <span class="spacer"></span>
+    <span class="elb" id="elBadge">음성 파일 0 / 0</span>
+    <details class="voices" id="voices">
+      <summary>캐스팅 · 음성 설정 ▾</summary>
+      <div class="vbox">
+        <div class="cast" id="cast">
+          <div class="cm"><span class="cdot" style="background:var(--violet)"></span><div><b>직원 · Hope</b><small>ElevenLabs 에이전트와 같은 경쾌한 여성 목소리 · 한국어 해설도 같은 목소리</small></div><button type="button" class="pv" data-src="voices/agent.mp3" data-p="0" aria-label="직원 목소리 미리듣기">▶</button></div>
+          <div class="cm"><span class="cdot" style="background:var(--green)"></span><div><b>Daniel Kim · Chris</b><small>단골 퍼블릭 골퍼 · 굵고 느긋한 톤 · 예약·취소·확인·음식주문</small></div><button type="button" class="pv" data-src="voices/algieba.mp3" data-p="0" aria-label="Daniel 미리듣기">▶</button></div>
+          <div class="cm"><span class="cdot" style="background:var(--green)"></span><div><b>Jason · Liam</b><small>처음 전화한 20대 · 가볍고 젊은 톤 · 그린피</small></div><button type="button" class="pv" data-src="voices/algieba.mp3" data-p="2.5" aria-label="Jason 미리듣기">▶</button></div>
+          <div class="cm"><span class="cdot" style="background:var(--sand)"></span><div><b>Connor Walton · Will</b><small>풀 회원 · 또렷하고 빠른 말투 · 분실물</small></div><button type="button" class="pv" data-src="voices/alnilam.mp3" data-p="0" aria-label="Connor 미리듣기">▶</button></div>
+          <div class="cm"><span class="cdot" style="background:var(--sand)"></span><div><b>Ryan Patel · Eric</b><small>올해 22라운드 단골 · 밝은 톤 · 멤버십</small></div><button type="button" class="pv" data-src="voices/alnilam.mp3" data-p="2" aria-label="Ryan 미리듣기">▶</button></div>
+          <div class="cm"><span class="cdot" style="background:var(--flag)"></span><div><b>Megan · Matilda</b><small>첫 방문 예정 · 부드럽고 상냥함 · 영업시간·위치</small></div><button type="button" class="pv" data-src="voices/despina.mp3" data-p="0" aria-label="Megan 미리듣기">▶</button></div>
+          <div class="cm"><span class="cdot" style="background:var(--flag)"></span><div><b>Olivia · Sarah</b><small>차분한 30대 · 낮고 안정된 톤 · 카트피</small></div><button type="button" class="pv" data-src="voices/despina.mp3" data-p="-2" aria-label="Olivia 미리듣기">▶</button></div>
+        </div>
+        <label class="up" for="fAudio">생성한 음성 파일 불러오기 (audio 폴더에서 전체 선택)</label>
+        <input type="file" id="fAudio" accept="audio/*,.mp3,.json" multiple>
+        <p class="note" id="elNote">ElevenLabs로 만든 대사 mp3(audio 폴더)가 연결되면 그 목소리로 재생하고, 없는 대사만 브라우저 음성으로 대신 읽습니다. 캐릭터별 톤 차이는 재생할 때 자동으로 적용돼요.</p>
+        <details class="fb"><summary>브라우저 대체 음성</summary>
+          <div class="vrow"><label class="lbl" for="vAi">AI 상담원</label><select class="sel" id="vAi"></select></div>
+          <div class="vrow"><label class="lbl" for="vCu">고객</label><select class="sel" id="vCu"></select></div>
+          <div class="vrow"><label class="lbl" for="vKo">한국어 해설</label><select class="sel" id="vKo"></select></div>
+          <p class="note" id="vNote"></p>
+        </details>
+      </div>
+    </details>
+  </div>
+
+  <div class="cap">
+    <span class="stepno" id="stepno">1 / 1</span>
+    <p id="capText" aria-live="polite"></p>
+    <div class="timer" aria-label="진행 시간">
+      <div class="tline"><span class="tl">이 시나리오</span><span class="tv" id="tmScen">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl">전체 10개</span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+      <span class="tsub" id="tmSub"></span>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-label="통화">
+      <div class="callhead">
+        <div class="orb" id="orb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="caller"><b id="cName"></b><span id="cNum"></span></div>
+        <div class="cstat"><span class="pill" id="cStat">대기</span><span class="clock" id="clock">0:00</span></div>
+      </div>
+      <div class="scroll" id="chatWrap"><div class="chat" id="chat"></div></div>
+    </section>
+
+    <section class="col" aria-label="시스템">
+      <div class="head"><h2>뒤에서 일어나는 일 · 도구 호출</h2><span class="mono" style="color:var(--muted);font-size:11px">FastAPI · Supabase · Twilio</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+
+    <section class="col split" aria-label="화면">
+      <div class="pane grow">
+        <div class="head"><h2 id="scrTitle">티시트</h2><span class="live">LIVE</span></div>
+        <div class="scroll" id="screen"></div>
+      </div>
+      <div class="pane sms">
+        <div class="head"><h2>고객 휴대폰 · SMS</h2><span class="mono" style="color:var(--muted);font-size:11px">Twilio Messaging</span></div>
+        <div class="scroll" id="smsWrap"><div class="phone" id="sms"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>직원(AI 상담원)은 업로드한 call-center agent 목소리만 쓰고, 고객 6명은 Google Chirp 3 HD 보이스 세 개(Algieba·Alnilam·Despina)를 캐릭터별 톤으로 나눠 씁니다. 음성 파일이 연결되지 않은 대사만 브라우저 음성으로 대신 읽습니다. 톤 슬라이더는 반음 단위로 높낮이를 바꾸며 재생 중에도 바로 적용됩니다(브라우저 음성은 다음 문장부터). 단축키: Space 재생·일시정지, ← → 단계 이동, 1·2·3·4·5 속도 1×·1.1×·1.2×·1.5×·2×. 진행 시간은 음성 길이를 바탕으로 한 예상치이며, 음성 파일이 연결되면 실제 길이로 다시 계산됩니다.</p>
+    <p>예약·요금 수치는 2026 요금표(주말 18홀 $58.41 세전, 카트 1인 $22 세후, HST 13%) 기준 예시입니다. <b>예시</b> 표시가 붙은 영업시간·메뉴·분실물·취소 규정은 클럽 확인 전 샘플값입니다.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- knowledge base ---------------- */
+const KB = [
+  {id:"course", t:"18 holes · par 71 · about 6,900 yards · established 1966"},
+  {id:"tee",    t:"Tee times 6:40 AM – 6:58 PM, every 9 minutes (83 per day)"},
+  {id:"season", t:"Season April 1 – November 30, weather permitting"},
+  {id:"proshop",t:"Pro shop opens 6:15 AM, closes at dusk", ex:1},
+  {id:"snack",  t:"Snack bar 7:00 AM – 6:00 PM · pickup at the turn after hole 9", ex:1},
+  {id:"gf1",    t:"Weekday 18 holes $54 · afternoon $44 · twilight $39 (HST incl.)"},
+  {id:"gf2",    t:"Weekend 18 holes $66 · afternoon $53 · twilight $44 (HST incl.)"},
+  {id:"gf3",    t:"Fall pricing starts October 1"},
+  {id:"cart1",  t:"Power cart, 18 holes: $22 per rider (HST incl.)"},
+  {id:"cart2",  t:"2 riders per cart · 60 electric carts · walking and pull carts allowed"},
+  {id:"cart3",  t:"Member cart: $20 (18 holes) · $11 (9 holes)"},
+  {id:"m1",     t:"2027 Early Bird prices incl. HST · deadline Nov 15, 2026"},
+  {id:"m2",     t:"Full Single $3,051 · Weekday $2,316.50 · Twilight $1,638.50"},
+  {id:"m3",     t:"Junior (17 & under) $565 · Spousal Full $5,152.80 · Range $395.50"},
+  {id:"m4",     t:"Credit card payment +3% · members may play up to 36 holes a day"},
+  {id:"loc1",   t:"196 Webber Road, Welland, ON L3B 5N8 (Niagara region)"},
+  {id:"loc2",   t:"Free parking beside the clubhouse", ex:1},
+  {id:"cxl",    t:"Free cancellation up to 24 hours before the tee time", ex:1},
+  {id:"lf1",    t:"Found items held at the pro shop for 30 days · pickup with photo ID", ex:1},
+  {id:"menu",   t:"Hot dog $6.50 · Chicken wrap $9.50 · Bottled water $2.50", ex:1}
+];
+
+/* ---------------- baseline screens ---------------- */
+function openCells(){ return [0,0,0,0].map(()=>({n:"",k:"open"})); }
+function aiCells(name,p){ const c=[{n:name,k:"ai"}]; for(let i=1;i<4;i++) c.push(i<p?{n:"Guest",k:"aig"}:{n:"",k:"open"}); return c; }
+function sheetBase(v){
+  const R=(t,cells,x)=>Object.assign({t,cells,hold:null,badge:null,flash:false,sms:false,opt:false,cart:""},x||{});
+  return [
+    R("10:16",[{n:"Walton, Connor",k:"mem"},{n:"Guest",k:"guest"},{n:"Guest",k:"guest"},{n:"Guest",k:"guest"}],{cart:"2"}),
+    R("10:25",openCells()),
+    v==="empty" ? R("10:34",openCells()) : R("10:34",aiCells("Kim, Daniel",4),{cart:"2",sms:true}),
+    R("10:43",[{n:"Park, Min-ho",k:"mem"},{n:"Lee, Sarah",k:"mem"},{n:"Guest",k:"guest"},{n:"Guest",k:"guest"}],{cart:"2",badge:"대기 2"}),
+    R("10:52",[{n:"Singh, Arjun",k:"mem"},{n:"Guest",k:"guest"},{n:"",k:"open"},{n:"",k:"open"}],{cart:"1"}),
+    R("11:01",openCells())
+  ];
+}
+const LOST0=[
+  {id:"LF-0415",item:"Titleist cap · white",meta:"Hole 12 · Sat Sep 26",st:"found"},
+  {id:"LF-0416",item:"Honda car key",meta:"Parking lot · Sun Sep 27",st:"returned"},
+  {id:"LF-0417",item:"Golf glove · left, M",meta:"Driving range · Mon Sep 28",st:"searching"}
+];
+const FOOD0=[
+  {id:"F-2215",where:"Bev cart · Hole 4",who:"Walton",items:["4 × Bottled water","2 × Granola bar"],st:"ready"},
+  {id:"F-2216",where:"Counter",who:"Singh",items:["1 × Breakfast sandwich","1 × Coffee"],st:"prep"}
+];
+const ST_LABEL={searching:"찾는 중",found:"보관 중",returned:"반환 완료",prep:"조리 중",ready:"준비 완료",newo:"NEW"};
+
+/* ---------------- scenarios ---------------- */
+/* cast: 3 Google Chirp 3 HD customer voices (Algieba, Alnilam, Despina), varied into 6 callers with per-character pitch */
+const KIM={num:"+1 905-562-7189",name:"Kim, Daniel",tag:"기존 고객 · Public",voice:"daniel",short:"Daniel",gv:"Algieba",pitch:0};
+const NEWC={num:"+1 289-***-3350",name:"미등록 번호",tag:"신규 · Megan",voice:"megan",short:"Megan",gv:"Despina",pitch:0};
+const WALTON={num:"+1 905-***-2214",name:"Walton, Connor",tag:"회원 · Full",voice:"connor",short:"Connor",gv:"Alnilam",pitch:0};
+const JASON={num:"+1 416-***-8021",name:"미등록 번호",tag:"신규 · Jason",voice:"jason",short:"Jason",gv:"Algieba",pitch:2.5};
+const OLIVIA={num:"+1 905-***-6632",name:"미등록 번호",tag:"신규 · Olivia",voice:"olivia",short:"Olivia",gv:"Despina",pitch:-2};
+const RYAN={num:"+1 905-***-5147",name:"Patel, Ryan",tag:"기존 고객 · Public",voice:"ryan",short:"Ryan",gv:"Alnilam",pitch:2};
+
+const S=[
+{ko:"예약",en:"Booking",screen:"sheet",sheet:"empty",caller:KIM,steps:[
+ {k:"ring",n:"자, 전화가 들어왔어요! Twilio가 받아서 바로 AI 상담원한테 넘겨줘요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:380,req:{caller:"+19055627189"},res:{customer:"Kim, Daniel",member:false,rate:"Public",upcoming:null},n:"받기도 전에 번호로 누군지 벌써 찾아봤어요. 단골 대니얼이네요! 그래서 이름 불러주면서 반갑게 인사하는 거예요."},
+ {k:"ai",t:"Good morning, Pelham Hills Golf Club! Oh, hey Daniel! How's it going? What can I do for you today?"},
+ {k:"cu",t:"Hey! Yeah, good, good. Um, I wanna book a tee time for this Saturday?"},
+ {k:"ai",t:"Ooh, Saturday, love it! How many of you are playing, and is that nine or eighteen?"},
+ {k:"cu",t:"Uh, there's four of us. Eighteen holes."},
+ {k:"ai",t:"Awesome. Any time you're thinking? And do you guys need carts?"},
+ {k:"cu",t:"Yeah, like, around ten-ish in the morning? And, uh, two carts."},
+ {k:"ai",t:"Okay, give me just a sec while I pull up the tee sheet.",n:"잠깐 조회하는 동안 가만히 있으면 어색하잖아요? 그래서 ‘잠깐만요’ 한마디 해줘요."},
+ {k:"tool",name:"check_availability",ep:"POST /api/voice/availability",ms:640,req:{date:"2026-10-03",window:"09:30-11:00",players:4,holes:18,carts:2},res:{options:["10:25","10:34","11:01"],green_fee:"$58.41 / player",cart:"$19.47 / rider",total_incl_tax:"$352.02"},fx:{opts:["10:25","10:34","11:01"]},n:"자리를 딱 세 개만 골라왔어요. 금액은 AI가 머리로 계산하는 게 아니라, 요금 엔진이 준 숫자를 그대로 읽는 거예요."},
+ {k:"ai",t:"Okay! So I've got ten twenty-five, ten thirty-four, or eleven-oh-one. Which one works best for you?"},
+ {k:"cu",t:"Oh, ten thirty-four's perfect."},
+ {k:"tool",name:"hold_slot",ep:"POST /api/voice/hold",ms:420,req:{tee_time:"2026-10-03 10:34",players:4},res:{hold_id:"H-4821",expires_in:"5:00"},fx:{hold:"10:34",label:"HOLD 4:58 · AI 통화 중 · 4명"},n:"고객이 고르자마자 그 자리 5분 동안 찜! 티시트 보시면 10시 34분 줄이 줄무늬로 바뀌었죠? 이제 프로샵에서도 못 가져가요."},
+ {k:"ai",t:"Perfect, I'm holding ten thirty-four for you right now. So that's Saturday, October third, four players, eighteen holes, with two carts. All in, it comes to three fifty-two and two cents, tax included. And is this the best number to text you at?"},
+ {k:"cu",t:"Yep, that's my cell."},
+ {k:"ai",t:"Great. Want me to go ahead and lock that in?"},
+ {k:"cu",t:"Yeah, let's do it."},
+ {k:"tool",name:"confirm_booking",ep:"POST /api/voice/confirm",ms:610,req:{hold_id:"H-4821",name:"Daniel Kim",phone:"+19055627189",pay_mode:"link"},res:{ref:"PH-10392",status:"booked",source:"voice_ai",payment_link:"sent"},fx:{book:"10:34",name:"Kim, Daniel",players:4,cart:"2"},n:"고객이 ‘예스’ 해야만 확정이에요. 짠, 예약번호 나왔고 티시트도 보라색 AI 예약으로 바뀌었어요."},
+ {k:"sms",to:"Daniel Kim",t:"Pelham Hills: Sat Oct 3, 10:34 AM · 4 players · 18 holes · 2 carts. Ref PH-10392. Reply C to cancel.",n:"확정 문자가 바로 슝 날아가요."},
+ {k:"sms",to:"Daniel Kim",t:"Total $352.02 incl. HST. Pay securely: pay.pelhamhills.com/PH-10392 · link expires in 2h",n:"결제 링크도 문자로 같이 가요. 카드번호요? 전화로는 절대 안 받아요."},
+ {k:"ai",t:"Yay, you're all set! Your confirmation number is P H, one oh three, nine two. I just texted you the details and a secure payment link. Just check in at the pro shop about fifteen minutes early, okay? Anything else I can help with?"},
+ {k:"cu",t:"Nope, that's it. Thanks a lot!"},
+ {k:"ai",t:"Awesome. Thanks for calling, Daniel. Have a great round!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"booked",booking:"PH-10392",duration:"1:52",summary:"Sat 10:34 · 4p · 18h · 2 carts · payment link sent"},n:"통화 끝! 녹취랑 요약이 자동으로 저장되고, 어드민의 AI 통화 카운터도 하나 올라가요."}
+]},
+{ko:"취소",en:"Cancel",screen:"sheet",sheet:"booked",caller:KIM,steps:[
+ {k:"ring",n:"이번엔 아까 그 고객이 토요일 예약을 취소하고 싶대요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:360,req:{caller:"+19055627189"},res:{customer:"Kim, Daniel",upcoming:"PH-10392 · Sat 10:34 · 4p"},n:"번호만 보고도 다가오는 예약까지 한 번에 쫙 불러와요."},
+ {k:"ai",t:"Good afternoon, Pelham Hills! Hey Daniel, what can I do for you?"},
+ {k:"cu",t:"Hey, so, uh, bad news. I gotta cancel my tee time for Saturday."},
+ {k:"tool",name:"find_booking",ep:"POST /api/voice/booking/find",ms:350,req:{phone:"+19055627189"},res:{ref:"PH-10392",date:"Sat Oct 3",time:"10:34",players:4,phone_match:true},fx:{opts:["10:34"]}},
+ {k:"ai",t:"Aw, no worries. Okay, I see you're booked this Saturday, October third, at ten thirty-four for four players. Is that the one?"},
+ {k:"cu",t:"Yeah, that's the one."},
+ {k:"tool",name:"cancel_booking",ep:"POST /api/voice/booking/cancel",ms:400,req:{ref:"PH-10392",preview:true},res:{fee:"$0.00",rule:"more than 24h before tee time"},fx:{kb:["cxl"]},n:"바로 취소 안 하고, 먼저 수수료가 있는지 슬쩍 확인해요. 이건 AI가 아니라 API가 정해요. 참고로 24시간 규정은 예시예요."},
+ {k:"ai",t:"Good news, since it's more than twenty-four hours out, there's no cancellation fee. Want me to go ahead and cancel it?"},
+ {k:"cu",t:"Oh, nice. Yeah, go ahead."},
+ {k:"tool",name:"cancel_booking",ep:"POST /api/voice/booking/cancel",ms:450,req:{ref:"PH-10392",preview:false},res:{status:"cancelled"},fx:{cancel:"10:34"},n:"번호가 예약이랑 딱 맞으니까 바로 취소! 번호가 다르면 예약번호랑 성부터 물어봐요."},
+ {k:"sms",to:"Daniel Kim",t:"Cancelled PH-10392 (Sat Oct 3, 10:34 AM). Hope to see you soon!"},
+ {k:"tool",name:"tee_sniper.notify",ep:"trigger · on cancel",hook:1,ms:500,req:{slot:"Sat 10:34",players:4},res:{waitlist_first:"+1 289-***-4410",reply_window:"10 min"},fx:{offer:"10:34"},n:"여기가 꿀포인트예요. 빈자리가 생기면 대기자 1번한테 자동으로 연락이 가요. 사람 손 하나 안 대고 다시 채워지는 거죠."},
+ {k:"sms",to:"대기자 +1 289-***-4410",other:1,t:"Pelham Hills: A 10:34 AM spot opened on Sat Oct 3 for 4 players. Reply Y within 10 min to grab it."},
+ {k:"ai",t:"All done! Your booking's cancelled, and you'll get a text confirming it. Anything else?"},
+ {k:"cu",t:"Nah, that's it. Thanks."},
+ {k:"ai",t:"No worries. Hope to see you out here again soon!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"cancelled",booking:"PH-10392",duration:"1:05"}}
+]},
+{ko:"확인",en:"Confirm",screen:"sheet",sheet:"booked",caller:KIM,steps:[
+ {k:"ring",n:"이번엔 예약 확인 전화예요. 중간에 인원 바꾸는 것까지 보여드릴게요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:360,req:{caller:"+19055627189"},res:{customer:"Kim, Daniel",upcoming:"PH-10392",has_unpaid:true}},
+ {k:"ai",t:"Good morning, Pelham Hills! Hey Daniel, what's up?"},
+ {k:"cu",t:"Hey! Um, can you just check if I've got a tee time this weekend? I can't remember if it went through."},
+ {k:"tool",name:"find_booking",ep:"POST /api/voice/booking/find",ms:340,req:{phone:"+19055627189"},res:{ref:"PH-10392",date:"Sat Oct 3",time:"10:34",players:4,holes:18,carts:2,payment:"pending"},fx:{opts:["10:34"]},n:"예약이랑 결제 상태를 같이 봤더니, 아직 결제 전이네요? 그래서 링크 다시 보내줄까 먼저 물어봐요."},
+ {k:"ai",t:"Yep, it went through! You're all set for Saturday, October third, at ten thirty-four. Four players, eighteen holes, two carts. Oh, and it looks like payment's still pending. Want me to resend that payment link?"},
+ {k:"cu",t:"Oh, sure. Actually, wait, one of my buddies just bailed on me. Can we make it three?"},
+ {k:"tool",name:"modify_booking",ep:"POST /api/voice/booking/modify",ms:520,req:{ref:"PH-10392",players:3},res:{players:3,carts:2,total_incl_tax:"$264.01"},fx:{update:"10:34",name:"Kim, Daniel",players:3},n:"인원이 바뀌면 총액은 요금 엔진이 알아서 다시 계산해요. 티시트에 한 자리 비었으니까 또 팔 수 있고요!"},
+ {k:"ai",t:"Ha, no problem. I've changed it to three players. Your new total is two sixty-four and one cent, tax included. I'll text you the updated details and the link."},
+ {k:"tool",name:"resend_payment_link",ep:"POST /api/bookings/PH-10392/payment-link",ms:380,req:{ref:"PH-10392"},res:{sent:true,amount:"$264.01"}},
+ {k:"sms",to:"Daniel Kim",t:"Updated PH-10392: Sat Oct 3, 10:34 AM · 3 players · 18 holes. Total $264.01 incl. HST. Pay: pay.pelhamhills.com/PH-10392"},
+ {k:"cu",t:"Perfect. Thanks!"},
+ {k:"ai",t:"You got it, Daniel. See you Saturday!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"modified",booking:"PH-10392",change:"players 4 → 3"}}
+]},
+{ko:"영업시간",en:"Hours",screen:"kb",caller:NEWC,steps:[
+ {k:"ring",n:"처음 전화한 분이 몇 시에 여냐고 물어보네요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:330,req:{caller:"+1289•••3350"},res:{customer:null}},
+ {k:"ai",t:"Good morning, Pelham Hills Golf Club! How can I help you today?"},
+ {k:"cu",t:"Hi! Um, I was just wondering, what time do you guys open tomorrow?"},
+ {k:"kb",ids:["tee","proshop"],n:"영업시간은 지식베이스에 있는 것만 읽어요. 모르는 건 지어내지 않고 직원한테 넘겨요."},
+ {k:"ai",t:"Sure! So our first tee time is six forty in the morning, and the pro shop opens at six fifteen. Last tee time's around six fifty-eight in the evening, but it gets a little earlier as the days get shorter."},
+ {k:"cu",t:"Oh, okay. And, like, how late in the year are you guys open?"},
+ {k:"kb",ids:["season"]},
+ {k:"ai",t:"We're open right through the end of November, weather permitting! Did you wanna book a tee time?"},
+ {k:"cu",t:"Not right now, but thank you!"},
+ {k:"ai",t:"No problem at all. Thanks for calling!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"info",topic:"hours",duration:"0:48"}}
+]},
+{ko:"물품분실",en:"Lost item",screen:"lost",caller:WALTON,steps:[
+ {k:"ring",n:"어제 친 회원이 거리측정기를 두고 온 것 같대요. 이런 전화 진짜 많죠?"},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:370,req:{caller:"+1905•••2214"},res:{customer:"Walton, Connor",member:"Full",last_round:"Mon Sep 28 · 2:07 PM · cart #34"},n:"어제 몇 시에 쳤는지, 몇 번 카트 탔는지까지 벌써 알고 있어요."},
+ {k:"ai",t:"Good morning, Pelham Hills! Hey Connor, what can I do for you?"},
+ {k:"cu",t:"Hey, yeah, so, uh, I'm pretty sure I left my rangefinder in the cart yesterday."},
+ {k:"ai",t:"Oh no, sorry to hear that! Let me log it for you. What brand and colour is it?"},
+ {k:"cu",t:"It's a black Bushnell. It's in, like, a little grey case."},
+ {k:"ai",t:"Got it. And I see you played yesterday at two oh seven. Do you remember where you last had it? In the cart, out on the course, or in the clubhouse?"},
+ {k:"cu",t:"Hmm. Probably in the cart, in the cup holder thing."},
+ {k:"tool",name:"report_lost_item",ep:"POST /api/voice/lost-item",ms:450,req:{item:"rangefinder",desc:"black Bushnell, grey case",played:"2026-09-28 14:07",where:"cart #34",phone:"+1905•••2214"},res:{ticket:"LF-0418",alert:"pro shop tablet"},fx:{lost:{id:"LF-0418",item:"Bushnell rangefinder · black, grey case",meta:"Cart #34 · Mon Sep 28 · Walton",st:"searching"}},n:"분실물 접수 완료! 프로샵 보드에 티켓이 바로 떴어요. 근데 AI가 ‘찾았어요’라고 먼저 말하는 일은 절대 없어요."},
+ {k:"ai",t:"Okay, I've logged a black Bushnell rangefinder in a grey case, left in cart thirty-four yesterday afternoon. Your reference number is L F, zero four one eight. If our staff find it, we'll text you right away."},
+ {k:"kb",ids:["lf1"]},
+ {k:"ai",t:"Just so you know, we keep found items at the pro shop for thirty days, and you can pick it up with a photo ID. Anything else?"},
+ {k:"cu",t:"Nope, that's all. Thanks, appreciate it."},
+ {k:"ai",t:"You're welcome, Connor. Fingers crossed we find it!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"lost_item_logged",ticket:"LF-0418"}},
+ {k:"note",t:"2시간 후",name:"lost_item.update",res:{ticket:"LF-0418",status:"found",by:"staff · cart barn"},fx:{lostSt:["LF-0418","found"]},n:"직원이 카트에서 찾아서 ‘보관 중’으로 바꾸면? 고객한테 문자가 자동으로 가요."},
+ {k:"sms",to:"Connor Walton",t:"Pelham Hills: Good news! Your Bushnell rangefinder (LF-0418) was found. Pick it up at the pro shop with photo ID."}
+]},
+{ko:"그린피",en:"Green fee",screen:"kb",caller:JASON,steps:[
+ {k:"ring",n:"그린피 문의예요. 일반 요금이랑 특정 날짜 요금을 어떻게 다르게 답하는지 봐 주세요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:330,req:{caller:"+1416•••8021"},res:{customer:null}},
+ {k:"ai",t:"Good morning, Pelham Hills Golf Club! How can I help you today?"},
+ {k:"cu",t:"Hi, um, how much is it for eighteen holes on a weekday?"},
+ {k:"kb",ids:["gf1","gf2","gf3"],n:"공시 요금은 문서에서 읽고, ‘시간대랑 시즌마다 달라요’라는 말을 꼭 붙여요."},
+ {k:"ai",t:"So our weekday rate for eighteen holes is fifty-four dollars, tax included, and it's a bit cheaper in the afternoon and at twilight. Prices can change by time and season, though. Want me to check an exact price for a specific day?"},
+ {k:"cu",t:"Oh, yeah, sure. Tomorrow morning? For two of us."},
+ {k:"tool",name:"get_rates",ep:"POST /api/voice/rates",ms:480,req:{date:"2026-09-30",time:"morning",holes:18,players:2},res:{per_player:"$47.79 + HST = $54.00",total_incl_tax:"$108.00",season:"regular"},n:"날짜가 정해지면 요금 API로 딱 확인해요. 10월 1일부터 가을 요금이라, 외워서 말하면 틀릴 수 있거든요."},
+ {k:"ai",t:"Okay, tomorrow morning it's fifty-four dollars per player, tax included, so a hundred and eight for the two of you. Want me to book it?"},
+ {k:"cu",t:"Hmm, not yet. I gotta check with my friend first. I'll call back."},
+ {k:"ai",t:"No problem! Just a heads up, fall pricing kicks in October first. Thanks for calling!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"info",topic:"green_fee",lead:"hot · call back"}}
+]},
+{ko:"카트피",en:"Cart fee",screen:"kb",caller:OLIVIA,steps:[
+ {k:"ring",n:"이번엔 카트 요금이요. 회원 요금까지 이어서 물어보네요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:320,req:{caller:"+1905•••6632"},res:{customer:null}},
+ {k:"ai",t:"Good afternoon, Pelham Hills Golf Club! How can I help?"},
+ {k:"cu",t:"Hi! Quick question. How much is a power cart?"},
+ {k:"kb",ids:["cart1","cart2"]},
+ {k:"ai",t:"A power cart for eighteen holes is twenty-two dollars per rider, tax included, and each cart fits two. And if you'd rather walk, that's totally fine too!"},
+ {k:"cu",t:"Okay. And is it cheaper if you're a member?"},
+ {k:"kb",ids:["cart3"],n:"똑같은 질문이어도 회원이냐 아니냐에 따라 읽는 줄이 달라요."},
+ {k:"ai",t:"Yep! Members pay twenty dollars per rider for eighteen holes, or eleven for nine."},
+ {k:"cu",t:"Oh, cool, good to know. Thanks!"},
+ {k:"ai",t:"Of course! Did you wanna book a tee time with a cart?"},
+ {k:"cu",t:"Uh, maybe later."},
+ {k:"ai",t:"Sounds good. Thanks for calling!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"info",topic:"cart_fee"}}
+]},
+{ko:"멤버쉽",en:"Membership",screen:"kb",caller:RYAN,steps:[
+ {k:"ring",n:"올해 22번이나 온 단골이 내년 멤버십을 물어봐요. 영업 기회죠!"},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:360,req:{caller:"+1905•••5147"},res:{customer:"Patel, Ryan",member:false,rounds_2026:22}},
+ {k:"ai",t:"Good morning, Pelham Hills! Hey Ryan, how's it going?"},
+ {k:"cu",t:"Good! So, uh, I've been playing a lot this year, and I'm kinda thinking about getting a membership for next year."},
+ {k:"kb",ids:["m1","m2","m3"],n:"요금표에서 대표적인 거 두 개만 말해줘요. 전부 읽으면 지루하잖아요? 나머지는 문자로 보내요."},
+ {k:"ai",t:"Oh, awesome! So for twenty twenty-seven we've got Full, Weekday, Twilight, Junior and Spousal memberships, plus a range membership. Early-bird pricing runs until November fifteenth. Just to give you an idea, a Full Single is three thousand fifty-one dollars, and a Weekday is twenty-three sixteen fifty, both with tax."},
+ {k:"cu",t:"Okay, that's a lot of options. Can you just send me the details?"},
+ {k:"tool",name:"send_info_sms",ep:"POST /api/sms/info",ms:400,req:{topic:"membership",phone:"+1905•••5147"},res:{sent:true}},
+ {k:"sms",to:"Ryan Patel",t:"Pelham Hills 2027 Memberships. Early Bird until Nov 15: Full $3,051 · Weekday $2,316.50 · Twilight $1,638.50 · Junior $565. Details: pelhamhills.com/membership"},
+ {k:"ai",t:"Sent! And if you wanna sign up or talk through payment options, I can connect you with our pro shop team."},
+ {k:"cu",t:"Yeah, actually, could I talk to someone real quick?"},
+ {k:"ai",t:"Of course! Let me connect you with the pro shop. One sec."},
+ {k:"tool",name:"transfer_to_proshop",ep:"ElevenLabs · transfer",ms:300,req:{reason:"membership sign-up",summary:"Public, 22 rounds in 2026, wants 2027 membership, info SMS sent"},res:{status:"transferred",to:"Pro shop desk"},n:"가입이랑 결제는 사람이 하는 게 좋으니까 직원한테 넘겨요. 요약까지 같이 가니까 고객이 같은 말을 두 번 안 해도 돼요."},
+ {k:"end",name:"post_call_webhook",res:{outcome:"transferred",topic:"membership",lead:"hot"}}
+]},
+{ko:"위치안내",en:"Directions",screen:"kb",caller:NEWC,steps:[
+ {k:"ring",n:"처음 오시는 분이 위치를 물어보네요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:320,req:{caller:"+1289•••3350"},res:{customer:null}},
+ {k:"ai",t:"Good morning, Pelham Hills Golf Club! How can I help you today?"},
+ {k:"cu",t:"Hi! Sorry, this is probably a dumb question, but where exactly are you guys?"},
+ {k:"kb",ids:["loc1","loc2"]},
+ {k:"ai",t:"Not dumb at all! We're at one ninety-six Webber Road in Welland, in the Niagara region. There's free parking right beside the clubhouse. Want me to text you a map link?"},
+ {k:"cu",t:"Oh, yes, please. That'd be great."},
+ {k:"tool",name:"send_info_sms",ep:"POST /api/sms/info",ms:380,req:{topic:"directions"},res:{sent:true},n:"주소를 말로 몇 번씩 불러주는 대신, 지도 링크를 문자로 쏙 보내줘요."},
+ {k:"sms",to:"+1 289-***-3350",t:"Pelham Hills Golf Club · 196 Webber Road, Welland, ON L3B 5N8 · Map: maps.google.com/?q=Pelham+Hills+Golf+Club"},
+ {k:"ai",t:"Done, it's on its way. See you soon!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"info",topic:"directions"}}
+]},
+{ko:"음식주문",en:"Food order",screen:"food",caller:KIM,steps:[
+ {k:"ring",n:"라운드 중에 7번 홀에서 전화가 왔어요. 9홀 끝나고 먹을 걸 주문하고 싶대요."},
+ {k:"tool",name:"identify_caller",ep:"POST /api/voice/init",ms:360,req:{caller:"+19055627189"},res:{customer:"Kim, Daniel",on_course:true,tee_time:"10:34 today",est_turn:"12:35"},n:"오늘 몇 시에 티오프했는지 아니까, 9홀 끝나는 시간도 대충 계산이 돼요. 그래서 픽업 시간을 먼저 제안할 수 있어요."},
+ {k:"ai",t:"Hey Daniel, Pelham Hills! How's the round going?"},
+ {k:"cu",t:"Pretty good! Hey, can I order some food for the turn? We're starving."},
+ {k:"ai",t:"Ha, for sure! What can I get you?"},
+ {k:"cu",t:"Uh, let's do two hot dogs, a chicken wrap, and, um, three waters."},
+ {k:"kb",ids:["menu","snack"],n:"메뉴에 있는 건지, 스낵바가 지금 열려 있는지 먼저 체크해요. 메뉴랑 가격은 예시예요."},
+ {k:"ai",t:"Okay, two hot dogs, one chicken wrap, and three waters. Want it ready at the snack bar after hole nine, around twelve thirty-five?"},
+ {k:"cu",t:"Yep, perfect."},
+ {k:"tool",name:"place_food_order",ep:"POST /api/voice/food-order",ms:560,req:{items:["2 hot dog","1 chicken wrap","3 water"],name:"Kim",pickup:"turn",eta:"12:35"},res:{order:"F-2217",subtotal:"$30.00",total_incl_tax:"$33.90",pay:"at pickup"},fx:{food:{id:"F-2217",where:"The turn · 12:35",who:"Kim",items:["2 × Hot dog","1 × Chicken wrap","3 × Bottled water"],st:"newo"}},n:"주문이 주방 화면에 바로 떴어요! Lightspeed 스낵바 매장이랑 연결되는 구조예요."},
+ {k:"ai",t:"Your order's in! Two hot dogs, a chicken wrap and three waters for Kim, ready around twelve thirty-five. It's thirty-three ninety with tax, and you can just pay when you pick it up. Enjoy the back nine!"},
+ {k:"sms",to:"Daniel Kim",t:"Pelham Hills Snack Bar: Order F-2217 for Kim. 2 hot dogs, 1 chicken wrap, 3 water. Ready ~12:35 PM at the turn. Total $33.90, pay at pickup."},
+ {k:"cu",t:"Sweet, thanks!"},
+ {k:"end",name:"post_call_webhook",res:{outcome:"food_order",order:"F-2217",duration:"1:02"}},
+ {k:"note",t:"55분 후",name:"kds.update",res:{order:"F-2217",status:"ready"},fx:{foodSt:["F-2217","ready"]},n:"주방에서 ‘준비 완료’ 누르면 고객한테 바로 알림 문자가 가요."},
+ {k:"sms",to:"Daniel Kim",t:"Your order F-2217 is ready at the snack bar. See you at the turn!"}
+]}
+];
+
+/* ---------------- state ---------------- */
+function fresh(sc){
+  return {status:"idle",chat:[],log:[],sms:[],sheet:sheetBase(sc.sheet||"empty"),kb:new Set(),
+    lost:LOST0.map(x=>Object.assign({},x)),food:FOOD0.map(x=>Object.assign({},x,{items:x.items.slice()})),
+    screen:sc.screen,clock:0,caption:"",capWho:""};
+}
+function words(t){return t.split(/\s+/).length}
+function row(st,t){return st.sheet.find(r=>r.t===t)}
+function applyFx(st,fx){
+  if(!fx) return;
+  st.sheet.forEach(r=>{r.flash=false});
+  if(fx.opts){st.sheet.forEach(r=>r.opt=fx.opts.includes(r.t))}
+  if(fx.hold){st.sheet.forEach(r=>r.opt=false);const r=row(st,fx.hold);r.hold={label:fx.label,kind:"hold"};st.screen="sheet"}
+  if(fx.book){const r=row(st,fx.book);r.hold=null;r.cells=aiCells(fx.name,fx.players);r.cart=fx.cart||"";r.sms=true;r.flash=true}
+  if(fx.update){const r=row(st,fx.update);r.opt=false;r.cells=aiCells(fx.name,fx.players);r.flash=true}
+  if(fx.cancel){const r=row(st,fx.cancel);r.opt=false;r.cells=openCells();r.cart="";r.sms=false;r.flash=true}
+  if(fx.offer){const r=row(st,fx.offer);r.hold={label:"대기자 1순위에게 제안 중 · 10:00",kind:"offer"};const w=row(st,"10:43");w.badge="대기 1"}
+  if(fx.kb){st.kb=new Set(fx.kb)}
+  if(fx.opts||fx.hold||fx.book||fx.update||fx.cancel||fx.offer)st.screen="sheet";
+  if(fx.lost||fx.lostSt)st.screen="lost";
+  if(fx.food||fx.foodSt)st.screen="food";
+  if(fx.lost){st.lost.forEach(x=>x.fresh=false);st.lost.push(Object.assign({fresh:true},fx.lost))}
+  if(fx.lostSt){const x=st.lost.find(l=>l.id===fx.lostSt[0]);x.st=fx.lostSt[1];x.fresh=true}
+  if(fx.food){st.food.forEach(x=>x.fresh=false);st.food.push(Object.assign({fresh:true},fx.food))}
+  if(fx.foodSt){const x=st.food.find(l=>l.id===fx.foodSt[0]);x.st=fx.foodSt[1];x.fresh=true}
+}
+function apply(st,s,pending){
+  if(s.n){st.caption=s.n}
+  switch(s.k){
+    case "ring": st.status="ringing"; st.clock=0; st.chat.push({k:"sysline",t:"수신 중 · Twilio → ElevenLabs"}); break;
+    case "ai": case "cu": st.status="live"; st.chat.push({k:s.k,t:s.t}); st.clock+=Math.max(2,words(s.t)*.38); if(!s.n){st.capWho=s.k} break;
+    case "tool":
+      if(pending){st.log.push({type:s.hook?"hook":"tool",name:s.name,ep:s.ep,req:s.req,res:null})}
+      else{
+        const last=st.log[st.log.length-1];
+        if(last&&last.name===s.name&&last.res===null){last.res=s.res;last.ms=s.ms}
+        else st.log.push({type:s.hook?"hook":"tool",name:s.name,ep:s.ep,req:s.req,res:s.res,ms:s.ms});
+        applyFx(st,s.fx); st.clock+=s.ms/1000;
+      }
+      break;
+    case "kb": st.log.push({type:"kb",name:"knowledge_base",ep:"lookup",res:{lines:s.ids}}); st.screen="kb"; applyFx(st,{kb:s.ids}); break;
+    case "sms": st.sms.push({to:s.to,t:s.t,other:!!s.other}); st.log.push({type:"sms",name:"twilio.messages.create",ep:"to: "+s.to,res:{status:"delivered"}}); break;
+    case "end": st.status="ended"; st.chat.push({k:"sysline",t:"통화 종료"}); st.log.push({type:"hook",name:s.name,ep:"ElevenLabs → /api/voice/post-call",res:s.res}); break;
+    case "note": st.chat.push({k:"sysline",t:"⏱ "+s.t}); st.log.push({type:"time",name:s.name,ep:s.t,res:s.res}); applyFx(st,s.fx); if(s.fx&&s.fx.lostSt)st.screen="lost"; if(s.fx&&s.fx.foodSt)st.screen="food"; break;
+  }
+}
+
+/* ---------------- render ---------------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function fmtJson(o){
+  if(o==null) return '<span class="d">null</span>';
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    let val;
+    if(v===null) val='<span class="d">null</span>';
+    else if(Array.isArray(v)) val="["+v.map(x=>'<span class="s">"'+esc(x)+'"</span>').join(", ")+"]";
+    else if(typeof v==="string") val='<span class="s">"'+esc(v)+'"</span>';
+    else val=esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+let SC=0, st=null, cur=0, playing=false, runId=0, finished=true;
+
+function renderChat(animate,speakIdx){
+  $("chat").innerHTML=st.chat.map((m,i)=>{
+    const cls="msg "+m.k+(animate&&i===st.chat.length-1?" new":"")+(i===speakIdx?" speaking":"");
+    if(m.k==="sysline") return '<div class="'+cls+'">'+esc(m.t)+'</div>';
+    return '<div class="'+cls+'"><small>'+(m.k==="ai"?"직원 · Hope":S[SC].caller.short+" · 고객")+'</small>'+esc(m.t)+'</div>';
+  }).join("");
+  const w=$("chatWrap"); w.scrollTop=w.scrollHeight;
+}
+function renderLog(animate){
+  if(!st.log.length){$("log").innerHTML='<p class="empty">통화가 시작되면 도구 호출이 여기에 쌓입니다.</p>';return}
+  $("log").innerHTML=st.log.map((e,i)=>{
+    const tagTxt={tool:"TOOL",kb:"KB",sms:"SMS",hook:"WEBHOOK",time:"LATER"}[e.type];
+    const lat=e.type==="tool"||e.type==="hook"?(e.res===null?'<span class="lat wait"><span class="spin"></span> 응답 대기</span>':(e.ms?'<span class="lat">200 · '+e.ms+'ms</span>':'<span class="lat">200</span>')):"";
+    let body="";
+    if(e.req) body+='<div class="json req">'+fmtJson(e.req)+'</div>';
+    if(e.res) body+='<div class="json">'+fmtJson(e.res)+'</div>';
+    return '<div class="ent'+(animate&&i===st.log.length-1?" new":"")+'"><div class="eh"><span class="tag '+(e.type==="time"?"time":e.type)+'">'+tagTxt+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span>'+lat+'</div>'+body+'</div>';
+  }).join("");
+  const w=$("logWrap"); w.scrollTop=w.scrollHeight;
+}
+function renderSheet(){
+  const rows=st.sheet.map(r=>{
+    let mid;
+    if(r.hold) mid='<div class="span '+(r.hold.kind==="offer"?"offer":"")+'">'+esc(r.hold.label)+'</div>';
+    else mid=r.cells.map((c,i)=>{
+      if(c.k==="open") return '<div class="c-open"></div>';
+      const sms=r.sms&&i===r.cells.filter(x=>x.k!=="open").length-1?'<span class="b-sms">SMS ✓</span>':"";
+      return '<div class="c-'+c.k+'">'+(c.k==="ai"?'<span class="b-ai">AI</span>':"")+'<span class="nm">'+esc(c.n)+'</span>'+sms+'</div>';
+    }).join("");
+    return '<div class="srow'+(r.opt?" opt":"")+(r.flash?" flash":"")+'"><div class="tt">'+r.t+'</div>'+mid+'<div>'+(r.cart?"🚗 "+r.cart:"")+'</div>'+(r.badge&&!r.hold?'<span class="b-wl">'+r.badge+'</span>':"")+'</div>';
+  }).join("");
+  return '<div class="sheet"><div class="sh-h"><span>Sat Oct 3, 2026 · 18 holes</span><span>Public <b>$58.41</b> 세전</span></div>'+rows+
+  '<div class="legend"><span><i style="background:var(--c-mem)"></i>기존 고객</span><span><i style="background:var(--c-guest)"></i>게스트</span><span><i style="background:var(--c-ai)"></i>AI 전화 예약</span><span><i style="background:var(--flag-soft)"></i>통화 중 HOLD</span><span><i style="background:var(--blue-soft)"></i>AI가 제안한 시간</span></div></div>';
+}
+function renderKB(){
+  return '<div class="kb">'+KB.map(l=>'<div class="kbl'+(st.kb.has(l.id)?" hi":"")+'"><span class="kid">'+l.id+'</span><span>'+esc(l.t)+'</span>'+(l.ex?'<span class="ex">예시</span>':"")+'</div>').join("")+'</div>';
+}
+function renderLost(){
+  return '<div class="cards">'+st.lost.slice().reverse().map(x=>'<div class="card'+(x.fresh?" fresh new":"")+'"><div class="r1"><span class="id">'+x.id+'</span><span class="st '+x.st+'">'+ST_LABEL[x.st]+'</span></div><span class="it">'+esc(x.item)+'</span><span class="mt">'+esc(x.meta)+'</span></div>').join("")+'</div>';
+}
+function renderFood(){
+  return '<div class="kds">'+st.food.slice().reverse().map(x=>'<div class="card'+(x.fresh?" fresh new":"")+'"><div class="r1"><span class="id">'+x.id+'</span><span class="st '+x.st+'">'+ST_LABEL[x.st]+'</span></div><span class="mt">'+esc(x.where)+' · '+esc(x.who)+'</span><ul>'+x.items.map(i=>'<li>'+esc(i)+'</li>').join("")+'</ul></div>').join("")+'</div>';
+}
+const SCR_TITLE={sheet:"티시트 · 어드민 화면",kb:"지식베이스 · 에이전트가 읽는 문서",lost:"분실물 보드 · 프로샵",food:"스낵바 주문 화면 (KDS)"};
+function renderScreen(){
+  $("scrTitle").textContent=SCR_TITLE[st.screen];
+  $("screen").innerHTML=st.screen==="sheet"?renderSheet():st.screen==="kb"?renderKB():st.screen==="lost"?renderLost():renderFood();
+}
+function renderSms(animate){
+  if(!st.sms.length){$("sms").innerHTML='<p class="empty">보낸 문자가 여기에 표시됩니다.</p>';return}
+  $("sms").innerHTML=st.sms.map((m,i)=>'<div class="bub'+(m.other?" other":"")+(animate&&i===st.sms.length-1?" new":"")+'"><div class="to"><span>To · '+esc(m.to)+'</span><span>✓ delivered</span></div>'+esc(m.t)+'</div>').join("");
+  const w=$("smsWrap"); w.scrollTop=w.scrollHeight;
+}
+function renderHead(){
+  const sc=S[SC];
+  $("cName").textContent=sc.caller.name;
+  $("cNum").textContent=sc.caller.num+" · "+sc.caller.tag;
+  const p=$("cStat");
+  p.className="pill "+(st.status==="idle"?"":st.status);
+  p.textContent={idle:"대기",ringing:"수신 중",live:"통화 중",ended:"통화 종료"}[st.status];
+  const c=Math.round(st.clock);$("clock").textContent=Math.floor(c/60)+":"+String(c%60).padStart(2,"0");
+}
+function renderCaption(){
+  const steps=S[SC].steps; const s=steps[cur];
+  $("stepno").textContent=(cur+1)+" / "+steps.length;
+  let html="";
+  if(st.caption) html='<span class="who">해설</span>'+esc(st.caption);
+  $("capText").innerHTML=html||'<span class="who">해설</span>'+esc(S[SC].ko+" 시나리오");
+  $("dots").innerHTML=steps.map((x,i)=>'<button type="button" class="dot k-'+x.k+(i<cur?" done":"")+(i===cur?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'단계로 이동"></button>').join("");
+}
+function renderAll(animate,speakIdx){renderHead();renderChat(animate,speakIdx);renderLog(animate);renderScreen();renderSms(animate);renderCaption()}
+function buildStatic(k){st=fresh(S[SC]);for(let j=0;j<=k;j++)apply(st,S[SC].steps[j],false)}
+
+/* ---------------- scenario chips ---------------- */
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span>'+s.ko+' <small>'+s.en+'</small><span class="dur">'+fmt(scenEst(i)/SPEED)+'</span></button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]'); if(b) b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+
+/* ---------------- TTS ---------------- */
+const TTS="speechSynthesis" in window && typeof SpeechSynthesisUtterance!=="undefined";
+let voices=[];
+const pref={
+  ai:[/aria/i,/jenny/i,/samantha/i,/google us english/i,/zira/i,/female/i,/allison/i,/ava/i],
+  cu:[/guy/i,/daniel/i,/google uk english male/i,/alex/i,/david/i,/male/i,/fred/i,/tom/i],
+  ko:[/sunhi/i,/yuna/i,/google 한국/i,/heami/i,/korean/i]
+};
+function pick(list,res,exclude){
+  for(const r of res){const v=list.find(x=>r.test(x.name)&&x.name!==exclude);if(v)return v.name}
+  const v=list.find(x=>x.name!==exclude)||list[0]; return v?v.name:"";
+}
+function loadVoices(){
+  if(!TTS) return;
+  voices=speechSynthesis.getVoices()||[];
+  const en=voices.filter(v=>/^en/i.test(v.lang)), ko=voices.filter(v=>/^ko/i.test(v.lang));
+  const fill=(sel,list,def)=>{
+    const keep=sel.value;
+    sel.innerHTML=list.length?list.map(v=>'<option value="'+esc(v.name)+'">'+esc(v.name)+' ('+v.lang+')</option>').join(""):'<option value="">사용 가능한 음성 없음</option>';
+    sel.value=keep&&list.some(v=>v.name===keep)?keep:def;
+  };
+  const aiDef=pick(en,pref.ai);
+  fill($("vAi"),en,aiDef);
+  fill($("vCu"),en,pick(en,pref.cu,$("vAi").value));
+  fill($("vKo"),ko,pick(ko,pref.ko));
+  if(!ko.length){$("vNote").textContent="이 브라우저에는 한국어 음성이 없어, ElevenLabs 파일이 없으면 해설은 자막으로만 표시됩니다."}
+}
+if(TTS){loadVoices(); speechSynthesis.onvoiceschanged=loadVoices;}
+else{ $("vNote").textContent="이 브라우저는 음성 합성을 지원하지 않아, ElevenLabs 파일이 없는 대사는 자막으로만 재생합니다."; }
+
+let SPEED=1;
+function speed(){return SPEED}
+/* ---- time estimates, in 1× milliseconds ---- */
+const DUR=new Map(); // clip id -> seconds, from ElevenLabs file metadata
+function probeDur(id,url){const a=new Audio();a.preload="metadata";a.onloadedmetadata=()=>{if(isFinite(a.duration)){DUR.set(id,a.duration);scheduleTimes()}};a.src=url}
+function narrEst(sc,i,s){
+  if(!s.n) return 350;
+  const cid=clipId(sc,i,1);
+  if($("tNarr").checked&&(CLIPS.has(cid)||TTS)) return DUR.has(cid)?DUR.get(cid)*1000:Math.max(1400,s.n.replace(/\s/g,"").length*150);
+  return Math.max(1400,s.n.length*62);
+}
+function stepEst(sc,i){
+  const s=S[sc].steps[i];let t=0;
+  if(s.k==="ai"||s.k==="cu"){
+    const cid=clipId(sc,i);
+    t=$("tTalk").checked&&DUR.has(cid)&&CLIPS.has(cid)?DUR.get(cid)*1000:$("tTalk").checked&&TTS?words(s.t)*380+400:Math.max(1400,s.t.length*52);
+    t+=s.n?narrEst(sc,i,s):250;
+  }else if(s.k==="tool"){t=Math.max(450,s.ms*1.4)+narrEst(sc,i,s)}
+  else t=narrEst(sc,i,s);
+  return t+200;
+}
+const SCEN_GAP=1600;
+function scenEst(sc){let t=0;for(let i=0;i<S[sc].steps.length;i++)t+=stepEst(sc,i);return t}
+function upTo(sc,n){let t=0;for(let i=0;i<n;i++)t+=stepEst(sc,i);return t}
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));const h=Math.floor(x/3600),m=Math.floor(x%3600/60),sec=x%60;return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(sec).padStart(2,"0")}
+let stepT0=0,stepAcc=0; // progress inside the running step, in 1× ms
+function stepElapsed(){return playing?Math.min(stepAcc+(performance.now()-stepT0)*SPEED,stepEst(SC,cur)):0}
+function updateTimes(){
+  const scTot=scenEst(SC);
+  const doneSteps=playing?upTo(SC,cur)+stepElapsed():(finished?scTot:upTo(SC,cur+1));
+  const all=S.map((_,i)=>scenEst(i));const allTot=all.reduce((a,b)=>a+b,0)+SCEN_GAP*(S.length-1);
+  const before=all.slice(0,SC).reduce((a,b)=>a+b,0)+SCEN_GAP*SC;
+  const el=before+doneSteps;
+  $("tmScen").textContent=fmt(doneSteps/SPEED)+" / "+fmt(scTot/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(allTot/SPEED);
+  $("tmBar").style.width=(100*el/allTot).toFixed(2)+"%";
+  $("tmSub").textContent=SPEED===1?"남은 시간 "+fmt((allTot-el))+" · 2×면 "+fmt(allTot/2):"남은 시간 "+fmt((allTot-el)/SPEED)+" · "+SPEED+"× 기준 (1×는 "+fmt(allTot)+")";
+}
+let timesQueued=false;
+function scheduleTimes(){if(timesQueued)return;timesQueued=true;requestAnimationFrame(()=>{timesQueued=false;updateTimes();renderChipDur()})}
+function renderChipDur(){document.querySelectorAll("#scen .chip").forEach((b,i)=>{const d=b.querySelector(".dur");if(d)d.textContent=fmt(scenEst(i)/SPEED)})}
+setInterval(()=>{if(playing)updateTimes()},250);
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+function readMs(t,ko){return Math.max(1400,(ko?t.length*62:t.length*52))/speed()}
+function speakOne(text,who,id){
+  return new Promise(resolve=>{
+    if(id!==runId) return resolve();
+    const u=new SpeechSynthesisUtterance(text);
+    const name=who==="ko"?$("vKo").value:who==="cu"?$("vCu").value:$("vAi").value;
+    const v=voices.find(x=>x.name===name);
+    if(v){u.voice=v;u.lang=v.lang}else u.lang=who==="ko"?"ko-KR":"en-US";
+    u.rate=Math.min(2,speed()*(who==="ko"?1.08:1));
+    u.pitch=Math.max(0,Math.min(2,((who==="cu"&&$("vCu").value===$("vAi").value)?0.78:1)*Math.pow(2,semis(who)/12)));
+    let done=false;const fin=()=>{if(!done){done=true;clearTimeout(to);resolve()}};
+    const to=setTimeout(fin,readMs(text,who==="ko")*1.8+2500);
+    u.onend=fin;u.onerror=fin;
+    speechSynthesis.speak(u);
+  });
+}
+let actx=null;
+/* ElevenLabs clips: audio/<id>.mp3 bundled with the page, or loaded from the viewer's disk */
+const CLIPS=new Map();
+function pad(n){return String(n).padStart(2,"0")}
+function clipId(sc,i,narr){return "s"+pad(sc+1)+"-"+pad(i+1)+(narr?"-n":"")}
+function allClipIds(){const ids=[];S.forEach((sc,a)=>sc.steps.forEach((s,i)=>{if(s.k==="ai"||s.k==="cu")ids.push(clipId(a,i));if(s.n)ids.push(clipId(a,i,1))}));return ids}
+function updateBadge(){
+  const ids=allClipIds();const have=ids.filter(i=>CLIPS.has(i)).length;
+  const b=$("elBadge");b.textContent="음성 파일 "+have+" / "+ids.length;b.classList.toggle("on",have>0);
+  b.title=have?"생성한 음성 파일이 연결됐어요. 없는 대사만 브라우저 음성으로 대신 읽습니다.":"대사 음성 파일이 아직 없어 브라우저 음성으로 재생 중입니다.";
+}
+/* pitch: semitones per role. ElevenLabs clips go through a small pitch shifter so speed and pitch stay independent */
+const PITCH={ai:0,cu:0};
+let CHAR_PITCH=true;
+function semis(who){return who==="cu"?PITCH.cu+(CHAR_PITCH?(S[SC].caller.pitch||0):0):PITCH.ai}
+function ensureCtx(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume()}catch(e){}return actx}
+function makeShifter(getS){
+  const W=Math.round(actx.sampleRate*0.05),B=1<<15,buf=new Float32Array(B);let wp=0,ph=0;
+  const n=actx.createScriptProcessor(2048,1,1);n.channelCount=1;n.channelCountMode="explicit";
+  const tap=d=>{const pos=wp-d,i0=Math.floor(pos),f=pos-i0,a=buf[i0&(B-1)],b=buf[(i0+1)&(B-1)];return a+(b-a)*f};
+  n.onaudioprocess=e=>{
+    const inp=e.inputBuffer.getChannelData(0),out=e.outputBuffer.getChannelData(0);
+    const r=Math.pow(2,getS()/12);
+    if(Math.abs(r-1)<1e-4){for(let i=0;i<inp.length;i++){buf[wp]=inp[i];wp=(wp+1)&(B-1)}out.set(inp);return}
+    const step=(1-r)/W;
+    for(let i=0;i<inp.length;i++){
+      buf[wp]=inp[i];
+      ph+=step;ph-=Math.floor(ph);
+      const p2=(ph+0.5)%1,g1=Math.sin(Math.PI*ph)**2;
+      out[i]=tap(ph*W)*g1+tap(p2*W)*(1-g1);
+      wp=(wp+1)&(B-1);
+    }
+  };
+  return n;
+}
+let curAudio=null;
+function playClip(url,id,who){
+  return new Promise(res=>{
+    if(id!==runId) return res();
+    const a=new Audio(url);curAudio=a;a.playbackRate=speed();a.preservesPitch=true;
+    let chain=null;
+    try{if(ensureCtx()){const src=actx.createMediaElementSource(a),sh=makeShifter(()=>semis(who));src.connect(sh);sh.connect(actx.destination);chain=[src,sh]}}catch(e){chain=null}
+    let done=false;const fin=()=>{if(!done){done=true;clearTimeout(to);if(chain){try{chain[0].disconnect();chain[1].disconnect();chain[1].onaudioprocess=null}catch(e){}}res()}};
+    const to=setTimeout(fin,90000);a.onended=fin;a.onerror=fin;
+    a.play().catch(fin);
+  });
+}
+(async()=>{
+  try{const r=await fetch("audio/manifest.json");if(r.ok){const m=await r.json();(m.clips||[]).forEach(c=>{CLIPS.set(c.id,"audio/"+c.file);probeDur(c.id,"audio/"+c.file)});
+    if(m.char_pitch===false)CHAR_PITCH=false; if((m.clips||[]).some(c=>/-n$/.test(c.id))) $("tNarr").checked=true;}}catch(e){}
+  updateBadge();
+})();
+$("fAudio").addEventListener("change",async e=>{
+  const mf=[...e.target.files].find(f=>f.name==="manifest.json"); if(mf){try{const m=JSON.parse(await mf.text()); if(m.char_pitch===false)CHAR_PITCH=false;}catch(err){}}
+  [...e.target.files].forEach(f=>{const k=f.name.replace(/\.[^.]+$/,"");if(/^s\d\d-\d\d(-n)?$/.test(k)){const u=URL.createObjectURL(f);CLIPS.set(k,u);probeDur(k,u)}});
+  if([...CLIPS.keys()].some(k=>/-n$/.test(k))) $("tNarr").checked=true;
+  updateBadge();scheduleTimes();
+});
+async function speak(text,who,id,cid){
+  const on=who==="ko"?$("tNarr").checked:$("tTalk").checked;
+  if(on&&cid&&CLIPS.has(cid)){await playClip(CLIPS.get(cid),id,who);return}
+  if(!TTS||!on){await wait(readMs(text,who==="ko"));return}
+  const parts=text.match(/[^.!?]+[.!?]*\s*/g)||[text];
+  for(const p of parts){ if(id!==runId) return; await speakOne(p.trim(),who,id); }
+}
+async function ringTone(id){
+  if(!$("tTalk").checked){await wait(900/speed());return}
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    for(let n=0;n<2&&id===runId;n++){
+      const g=actx.createGain();g.gain.value=0.0001;g.connect(actx.destination);
+      [440,480].forEach(f=>{const o=actx.createOscillator();o.frequency.value=f;o.connect(g);o.start();o.stop(actx.currentTime+0.9)});
+      g.gain.setTargetAtTime(0.06,actx.currentTime,0.02);g.gain.setTargetAtTime(0.0001,actx.currentTime+0.8,0.03);
+      await wait(1300);
+    }
+  }catch(e){await wait(900)}
+}
+
+/* ---------------- player ---------------- */
+function setOrb(who){const o=$("orb");if(who)o.dataset.who=who;else delete o.dataset.who}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>일시정지':'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished&&cur>=S[SC].steps.length-1?"프레젠테이션 시작":"재생");
+}
+function stopAudio(){runId++;if(TTS)speechSynthesis.cancel();if(curAudio){curAudio.pause();curAudio=null}setOrb(null)}
+
+async function narr(s,id){
+  if(!s.n){await wait(350/speed());return}
+  const cid=clipId(SC,cur,1);
+  if($("tNarr").checked&&(TTS||CLIPS.has(cid))){setOrb("ko");await speak(s.n,"ko",id,cid);setOrb(null)}
+  else await wait(readMs(s.n,true));
+}
+async function runStep(s,id){
+  if(s.k==="tool"){
+    apply(st,s,true);renderAll(true);
+    await wait(Math.max(450,s.ms*1.4)/speed()); if(id!==runId)return;
+    apply(st,s,false);renderAll(true);
+    await narr(s,id);return;
+  }
+  apply(st,s,false);
+  if(s.k==="ai"||s.k==="cu"){
+    renderAll(true,st.chat.length-1);
+    setOrb(s.k); await speak(s.t,s.k,id,clipId(SC,cur)); if(id!==runId)return; setOrb(null);
+    renderChat(false,-1);
+    if(s.n) await narr(s,id); else await wait(250/speed());
+    return;
+  }
+  renderAll(true);
+  if(s.k==="ring"){ringTone(id);}
+  await narr(s,id);
+}
+async function runFrom(i){
+  stopAudio(); const id=runId;
+  playing=true; finished=false;
+  const steps=S[SC].steps;
+  cur=Math.max(0,Math.min(i,steps.length-1));
+  if(cur===0) st=fresh(S[SC]); else buildStatic(cur-1);
+  renderAll(false); updatePlay(); updateTimes();
+  for(;cur<steps.length;cur++){
+    if(id!==runId) return;
+    renderCaption(); stepT0=performance.now(); stepAcc=0;
+    await runStep(steps[cur],id);
+    if(id!==runId) return;
+    await wait(200/speed());
+  }
+  cur=steps.length-1; finished=true; playing=false; setOrb(null); renderCaption(); updatePlay(); updateTimes();
+  if($("tAll").checked&&SC<S.length-1){
+    await wait(SCEN_GAP/speed()); if(id!==runId) return;
+    selectScenario(SC+1,true);
+  }
+}
+function pause(){stopAudio();playing=false;updatePlay();updateTimes()}
+function showStatic(i){
+  stopAudio(); playing=false;
+  const steps=S[SC].steps; cur=Math.max(0,Math.min(i,steps.length-1));
+  finished=cur===steps.length-1;
+  buildStatic(cur); renderAll(false); updatePlay(); updateTimes();
+}
+function selectScenario(i,autoplay){
+  SC=i; renderChips();
+  if(autoplay) runFrom(0);
+  else showStatic(S[SC].steps.length-1);
+}
+
+$("bPlay").addEventListener("click",()=>{
+  ensureCtx();
+  if(playing){pause();return}
+  if(finished&&cur>=S[SC].steps.length-1) runFrom(0); else runFrom(cur);
+});
+$("bRestart").addEventListener("click",()=>{ensureCtx();runFrom(0)});
+function setPitch(role,v,save){
+  PITCH[role]=v;const k=role==="ai"?"pAi":"pCu";$(k).value=v;$(k+"V").textContent=(v>0?"+":"")+v;
+  if(save){try{localStorage.setItem("ph-pitch-"+role,String(v))}catch(e){}}
+}
+/* cast preview: sample clip + that character's pitch */
+let pvAudio=null,pvChain=null,pvBtn=null;
+function stopPreview(){if(pvAudio){pvAudio.pause();pvAudio=null}if(pvChain){try{pvChain.forEach(n=>n.disconnect());pvChain[1].onaudioprocess=null}catch(e){}pvChain=null}if(pvBtn){pvBtn.setAttribute("aria-pressed","false");pvBtn.textContent="▶";pvBtn=null}}
+$("cast").addEventListener("click",e=>{
+  const b=e.target.closest(".pv");if(!b)return;
+  const again=pvBtn===b;stopPreview();if(again)return;
+  const semi=+b.dataset.p;const a=new Audio(b.dataset.src);a.preservesPitch=true;
+  try{if(ensureCtx()){const src=actx.createMediaElementSource(a),sh=makeShifter(()=>semi);src.connect(sh);sh.connect(actx.destination);pvChain=[src,sh]}}catch(err){}
+  pvAudio=a;pvBtn=b;b.setAttribute("aria-pressed","true");b.textContent="■";
+  a.onended=stopPreview;a.onerror=()=>{stopPreview();$("elNote").textContent="미리듣기 파일을 불러오지 못했어요."};
+  a.play().catch(stopPreview);
+});
+$("pAi").addEventListener("input",e=>setPitch("ai",+e.target.value,true));
+$("pCu").addEventListener("input",e=>setPitch("cu",+e.target.value,true));
+try{["ai","cu"].forEach(r=>{const v=localStorage.getItem("ph-pitch-"+r);if(v!==null&&!isNaN(+v))setPitch(r,+v,false)})}catch(e){}
+$("bNext").addEventListener("click",()=>{const was=playing;const n=Math.min(cur+1,S[SC].steps.length-1);if(was)runFrom(n);else showStatic(n)});
+$("bPrev").addEventListener("click",()=>{const was=playing;const n=Math.max(cur-1,0);if(was)runFrom(n);else showStatic(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(b)selectScenario(+b.dataset.s,playing)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(b)showStatic(+b.dataset.i)});
+function setSpeed(v){
+  if(v===SPEED) return;
+  if(playing){stepAcc+=(performance.now()-stepT0)*SPEED;stepT0=performance.now()}
+  SPEED=v;
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  if(curAudio) curAudio.playbackRate=v; // ElevenLabs clip changes speed on the spot; browser voices pick it up from the next sentence
+  try{localStorage.setItem("ph-speed",String(v))}catch(e){}
+  updateTimes(); renderChipDur();
+}
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+["tTalk","tNarr"].forEach(k=>$(k).addEventListener("change",scheduleTimes));
+document.addEventListener("keydown",e=>{
+  if(/SELECT|INPUT|TEXTAREA|SUMMARY/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight"){$("bNext").click()}
+  else if(e.key==="ArrowLeft"){$("bPrev").click()}
+  else if({"1":1,"2":1.1,"3":1.2,"4":1.5,"5":2}[e.key]){setSpeed({"1":1,"2":1.1,"3":1.2,"4":1.5,"5":2}[e.key])}
+});
+
+/* initial: scenario 1 shown complete, ready to present */
+try{const v=parseFloat(localStorage.getItem("ph-speed"));if([1,1.1,1.2,1.5,2].includes(v))setSpeed(v)}catch(e){}
+renderChips(); showStatic(S[0].steps.length-1);
+})();
+</script>
+
+</body></html>

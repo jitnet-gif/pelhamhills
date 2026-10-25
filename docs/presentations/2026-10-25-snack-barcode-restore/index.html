@@ -1,0 +1,292 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>스낵바 바코드 복원</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: presenter bar → scene chips → stage (상품 화면 | 진행 상태) → 나레이션 띠 → SQL 상자 */
+:root{
+  --bg:#f3f6f1; --panel:#ffffff; --ink:#18261c; --muted:#5d6e61; --line:#d6e0d6;
+  --green:#1f6b3a; --green-soft:#e1efe4; --red:#b3372b; --red-soft:#f8e3df;
+  --amber:#9a6a00; --amber-soft:#f6ecd2; --band:#13241a; --band-ink:#eef5ef;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1712; --panel:#17221b; --ink:#e4ede6; --muted:#9aab9e; --line:#2a3a2f;
+  --green:#5cc184; --green-soft:#1c3424; --red:#f08072; --red-soft:#3a1f1b;
+  --amber:#e0b54f; --amber-soft:#352c14; --band:#08100b; --band-ink:#e4ede6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1712; --panel:#17221b; --ink:#e4ede6; --muted:#9aab9e; --line:#2a3a2f;
+  --green:#5cc184; --green-soft:#1c3424; --red:#f08072; --red-soft:#3a1f1b;
+  --amber:#e0b54f; --amber-soft:#352c14; --band:#08100b; --band-ink:#e4ede6; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px}
+h1{font-size:1.45rem;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 12px}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+button.primary{background:var(--green);border-color:var(--green);color:var(--panel);font-weight:700;min-width:96px}
+.speed{display:flex;gap:4px;margin-left:auto}
+.speed button[aria-pressed="true"]{background:var(--green-soft);border-color:var(--green);color:var(--green);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.85rem;padding:6px 10px;border-radius:999px;position:relative;overflow:hidden}
+.chip[aria-current="true"]{border-color:var(--green);color:var(--green);font-weight:700}
+.chip .fill{position:absolute;left:0;bottom:0;height:3px;background:var(--green);width:0}
+.stage{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px}
+@media (max-width:760px){.stage{grid-template-columns:minmax(0,1fr)}}
+.lane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.lane h2{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:600}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:480px;font-size:.88rem}
+th{text-align:left;color:var(--muted);font-weight:500;font-size:.78rem;border-bottom:1px solid var(--line);padding:6px 8px}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.code{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.82rem;white-space:nowrap}
+.empty{color:var(--muted);font-style:italic;font-family:var(--sans)}
+.tag{display:inline-block;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.t-ok{background:var(--green-soft);color:var(--green)}
+.t-bad{background:var(--red-soft);color:var(--red)}
+.t-wait{background:var(--amber-soft);color:var(--amber)}
+.t-none{color:var(--muted)}
+td.code.changed{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:var(--amber-soft)}to{background:transparent}}
+td.code.strike{text-decoration:line-through;color:var(--red)}
+.scan{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.9rem}
+.scan .beam{font-family:var(--mono);background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:6px 10px}
+ul.check{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ul.check li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start}
+.dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:.75rem;font-weight:700;margin-top:1px}
+.d-done{background:var(--green);color:var(--panel)}
+.d-todo{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber)}
+.d-x{background:var(--red-soft);color:var(--red)}
+.d-wait{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+ul.check li.on{font-weight:600}
+ul.check small{display:block;color:var(--muted);font-weight:400}
+.narr{background:var(--band);color:var(--band-ink);border-radius:12px;padding:16px 18px;font-size:1.02rem;min-height:5.2em}
+.narr b{color:var(--green)}
+.narr .lab{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;opacity:.65;display:block;margin-bottom:4px}
+.sqlbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;min-width:0}
+.sqlhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.sqlhead h2{margin:0;font-size:1rem}
+pre{margin:0;overflow-x:auto;font-family:var(--mono);font-size:.78rem;line-height:1.5;background:var(--bg);border-radius:8px;padding:12px}
+@media (prefers-reduced-motion:reduce){td.code.changed{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>스낵바 바코드: 숫자 SKU만 바코드로</h1>
+    <p class="sub">0105 백업 복원 → 0106 취소 → 0107 실행 · 2026-10-25</p>
+  </header>
+
+  <div class="bar">
+    <button id="prev" aria-label="이전 장면">◀ 이전</button>
+    <button id="play" class="primary">▶ 재생</button>
+    <button id="next" aria-label="다음 장면">다음 ▶</button>
+    <div class="speed" role="group" aria-label="재생 속도">
+      <button data-rate="1" aria-pressed="true">1×</button>
+      <button data-rate="1.25" aria-pressed="false">1.25×</button>
+      <button data-rate="1.5" aria-pressed="false">1.5×</button>
+    </div>
+  </div>
+  <nav class="chips" id="chips" aria-label="장면"></nav>
+
+  <section class="stage">
+    <div class="lane">
+      <h2>Retail → Products · 스낵바 상품</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>상품</th><th>SKU</th><th>Barcode</th><th>상태</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <div class="scan" id="scan"></div>
+    </div>
+    <div class="lane">
+      <h2>진행 상태</h2>
+      <ul class="check" id="check"></ul>
+    </div>
+  </section>
+
+  <div class="narr" aria-live="polite"><span class="lab" id="nlab"></span><span id="ntext"></span></div>
+
+  <section class="sqlbox">
+    <div class="sqlhead">
+      <h2>0107 SQL · Supabase SQL editor에 붙여 넣고 Run</h2>
+      <button id="copy">SQL 복사</button>
+    </div>
+    <pre id="sql">with undo as (
+  update public.pelham_retail_products p
+     set barcode = null, updated_at = now()
+   where p.category = &#x27;Food &amp; Beverage&#x27;
+     and p.barcode is not null
+     and p.barcode = btrim(p.sku)
+     and p.barcode !~ &#x27;^[0-9]+$&#x27;
+     and p.id not in (280, 290)
+  returning p.id, p.name, p.sku
+),
+todo as (
+  select p.id, p.name, btrim(p.sku) as code,
+         exists (select 1 from public.pelham_retail_products o
+                 where o.id &lt;&gt; p.id and lower(o.barcode) = lower(btrim(p.sku))) as taken
+  from public.pelham_retail_products p
+  where p.category = &#x27;Food &amp; Beverage&#x27;
+    and nullif(btrim(coalesce(p.barcode, &#x27;&#x27;)), &#x27;&#x27;) is null
+    and btrim(coalesce(p.sku, &#x27;&#x27;)) ~ &#x27;^[0-9]+$&#x27;
+),
+copied as (
+  update public.pelham_retail_products p
+     set barcode = t.code, updated_at = now()
+    from todo t
+   where p.id = t.id and not t.taken
+  returning p.id
+)
+select name, sku as code, &#x27;cleared (club SKU, not a barcode)&#x27; as result from undo
+union all
+select t.name, t.code,
+       case when t.taken then &#x27;skipped (barcode used by another product)&#x27; else &#x27;copied&#x27; end
+  from todo t
+ order by result, name;</pre>
+  </section>
+</div>
+
+<script>
+(function(){
+const NARR = [
+  "아이패드에 블루투스 스캐너를 연결해서 스낵바 상품을 스캔했는데 계산서에 담기지 않았습니다. 상품 화면을 보면 바코드 칸이 비어 있고, 바코드 숫자는 SKU 칸에 들어 있는 상품들이 있었습니다.",
+  "먼저 영공일오 SQL로 어젯밤 열 시 삼십육 분 백업에 있던 스낵바 바코드 쉰일곱 개를 되돌렸습니다. 이 단계는 실행해서 성공을 확인했습니다.",
+  "다음 영공일육은 비어 있는 바코드 칸에 SKU를 모두 복사하는 SQL이었습니다. 그런데 LS 백삼십오나 GTR 오구일 같은 클럽 SKU는 제조사 바코드가 아닙니다. 그래서 이 방법은 틀렸습니다.",
+  "새 영공일칠은 두 가지를 합니다. 첫째, 영공일육이 넣은 문자 SKU를 바코드 칸에서 지웁니다. 둘째, 숫자로만 된 SKU만 바코드 칸에 복사합니다. 백업 기준으로 G 오렌지, G 제로 블루 쿨, 진저에일 세 개입니다. 영공일육을 실행하지 않았어도 그대로 실행하시면 됩니다.",
+  "이제 할 일입니다. 슈파베이스 SQL 편집기에 영공일칠을 붙여 넣고 실행하세요. 결과 표에서 지움, 복사, 건너뜀을 확인한 다음, 아이패드 계산대를 새로고침하고 다시 스캔해 보세요. 그래도 안 잡히면 블루투스 스캐너의 입력 속도 기준을 넓혀 드리겠습니다."
+];
+const DUR = [13.27, 10.68, 14.45, 20.61, 18.1];
+const TITLES = ["문제","0105 백업 복원","0106 은 틀림","0107 숫자만","할 일"];
+const P = [
+  {n:"Budweiser", sku:"LS-135", bc:"062067335358"},
+  {n:"Pepsi", sku:"069000009918", bc:"069000009918"},
+  {n:"Doritos Nacho Cheese", sku:"060410071953-", bc:"060410071953-"},
+  {n:"Gatorade 591 mL", sku:"GTR-591"},
+  {n:"Clif Bar", sku:"CLIF-BAR"},
+  {n:"$3 Juice Bottle", sku:"LS-428"},
+  {n:"G orange", sku:"055577420249"},
+  {n:"Ginger Ale", sku:"016600010240"}
+];
+// 장면마다 각 줄의 [바코드 값, 태그 종류, 태그 글, 표시]  표시: c=바뀜, s=취소선
+const E = "";
+const SC = [
+  [[E,"wait","바코드 없음"],[E,"wait","바코드 없음"],[E,"wait","바코드 없음"],[E,"none","—"],[E,"none","—"],[E,"none","—"],[E,"bad","SKU에만 숫자"],[E,"bad","SKU에만 숫자"]],
+  [["062067335358","ok","복원","c"],["069000009918","ok","복원","c"],["060410071953-","ok","복원","c"],[E,"none","—"],[E,"none","—"],[E,"none","—"],[E,"wait","SKU에만 숫자"],[E,"wait","SKU에만 숫자"]],
+  [["062067335358","ok","그대로"],["069000009918","ok","그대로"],["060410071953-","ok","그대로"],["GTR-591","bad","클럽 SKU · 바코드 아님","c"],["CLIF-BAR","bad","클럽 SKU · 바코드 아님","c"],["LS-428","bad","클럽 SKU · 바코드 아님","c"],["055577420249","ok","복사","c"],["016600010240","ok","복사","c"]],
+  [["062067335358","ok","그대로"],["069000009918","ok","그대로"],["060410071953-","wait","예외 · 백업 값 유지"],["GTR-591","bad","cleared · 지움","s"],["CLIF-BAR","bad","cleared · 지움","s"],["LS-428","bad","cleared · 지움","s"],["055577420249","ok","copied · 숫자만 복사","c"],["016600010240","ok","copied · 숫자만 복사","c"]],
+  [["062067335358","ok","그대로"],["069000009918","ok","그대로"],["060410071953-","wait","끝의 - 는 다시 스캔 권장"],[E,"none","—"],[E,"none","—"],[E,"none","—"],["055577420249","ok","copied"],["016600010240","ok","copied"]]
+];
+const SCAN = [
+  ["055577420249","bad","못 찾음 · 바코드 칸이 비어 있음"],
+  ["062067335358","ok","Budweiser 바코드 복원됨"],
+  ["GTR-591","bad","클럽 SKU가 바코드 칸에 들어감"],
+  ["055577420249","ok","G orange · 0107 실행 후 바코드로 찾음"],
+  ["055577420249","wait","SQL 실행 → 새로고침 → 스캔해서 확인"]
+];
+// 진행 상태: [상태, 제목, 설명]  done / todo / x / wait
+const CHECK = [
+  ["done","0105 · 백업에서 57개 복원","실행 완료, 성공 확인"],
+  ["x","0106 · SKU 전부 복사","틀린 방법. 실행했어도 0107이 되돌림"],
+  ["todo","0107 · 숫자 SKU만 바코드로","Supabase에 붙여 넣기 (아래 SQL)"],
+  ["todo","아이패드 계산대 새로고침 후 스캔","G orange, Ginger Ale 등으로 확인"],
+  ["wait","그래도 안 잡히면","블루투스 스캐너 입력 속도 기준 넓히기"]
+];
+const FOCUS = [[3],[0],[1],[2],[2,3,4]];
+const MARK = {done:"✓",todo:"!",x:"✕",wait:"…"};
+
+const $ = id => document.getElementById(id);
+let cur = 0, playing = false, rate = 1, timer = null, start = 0, elapsed = 0;
+const audio = new Audio();
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+function render(){
+  const rows = SC[cur];
+  $("rows").innerHTML = P.map((p,i)=>{
+    const [bc,kind,label,mark] = rows[i];
+    const cls = "code"+(mark==="c"?" changed":"")+(mark==="s"?" strike":"");
+    const cell = bc ? esc(bc) : '<span class="empty">비어 있음</span>';
+    return `<tr><td>${esc(p.n)}</td><td class="code">${esc(p.sku)}</td><td class="${cls}">${cell}</td><td><span class="tag t-${kind}">${esc(label)}</span></td></tr>`;
+  }).join("");
+  const [code,kind,msg] = SCAN[cur];
+  $("scan").innerHTML = `<span>🔫 아이패드 + 블루투스 스캐너</span><span class="beam">${esc(code)}</span><span class="tag t-${kind}">${esc(msg)}</span>`;
+  $("check").innerHTML = CHECK.map((c,i)=>`<li class="${FOCUS[cur].includes(i)?"on":""}"><span class="dot d-${c[0]}">${MARK[c[0]]}</span><span>${esc(c[1])}<small>${esc(c[2])}</small></span></li>`).join("");
+  $("nlab").textContent = `장면 ${cur+1} / ${NARR.length} · ${TITLES[cur]}`;
+  $("ntext").textContent = NARR[cur];
+  [...$("chips").children].forEach((b,i)=>{
+    b.setAttribute("aria-current", i===cur ? "true" : "false");
+    b.querySelector(".fill").style.width = i<cur ? "100%" : "0";
+  });
+}
+
+function tick(){
+  const fill = $("chips").children[cur].querySelector(".fill");
+  let p;
+  if (audio.src && !isNaN(audio.duration) && audio.duration > 0) p = audio.currentTime / audio.duration;
+  else p = (elapsed + (playing ? (performance.now()-start)/1000*rate : 0)) / DUR[cur];
+  fill.style.width = Math.min(100, p*100) + "%";
+  if (playing) timer = requestAnimationFrame(tick);
+}
+
+function go(i, autoplay){
+  cur = Math.max(0, Math.min(NARR.length-1, i));
+  elapsed = 0; render();
+  audio.pause();
+  audio.src = `audio/s${cur+1}.mp3`;
+  audio.playbackRate = rate;
+  if (autoplay) playScene(); else { playing = false; setPlayLabel(); }
+}
+
+function playScene(){
+  playing = true; setPlayLabel(); start = performance.now();
+  audio.playbackRate = rate;
+  audio.play().catch(()=>{ audio.removeAttribute("src"); fallback(); });
+  cancelAnimationFrame(timer); tick();
+}
+
+let fbTimer = null;
+function fallback(){
+  clearTimeout(fbTimer);
+  fbTimer = setTimeout(ended, Math.max(0, DUR[cur] - elapsed) / rate * 1000);
+}
+
+function ended(){
+  if (!playing) return;
+  if (cur < NARR.length-1) go(cur+1, true);
+  else { playing = false; setPlayLabel(); $("chips").children[cur].querySelector(".fill").style.width = "100%"; }
+}
+audio.addEventListener("ended", ended);
+
+function pause(){
+  playing = false; audio.pause(); clearTimeout(fbTimer);
+  elapsed += (performance.now()-start)/1000*rate; setPlayLabel();
+}
+function setPlayLabel(){ $("play").textContent = playing ? "❚❚ 멈춤" : "▶ 재생"; }
+
+TITLES.forEach((t,i)=>{
+  const b = document.createElement("button");
+  b.className = "chip"; b.innerHTML = `${i+1}. ${esc(t)}<span class="fill"></span>`;
+  b.addEventListener("click", ()=>go(i, playing));
+  $("chips").appendChild(b);
+});
+$("play").addEventListener("click", ()=>{ playing ? pause() : (audio.src && audio.currentTime > 0 && !audio.ended ? playScene() : go(cur, true)); });
+$("prev").addEventListener("click", ()=>go(cur-1, playing));
+$("next").addEventListener("click", ()=>go(cur+1, playing));
+document.querySelectorAll(".speed button").forEach(b=>b.addEventListener("click", ()=>{
+  rate = Number(b.dataset.rate); audio.playbackRate = rate;
+  document.querySelectorAll(".speed button").forEach(x=>x.setAttribute("aria-pressed", x===b ? "true" : "false"));
+}));
+$("copy").addEventListener("click", ()=>{
+  const text = $("sql").textContent;
+  const done = ()=>{ $("copy").textContent = "복사됨"; setTimeout(()=>$("copy").textContent = "SQL 복사", 1500); };
+  const select = ()=>{ const r = document.createRange(); r.selectNodeContents($("sql")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("copy").textContent = "선택됨 · ⌘C"; };
+  try { navigator.clipboard.writeText(text).then(done, select); } catch(e){ select(); }
+});
+
+go(0, false);
+})();
+</script>
+
+</body></html>

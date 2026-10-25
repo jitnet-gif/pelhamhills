@@ -1,0 +1,748 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Missing Stripe Refund</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* Pro shop admin mock — keeps a light look in both themes */
+.ad{--ai:#1F2328;--am:#6B7280;--al:#D4D4D8;--as:#F2F2F4;--av:#4533FF;background:#F2F2F4;color:var(--ai);border:1px solid var(--al);border-radius:10px;overflow:hidden;font-size:12px}
+.ad .urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#E4E4E8;border-bottom:1px solid var(--al);font-family:var(--mono);font-size:10.5px;color:var(--am);min-width:0}
+.ad .urlbar i{width:8px;height:8px;border-radius:50%;background:#C9CDD2;flex:none}
+.ad .urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#111315;color:#fff;padding:7px 12px;font-size:12px;font-weight:700}
+.adbar small{color:rgba(255,255,255,.6);font-weight:500;font-size:10.5px}
+.adbody{padding:10px;display:grid;gap:8px;min-width:0}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chips span{border:1px solid var(--al);background:#fff;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap}
+.chips span.on{background:#111315;color:#fff;border-color:#111315}
+.box{background:#fff;border:1px solid var(--al);padding:10px;display:grid;gap:6px;min-width:0}
+.box h5{margin:0;font-size:13px}
+.box p{margin:0;color:var(--am);font-size:11px;line-height:1.5}
+.eyeb{font-size:9.5px;font-weight:800;letter-spacing:.12em;color:var(--am);text-transform:uppercase}
+.pw{height:34px;border:1px solid var(--al);display:flex;align-items:center;padding:0 10px;font-family:var(--mono);letter-spacing:.2em;font-size:13px}
+.btnp{background:var(--av);color:#fff;text-align:center;font-weight:800;padding:8px}
+.errn{border:1px solid #F0B4B4;background:#FDF0F0;color:#8A1F1F;padding:6px 8px;font-size:11px}
+.cc{background:#fff;border:1px solid var(--al);min-width:0}
+.cch{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;border-bottom:1px solid #ECECF0;padding:6px 8px;font-size:11px}
+.cch .t{margin-left:auto;color:var(--am);font-variant-numeric:tabular-nums}
+.cch .by{width:100%;color:var(--am);font-size:10.5px}
+.op{font-size:10px;font-weight:800;padding:1px 6px}
+.op.ins{background:#E3F4E8;color:#1F6B3A}.op.upd{background:#FFF1CC;color:#8A5A00}.op.del{background:#FDE2E2;color:#8A1F1F}
+.ccb{padding:6px 8px;display:grid;gap:5px}
+.hist{margin:0;padding:0;list-style:none;font-size:11px}
+.dt{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}
+.dt th{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--am);text-align:left;padding:3px 4px;border-bottom:1px solid #ECECF0}
+.dt td{padding:3px 4px;border-bottom:1px solid #F2F2F4;vertical-align:top;word-break:break-all}
+.dt td.f{font-family:var(--mono);font-size:9.5px;color:#3F434A}
+.dt td.b{color:#8A1F1F}.dt td.b s{text-decoration-thickness:1px}.dt td.a{color:#1F6B3A}
+.dt tr.hot td{background:#FFF6DD}
+.hot{outline:2.5px solid #F2A33A;outline-offset:2px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(242,163,58,.25)}}
+.tee{background:#fff;border:1px solid var(--al);padding:8px;display:grid;gap:4px}
+.tee .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}
+.tee .pl{display:flex;gap:4px;flex-wrap:wrap}
+.tee .pl span{border:1px solid var(--al);padding:2px 6px;font-weight:700;font-size:11px}
+.tee .pl span.gone{opacity:.35;text-decoration:line-through}
+.tee .hl{border-top:1px dashed var(--al);padding-top:4px;font-size:10.5px;color:var(--am)}
+.vanish{opacity:.25;filter:grayscale(1)}
+.xmark{color:#B42318;font-weight:800;font-size:12px}
+.flow{display:grid;gap:6px}
+.fstep{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--al);padding:7px 9px;font-size:11.5px}
+.fstep b{font-family:var(--mono);font-size:10.5px}
+.fstep .n{flex:none;width:20px;height:20px;border-radius:50%;background:#111315;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800}
+.fstep.on{border-color:var(--av);box-shadow:0 0 0 2px rgba(69,51,255,.15)}
+.tbls{display:flex;flex-wrap:wrap;gap:4px}
+.tbls span{font-family:var(--mono);font-size:9.5px;background:#fff;border:1px solid var(--al);padding:2px 5px}
+.tbls span.on{background:#E3F4E8;border-color:#9BD2AE}
+.who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.who div{background:#fff;border:1px solid var(--al);padding:8px;text-align:center;font-size:11px}
+.who div b{display:block;font-size:13px}
+.who div.no{opacity:.45}
+.ad .plan{background:#fff;border:1px solid var(--al);padding:10px}
+.plan .done li{color:var(--ok)}
+.lc.lcdim{opacity:.5}.lc.lcon{border-color:var(--green)}
+.plan{display:grid;gap:4px;font-size:13px;color:#1F2328}
+.plan h3{margin:8px 0 2px;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.plan code{font-family:var(--mono);font-size:11.5px;background:#F2F2F4;padding:1px 4px;border-radius:4px}
+.plan .q li{color:#B5461F;font-weight:600}
+.plan .done li{color:#1F6B3A}
+/* phone call mock */
+.pc{background:#0F1A14;color:#E8F0EA;border-radius:14px;padding:10px;display:grid;gap:6px;font-size:11.5px;min-width:0}
+.pc .top{display:flex;justify-content:space-between;font-size:10.5px;color:#9FB8A8}
+.pc .b{max-width:88%;padding:6px 9px;border-radius:10px;line-height:1.45}
+.pc .b.ag{background:#1E3326;justify-self:start}
+.pc .b.us{background:#E8F0EA;color:#14231A;justify-self:end}
+.pc .tc{justify-self:center;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid #3A5A46;color:#BFD6C6}
+.pc .tc.x{border-color:#E06A5A;color:#FFB3A8;background:rgba(224,106,90,.12)}
+.pc .tc.ok{border-color:#5BC08A;color:#A9EBC5;background:rgba(91,192,138,.12)}
+.pc .dim{opacity:.35}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal div{background:#fff;border:1px solid var(--al);text-align:center;padding:4px 0;font-size:10.5px;font-variant-numeric:tabular-nums}
+.cal div.in{background:#E3F4E8;border-color:#9BD2AE}
+.cal div.td{background:#111315;color:#fff}
+.cal div.edge{outline:2px solid #1F6B3A}
+.cal div.ask{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F;font-weight:800}
+.cal div.hd{background:transparent;border:0;color:var(--am);font-size:9.5px}
+.js{font-family:var(--mono);font-size:10.5px;background:#fff;border:1px solid var(--al);padding:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.js .k{color:#6B7280}.js .bad{color:#B42318;font-weight:700}.js .good{color:#1F6B3A;font-weight:700}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.two h6{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--am)}
+.rows{display:grid;gap:3px}
+.rows div{display:flex;justify-content:space-between;gap:6px;background:#fff;border:1px solid var(--al);padding:4px 7px;font-size:10.5px}
+.rows div b{font-family:var(--mono);font-weight:600}
+.rows div.w{background:#FFF1CC;border-color:#F2C46A}
+.rows div.x{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F}
+.rows div.n{background:#E3F4E8;border-color:#9BD2AE}
+.big{font-size:20px;font-weight:800;font-family:var(--mono)}
+@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}}
+.h6d{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6B7280)}
+.fstep.bad{border-color:#E06A5A;box-shadow:0 0 0 2px rgba(224,106,90,.18)}
+
+.bub{width:18px;height:15px;margin-right:4px;vertical-align:-3px}
+</style></head><body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Stripe · 영수증 환불</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const L=(ko,en)=>({ko,en});
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 영수증 환불 · PH-20261021-0005",
+  h1:"화면은 <b>Refunded</b>, Stripe 는 그대로",
+  lede:"10월 21일 오전 9시 55분, James 가 받은 Interac 직불 $105.99 영수증이 앱에서는 환불로 표시됐지만 Stripe 에는 환불이 없었어요. 원인은 환불 창의 버튼 두 개가 하는 일이 달라서예요. 왼쪽은 화면, 가운데는 뒤에서 일어나는 일, 오른쪽은 진행 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 7장면",laneScreen:"화면",laneLog:"뒤에서",laneLedger:"진행 상태",
+  ledgerSub:"푸시됨 · 이 영수증 환불은 남음",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 기록이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"근거: frontend/components/reports/SaleDetail.tsx(환불 창), frontend/lib/retail/api.ts(refundSale → pelham_staff_bill_refund), supabase/migrations/0005 · 0024 · 0056(장부 환불 함수, Stripe 호출 없음), backend/api/routes/terminal.py(/terminal/refund → Stripe). Pelham Hills DB 는 이 세션에서 열 수 없어서 이 영수증의 단말기 기록은 직접 보지 못했어요. 결론은 코드 흐름에서 나왔어요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Receipt refund · PH-20261021-0005",
+  h1:"The app says <b>Refunded</b>, Stripe doesn't",
+  lede:"At 9:55 a.m. on 21 October, James took a $105.99 Interac debit payment. The app now shows that receipt as refunded, but Stripe has no refund. The refund window has two buttons that do different things. Left: the screen. Middle: what happens behind. Right: progress.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 7 scenes",laneScreen:"Screen",laneLog:"Behind the scenes",laneLedger:"Progress",
+  ledgerSub:"Pushed · this receipt still to refund",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Records appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Sources: frontend/components/reports/SaleDetail.tsx (refund window), frontend/lib/retail/api.ts (refundSale → pelham_staff_bill_refund), supabase/migrations/0005 · 0024 · 0056 (books-only refund, no Stripe call), backend/api/routes/terminal.py (/terminal/refund → Stripe). The Pelham Hills database was not reachable from this session, so this receipt's terminal records were not read directly; the finding comes from the code path."}
+};
+
+function box(h,inner,o){o=o||{};return '<div class="box'+(o.hot?" hot":"")+'">'+(o.eyeb?'<span class="eyeb">'+o.eyeb+'</span>':'')+(h?'<h5>'+h+'</h5>':'')+inner+'</div>'}
+function rows(list){return '<div class="rows">'+list.map(r=>'<div class="'+(r[2]||"")+'"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join("")+'</div>'}
+function shell(url,bar,sub,inner){return '<div class="ad"><div class="urlbar"><i></i><span>'+url+'</span></div><div class="adbar"><span>'+bar+'</span><small>'+(sub||"")+'</small></div><div class="adbody">'+inner+'</div></div>'}
+const k=l=>(ko,en)=>l==="ko"?ko:en;
+const hl=on=>on?';outline:2.5px solid #F2A33A':'';
+const btn=(txt,o)=>{o=o||{};return '<div style="border:1px solid '+(o.danger?'#C0392B':'#A1A1AA')+';background:'+(o.danger?'#C0392B':'#fff')+';color:'+(o.danger?'#fff':'#18181B')+';padding:7px 9px;font-size:11.5px;font-weight:700;text-align:center'+(o.off?';opacity:.35':'')+hl(o.hot)+'">'+txt+'</div>'};
+const note=(txt,o)=>{o=o||{};return '<p style="margin:0;background:'+(o.warn?'#FFF8E1':'#F2F2F4')+';color:'+(o.warn?'#5B4708':'#3F3F46')+';padding:7px 9px;font-size:11px'+(o.bold?';font-weight:700':'')+hl(o.hot)+'">'+txt+'</p>'};
+
+const S=[
+ {a:"what",ph:"why",ko:"무슨 일이 있었나",en:"What happened",
+  screen:(l,p)=>{const t=k(l);return '<div class="ad"><div class="adbody"><div class="two"><div>'+
+    box(t("앱 · 영수증","App · receipt"),rows([["PH-20261021-0005",""],[t("Debit (Interac) · James","Debit (Interac) · James"),"$105.99"],[t("상태","Status"),"Refunded","x"],[t("사유","Reason"),"error no glove purchased"]]),{hot:p<.45,eyeb:"Reports"})+'</div><div>'+
+    (p>=.4?box(t("Stripe · 결제","Stripe · payment"),rows([["Interac ****5882","$105.99"],[t("상태","Status"),"Succeeded","n"],[t("환불","Refunds"),t("없음","none"),"w"]]),{hot:p<.8,eyeb:"Stripe"}):'<div class="pw" style="opacity:.35">…</div>')+'</div></div>'+
+    (p>.78?rows([[t("손님 카드","Customer's card"),t("$105.99 아직 안 돌아감","$105.99 not returned yet"),"x"]]):'')+'</div></div>'},
+  log:[{at:.1,tag:"local",name:"pelham_bills.status",ep:"refunded"},
+       {at:.45,tag:"stripe",name:"PaymentIntent",ep:"succeeded · no refund"},
+       {at:.8,tag:"key",name:"$105.99",ep:"still with the club",why:L("장갑은 안 샀는데 그린피 두 명분과 장갑값이 같이 결제된 영수증이에요. 돈은 손님에게 돌아가지 않았어요.","A glove was charged by mistake along with two green fees. The money has not gone back to the customer.")}],
+  focus:["cause"]},
+
+ {a:"two",ph:"why",ko:"버튼 두 개, 하는 일이 다름",en:"Two buttons, two jobs",
+  screen:(l,p)=>{const t=k(l);return shell("Reports · PH-20261021-0005","Refund this sale",t("환불 창 (수정 전)","refund window (before the fix)"),
+    '<div class="box'+(p<.5?' hot':'')+'" style="display:grid;gap:6px"><span class="eyeb">Paid through the card reader</span><p style="margin:0;font-size:11.5px">Debit (Interac) $105.99 · Approval 095510 · ****5882</p>'+btn("Refund on reader (customer taps card)",{hot:p<.5})+'</div>'+
+    btn("Confirm refund",{danger:true,hot:p>=.5})+
+    rows([[t("① 리더 버튼","① Reader button"),t("Stripe → S700 → 손님 카드","Stripe → S700 → customer's card"),p<.5?"n":""],[t("② Confirm refund","② Confirm refund"),t("장부만: 재고 복구 · 그린피 미결제","books only: stock back · green fees unpaid"),p>=.5?"w":""]]))},
+  log:[{at:.15,tag:"ui",name:"Refund on reader",ep:"POST /terminal/refund"},
+       {at:.3,tag:"stripe",name:"refund_payment",ep:"reader waits for a tap",why:L("Interac 직불은 손님이 카드를 리더에 다시 대야 돈이 돌아가요.","An Interac debit refund needs the customer to tap the card on the reader again.")},
+       {at:.6,tag:"ui",name:"Confirm refund",ep:"rpc pelham_staff_bill_refund"},
+       {at:.8,tag:"rpc",name:"bill_refund",ep:"SQL only · no Stripe call",why:L("이 함수는 데이터베이스 안에서만 움직여요. Stripe 에는 아무것도 보내지 않아요.","This function only works inside the database. It sends nothing to Stripe.")}],
+  focus:["cause"]},
+
+ {a:"path",ph:"why",ko:"실제로 일어난 순서",en:"What actually ran",
+  screen:(l,p)=>{const t=k(l);const st=p<.3?1:p<.6?2:3;return '<div class="ad"><div class="adbody"><div class="flow">'+
+    [[t("사유 입력","Type the reason"),"error no glove purchased"],
+     ["Confirm refund","pelham_staff_bill_refund → refunded_at"],
+     [t("창이 Refunded 로 바뀜","Window turns Refunded"),t("환불 칸 전체가 숨겨짐 (리더 버튼 포함)","the whole refund panel hides, reader button too")]]
+     .map((s,i)=>'<div class="fstep'+(i+1===st?" on":"")+(i+1>st?" vanish":"")+'"><span class="n">'+(i+1)+'</span><span><b>'+s[0]+'</b><br>'+s[1]+'</span></div>').join("")+'</div>'+
+    (p>.8?rows([[t("Stripe 로 간 요청","Requests sent to Stripe"),"0","x"],[t("다시 할 버튼","Button to retry"),t("없음","none"),"x"]]):'')+'</div></div>'},
+  log:[{at:.15,tag:"ui",name:"reason",ep:"required field"},
+       {at:.4,tag:"rpc",name:"refunded_at = now()",ep:"books refunded"},
+       {at:.65,tag:"ui",name:"sale.refunded_at ? null",ep:"refund panel removed",why:L("장부가 환불되면 화면이 환불 칸을 통째로 지워서, 카드 환불을 할 길이 막혔어요.","Once the books said refunded, the screen dropped the whole panel, so there was no way left to refund the card.")},
+       {at:.85,tag:"stripe",name:"/terminal/refund",ep:"never called"}],
+  focus:["cause"]},
+
+ {a:"traps",ph:"what",ko:"실수하기 쉬웠던 이유 3가지",en:"Three traps in the screen",
+  screen:(l,p)=>{const t=k(l);return '<div class="ad"><div class="adbody">'+
+    box(t("① 옛 단말기 문구","① Old terminal wording"),'<p style="margin:0;font-size:11px">"Refund the card or debit part on the <b>Chase DX8000</b> first."</p><p style="margin:4px 0 0;font-size:11px;color:#71717A">'+t("10월 9일에 Stripe S700 으로 바꿨는데 문구는 그대로였어요.","We moved to Stripe S700 on 9 October; the text never changed.")+'</p>',{hot:p<.33})+
+    (p>=.3?box(t("② 막는 장치 없음","② Nothing stops it"),'<p style="margin:0;font-size:11px">'+t("리더 결제가 남아 있어도 Confirm refund 가 눌렸어요.","Confirm refund worked even with a reader payment still on the card.")+'</p>',{hot:p<.66}):'')+
+    (p>=.63?box(t("③ 버튼이 사라짐","③ The button disappears"),'<p style="margin:0;font-size:11px">'+t("장부 환불 뒤에는 리더 환불 버튼까지 숨겨졌어요.","After a books refund, even the reader refund button was hidden.")+'</p>',{hot:true}):'')+'</div></div>'},
+  log:[{at:.15,tag:"ui",name:"SaleDetail.tsx:189",ep:"Chase DX8000"},
+       {at:.45,tag:"ui",name:"disabled",ep:"busy || !reason"},
+       {at:.75,tag:"ui",name:"SaleDetail.tsx:182",ep:"refunded_at ? null"}],
+  focus:["traps"]},
+
+ {a:"fix",ph:"how",ko:"고친 화면",en:"The fixed screen",
+  screen:(l,p)=>{const t=k(l);const done=p>=.6;return shell("Reports · receipt","Refund this sale",t("수정 후","after the fix"),
+    '<div class="box'+(p<.6?' hot':'')+'" style="display:grid;gap:6px"><span class="eyeb">Paid through the card reader</span><p style="margin:0;font-size:11.5px">Debit (Interac) $105.99 · ****5882</p>'+(done?'<p style="margin:0;font-size:11.5px;font-weight:700;color:#1F6B3A">Refunded to the card.</p>':btn("Refund on reader (customer taps card)",{hot:p>=.3}))+'</div>'+
+    note("Confirm refund only fixes the books: it puts stock back and marks any green fees on this bill unpaid again. It does not send money back to a card.",{})+
+    (done?'':note("Refund the card payment above first. Confirm refund unlocks once the money is back on the card.",{warn:true,bold:true,hot:p<.3}))+
+    btn("Confirm refund",{danger:true,off:!done,hot:done}))},
+  log:[{at:.1,tag:"ui",name:"cardsPending = 1",ep:"Confirm refund locked",why:L("리더로 받은 결제가 아직 카드로 돌아가지 않았으면 Confirm refund 가 잠겨요.","While a reader payment is still on the card, Confirm refund stays locked.")},
+       {at:.4,tag:"stripe",name:"refund on reader",ep:"customer taps"},
+       {at:.65,tag:"ui",name:"cardsPending = 0",ep:"Confirm refund unlocks"},
+       {at:.85,tag:"local",name:"no reader record found",ep:"not counted → no dead end",why:L("리더 승인 기록을 못 찾는 결제는 세지 않아요. 그래야 장부 환불이 영영 막히지 않아요.","A payment with no reader record is not counted, so the books refund never gets stuck.")}],
+  focus:["code"]},
+
+ {a:"fix2",ph:"how",ko:"이미 환불된 영수증도",en:"Even after a books refund",
+  screen:(l,p)=>{const t=k(l);return shell("Reports · PH-20261021-0005","PH-20261021-0005",t("수정 후 · 이미 Refunded","after the fix · already Refunded"),
+    '<div class="box" style="border-color:#E2A5A5;background:#FDF0F0;color:#8A1F1F"><b>Refunded</b><br>error no glove purchased</div>'+
+    '<div class="box'+(p>=.25&&p<.75?' hot':'')+'" style="display:grid;gap:6px"><span class="eyeb">Paid through the card reader</span><p style="margin:0;font-size:11.5px">Debit (Interac) $105.99 · ****5882</p>'+(p>=.75?'<p style="margin:0;font-size:11.5px;font-weight:700;color:#1F6B3A">Refunded to the card.</p>':btn("Refund on reader (customer taps card)",{hot:p>=.25}))+'</div>'+
+    (p>=.45?rows([[t("매니저 승인","Manager approval"),t("필요 (이미 닫힌 계산서)","needed (bill already closed)"),"w"],[t("손님 카드","Customer's card"),t("리더에 다시 대기","tap on the reader"),"w"]]):''))},
+  log:[{at:.2,tag:"ui",name:"refunded_at set",ep:"panel still shown"},
+       {at:.5,tag:"rpc",name:"terminal_begin",ep:"manager gate: refund",why:L("서버는 원래 닫힌 계산서의 카드 환불도 받아 줘요. 매니저 승인만 거치면 돼요.","The server already accepts a card refund on a closed bill, with manager approval.")},
+       {at:.8,tag:"stripe",name:"refund_payment",ep:"$105.99 → ****5882"}],
+  focus:["code","sale"]},
+
+ {a:"status",ph:"check",ko:"지금 상태와 할 일",en:"Where it stands",
+  screen:(l,p)=>{const t=k(l);return '<div class="ad"><div class="plan">'+
+   '<h3>'+t("끝난 것","Done")+'</h3><ul class="done"><li>'+t("원인 확인 (코드 흐름)","Cause found (code path)")+'</li><li>'+t("SaleDetail.tsx 수정 · 타입 검사·lint 통과","SaleDetail.tsx fixed · typecheck and lint pass")+'</li><li>'+t("커밋 <code>a5e60d5</code> → main 푸시","Commit <code>a5e60d5</code> → pushed to main")+'</li></ul>'+
+   '<h3>'+t("남은 것 (순서대로)","Still to do (in order)")+'</h3><ul class="q"><li'+(p>.2&&p<.5?' class="hot"':'')+'>'+t("Vercel 배포 끝나면 새로고침","Reload once the Vercel deploy finishes")+'</li><li'+(p>=.5&&p<.8?' class="hot"':'')+'>'+t("손님 연락 → 영수증 열고 리더로 $105.99 환불","Contact the customer → open the receipt, refund $105.99 on the reader")+'</li><li'+(p>=.8?' class="hot"':'')+'>'+t("Stripe 에서 환불 확인","Check the refund in Stripe")+'</li></ul>'+
+   '<h3>'+t("확인 못 한 것","Not checked")+'</h3><ul><li>'+t("이 영수증의 단말기 기록 (DB 연결 안 됨)","This receipt's terminal records (no database access)")+'</li><li>'+t("실제 리더에서 바뀐 화면","The new screen on a live reader")+'</li></ul></div></div>'},
+  log:[{at:.15,tag:"local",name:"a5e60d5",ep:"pushed to main"},{at:.35,tag:"key",name:"Vercel",ep:"auto-deploys"},
+       {at:.65,tag:"key",name:"customer",ep:"card needed for Interac"},{at:.85,tag:"stripe",name:"dashboard",ep:"refund visible"}],
+  focus:["deploy","sale","db"]}
+];
+
+S.forEach(s=>{s.ledger=s.ledger||[{at:0}]});
+const PH={why:{ko:"원인",en:"Cause"},what:{ko:"함정",en:"Traps"},how:{ko:"수정",en:"Fix"},check:{ko:"상태",en:"Status"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"DATA",stripe:"STRIPE",key:"ACTION"};
+
+const ITEMS=[
+ {id:"cause",src:L("원인","Cause"),sub:"Confirm refund = books only",st:["ok",L("찾음","Found")],rows:[[L("Stripe 호출 없음","no Stripe call"),""]]},
+ {id:"traps",src:L("화면 함정","Screen traps"),sub:"DX8000 · no lock · hidden",st:["ok",L("3가지","3 found")],rows:[[L("모두 이번에 고침","all fixed in this change"),""]]},
+ {id:"code",src:L("코드 수정","Code fix"),sub:"SaleDetail.tsx",st:["ok",L("작성됨","Written")],rows:[[L("tsc · eslint 통과","tsc · eslint pass"),""]]},
+ {id:"deploy",src:L("배포","Deploy"),sub:"main → Vercel",st:["ok",L("푸시됨","Pushed")],rows:[[L("a5e60d5 · Vercel 자동 배포","a5e60d5 · Vercel auto-deploy"),""]]},
+ {id:"sale",src:L("이 영수증","This receipt"),sub:"PH-20261021-0005 · $105.99",st:["wait",L("직접 해 주세요","Your step")],rows:[[L("손님 카드로 리더 환불","reader refund with customer's card"),""]]},
+ {id:"db",src:L("DB 확인","Database check"),sub:"pelham_terminal_txns",st:["vi",L("못 봄","Not read")],rows:[[L("kind = 'refund' 줄 없는지","no kind = 'refund' row"),""]]}
+];
+function renderLedger(p){
+  const k=LANG;const f=new Set(S[SC].focus||[]);
+  $("ledger").innerHTML=ITEMS.map(it=>'<div class="lc'+(f.has(it.id)?" flash lcon":" lcdim")+'"><div class="r1"><span class="src">'+esc(it.src[k])+'<em>'+esc(it.sub)+'</em></span><span class="pill '+it.st[0]+'">'+esc(it.st[1][k])+'</span></div><div class="lrows">'+it.rows.map(r=>'<div><span>'+esc(typeof r[0]==="string"?r[0]:r[0][k])+'</span><span></span></div>').join("")+'</div></div>').join("");
+}
+
+const DUR={"what": {"ko": 19.7, "en": 18.7}, "two": {"ko": 22.0, "en": 19.4}, "path": {"ko": 19.7, "en": 17.0}, "traps": {"ko": 17.1, "en": 14.6}, "fix": {"ko": 22.2, "en": 20.5}, "fix2": {"ko": 13.3, "en": 13.2}, "status": {"ko": 24.2, "en": 22.7}};
+const NARR={"ko": {"what": "오늘 아침 아홉 시 오십오 분, James 가 Interac 직불로 백오 달러 구십구 센트를 받았어요. 장갑은 사지 않았는데 같이 결제돼서 환불을 했죠. 앱 영수증에는 Refunded 가 떠 있어요. 그런데 Stripe 를 보면 결제는 성공 그대로이고 환불은 없어요. 손님 카드로 돈이 돌아가지 않은 거예요.", "two": "환불 창에는 버튼이 두 개 있어요. 위쪽 Refund on reader 버튼은 Stripe 에 환불을 보내고, 리더가 손님 카드를 기다려요. Interac 직불은 손님이 카드를 다시 대야 돈이 돌아가요. 아래쪽 빨간 Confirm refund 버튼은 장부만 고쳐요. 재고를 되돌리고 그린피를 미결제로 바꿀 뿐, Stripe 에는 아무것도 보내지 않아요.", "path": "실제로는 이렇게 됐어요. 사유를 적고 Confirm refund 만 눌렀어요. 데이터베이스 함수가 영수증에 환불 시각을 찍었고, 그 순간 창이 Refunded 로 바뀌면서 환불 칸 전체가 사라졌어요. 리더 버튼도 같이요. 그래서 Stripe 로 간 요청은 하나도 없고, 다시 할 버튼도 남지 않았어요.", "traps": "화면에 함정이 세 가지 있었어요. 첫째, 안내 문구가 아직 예전 단말기인 Chase DX8000 을 말하고 있었어요. 둘째, 리더 결제가 남아 있어도 Confirm refund 를 막지 않았어요. 셋째, 장부 환불이 끝나면 리더 환불 버튼까지 숨겨졌어요.", "fix": "고친 화면이에요. 리더로 받은 결제가 아직 카드로 돌아가지 않았으면 Confirm refund 가 잠기고, 먼저 위에서 카드 환불을 하라는 노란 안내가 떠요. 손님이 카드를 대서 환불이 끝나면 Refunded to the card 가 뜨고, 그때 Confirm refund 가 풀려요. 리더 기록을 못 찾는 결제는 세지 않아서 영원히 막히는 일은 없어요.", "fix2": "이미 장부 환불이 된 영수증도 이제 리더 환불 칸이 계속 보여요. 서버는 원래 닫힌 계산서의 카드 환불도 받아 주니까, 매니저 승인을 거쳐 손님이 카드를 대면 백오 달러 구십구 센트가 돌아가요.", "status": "지금 상태예요. 원인을 찾았고, 화면 코드를 고쳐 타입 검사와 lint 를 통과했고, main 에 푸시했어요. Vercel 배포가 끝나면 화면을 새로고침하세요. 그다음 손님께 연락해서 이 영수증을 열고, 리더로 환불한 뒤 Stripe 에서 환불이 보이는지 확인해 주세요. 이 영수증의 단말기 기록은 데이터베이스에 접속하지 못해 직접 보지는 못했어요."}, "en": {"what": "At nine fifty-five this morning, James took a hundred and five ninety-nine on an Interac debit card. A glove was charged by mistake, so the sale was refunded. The receipt in the app says Refunded. But in Stripe the payment still shows succeeded, with no refund. The money never went back to the customer's card.", "two": "The refund window has two buttons. The upper one, Refund on reader, sends the refund to Stripe, and the reader waits for the card. An Interac refund needs the customer to tap the card again. The red Confirm refund button only fixes the books. It puts stock back and marks green fees unpaid. It sends nothing to Stripe.", "path": "Here is what actually ran. The reason was typed and only Confirm refund was pressed. A database function stamped the refund time on the receipt, and the window switched to Refunded and hid the whole refund panel, reader button included. No request reached Stripe, and no button was left to try again.", "traps": "The screen had three traps. First, its warning still named the old Chase DX8000 terminal. Second, nothing stopped Confirm refund while a reader payment was still on the card. Third, after a books refund, even the reader refund button disappeared.", "fix": "This is the fixed screen. While a reader payment is still on the card, Confirm refund is locked, and a yellow note says to refund the card first. When the customer taps and the refund goes through, it shows Refunded to the card, and Confirm refund unlocks. A payment with no reader record isn't counted, so the screen can never get stuck.", "fix2": "A receipt that was already refunded in the books now keeps the reader refund panel. The server already accepts a card refund on a closed bill, so with manager approval and a tap of the customer's card, the hundred and five ninety-nine goes back.", "status": "Here is where it stands. The cause is found, the screen code is fixed and passes the type check and lint, and it is pushed to main. Reload the screen once Vercel finishes deploying. Then contact the customer, open this receipt, refund it on the reader, and check that Stripe shows the refund. I could not read this receipt's terminal records because the database wasn't reachable from here."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phrf-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phrf-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phrf-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phrf-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script></body></html>
+</body></html>

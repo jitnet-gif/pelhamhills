@@ -1,0 +1,500 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>골프장 결제 장비 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=Noto+Sans+KR:wght@400;500&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: presenter bar pinned on top; each device gets an annotated drawing beside its how-to steps, like a club-fitting spec sheet */
+:root{
+  --bg:#f5f7f3; --surface:#ffffff; --line:#d9e0d4; --fg:#1b2a1f; --muted:#5b6b5f;
+  --accent:#1f6b3a; --accent-soft:#e3efe6; --flag:#c8452b; --flag-soft:#fbe5db;
+  --device:#2a2f2c; --device-edge:#151917; --screen:#eef4ef; --screen-ink:#1b2a1f; --key:#4a514d; --card:#d9a441;
+  --term:#14201a; --term-ink:#dde8e0; --term-dim:#7f9489;
+  --display:"IBM Plex Sans KR","Noto Sans KR",system-ui,sans-serif;
+  --body:"Noto Sans KR","IBM Plex Sans KR",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111813; --surface:#18221b; --line:#2b3a2f; --fg:#e7eee8; --muted:#9db0a2;
+  --accent:#6cc48a; --accent-soft:#1e3325; --flag:#f08a6f; --flag-soft:#3a2219;
+  --device:#3a423d; --device-edge:#5c665f; --screen:#0d1410; --screen-ink:#d6e2da; --key:#5d6661; --card:#d9a441;
+  --term:#0a110d; --term-ink:#d6e2da; --term-dim:#6e8277; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111813; --surface:#18221b; --line:#2b3a2f; --fg:#e7eee8; --muted:#9db0a2;
+  --accent:#6cc48a; --accent-soft:#1e3325; --flag:#f08a6f; --flag-soft:#3a2219;
+  --device:#3a423d; --device-edge:#5c665f; --screen:#0d1410; --screen-ink:#d6e2da; --key:#5d6661; --card:#d9a441;
+  --term:#0a110d; --term-ink:#d6e2da; --term-dim:#6e8277; color-scheme:dark}
+*{box-sizing:border-box}
+html[data-lang="en"] [lang="ko"],html[data-lang="ko"] [lang="en"]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.65}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:960px;margin:0 auto;padding-inline:16px;padding-block:20px 56px;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;line-height:1.2}
+h2{font-size:21px;font-weight:600;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2 .tag{font-family:var(--mono);font-size:12px;color:var(--flag);letter-spacing:.06em}
+h3{font-size:15px;font-weight:600}
+p{margin:0}
+.muted{color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
+
+/* presenter */
+.presenter{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);padding-block:10px;display:flex;flex-direction:column;gap:8px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.btn{border:1px solid var(--line);background:var(--bg);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:500;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:112px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--bg);height:34px;padding:0 12px;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.spacer{flex:1}
+.src{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+details.vset{position:relative;font-size:13px}
+details.vset summary{cursor:pointer;list-style:none;color:var(--muted);padding:6px 8px;border-radius:6px}
+details.vset summary::-webkit-details-marker{display:none}
+.vbox{position:absolute;right:0;top:100%;margin-top:6px;width:min(340px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.vbox .note{font-size:12px;color:var(--muted)}
+.vbox select{height:34px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:0 8px;max-width:100%}
+.vbox input[type=file]{font-size:12px;max-width:100%}
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:12px 16px}
+.cap .no{font-family:var(--mono);font-size:12px;color:#8fd3ae;border:1px solid var(--term-dim);border-radius:6px;padding:2px 8px;white-space:nowrap}
+.cap p{font-size:15px;line-height:1.6;min-height:1.6em}
+.prog{grid-column:1/-1;display:flex;gap:4px}
+.prog button{flex:1;height:5px;border:0;border-radius:3px;background:#2e3f35;cursor:pointer;padding:0}
+.prog button.done{background:var(--term-dim)}
+.prog button.now{background:#f2c48b}
+
+/* slides */
+.slide{display:flex;flex-direction:column;gap:18px;scroll-margin-top:190px;border-radius:14px;transition:background .3s,box-shadow .3s}
+.slide.on{background:var(--accent-soft);box-shadow:0 0 0 12px var(--accent-soft)}
+header.slide p{max-width:64ch;color:var(--muted)}
+.lineup{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.dev{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.dev svg{height:120px;width:100%}
+.dev .price{font-family:var(--mono);font-size:13px;color:var(--accent)}
+.dev .use{font-size:13px;color:var(--muted)}
+.split{display:grid;gap:18px;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start}
+@media (max-width:760px){.split{grid-template-columns:minmax(0,1fr)}}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px;overflow-x:auto}
+.fig svg{width:100%;min-width:420px;height:auto;display:block}
+.lbl{font-family:var(--body);font-size:13px;fill:var(--fg)}
+.lbl2{font-family:var(--body);font-size:11.5px;fill:var(--muted)}
+.lead{stroke:var(--muted);stroke-width:1;fill:none;stroke-dasharray:3 3}
+.pt{fill:var(--flag)}
+.specs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.spec{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.spec b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;font-variant-numeric:tabular-nums}
+.spec span{font-size:12px;color:var(--muted)}
+ol.how{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;counter-reset:s}
+ol.how li{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+ol.how li:last-child{border-bottom:1px solid var(--line)}
+ol.how li::before{counter-increment:s;content:counter(s);font-family:var(--mono);font-size:13px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--bg);display:grid;place-items:center}
+ol.how h3{font-size:14px}
+ol.how p{font-size:13.5px;color:var(--muted)}
+code{font-family:var(--mono);font-size:13px;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:5px}
+.warn{display:flex;gap:10px;align-items:flex-start;background:var(--flag-soft);border-radius:10px;padding:12px 14px;font-size:13.5px}
+.warn b{color:var(--flag);font-weight:600;white-space:nowrap}
+.flow{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.fstep{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;position:relative;min-width:0}
+.fstep .n{font-family:var(--mono);font-size:12px;color:var(--flag)}
+.fstep p{font-size:13px;color:var(--muted)}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:440px}
+th,td{padding:10px 14px;text-align:left;border-top:1px solid var(--line);vertical-align:top}
+tr:first-child th,tr:first-child td{border-top:none}
+th{font-weight:500;color:var(--muted);font-size:12px}
+.ok{color:var(--accent);font-weight:500}.bad{color:var(--flag);font-weight:500}
+.place{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.pl{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.pl .where{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.pl .what{font-weight:500}
+.pl p{font-size:13px;color:var(--muted)}
+.check{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.check li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px 10px 38px;position:relative;font-size:13.5px}
+.check li::before{content:"";position:absolute;left:12px;top:13px;width:14px;height:14px;border:2px solid var(--accent);border-radius:4px}
+footer{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+footer a{color:var(--accent)}
+@media (max-width:600px){.presenter .src{display:none}.slide{scroll-margin-top:230px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<!-- device drawings (generic schematics) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="d-smart" viewBox="0 0 136 264">
+      <rect x="4" y="2" width="126" height="258" rx="18" style="fill:var(--device);stroke:var(--device-edge)" stroke-width="1.5"/>
+      <rect x="0" y="130" width="5" height="18" rx="2" style="fill:var(--key)"/>
+      <rect x="129" y="60" width="5" height="30" rx="2" style="fill:var(--key)"/>
+      <rect x="14" y="20" width="106" height="190" rx="6" style="fill:var(--screen)"/>
+      <g style="stroke:var(--accent)" stroke-width="3" fill="none" stroke-linecap="round">
+        <path d="M58 60a14 14 0 0 1 0 22"/><path d="M65 54a22 22 0 0 1 0 34"/><path d="M72 48a30 30 0 0 1 0 46"/>
+      </g>
+      <text x="67" y="130" text-anchor="middle" style="fill:var(--screen-ink);font-family:var(--mono);font-size:20px">$58.41</text>
+      <rect x="32" y="150" width="70" height="8" rx="4" style="fill:var(--line)"/>
+      <rect x="40" y="166" width="54" height="8" rx="4" style="fill:var(--line)"/>
+      <rect x="37" y="248" width="60" height="5" rx="2" style="fill:var(--device-edge)"/>
+    </symbol>
+    <symbol id="d-pad" viewBox="0 0 124 256">
+      <rect x="2" y="2" width="120" height="250" rx="16" style="fill:var(--device);stroke:var(--device-edge)" stroke-width="1.5"/>
+      <rect x="14" y="16" width="96" height="72" rx="4" style="fill:var(--screen)"/>
+      <g style="stroke:var(--accent)" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <path d="M54 30a8 8 0 0 1 0 14"/><path d="M60 26a14 14 0 0 1 0 22"/><path d="M66 22a20 20 0 0 1 0 30"/>
+      </g>
+      <text x="62" y="76" text-anchor="middle" style="fill:var(--screen-ink);font-family:var(--mono);font-size:13px">$12.50</text>
+      <g style="fill:var(--key)">
+        <rect x="18" y="100" width="28" height="20" rx="4"/><rect x="48" y="100" width="28" height="20" rx="4"/>
+        <rect x="18" y="126" width="28" height="20" rx="4"/><rect x="48" y="126" width="28" height="20" rx="4"/><rect x="78" y="126" width="28" height="20" rx="4"/>
+        <rect x="18" y="152" width="28" height="20" rx="4"/><rect x="48" y="152" width="28" height="20" rx="4"/><rect x="78" y="152" width="28" height="20" rx="4"/>
+        <rect x="18" y="178" width="28" height="20" rx="4"/><rect x="48" y="178" width="28" height="20" rx="4"/><rect x="78" y="178" width="28" height="20" rx="4"/>
+      </g>
+      <rect x="78" y="100" width="28" height="20" rx="4" style="fill:var(--key);stroke:var(--flag)" stroke-width="2"/>
+      <rect x="18" y="208" width="28" height="22" rx="4" fill="#c8452b"/>
+      <rect x="48" y="208" width="28" height="22" rx="4" fill="#d9a441"/>
+      <rect x="78" y="208" width="28" height="22" rx="4" fill="#2f8a50"/>
+      <rect x="32" y="244" width="60" height="5" rx="2" style="fill:var(--device-edge)"/>
+    </symbol>
+    <symbol id="d-phone" viewBox="0 0 120 230">
+      <rect x="10" y="2" width="100" height="224" rx="16" style="fill:var(--device);stroke:var(--device-edge)" stroke-width="1.5"/>
+      <rect x="18" y="14" width="84" height="200" rx="10" style="fill:var(--screen)"/>
+      <circle cx="60" cy="86" r="26" fill="none" style="stroke:var(--accent)" stroke-width="3"/>
+      <g style="stroke:var(--accent)" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <path d="M55 78a8 8 0 0 1 0 16"/><path d="M61 73a15 15 0 0 1 0 26"/>
+      </g>
+      <text x="60" y="140" text-anchor="middle" style="fill:var(--screen-ink);font-family:var(--mono);font-size:14px">$24.00</text>
+      <rect x="34" y="156" width="52" height="7" rx="3" style="fill:var(--line)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+<div class="presenter">
+  <div class="bar" role="toolbar" aria-label="Presenter">
+    <button class="btn play" id="bPlay" type="button">▶</button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <div class="seg" role="group" aria-label="Speed" id="speed">
+      <button type="button" data-v="1" aria-pressed="true">1×</button>
+      <button type="button" data-v="1.2" aria-pressed="false">1.2×</button>
+      <button type="button" data-v="1.5" aria-pressed="false">1.5×</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="src" id="srcBadge"></span>
+    <div class="seg" role="group" aria-label="Language" id="langSeg">
+      <button type="button" data-l="ko" aria-pressed="true">한국어</button>
+      <button type="button" data-l="en" aria-pressed="false">English</button>
+    </div>
+    <details class="vset">
+      <summary><span lang="ko">음성 설정 ▾</span><span lang="en">Voice ▾</span></summary>
+      <div class="vbox">
+        <label class="note" for="fAudio"><span lang="ko">ElevenLabs 나레이션 파일 불러오기 (ko-1.mp3 … ko-7.mp3, en-1.mp3 … en-7.mp3)</span><span lang="en">Load ElevenLabs narration files (ko-1.mp3 … ko-7.mp3, en-1.mp3 … en-7.mp3)</span></label>
+        <input type="file" id="fAudio" accept="audio/*,.mp3" multiple>
+        <label class="note" for="vSel"><span lang="ko">파일이 없을 때 쓸 브라우저 음성</span><span lang="en">Browser voice used when a file is missing</span></label>
+        <select id="vSel"></select>
+        <p class="note"><span lang="ko">ElevenLabs Hope(경쾌한 여성) 목소리로 만든 파일이 있으면 그 파일을 먼저 재생합니다.</span><span lang="en">Files made with the ElevenLabs Hope voice (upbeat female) play first when available.</span></p>
+      </div>
+    </details>
+  </div>
+  <div class="cap">
+    <span class="no" id="capNo">0 / 7</span>
+    <p id="capText" aria-live="polite"></p>
+    <div class="prog" id="prog"></div>
+  </div>
+</div>
+
+<!-- 1 lineup -->
+<header class="slide">
+  <span class="eyebrow">Stripe Terminal · Canada · Hardware</span>
+  <h1><span lang="ko">골프장 결제 장비 한눈에 보기</span><span lang="en">Golf Club Payment Hardware at a Glance</span></h1>
+  <p><span lang="ko">캐나다에서 주문할 수 있는 Stripe 결제 장비 네 가지를 그림으로 보고, 켜는 법부터 결제 받는 법, 매일 관리하는 법까지 정리했습니다.</span><span lang="en">The four Stripe payment devices you can order in Canada, drawn out, with how to turn them on, take a payment and look after them each day.</span></p>
+  <div class="lineup">
+    <div class="dev"><svg viewBox="0 0 136 264" role="img" aria-label="Stripe Reader S710"><use href="#d-smart"/></svg><h3>Stripe Reader S710</h3><span class="price">CA$419 · LTE</span><span class="use"><span lang="ko">코스·카트·음료 카트 (Wi-Fi 없는 곳)</span><span lang="en">Course, carts, beverage cart (no Wi-Fi)</span></span></div>
+    <div class="dev"><svg viewBox="0 0 136 264" role="img" aria-label="Stripe Reader S700"><use href="#d-smart"/></svg><h3>Stripe Reader S700</h3><span class="price">CA$419 · Wi-Fi</span><span class="use"><span lang="ko">프로샵 카운터, 클럽하우스</span><span lang="en">Pro shop counter, clubhouse</span></span></div>
+    <div class="dev"><svg viewBox="0 0 124 256" role="img" aria-label="BBPOS WisePad 3"><use href="#d-pad"/></svg><h3>BBPOS WisePad 3</h3><span class="price">CA$79 · Bluetooth</span><span class="use"><span lang="ko">직원 폰·태블릿과 짝지어 들고 다니기</span><span lang="en">Pairs with a staff phone or tablet</span></span></div>
+    <div class="dev"><svg viewBox="0 0 120 230" role="img" aria-label="Tap to Pay phone"><use href="#d-phone"/></svg><h3>Tap to Pay</h3><span class="price">CA$0 · +$0.15/tap</span><span class="use"><span lang="ko">휴대폰만으로 받는 비상용·이벤트용</span><span lang="en">Phone only, for backup or events</span></span></div>
+  </div>
+</header>
+
+<!-- 2 smart reader anatomy -->
+<section class="slide">
+  <h2><span class="tag">S700 · S710</span><span lang="ko">스마트 리더 생김새</span><span lang="en">Smart reader anatomy</span></h2>
+  <div class="split">
+    <div class="fig">
+      <svg viewBox="0 0 470 292" role="img" aria-label="S700/S710 diagram">
+        <use href="#d-smart" x="167" y="14" width="136" height="264"/>
+        <circle class="pt" cx="236" cy="84" r="4"/><path class="lead" d="M240 84 L318 62"/>
+        <text class="lbl" x="324" y="60"><tspan lang="ko">탭 결제 위치</tspan><tspan lang="en">Tap here</tspan></text>
+        <text class="lbl2" x="324" y="76"><tspan lang="ko">화면 위 아이콘</tspan><tspan lang="en">contactless icon</tspan></text>
+        <circle class="pt" cx="303" cy="89" r="4"/><path class="lead" d="M307 92 L318 110"/>
+        <text class="lbl" x="324" y="112"><tspan lang="ko">전원 버튼 (오른쪽)</tspan><tspan lang="en">Power button (right)</tspan></text>
+        <text class="lbl2" x="324" y="128"><tspan lang="ko">길게: 켜기·끄기</tspan><tspan lang="en">hold: on / off</tspan></text>
+        <circle class="pt" cx="285" cy="170" r="4"/><path class="lead" d="M289 170 L318 170"/>
+        <text class="lbl" x="324" y="168"><tspan lang="ko">5.5″ 터치스크린</tspan><tspan lang="en">5.5″ touchscreen</tspan></text>
+        <text class="lbl2" x="324" y="184"><tspan lang="ko">금액·팁·서명 표시</tspan><tspan lang="en">amount, tip, prompts</tspan></text>
+        <circle class="pt" cx="169" cy="153" r="4"/><path class="lead" d="M165 153 L150 153"/>
+        <text class="lbl" x="144" y="150" text-anchor="end">USB-C</text>
+        <text class="lbl2" x="144" y="166" text-anchor="end"><tspan lang="ko">충전 (왼쪽)</tspan><tspan lang="en">charging (left)</tspan></text>
+        <circle class="pt" cx="236" cy="264" r="4"/><path class="lead" d="M232 266 L150 270"/>
+        <text class="lbl" x="144" y="266" text-anchor="end"><tspan lang="ko">칩 카드 삽입구</tspan><tspan lang="en">Chip card slot</tspan></text>
+        <text class="lbl2" x="144" y="282" text-anchor="end"><tspan lang="ko">아래쪽</tspan><tspan lang="en">bottom edge</tspan></text>
+      </svg>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div class="specs">
+        <div class="spec"><b>5.5″</b><span lang="ko">1080p 화면</span><span lang="en">1080p display</span></div>
+        <div class="spec"><b>~15h</b><span lang="ko">사용 시간 (충전 2.5h)</span><span lang="en">active use (2.5h charge)</span></div>
+        <div class="spec"><b>318 g</b><span lang="ko">한 손 휴대 가능</span><span lang="en">handheld</span></div>
+        <div class="spec"><b>Android</b><span lang="ko">내 앱 직접 실행</span><span lang="en">runs your app</span></div>
+      </div>
+      <div class="tbl"><table>
+        <tr><th></th><th>S700</th><th>S710</th></tr>
+        <tr><td>Wi-Fi</td><td class="ok">✓</td><td class="ok">✓</td></tr>
+        <tr><td><span lang="ko">유선 랜 (허브 별도)</span><span lang="en">Ethernet (with hub)</span></td><td class="ok">✓</td><td class="ok">✓</td></tr>
+        <tr><td><span lang="ko">LTE 셀룰러</span><span lang="en">4G/LTE cellular</span></td><td class="bad">—</td><td class="ok">✓ $14/<span lang="ko">월</span><span lang="en">mo</span></td></tr>
+        <tr><td><span lang="ko">연결 우선순위</span><span lang="en">Network priority</span></td><td colspan="2" class="muted"><span lang="ko">유선 → Wi-Fi → LTE 자동 전환</span><span lang="en">Ethernet → Wi-Fi → LTE, automatic</span></td></tr>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 smart reader setup -->
+<section class="slide">
+  <h2><span class="tag">S700 · S710</span><span lang="ko">설치부터 첫 결제까지</span><span lang="en">From unboxing to first payment</span></h2>
+  <ol class="how">
+    <li><div><h3><span lang="ko">충전하고 켜기</span><span lang="en">Charge and power on</span></h3><p><span lang="ko">동봉된 USB-C 케이블과 12W 어댑터를 왼쪽 포트에 꽂습니다. 다 차면 오른쪽 전원 버튼을 화면이 켜질 때까지 길게 누르세요. 노트북 USB-A 포트는 전력이 모자라니 쓰지 마세요.</span><span lang="en">Plug the included USB-C cable and 12W adapter into the left port. When charged, hold the right-side power button until the screen lights up. Don't charge from a laptop USB-A port; it can't supply enough power.</span></p></div></li>
+    <li><div><h3><span lang="ko">설정 메뉴 열기</span><span lang="en">Open settings</span></h3><p><span lang="ko">화면 왼쪽 끝에서 오른쪽으로 쓸어 Settings를 누르고 관리자 암호 <code>07139</code>를 입력합니다. 운영 전에 꼭 바꿔 두세요.</span><span lang="en">Swipe in from the left edge, tap Settings and enter the admin passcode <code>07139</code>. Change it before going live.</span></p></div></li>
+    <li><div><h3><span lang="ko">인터넷 연결</span><span lang="en">Connect to the internet</span></h3><p><span lang="ko">Wi-Fi settings에서 클럽 네트워크를 고릅니다. 카운터용이면 Dock + Hub로 유선 랜을 꽂으면 가장 안정적이고, S710은 Wi-Fi가 없으면 LTE로 알아서 넘어갑니다.</span><span lang="en">Pick the club network under Wi-Fi settings. At a counter, a Dock and Hub with Ethernet is the most stable. The S710 falls back to LTE when Wi-Fi drops.</span></p></div></li>
+    <li><div><h3><span lang="ko">내 계정에 등록</span><span lang="en">Register to your account</span></h3><p><span lang="ko">설정에서 페어링 코드를 만들어 Stripe 대시보드(또는 내 프로그램의 등록 화면)에 입력하고 Location을 고릅니다. 주문할 때 Location을 골랐다면 이 단계는 자동입니다.</span><span lang="en">Generate a pairing code in settings, enter it in the Stripe Dashboard (or your app's register screen) and choose a Location. If you picked a Location when ordering, this already happened.</span></p></div></li>
+    <li><div><h3><span lang="ko">결제 받기</span><span lang="en">Take a payment</span></h3><p><span lang="ko">내 프로그램에서 금액을 보내면 리더 화면에 금액이 뜹니다. 고객이 화면 위에 카드·폰을 대거나 아래쪽에 칩을 꽂으면 끝. 길게 한 번 ‘삐—’는 성공, 짧게 두 번은 실패입니다.</span><span lang="en">Send the amount from your app and it appears on the reader. The customer taps a card or phone on the screen, or inserts a chip at the bottom. One long high beep means approved; two short low beeps means it failed.</span></p></div></li>
+    <li><div><h3><span lang="ko">밤에도 켜 두기</span><span lang="en">Leave it on overnight</span></h3><p><span lang="ko">리더는 매일 자정에 재시작하며 자동 업데이트를 받습니다. 전원에 꽂아 켜 둔 채로 퇴근하세요. 문제가 있으면 Settings → Diagnostics에서 ‘Stripe connectivity’가 Passed인지 확인합니다.</span><span lang="en">The reader restarts at midnight and updates itself, so leave it plugged in and on. If something's wrong, check that "Stripe connectivity" says Passed under Settings → Diagnostics.</span></p></div></li>
+  </ol>
+</section>
+
+<!-- 4 WisePad 3 -->
+<section class="slide">
+  <h2><span class="tag">WISEPAD 3</span><span lang="ko">들고 다니는 블루투스 리더</span><span lang="en">The pocket Bluetooth reader</span></h2>
+  <div class="split">
+    <div class="fig">
+      <svg viewBox="0 0 470 292" role="img" aria-label="WisePad 3 diagram">
+        <use href="#d-pad" x="173" y="16" width="124" height="256"/>
+        <circle class="pt" cx="235" cy="68" r="4"/><path class="lead" d="M239 68 L318 60"/>
+        <text class="lbl" x="324" y="58"><tspan lang="ko">2.4″ 컬러 화면</tspan><tspan lang="en">2.4″ colour screen</tspan></text>
+        <text class="lbl2" x="324" y="74"><tspan lang="ko">여기에 카드 탭</tspan><tspan lang="en">tap card here</tspan></text>
+        <circle class="pt" cx="265" cy="126" r="4"/><path class="lead" d="M269 126 L318 126"/>
+        <text class="lbl" x="324" y="124"><tspan lang="ko">전원·설정 버튼</tspan><tspan lang="en">Power / Settings</tspan></text>
+        <text class="lbl2" x="324" y="140"><tspan lang="ko">패드 오른쪽 위</tspan><tspan lang="en">top right of keypad</tspan></text>
+        <circle class="pt" cx="265" cy="235" r="4"/><path class="lead" d="M269 235 L318 235"/>
+        <text class="lbl" x="324" y="233"><tspan lang="ko">초록 Enter</tspan><tspan lang="en">Green Enter</tspan></text>
+        <text class="lbl2" x="324" y="249"><tspan lang="ko">빨강 취소 · 노랑 지우기</tspan><tspan lang="en">red cancel · yellow clear</tspan></text>
+        <circle class="pt" cx="205" cy="180" r="4"/><path class="lead" d="M201 180 L150 180"/>
+        <text class="lbl" x="144" y="177" text-anchor="end"><tspan lang="ko">PIN 패드</tspan><tspan lang="en">PIN pad</tspan></text>
+        <text class="lbl2" x="144" y="193" text-anchor="end"><tspan lang="ko">인터락 PIN 입력</tspan><tspan lang="en">Interac PIN entry</tspan></text>
+        <circle class="pt" cx="235" cy="264" r="4"/><path class="lead" d="M231 266 L150 270"/>
+        <text class="lbl" x="144" y="266" text-anchor="end"><tspan lang="ko">칩 카드 삽입구</tspan><tspan lang="en">Chip card slot</tspan></text>
+        <text class="lbl2" x="144" y="282" text-anchor="end"><tspan lang="ko">아래쪽</tspan><tspan lang="en">bottom edge</tspan></text>
+      </svg>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div class="specs">
+        <div class="spec"><b>130 g</b><span lang="ko">주머니 크기</span><span lang="en">pocket size</span></div>
+        <div class="spec"><b>~15h</b><span lang="ko">사용 (충전 2h)</span><span lang="en">active (2h charge)</span></div>
+        <div class="spec"><b>~800</b><span lang="ko">탭 결제 / 1회 충전</span><span lang="en">taps per charge</span></div>
+        <div class="spec"><b>BLE 4.2</b><span lang="ko">폰·태블릿 연결</span><span lang="en">to phone/tablet</span></div>
+      </div>
+      <ol class="how">
+        <li><div><h3><span lang="ko">켜기</span><span lang="en">Turn on</span></h3><p><span lang="ko">전원 버튼을 길게 누르면 화면이 켜집니다. 앱과 연결이 끊긴 채 5분 동안 안 쓰면 ‘삐’ 하고 자동으로 꺼집니다.</span><span lang="en">Hold the power button until the screen lights. It beeps and switches off after 5 minutes idle without an app connection.</span></p></div></li>
+        <li><div><h3><span lang="ko">앱과 짝짓기</span><span lang="en">Pair with your app</span></h3><p><span lang="ko">직원 폰의 내 프로그램(iOS·Android 앱)에서 ‘리더 찾기’를 누르면 블루투스로 연결됩니다. 폰 블루투스 설정에서 따로 페어링하지 않습니다.</span><span lang="en">In your iOS or Android app on the staff phone, tap "Find reader" and it connects over Bluetooth. Don't pair it in the phone's Bluetooth settings.</span></p></div></li>
+        <li><div><h3><span lang="ko">결제·PIN</span><span lang="en">Pay and PIN</span></h3><p><span lang="ko">고객이 화면에 탭하거나 칩을 꽂고, 필요하면 PIN을 누른 뒤 초록 Enter. 끝나면 앱에 결과가 바로 돌아옵니다.</span><span lang="en">The customer taps or inserts, enters a PIN if asked and presses green Enter. The result comes straight back to your app.</span></p></div></li>
+        <li><div><h3><span lang="ko">매일 충전</span><span lang="en">Charge daily</span></h3><p><span lang="ko">USB-C 케이블로 하루 한 번 충전하면 충분합니다.</span><span lang="en">One charge a day over USB-C is enough.</span></p></div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- 5 Tap to Pay -->
+<section class="slide">
+  <h2><span class="tag">TAP TO PAY</span><span lang="ko">휴대폰이 곧 단말기</span><span lang="en">Your phone is the terminal</span></h2>
+  <div class="split">
+    <div class="fig">
+      <svg viewBox="0 0 470 260" role="img" aria-label="Tap to Pay diagram">
+        <use href="#d-phone" x="120" y="16" width="120" height="230"/>
+        <g transform="rotate(-14 330 90)">
+          <rect x="270" y="56" width="120" height="76" rx="9" style="fill:var(--card)"/>
+          <rect x="284" y="76" width="22" height="16" rx="3" fill="#f3dc9a"/>
+          <rect x="284" y="108" width="70" height="6" rx="3" fill="#a77a24"/>
+        </g>
+        <g style="stroke:var(--accent)" stroke-width="2.5" fill="none" stroke-linecap="round">
+          <path d="M248 84a14 14 0 0 1 0 20"/><path d="M256 78a22 22 0 0 1 0 32"/>
+        </g>
+        <text class="lbl" x="280" y="180"><tspan lang="ko">카드·폰을 화면 뒤쪽에 대기</tspan><tspan lang="en">Hold card or phone to the back</tspan></text>
+        <text class="lbl2" x="280" y="198"><tspan lang="ko">진동 후 몇 초 그대로 유지</tspan><tspan lang="en">keep it there a few seconds</tspan></text>
+        <text class="lbl2" x="280" y="216"><tspan lang="ko">PIN 화면은 위치가 무작위</tspan><tspan lang="en">PIN pad appears at random spots</tspan></text>
+      </svg>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div class="tbl"><table>
+        <tr><th></th><th>iPhone</th><th>Android</th></tr>
+        <tr><td><span lang="ko">기기</span><span lang="en">Device</span></td><td>iPhone XS <span lang="ko">이상</span><span lang="en">or later</span></td><td><span lang="ko">NFC 내장, Android 13 이상</span><span lang="en">Built-in NFC, Android 13+</span></td></tr>
+        <tr><td><span lang="ko">조건</span><span lang="en">Rules</span></td><td><span lang="ko">Apple 승인(entitlement) 필요</span><span lang="en">Apple entitlement required</span></td><td><span lang="ko">루팅·개발자 옵션 X, 1년 내 보안 업데이트</span><span lang="en">Not rooted, developer options off, patch within 12 months</span></td></tr>
+        <tr><td><span lang="ko">캐나다 지원</span><span lang="en">Canada</span></td><td colspan="2" class="ok"><span lang="ko">✓ Visa·MC·Amex·Interac·Apple/Google Pay</span><span lang="en">✓ Visa, MC, Amex, Interac, Apple/Google Pay</span></td></tr>
+      </table></div>
+      <div class="warn"><b><span lang="ko">주의</span><span lang="en">Heads up</span></b><span><span lang="ko">캐나다 카드 상당수는 금액이 크면 칩을 꽂아 PIN을 눌러야 합니다. 폰에는 칩 삽입구가 없으니, 거절되면 리더기나 결제 링크로 받으세요. 그래서 Tap to Pay는 보조용으로 쓰는 게 좋습니다.</span><span lang="en">Many Canadian cards need a chip insert and PIN above the contactless limit. Phones have no chip slot, so if a tap is declined, switch to a reader or send a payment link. Treat Tap to Pay as a backup.</span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 payment flow -->
+<section class="slide">
+  <h2><span class="tag">FLOW</span><span lang="ko">결제 한 건이 처리되는 순서</span><span lang="en">How one payment travels</span></h2>
+  <div class="flow">
+    <div class="fstep"><span class="n">01</span><h3><span lang="ko">내 프로그램</span><span lang="en">Your app</span></h3><p><span lang="ko">직원이 그린피·상품을 고르면 금액을 Stripe에 보냅니다</span><span lang="en">Staff ring up green fees or items; the amount goes to Stripe</span></p></div>
+    <div class="fstep"><span class="n">02</span><h3><span lang="ko">리더 화면</span><span lang="en">Reader screen</span></h3><p><span lang="ko">금액과 팁 선택이 고객 쪽 화면에 뜹니다</span><span lang="en">Amount and tip choices appear for the customer</span></p></div>
+    <div class="fstep"><span class="n">03</span><h3><span lang="ko">고객 결제</span><span lang="en">Customer pays</span></h3><p><span lang="ko">탭 · 칩 삽입 · (필요 시) PIN</span><span lang="en">Tap, insert chip, PIN if asked</span></p></div>
+    <div class="fstep"><span class="n">04</span><h3><span lang="ko">Stripe 승인</span><span lang="en">Stripe approves</span></h3><p><span lang="ko">카드사 승인 후 결과가 리더와 앱에 동시에 도착</span><span lang="en">The result reaches the reader and your app together</span></p></div>
+    <div class="fstep"><span class="n">05</span><h3><span lang="ko">마무리</span><span lang="en">Finish</span></h3><p><span lang="ko">영수증 발송, 티타임·매출이 DB에 기록되고 다음 날 정산</span><span lang="en">Receipt sent, tee time and sale saved, payout next business day</span></p></div>
+  </div>
+  <div class="tbl"><table>
+    <tr><th><span lang="ko">S700/S710 소리</span><span lang="en">S700/S710 sounds</span></th><th><span lang="ko">탭</span><span lang="en">Tap</span></th><th><span lang="ko">칩</span><span lang="en">Chip</span></th><th><span lang="ko">스와이프</span><span lang="en">Swipe</span></th></tr>
+    <tr><td class="ok"><span lang="ko">성공</span><span lang="en">Approved</span></td><td><span lang="ko">길고 높은 ‘삐—’ 1번</span><span lang="en">1 long high beep</span></td><td><span lang="ko">소리 없음</span><span lang="en">silent</span></td><td>—</td></tr>
+    <tr><td class="bad"><span lang="ko">실패</span><span lang="en">Failed</span></td><td><span lang="ko">짧고 낮은 ‘삐삐’ 2번</span><span lang="en">2 short low beeps</span></td><td><span lang="ko">소리 없음</span><span lang="en">silent</span></td><td><span lang="ko">짧게 2번</span><span lang="en">2 short beeps</span></td></tr>
+  </table></div>
+</section>
+
+<!-- 7 placement + daily -->
+<section class="slide">
+  <h2><span class="tag">ON COURSE</span><span lang="ko">어디에 무엇을 두나 · 매일 체크</span><span lang="en">What goes where · daily checks</span></h2>
+  <div class="place">
+    <div class="pl"><span class="where"><span lang="ko">프로샵 카운터</span><span lang="en">Pro shop counter</span></span><span class="what">S700 + Dock + Hub</span><p><span lang="ko">유선 랜 연결, 허브 USB에 바코드 스캐너·영수증 프린터</span><span lang="en">Wired Ethernet; scanner and receipt printer on the hub's USB ports</span></p></div>
+    <div class="pl"><span class="where"><span lang="ko">클럽하우스 F&amp;B</span><span lang="en">Clubhouse food &amp; drink</span></span><span class="what">S700</span><p><span lang="ko">테이블까지 들고 가서 팁 선택까지 바로</span><span lang="en">Carry it to the table, tip on screen</span></p></div>
+    <div class="pl"><span class="where"><span lang="ko">코스 · 음료 카트</span><span lang="en">Course and beverage cart</span></span><span class="what">S710 (LTE)</span><p><span lang="ko">Wi-Fi가 안 닿는 홀에서도 셀룰러로 결제</span><span lang="en">Cellular keeps working on holes Wi-Fi can't reach</span></p></div>
+    <div class="pl"><span class="where"><span lang="ko">레인지 · 토너먼트</span><span lang="en">Range and tournaments</span></span><span class="what">WisePad 3 / Tap to Pay</span><p><span lang="ko">직원 폰과 함께, 줄이 길 때 추가 계산대</span><span lang="en">With a staff phone, as an extra till when lines get long</span></p></div>
+  </div>
+  <ul class="check">
+    <li><span lang="ko">퇴근 전 S700/S710은 전원에 꽂고 켜 둔다 (자정 업데이트)</span><span lang="en">Leave S700/S710 plugged in and on at night for the midnight update</span></li>
+    <li><span lang="ko">WisePad 3·카트용 S710은 매일 완충</span><span lang="en">Fully charge the WisePad 3 and cart S710s every day</span></li>
+    <li><span lang="ko">비 오는 날은 케이스·비닐 커버 사용 (방수 아님)</span><span lang="en">Use a case or cover in the rain; readers aren't waterproof</span></li>
+    <li><span lang="ko">결제가 안 되면 Settings → Diagnostics 먼저</span><span lang="en">If payments fail, run Settings → Diagnostics first</span></li>
+    <li><span lang="ko">관리자 암호 07139는 운영 전에 변경</span><span lang="en">Change the default 07139 admin passcode before launch</span></li>
+    <li><span lang="ko">대시보드에서 리더 온라인 상태 확인</span><span lang="en">Check reader status in the Dashboard</span></li>
+  </ul>
+</section>
+
+<footer>
+  <span lang="ko">기준: </span><span lang="en">Sources: </span><a href="https://docs.stripe.com/terminal/readers/stripe-reader-s700-s710">Stripe Reader S700/S710</a>, <a href="https://docs.stripe.com/terminal/payments/setup-reader/bbpos-wisepad3">BBPOS WisePad 3</a>, <a href="https://docs.stripe.com/terminal/payments/setup-reader/tap-to-pay">Tap to Pay</a>, <a href="https://stripe.com/en-ca/terminal">stripe.com/en-ca/terminal</a> <span lang="ko">(2026년 10월 확인). 그림은 이해를 돕기 위한 단순화된 도식이며 실제 제품 모양과 다를 수 있습니다.</span><span lang="en">(checked October 2026). Drawings are simplified schematics and may differ from the real products.</span>
+</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const N={
+ko:[
+"안녕하세요! 이번엔 골프장에서 쓸 결제 장비를 그림으로 보여드릴게요. 스마트 리더 S710과 S700, 들고 다니는 WisePad 3, 그리고 휴대폰으로 바로 받는 Tap to Pay까지, 네 가지예요!",
+"먼저 S700과 S710이에요. 생김새는 똑같아요. 5.5인치 터치스크린 위에 카드를 대면 탭 결제, 아래쪽 구멍에 칩을 꽂으면 칩 결제예요. 전원 버튼은 오른쪽, 충전 포트는 왼쪽! 차이는 딱 하나, S710은 LTE가 돼서 와이파이 없는 코스에서도 결제가 돼요.",
+"설치는 이렇게 해요. 12와트 어댑터로 충전하고 전원 버튼을 길게 눌러 켜요. 화면 왼쪽 끝을 쓸어서 설정을 열고, 관리자 암호 07139를 넣고 와이파이를 연결해요. 페어링 코드로 내 계정에 등록하면 준비 끝! 결제가 되면 ‘삐—’ 하고 길게 한 번 울려요. 밤에는 꼭 꽂아 두세요. 자정에 알아서 업데이트하거든요.",
+"다음은 WisePad 3! 130그램짜리 주머니 크기 리더예요. 오른쪽 위 전원 버튼을 길게 눌러 켜고, 직원 폰에 있는 우리 프로그램에서 리더 찾기를 누르면 블루투스로 연결돼요. 고객이 화면에 탭하거나 칩을 꽂고, PIN 누르고 초록 버튼! 하루 한 번만 충전하면 돼요.",
+"Tap to Pay는 휴대폰이 바로 단말기가 되는 거예요. 아이폰은 XS 이상, 안드로이드는 13 이상이면 돼요. 그런데 캐나다 카드는 금액이 크면 칩을 꽂아야 하는 경우가 많아서, 이건 비상용이나 이벤트용으로 쓰는 게 좋아요.",
+"결제 한 건은 이렇게 흘러가요. 우리 프로그램에서 금액을 보내면 리더 화면에 금액이 뜨고, 고객이 탭이나 칩으로 결제해요. Stripe가 승인하면 결과가 리더랑 프로그램에 동시에 도착하고, 매출은 자동으로 기록돼요. 정말 간단하죠?",
+"마지막으로 배치예요! 프로샵 카운터엔 S700에 도크랑 허브, 클럽하우스엔 S700, 코스랑 음료 카트엔 S710, 레인지랑 대회 땐 WisePad나 Tap to Pay! 그리고 매일 밤 충전하고, 비 오는 날엔 커버 씌우는 것, 잊지 마세요!"
+],
+en:[
+"Hi there! This time I'll show you the payment hardware for your golf club. The S710 and S700 smart readers, the pocket-size WisePad 3, and Tap to Pay right on a phone. Four options in all!",
+"First up, the S700 and S710. They look exactly the same. Tap a card on the five point five inch touchscreen, or insert a chip at the bottom. The power button's on the right and the charging port's on the left! The only difference? The S710 has LTE, so it works out on the course with no Wi-Fi.",
+"Here's the setup. Charge it with the twelve-watt adapter and hold the power button to turn it on. Swipe in from the left edge to open settings, enter the admin passcode zero seven one three nine, and join your Wi-Fi. Register it with a pairing code and you're ready! One long beep means the payment went through. And leave it plugged in at night, because it updates itself at midnight.",
+"Next, the WisePad 3! It's a pocket-size reader that weighs just a hundred thirty grams. Hold the top-right power button to turn it on, then tap Find reader in your app on a staff phone, and it connects over Bluetooth. The customer taps or inserts, enters a PIN, and presses the green button! Just charge it once a day.",
+"With Tap to Pay, your phone becomes the terminal. You'll need an iPhone XS or later, or an Android phone on Android thirteen or later. Heads up, though: many Canadian cards need a chip insert for bigger amounts, so keep this one as a backup or for events.",
+"Here's how one payment flows. Your app sends the amount, and it shows up on the reader. The customer taps or inserts their card. Stripe approves it, the result lands on the reader and in your app at the same time, and the sale is recorded automatically. Pretty simple, right?",
+"Finally, where everything goes! An S700 with a dock and hub at the pro shop counter, an S700 in the clubhouse, S710s on the course and the beverage cart, and a WisePad or Tap to Pay at the range and for tournaments! And don't forget: charge every night, and cover them up when it rains!"
+]};
+const TITLE={ko:"골프장 결제 장비 가이드",en:"Golf Club Payment Hardware"};
+const $=id=>document.getElementById(id);
+const slides=[...document.querySelectorAll(".slide")];
+const total=slides.length;
+let lang="ko", idx=-1, playing=false, rate=1, audio=null, token=0;
+const uploaded=new Map(), bundled=new Map();
+function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
+for(let i=0;i<total;i++){const b=document.createElement("button");b.type="button";b.setAttribute("aria-label",String(i+1));b.addEventListener("click",()=>go(i,playing));$("prog").appendChild(b);}
+function setLang(l){
+  lang=l; document.documentElement.setAttribute("data-lang",l); document.documentElement.lang=l; document.title=TITLE[l];
+  [...$("langSeg").children].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.l===l)));
+  store("gd-lang",l); fillVoices(); render(); if(playing) go(idx<0?0:idx,true);
+}
+function render(){
+  slides.forEach((s,i)=>s.classList.toggle("on",i===idx));
+  [...$("prog").children].forEach((b,i)=>{b.classList.toggle("now",i===idx);b.classList.toggle("done",i<idx)});
+  $("capNo").textContent=(idx<0?0:idx+1)+" / "+total;
+  $("capText").textContent=idx<0?(lang==="ko"?"‘발표 시작’을 누르면 장비를 하나씩 나레이션으로 설명합니다.":"Press Start to hear each device explained in turn."):N[lang][idx];
+  $("bPlay").textContent=playing?(lang==="ko"?"❚❚ 일시정지":"❚❚ Pause"):(idx<0?(lang==="ko"?"▶ 발표 시작":"▶ Start"):(lang==="ko"?"▶ 계속":"▶ Resume"));
+  const key=lang+"-"+(Math.max(idx,0)+1);
+  $("srcBadge").textContent=(uploaded.has(key)||bundled.get(key)!==false)?"ElevenLabs · Hope":(lang==="ko"?"브라우저 음성":"Browser voice");
+}
+function stopAll(){token++; if(audio){audio.pause();audio=null;} if("speechSynthesis" in window) speechSynthesis.cancel();}
+function go(i,autoplay){
+  stopAll(); idx=Math.max(0,Math.min(total-1,i)); playing=!!autoplay; render();
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  slides[idx].scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"});
+  if(playing) speak(idx);
+}
+function next(){ if(idx<total-1) go(idx+1,true); else {playing=false; render();} }
+function after(my){ if(my===token&&playing) setTimeout(()=>{if(my===token&&playing)next()},600); }
+function speak(i){
+  const my=++token, key=lang+"-"+(i+1);
+  const src=uploaded.get(key)||(bundled.get(key)===false?null:"audio/"+key+".mp3");
+  if(src){
+    audio=new Audio(src); audio.playbackRate=rate;
+    audio.onended=()=>after(my);
+    audio.onerror=()=>{bundled.set(key,false);render();if(my===token){audio=null;tts(i,my)}};
+    audio.play().catch(()=>{if(my===token){audio=null;tts(i,my)}});
+  } else tts(i,my);
+}
+function tts(i,my){
+  if(!("speechSynthesis" in window)){ setTimeout(()=>after(my), N[lang][i].length*70/rate); return; }
+  const u=new SpeechSynthesisUtterance(N[lang][i]);
+  const v=pickVoice(); if(v) u.voice=v; u.lang=lang==="ko"?"ko-KR":"en-US"; u.rate=rate*(lang==="ko"?1.05:1.02); u.pitch=1.15;
+  u.onend=()=>after(my);
+  speechSynthesis.speak(u);
+}
+const FEMALE=/(female|woman|yuna|sora|sunhi|seoyeon|heami|jimin|samantha|ava|allison|aria|jenny|zira|susan|karen|serena|victoria|google us english|google 한국의)/i;
+function langVoices(){ if(!("speechSynthesis" in window)) return []; const p=lang==="ko"?/^ko/i:/^en/i; return speechSynthesis.getVoices().filter(v=>p.test(v.lang)); }
+function pickVoice(){ const list=langVoices(); const saved=load("gd-voice-"+lang); return list.find(v=>v.name===saved)||list.find(v=>FEMALE.test(v.name))||list[0]||null; }
+function fillVoices(){
+  const sel=$("vSel"), list=langVoices(), cur=pickVoice(); sel.innerHTML="";
+  if(!list.length){const o=document.createElement("option");o.textContent=lang==="ko"?"이 브라우저에 한국어 음성이 없습니다":"No English voice in this browser";sel.appendChild(o);return;}
+  list.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=v.name+" ("+v.lang+")";if(cur&&v.name===cur.name)o.selected=true;sel.appendChild(o);});
+}
+if("speechSynthesis" in window) speechSynthesis.onvoiceschanged=fillVoices;
+$("vSel").addEventListener("change",e=>store("gd-voice-"+lang,e.target.value));
+$("fAudio").addEventListener("change",e=>{
+  [...e.target.files].forEach(f=>{const m=f.name.toLowerCase().match(/^(ko|en)[-_ ]?(\d+)/); if(m) uploaded.set(m[1]+"-"+Number(m[2]),URL.createObjectURL(f));});
+  render();
+});
+async function probeBundled(){
+  for(const l of ["ko","en"]) for(let i=1;i<=total;i++){
+    const k=l+"-"+i; try{const r=await fetch("audio/"+k+".mp3"); if(r.status===404) bundled.set(k,false);}catch(e){}
+  }
+  render();
+}
+$("bPlay").addEventListener("click",()=>{
+  if(playing){playing=false; stopAll(); render(); return;}
+  if(idx<0){go(0,true);return;}
+  playing=true; render(); speak(idx);
+});
+$("bPrev").addEventListener("click",()=>go(idx<=0?0:idx-1,playing));
+$("bNext").addEventListener("click",()=>go(idx<0?0:idx+1,playing));
+$("speed").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;rate=Number(b.dataset.v);[...$("speed").children].forEach(x=>x.setAttribute("aria-pressed",String(x===b)));if(audio)audio.playbackRate=rate;});
+$("langSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setLang(b.dataset.l);});
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea,summary"))return;
+  if(e.key===" "){e.preventDefault();$("bPlay").click();}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+});
+const start=(location.hash==="#en"||location.hash==="#ko")?location.hash.slice(1):(load("gd-lang")||"ko");
+setLang(start==="en"?"en":"ko");
+probeBundled();
+})();
+</script>
+
+</body></html>

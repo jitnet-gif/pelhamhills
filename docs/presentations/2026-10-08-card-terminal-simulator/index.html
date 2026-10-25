@@ -1,0 +1,482 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>카드 단말기 결제 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: change board (3 before→after cards) + presenter bar + narration, over a three-lane stage — register · behind the scenes · DX8000 screen. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --blue:#2D5E8C; --blue-soft:#E2ECF5; --violet:#5B3FD0; --violet-soft:#ECE7FF;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6; --bad:#B4372A; --bad-soft:#F8E1DD;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-line:#2E3F35;
+  --dev:#23272B; --dev-edge:#3A4046; --scr:#0F1A24; --scr-ink:#EAF2F8; --scr-dim:#8FA5B6;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222; --bad:#F0877A; --bad-soft:#3A1C18;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+    --dev:#1A1D20; --dev-edge:#30363C; --scr:#0B141C; --scr-ink:#EAF2F8; --scr-dim:#8FA5B6;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222; --bad:#F0877A; --bad-soft:#3A1C18;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+  --dev:#1A1D20; --dev-edge:#30363C; --scr:#0B141C; --scr-ink:#EAF2F8; --scr-dim:#8FA5B6;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mono{font-family:var(--mono)}
+.top{display:grid;gap:4px}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--green)}
+.top .lede{color:var(--muted);max-width:76ch;font-size:13.5px}
+
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.chg{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px;align-content:start;opacity:.55;transition:opacity .3s,border-color .3s,box-shadow .3s}
+.chg.on{opacity:1}
+.chg.pulse{border-color:var(--flag);box-shadow:0 0 0 3px var(--flag-soft)}
+.chg .hd{display:flex;align-items:center;gap:8px}
+.chg .num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--paper);background:var(--green);border-radius:5px;padding:1px 6px}
+.chg h3{font-size:14.5px;font-weight:700}
+.ba{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center}
+.ba .was,.ba .now{border-radius:8px;padding:6px 9px;font-size:12.5px;min-width:0}
+.ba .was{background:var(--sunk);color:var(--muted);text-decoration:line-through;text-decoration-color:var(--flag)}
+.ba .now{background:var(--green-soft);color:var(--ink);font-weight:600}
+.ba .arr{color:var(--flag);font-weight:700}
+.ba .big{font-family:var(--mono);font-size:15px;letter-spacing:.02em;display:block}
+.chg small{font-size:11.5px;color:var(--muted)}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip small{font-weight:400;color:var(--muted);font-size:11.5px}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no,.chip[aria-pressed="true"] small{color:var(--paper);opacity:.85}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:118px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--mono);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.elb{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--sand-soft);color:var(--sand);font-family:var(--mono);white-space:nowrap}
+.elb.on{background:var(--violet-soft);color:var(--violet)}
+details.voices{font-size:13px;position:relative}
+details.voices summary{cursor:pointer;list-style:none;color:var(--muted);font-weight:600;padding:6px 8px;border-radius:6px}
+details.voices summary::-webkit-details-marker{display:none}
+details.voices[open] summary{color:var(--ink)}
+.vbox{position:absolute;right:0;z-index:5;width:min(340px,calc(100vw - 32px));display:grid;gap:8px;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.cm{display:grid;grid-template-columns:10px minmax(0,1fr);gap:8px;align-items:start}
+.cm b{font-size:12.5px;display:block}.cm small{font-size:11.5px;color:var(--muted)}
+.cdot{width:10px;height:10px;border-radius:50%;margin-top:4px}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.cap .stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.55;min-height:1.55em}
+.cap .who{display:block;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+.timer{display:grid;gap:3px;min-width:190px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600;color:var(--term-ink)}
+#tmScen{color:var(--term-key)}
+.prog{height:4px;border-radius:2px;background:var(--term-line);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:18px;height:6px;border-radius:3px;border:0;background:var(--term-line);cursor:pointer;padding:0}
+.dot.k-ws,.dot.k-rpc,.dot.k-note{background:#27405A}
+.dot.k-term,.dot.k-pos{background:#5A3A24}
+.dot.done{background:var(--term-dim)}
+.dot.k-ws.done,.dot.k-rpc.done,.dot.k-note.done{background:#5E8FC0}
+.dot.k-term.done,.dot.k-pos.done{background:#D08A5A}
+.dot.now{background:var(--term-key)!important;transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.9fr);gap:12px;height:clamp(560px,72vh,760px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.callhead{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border-bottom:1px solid var(--line)}
+.orb{width:54px;height:54px;border-radius:50%;background:var(--sunk);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;gap:3px}
+.orb i{width:3px;height:8px;border-radius:2px;background:var(--muted);display:block}
+.orb[data-who="staff"],.orb[data-who="nr"]{border-color:var(--violet);background:var(--violet-soft)}
+.orb[data-who="staff"] i,.orb[data-who="nr"] i{background:var(--violet);animation:eq .7s ease-in-out infinite}
+.orb[data-who="cu"]{border-color:var(--green);background:var(--green-soft)}
+.orb[data-who="cu"] i{background:var(--green);animation:eq .7s ease-in-out infinite}
+.orb i:nth-child(2){animation-delay:.12s}.orb i:nth-child(3){animation-delay:.24s}.orb i:nth-child(4){animation-delay:.36s}.orb i:nth-child(5){animation-delay:.18s}
+@keyframes eq{0%,100%{height:6px}50%{height:24px}}
+.caller b{display:block;font-size:15px}
+.caller span{font-size:12px;color:var(--muted)}
+.cstat{display:grid;justify-items:end;gap:3px}
+.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.live{background:var(--ok-soft);color:var(--ok)}
+.pill.ended{background:var(--flag-soft);color:var(--flag)}
+.total{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.chat{display:grid;gap:8px;padding:14px;align-content:start}
+.msg{max-width:88%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
+.msg small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;margin-bottom:2px;opacity:.8}
+.msg.staff{background:var(--violet-soft);border-top-left-radius:3px}
+.msg.staff small{color:var(--violet)}
+.msg.cu{background:var(--green-soft);justify-self:end;border-top-right-radius:3px}
+.msg.cu small{color:var(--green);text-align:right}
+.msg.sysline{justify-self:center;background:transparent;color:var(--muted);font-size:11.5px;padding:2px 10px;border:1px dashed var(--line);border-radius:999px}
+.msg.speaking{box-shadow:0 0 0 2px var(--violet)}
+.msg.cu.speaking{box-shadow:0 0 0 2px var(--green)}
+.pos{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;display:grid;gap:2px;background:var(--sunk)}
+.pos .pk{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.pos b{font-family:var(--mono);font-size:14px}
+.pos small{font-size:11.5px;color:var(--muted)}
+.pos.action{border-style:dashed;border-color:var(--blue);background:var(--blue-soft)}
+.pos.action .pk{color:var(--blue)}
+.pos.line{border-color:var(--ok);background:var(--ok-soft)}
+.pos.line .pk{color:var(--ok)}
+.pos.error{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.pos.error .pk{color:var(--bad)}
+.pos.status{border-color:var(--sand);background:var(--sand-soft)}
+.pos.status .pk{color:var(--sand)}
+.pos.restore{border-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
+.pos.cur{box-shadow:0 0 0 2px var(--flag)}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent.cur{border-color:var(--blue)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;white-space:nowrap}
+.tag.out{background:var(--blue-soft);color:var(--blue)}
+.tag.in{background:var(--violet-soft);color:var(--violet)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.note{background:var(--flag-soft);color:var(--flag)}
+.tag.end{background:var(--ok-soft);color:var(--ok)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.json.req{border-bottom:1px dashed var(--term-line)}
+.json .hl{background:rgba(242,196,139,.18);border-radius:3px;outline:1px solid var(--term-str)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+.devwrap{display:grid;gap:12px;padding:16px;justify-items:center;align-content:start}
+.device{width:min(100%,280px);background:var(--dev);border:2px solid var(--dev-edge);border-radius:28px;padding:16px 14px 22px;display:grid;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.device .brand{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--scr-dim);letter-spacing:.12em}
+.screen{background:var(--scr);color:var(--scr-ink);border-radius:14px;aspect-ratio:3/4;max-width:100%;padding:18px 14px;display:grid;align-content:center;justify-items:center;gap:10px;text-align:center;transition:background .3s}
+.screen .st{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--scr-dim)}
+.screen .sb{font-family:var(--mono);font-size:clamp(22px,2.4vw,30px);font-weight:600;line-height:1.15;overflow-wrap:anywhere}
+.screen .ss{font-size:12.5px;color:var(--scr-dim)}
+.screen.ok{background:#12422D}.screen.ok .ss{color:#BFE6CF}
+.screen.bad{background:#4A1A16}.screen.bad .ss{color:#F2C3BC}
+.screen.wait .sb{animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.6}}
+.reader{height:10px;width:60%;justify-self:center;border-radius:5px;background:var(--dev-edge)}
+.link{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.link i{width:9px;height:9px;border-radius:50%;background:var(--ok);display:block}
+.link.down i{background:var(--bad)}
+.link.down{color:var(--bad)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:540px}
+  .col.dv{grid-column:1 / -1;height:auto}
+}
+@media (max-width:860px){ .board{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:470px}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow">Pelham Hills Golf Club · 카드 단말기 연동 · 2026-10-09</div>
+    <h1>카드 단말기 <b>결제 시뮬레이터</b></h1>
+    <p class="lede">계산대 화면이 DX8000으로 금액을 보내고, 승인 결과를 받아 바로 기록해요. 여섯 가지 장면을 한 단계씩 틀어 보면서 계산대, 뒤에서 오가는 메시지, 단말기 화면을 같이 볼게요.</p>
+  </header>
+
+  <section class="board" aria-label="바뀐 점">
+    <article class="chg" id="c1">
+      <div class="hd"><span class="num">1</span><h3>금액은 버튼으로</h3></div>
+      <div class="ba"><div class="was">DX8000 자판에 <span class="big">33.90</span>직접 입력</div><span class="arr">→</span><div class="now"><span class="big">Send $33.90</span>버튼 한 번</div></div>
+      <small>계산서 합계가 그대로 단말기로 가요. 금액을 잘못 칠 일이 없어요.</small>
+    </article>
+    <article class="chg" id="c2">
+      <div class="hd"><span class="num">2</span><h3>승인 정보는 자동, 바로 저장</h3></div>
+      <div class="ba"><div class="was">전표 보고 <span class="big">006830</span>옮겨 적기</div><span class="arr">→</span><div class="now">승인번호 · 끝 4자리 · 팁 자동</div></div>
+      <small>승인이 나면 Charge 전에 서버에 먼저 저장해요.</small>
+    </article>
+    <article class="chg" id="c3">
+      <div class="hd"><span class="num">3</span><h3>끊겨도, 닫혀도 되찾기</h3></div>
+      <div class="ba"><div class="was">결과를 모르면 다시 긁기</div><span class="arr">→</span><div class="now">단말기에 다시 묻고, 저장된 승인 복구</div></div>
+      <small>확신이 없으면 앱이 멈추고 단말기 화면부터 보라고 해요.</small>
+    </article>
+  </section>
+
+  <nav class="scen" id="scen" aria-label="장면"></nav>
+
+  <div class="bar" role="toolbar" aria-label="재생 제어">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" title="이전 단계 (←)" aria-label="이전 단계"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" title="다음 단계 (→)" aria-label="다음 단계"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button">처음부터</button>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl">속도</span>
+    <div class="seg" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.1">1.1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.2">1.2×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tTalk" checked> 대화 음성</label>
+    <label class="tog"><input type="checkbox" id="tNarr" checked> 한국어 해설 음성</label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> 6개 연속 재생</label>
+    <span class="spacer"></span>
+    <span class="elb" id="elBadge">음성 파일 0 / 0</span>
+    <details class="voices">
+      <summary>캐스팅 · 음성 ▾</summary>
+      <div class="vbox">
+        <div class="cm"><span class="cdot" style="background:var(--violet)"></span><div><b>해설 · 직원 · Hope</b><small>ElevenLabs 경쾌한 여성 목소리. 한국어 해설과 계산대 직원 대사를 같은 목소리로 읽어요.</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--green)"></span><div><b>Daniel Kim · Chris</b><small>단골 · 신용카드 결제, Wi-Fi 끊김</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--flag)"></span><div><b>Megan Lee · Matilda</b><small>스낵바 체크카드 + 팁, 창이 닫힌 장면</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--sand)"></span><div><b>Connor Walton · Will</b><small>카드 거절</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--blue)"></span><div><b>Olivia Park · Sarah</b><small>카드에서 현금으로 바꾸기 (VOID)</small></div></div>
+      </div>
+    </details>
+  </div>
+
+  <div class="cap">
+    <span class="stepno" id="stepno">1 / 1</span>
+    <p id="capText" aria-live="polite"></p>
+    <div class="timer" aria-label="진행 시간">
+      <div class="tline"><span class="tl">이 장면</span><span class="tv" id="tmScen">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl">전체 6개</span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-label="계산대">
+      <div class="callhead">
+        <div class="orb" id="orb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="caller"><b id="cName"></b><span id="cBill"></span></div>
+        <div class="cstat"><span class="pill" id="cStat">대기</span><span class="total" id="cTotal"></span></div>
+      </div>
+      <div class="scroll" id="chatWrap"><div class="chat" id="chat"></div></div>
+    </section>
+    <section class="col" aria-label="뒤에서 일어나는 일">
+      <div class="head"><h2>뒤에서 일어나는 일</h2><span class="mono" style="color:var(--muted);font-size:11px">WebSocket · Supabase</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col dv" aria-label="단말기 화면">
+      <div class="head"><h2>DX8000 화면</h2><span class="link" id="link"><i></i><span id="linkTx"></span></span></div>
+      <div class="scroll"><div class="devwrap">
+        <div class="device" aria-live="polite">
+          <div class="brand"><span>INGENICO AXIUM</span><span>DX8000</span></div>
+          <div class="screen" id="scr"><span class="st" id="scrT"></span><span class="sb" id="scrB"></span><span class="ss" id="scrS"></span></div>
+          <div class="reader" aria-hidden="true"></div>
+        </div>
+      </div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>메시지 이름과 필드는 실제 연동 코드(frontend/lib/pos/terminal.ts, 0019_terminal_payments.sql)와 J.P. Morgan Payment Terminal Application 문서를 따릅니다. 손님 이름, 금액, 승인번호, 참조번호는 예시입니다.</p>
+    <p>실제 단말기 테스트는 J.P. Morgan이 DX8000에 결제 앱을 연동 모드로 설치한 뒤에 합니다. 단축키: Space 재생·일시정지, ← → 단계 이동, 1–5 속도.</p>
+  </footer>
+</div>
+
+<script type="application/json" id="deck">{"terminal": "wss://192.168.1.50:8443", "scenarios": [{"ko": "신용카드 결제", "en": "Card", "station": "Pro shop", "hl": [1, 2], "who": {"name": "Daniel Kim", "short": "Daniel", "voice": "chris"}, "bill": "Bill #318 · 골프 장갑", "total": "$33.90", "steps": [{"k": "ring", "n": "첫 장면은 가장 흔한 경우예요. 단골 다니엘 님이 프로샵에서 골프 장갑 하나를 사요."}, {"k": "staff", "t": "That's thirty-three ninety with tax. Paying by card?"}, {"k": "cu", "t": "Yes, I'll just tap."}, {"k": "pos", "kind": "action", "t": "Card 선택 → Send $33.90 to terminal", "pulse": 1, "n": "예전에는 직원이 단말기에 금액을 손으로 쳤죠. 이제는 버튼 하나면 금액이 단말기로 바로 가요."}, {"k": "ws", "dir": "out", "name": "Transaction · SALE", "req": {"operation": "Transaction", "type": "SALE", "requestedAmount": "3390", "reference": "MGK4Q2A7X1PZ"}, "mark": "reference", "n": "금액은 센트 단위로 가고, 결제마다 고유한 참조번호가 붙어요. 나중에 연결이 끊기면 이 번호로 결과를 다시 찾아요."}, {"k": "term", "screen": {"title": "SALE", "big": "$33.90", "sub": "Tap, insert or swipe", "tone": "wait"}}, {"k": "ws", "dir": "in", "name": "Status", "req": {"operation": "Status", "context": "Communication", "result": "20"}, "mark": "context", "screen": {"title": "SALE", "big": "$33.90", "sub": "Processing…", "tone": "wait"}}, {"k": "ws", "dir": "in", "name": "Transaction · 결과", "req": {"operation": "Transaction", "result": "0", "approval": "approved", "authCode": "006830", "cardBrand": "VISA", "account": "476173******0011", "cardTypeProcessed": "1", "requestedAmount": "3390", "tipAmount": "0", "reference": "MGK4Q2A7X1PZ"}, "mark": "approval", "screen": {"title": "SALE", "big": "APPROVED", "sub": "VISA ****0011 · Auth 006830", "tone": "ok"}, "pulse": 2, "n": "단말기가 승인했어요. 승인번호, 카드 브랜드, 끝 네 자리가 함께 돌아와요. 카드 번호 전체는 단말기 밖으로 나오지 않아요."}, {"k": "rpc", "name": "pelham_staff_terminal_record", "req": {"reference": "MGK4Q2A7X1PZ", "kind": "sale", "approved": true, "requested_amount": 3390, "auth_code": "006830", "card_last4": "0011", "card_type": "credit"}, "res": {"id": 41, "used": false}, "mark": "used", "pulse": 3, "n": "승인이 나자마자, 차지를 누르기 전에 서버에 먼저 저장해요. 이번 업데이트의 핵심 안전장치예요."}, {"k": "pos", "kind": "line", "t": "Card $33.90", "sub": "VISA · Approval 006830 · ****0011 · from terminal", "pulse": 2, "n": "결제 줄이 저절로 채워졌어요. 전표를 보고 승인번호를 옮겨 적을 일이 없어요."}, {"k": "staff", "t": "You're all set, Daniel. Would you like a receipt?"}, {"k": "cu", "t": "No thanks, have a good one."}, {"k": "rpc", "name": "pelham_staff_bill_pay", "req": {"payments": [{"method": "card", "amount": 3390, "terminal_txn": 41}]}, "res": {"receipt_no": "PH-20261009-0012", "entry": "integrated"}, "mark": "terminal_txn", "n": "차지를 누르면 서버가 단말기 기록과 금액이 맞는지 한 번 더 확인하고 영수증 번호를 매겨요."}, {"k": "end", "name": "결제 완료", "res": {"receipt": "PH-20261009-0012", "card": "VISA ****0011", "entry": "integrated"}}]}, {"ko": "체크카드 + 팁", "en": "Debit", "station": "Snack bar", "hl": [1, 2], "who": {"name": "Megan Lee", "short": "Megan", "voice": "matilda"}, "bill": "Bill #322 · 샌드위치 · 커피", "total": "$14.69", "steps": [{"k": "ring", "n": "두 번째는 스낵바예요. 메건 님이 인터락 체크카드로 내고, 단말기에서 팁도 골라요."}, {"k": "staff", "t": "Fourteen sixty-nine. Go ahead on the terminal whenever you're ready."}, {"k": "ws", "dir": "out", "name": "Transaction · SALE", "req": {"operation": "Transaction", "type": "SALE", "requestedAmount": "1469", "reference": "MGK4R8C0N3WT"}}, {"k": "term", "screen": {"title": "ADD A TIP?", "big": "15%  18%  20%", "sub": "Custom · No tip", "tone": "wait"}, "n": "팁은 손님이 단말기 화면에서 직접 골라요. 직원이 팁을 물어볼 필요가 없어요."}, {"k": "cu", "t": "Fifteen percent is good."}, {"k": "term", "screen": {"title": "INTERAC", "big": "$16.89", "sub": "Enter PIN", "tone": "wait"}}, {"k": "ws", "dir": "in", "name": "Transaction · 결과", "req": {"operation": "Transaction", "result": "0", "approval": "approved", "authCode": "551807", "cardBrand": "INTERAC", "cardTypeProcessed": "2", "requestedAmount": "1469", "tipAmount": "220", "totalAmount": "1689", "reference": "MGK4R8C0N3WT"}, "mark": "cardTypeProcessed", "screen": {"title": "SALE", "big": "APPROVED", "sub": "INTERAC · Auth 551807", "tone": "ok"}, "pulse": 2, "n": "카드 유형 2는 체크카드라는 뜻이에요. 앱이 결제 수단을 데빗으로 알아서 바꿔요."}, {"k": "rpc", "name": "pelham_staff_terminal_record", "req": {"reference": "MGK4R8C0N3WT", "kind": "sale", "approved": true, "requested_amount": 1469, "tip": 220, "card_type": "debit"}, "res": {"id": 44, "used": false}, "mark": "tip"}, {"k": "pos", "kind": "line", "t": "Debit $14.69  + tip $2.20", "sub": "INTERAC · Approval 551807 · from terminal", "pulse": 2, "n": "팁은 계산서 합계 밖에 따로 적혀요. 마감 때 직원 팁으로 나뉘는 그 금액이에요."}, {"k": "staff", "t": "Thanks, Megan! Your sandwich will be right up."}, {"k": "end", "name": "결제 완료", "res": {"method": "debit", "amount": "$14.69", "tip": "$2.20"}}]}, {"ko": "거절", "en": "Declined", "station": "Pro shop", "hl": [1], "who": {"name": "Connor Walton", "short": "Connor", "voice": "will"}, "bill": "Bill #325 · 볼 한 다스", "total": "$55.37", "steps": [{"k": "ring", "n": "카드가 거절되면 어떻게 될까요? 코너 님이 골프공 한 다스를 사요."}, {"k": "ws", "dir": "out", "name": "Transaction · SALE", "req": {"operation": "Transaction", "type": "SALE", "requestedAmount": "5537", "reference": "MGK4S1H6D9QB"}}, {"k": "term", "screen": {"title": "SALE", "big": "$55.37", "sub": "Tap, insert or swipe", "tone": "wait"}}, {"k": "ws", "dir": "in", "name": "Transaction · 결과", "req": {"operation": "Transaction", "result": "0", "approval": "declined", "responseCode": "05", "hostMessage": "DO NOT HONOR", "reference": "MGK4S1H6D9QB"}, "mark": "approval", "screen": {"title": "SALE", "big": "DECLINED", "sub": "Do not honor", "tone": "bad"}, "n": "여기서 결과 코드 영은 '작업이 끝났다'는 뜻일 뿐이에요. 승인됐는지는 어프루벌 값으로 봐요. 지금은 거절이에요."}, {"k": "pos", "kind": "error", "t": "Declined — DO NOT HONOR", "n": "결제 줄은 생기지 않고, 계산대에 빨간 안내만 떠요. 돈이 나간 게 없으니 다른 카드로 다시 하면 돼요."}, {"k": "staff", "t": "Sorry, Connor, that card didn't go through. Do you have another one?"}, {"k": "cu", "t": "Huh. Try this one instead."}, {"k": "end", "name": "다시 시도", "res": {"charged": "nothing", "next": "another card"}}]}, {"ko": "결제 취소", "en": "Void", "station": "Pro shop", "hl": [1, 2], "who": {"name": "Olivia Park", "short": "Olivia", "voice": "sarah"}, "bill": "Bill #327 · 모자", "total": "$22.60", "steps": [{"k": "ring", "n": "이번엔 손님이 마음을 바꿨어요. 올리비아 님이 카드로 낸 걸 현금으로 바꾸고 싶대요."}, {"k": "pos", "kind": "line", "t": "Card $22.60", "sub": "VISA · Approval 411922 · ****0329 · from terminal"}, {"k": "cu", "t": "Oh wait, can I pay cash for that instead?"}, {"k": "staff", "t": "Sure, no problem. I'll cancel the card payment first."}, {"k": "pos", "kind": "action", "t": "결제 줄 × → \"Void the $22.60 card payment on the terminal?\" → OK", "n": "이미 승인된 카드 줄을 지우면, 앱이 먼저 단말기에서 그 거래를 취소해요. 돈이 나간 채로 줄만 사라지는 일은 없어요."}, {"k": "ws", "dir": "out", "name": "Transaction · VOID", "req": {"operation": "Transaction", "type": "VOID", "originalAuthCode": "411922", "reference": "MGK4T5J2L8RE"}, "mark": "originalAuthCode"}, {"k": "ws", "dir": "in", "name": "Transaction · 결과", "req": {"operation": "Transaction", "result": "0", "approval": "approved", "type": "VOID", "authCode": "411922"}, "screen": {"title": "VOID", "big": "APPROVED", "sub": "$22.60 returned", "tone": "ok"}}, {"k": "rpc", "name": "pelham_staff_terminal_record", "req": {"kind": "void", "approved": true, "original_auth_code": "411922", "cancels": 52}, "res": {"sale_52": "voided"}, "mark": "cancels", "n": "서버 기록에도 이 승인은 취소됐다고 남겨요. 그래야 나중에 화면을 다시 열어도 되살아나지 않아요."}, {"k": "pos", "kind": "line", "t": "Cash $22.60", "sub": "카드 줄은 지워지고 현금 줄로", "n": "이제 현금으로 받으면 끝이에요. 참고로 체크카드는 보이드가 안 돼서, 이때는 환불로 처리하고 손님이 카드를 한 번 더 대요."}, {"k": "end", "name": "현금으로 결제", "res": {"card": "voided", "cash": "$22.60"}}]}, {"ko": "Wi-Fi 끊김", "en": "Dropped", "station": "Pro shop", "hl": [3], "who": {"name": "Daniel Kim", "short": "Daniel", "voice": "chris"}, "bill": "Bill #331 · 레인 재킷", "total": "$47.46", "steps": [{"k": "ring", "n": "이번엔 장애 상황이에요. 다니엘 님이 카드를 대는 바로 그 순간, 계산대 와이파이가 끊겨요."}, {"k": "ws", "dir": "out", "name": "Transaction · SALE", "req": {"operation": "Transaction", "type": "SALE", "requestedAmount": "4746", "reference": "MGK4V9P1A6KD"}, "mark": "reference"}, {"k": "term", "screen": {"title": "SALE", "big": "APPROVED", "sub": "MASTERCARD ****4410 · Auth 093588", "tone": "ok"}}, {"k": "note", "name": "연결 끊김", "res": {"websocket": "closed", "final_response": "not received"}, "pulse": 3, "n": "단말기는 승인했는데, 계산대는 결과를 못 받았어요. 예전 같으면 직원이 카드를 한 번 더 긁었을지도 몰라요."}, {"k": "pos", "kind": "status", "t": "Lost the terminal — checking what happened…"}, {"k": "ws", "dir": "out", "name": "LastTransaction", "req": {"operation": "LastTransaction"}, "n": "앱은 몇 초 뒤 다시 연결해서, 단말기에 마지막 거래의 결과를 물어봐요."}, {"k": "ws", "dir": "in", "name": "LastTransaction · 결과", "req": {"operation": "LastTransaction", "result": "0", "approval": "approved", "authCode": "093588", "cardBrand": "MASTERCARD", "requestedAmount": "4746", "reference": "MGK4V9P1A6KD"}, "mark": "reference", "pulse": 3, "n": "돌아온 참조번호가 우리가 보낸 번호와 똑같아요. 그러니 이 승인이 바로 방금 우리 거래예요."}, {"k": "rpc", "name": "pelham_staff_terminal_record", "req": {"reference": "MGK4V9P1A6KD", "kind": "sale", "approved": true, "auth_code": "093588"}, "res": {"id": 58, "used": false}}, {"k": "pos", "kind": "line", "t": "Card $47.46", "sub": "MASTERCARD · Approval 093588 · ****4410 · from terminal", "pulse": 2}, {"k": "note", "name": "번호가 다르면", "res": {"result": "uncertain", "screen": "Look at the terminal screen before trying again"}, "n": "만약 번호가 다르거나 확인이 안 되면 앱은 일부러 멈추고, 단말기 화면부터 보라고 안내해요. 이중 결제를 막기 위해서예요."}, {"k": "end", "name": "복구 완료", "res": {"charged": "once", "recovered_by": "LastTransaction"}}]}, {"ko": "창이 닫혀도", "en": "Restore", "station": "Tee sheet", "hl": [2, 3], "who": {"name": "Megan Lee", "short": "Megan", "voice": "matilda"}, "bill": "Bill #334 · 그린피 18홀", "total": "$28.25", "steps": [{"k": "ring", "n": "마지막은 승인 직후, 차지를 누르기 전에 계산대 브라우저가 닫혀 버린 경우예요."}, {"k": "ws", "dir": "in", "name": "Transaction · 결과", "req": {"operation": "Transaction", "result": "0", "approval": "approved", "authCode": "271604", "requestedAmount": "2825", "reference": "MGK4W3E7G2NS"}, "screen": {"title": "SALE", "big": "APPROVED", "sub": "VISA ****7781 · Auth 271604", "tone": "ok"}}, {"k": "rpc", "name": "pelham_staff_terminal_record", "req": {"reference": "MGK4W3E7G2NS", "kind": "sale", "approved": true, "auth_code": "271604"}, "res": {"id": 63, "used": false}, "pulse": 2}, {"k": "note", "name": "탭이 닫힘", "res": {"browser": "closed before Charge", "bill_334": "still open"}, "n": "화면은 사라졌지만, 승인은 이미 서버에 저장돼 있어요."}, {"k": "staff", "t": "Sorry, Megan, one second. My screen just closed on me."}, {"k": "pos", "kind": "action", "t": "다시 열기 → 열린 계산서 #334 선택"}, {"k": "rpc", "name": "pelham_staff_terminal_pending", "req": {"p_bill": 334}, "res": [{"id": 63, "requested_amount": 2825, "auth_code": "271604", "used": false}], "mark": "used", "pulse": 3, "n": "계산서를 다시 열면, 서버에 저장해 둔 승인 중 아직 안 쓴 것을 찾아서 결제 줄로 되살려요."}, {"k": "pos", "kind": "restore", "t": "1 card payment was already approved on the terminal for this bill and is back on the list.", "n": "초록 안내와 함께 결제 줄이 돌아왔어요. 카드를 다시 댈 필요가 없어요."}, {"k": "cu", "t": "No worries. Am I good to go?"}, {"k": "staff", "t": "All done. Enjoy your round!"}, {"k": "end", "name": "정리", "res": {"1": "금액은 버튼으로 단말기에", "2": "승인은 Charge 전에 서버로", "3": "끊기거나 닫혀도 되찾기"}, "n": "정리하면, 금액은 버튼으로 단말기에, 승인은 차지 전에 서버로, 그리고 끊기거나 닫혀도 결과를 되찾아요. 이상하면 그 계산대만 오프로 돌리면 예전 방식 그대로예요."}]}]}</script>
+
+<script>
+(function(){
+"use strict";
+const D=JSON.parse(document.getElementById("deck").textContent);
+const S=D.scenarios;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const clipId=(si,j,narr)=>"s"+pad(si+1)+"-"+pad(j+1)+(narr?"-n":"");
+const talk=st=>st.k==="staff"||st.k==="cu";
+
+/* ---------- audio ---------- */
+const CLIPS=new Map(), DUR=new Map();
+let total=0; S.forEach(s=>s.steps.forEach(st=>{ if(talk(st)) total++; if(st.n) total++; }));
+function badge(){ const b=$("elBadge"); b.textContent="음성 파일 "+CLIPS.size+" / "+total; b.classList.toggle("on",CLIPS.size>0); }
+function probe(id,url){ const a=new Audio(); a.preload="metadata"; a.src=url; a.addEventListener("loadedmetadata",()=>{ if(isFinite(a.duration)){DUR.set(id,a.duration); timers();} }); }
+(async function(){ try{ const r=await fetch("audio/manifest.json"); if(r.ok){ const m=await r.json(); (m.clips||[]).forEach(c=>{CLIPS.set(c.id,"audio/"+c.file); probe(c.id,"audio/"+c.file);}); } }catch(e){} badge(); timers(); })();
+
+let VOICES=[];
+function loadVoices(){ try{ VOICES=speechSynthesis.getVoices()||[]; }catch(e){ VOICES=[]; } }
+if("speechSynthesis" in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function pick(lang){ const pool=VOICES.filter(v=>v.lang&&v.lang.toLowerCase().startsWith(lang)); return pool[0]||null; }
+
+let speed=1, token=0, curAudio=null;
+function stopAudio(){ if(curAudio){ curAudio.pause(); curAudio=null; } try{ speechSynthesis.cancel(); }catch(e){} }
+function est(t,role){ return role==="nr"? t.length/7.5+.4 : t.length/15+.4; }
+function say(id,text,role,my){
+  return new Promise(res=>{
+    if(my!==token) return res();
+    const url=CLIPS.get(id);
+    if(url){ const a=new Audio(url); a.playbackRate=speed; curAudio=a; a.onended=a.onerror=()=>res(); a.play().catch(()=>res()); return; }
+    if(!("speechSynthesis" in window)) return setTimeout(res,est(text,role)*1000/speed);
+    const u=new SpeechSynthesisUtterance(text), ko=role==="nr";
+    u.lang=ko?"ko-KR":"en-US"; const v=pick(ko?"ko":"en"); if(v) u.voice=v; u.rate=Math.min(2,1.05*speed);
+    let done=false; const fin=()=>{ if(!done){done=true;res();} };
+    u.onend=fin; u.onerror=fin; setTimeout(fin,(est(text,role)*1.8+3)*1000/speed);
+    speechSynthesis.speak(u);
+  });
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms/speed));
+
+/* ---------- durations ---------- */
+function base(st){ return st.k==="ws"?1100:st.k==="rpc"?1100:st.k==="term"?1300:st.k==="pos"?1000:st.k==="ring"?900:st.k==="note"?1100:st.k==="end"?900:350; }
+function stepDur(si,j){
+  const st=S[si].steps[j]; let d=0;
+  if(talk(st)&&$("tTalk").checked) d+=DUR.get(clipId(si,j))||est(st.t,"en");
+  if(st.n&&$("tNarr").checked) d+=DUR.get(clipId(si,j,1))||est(st.n,"nr");
+  return (d+base(st)/1000)/speed;
+}
+const scenDur=si=>S[si].steps.reduce((a,_,j)=>a+stepDur(si,j),0);
+const fmt=s=>{ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+":"+pad(s%60); };
+function timers(){
+  const all=S.reduce((a,_,i)=>a+scenDur(i),0);
+  let doneScen=0; for(let j=0;j<step;j++) doneScen+=stepDur(SC,j);
+  let before=0; for(let i=0;i<SC;i++) before+=scenDur(i);
+  $("tmScen").textContent=fmt(doneScen)+" / "+fmt(scenDur(SC));
+  $("tmAll").textContent=fmt(before+doneScen)+" / "+fmt(all);
+  $("tmBar").style.width=(all?((before+doneScen)/all*100):0)+"%";
+}
+
+/* ---------- rendering ---------- */
+let SC=0, step=0, playing=false;
+function json(o,mark){
+  return esc(JSON.stringify(o,null,1)).replace(/&quot;([^&]+?)&quot;:/g,(m,k)=>'<span class="k'+(mark&&k===mark?' hl':'')+'">"'+k+'"</span>:')
+    .replace(/: &quot;(.*?)&quot;/g,(m,v)=>': <span class="s">"'+v+'"</span>')
+    .replace(/[{}\[\]]/g,c=>'<span class="d">'+c+'</span>');
+}
+const IDLE={title:"J.P. MORGAN",big:"Waiting for POS",sub:"Connection ready",tone:"idle"};
+const POSK={action:"직원 조작",line:"결제 줄",error:"계산대 안내",status:"계산대 안내",restore:"되살린 결제"};
+function render(){
+  const sc=S[SC], who=sc.who, cur=sc.steps[step], seen=sc.steps.slice(0,step+1);
+  [...$("scen").children].forEach((c,i)=>c.setAttribute("aria-pressed",i===SC));
+  [1,2,3].forEach(n=>{ $("c"+n).classList.toggle("on",sc.hl.includes(n)); $("c"+n).classList.toggle("pulse",!!(cur&&cur.pulse===n)); });
+  $("cName").textContent=who.name; $("cBill").textContent=sc.station+" · "+sc.bill; $("cTotal").textContent=sc.total;
+  const ended=seen.some(s=>s.k==="end"), st=$("cStat");
+  st.className="pill "+(ended?"ended":"live"); st.textContent=ended?"끝":"계산 중";
+
+  let chat="",log="",screen=IDLE,down=false;
+  seen.forEach((s,j)=>{
+    const isCur=j===step, nw=isCur?" new":"";
+    if(s.k==="ring") chat+='<div class="msg sysline'+nw+'">'+esc(sc.station)+' 계산대 · 손님 도착</div>';
+    if(talk(s)) chat+='<div class="msg '+s.k+nw+(isCur&&playing?' speaking':'')+'"><small>'+(s.k==="staff"?"직원 · Hope":esc(who.short)+" · 손님")+'</small>'+esc(s.t)+'</div>';
+    if(s.k==="pos") chat+='<div class="pos '+s.kind+nw+(isCur?' cur':'')+'"><span class="pk">'+POSK[s.kind]+'</span>'+(s.kind==="line"?'<b>'+esc(s.t)+'</b>':'<span>'+esc(s.t)+'</span>')+(s.sub?'<small>'+esc(s.sub)+'</small>':'')+'</div>';
+    if(s.k==="end") chat+='<div class="msg sysline'+nw+'">'+esc(s.name)+'</div>';
+    if(s.k==="ws"||s.k==="rpc"||s.k==="note"||s.k==="end"){
+      const tg=s.k==="ws"?s.dir:s.k, tl={out:"→ 단말기",in:"← 단말기",rpc:"SUPABASE",note:"참고",end:"END"}[tg];
+      const body=s.k==="ws"?s.req:s.req;
+      log+='<div class="ent'+nw+(isCur?' cur':'')+'"><div class="eh"><span class="tag '+tg+'">'+tl+'</span><span class="tn">'+esc(s.name)+'</span></div>'+
+        (body?'<div class="json'+(s.res?' req':'')+'">'+json(body,s.mark)+'</div>':'')+(s.res?'<div class="json">'+json(s.res,s.mark)+'</div>':'')+'</div>';
+    }
+    if(s.screen) screen=s.screen;
+    if(s.k==="note"&&s.name==="연결 끊김") down=true;
+    if(s.k==="ws"&&s.name==="LastTransaction") down=false;
+  });
+  $("chat").innerHTML=chat||'<div class="empty">재생을 누르면 시작해요</div>';
+  $("log").innerHTML=log||'<div class="empty">아직 오간 메시지가 없어요</div>';
+  ["chatWrap","logWrap"].forEach(id=>{ const el=$(id); el.scrollTop=el.scrollHeight; });
+  const scr=$("scr"); scr.className="screen "+(screen.tone||"idle");
+  $("scrT").textContent=screen.title; $("scrB").textContent=screen.big; $("scrS").textContent=screen.sub;
+  $("link").classList.toggle("down",down); $("linkTx").textContent=down?"연결 끊김":D.terminal.replace("wss://","");
+
+  $("stepno").textContent=(step+1)+" / "+sc.steps.length;
+  const cap=cur.n?cur.n:talk(cur)?cur.t:cur.k==="ws"?(cur.dir==="out"?"단말기로 ":"단말기에서 ")+cur.name:cur.k==="rpc"?cur.name+" 호출":cur.k==="term"?"단말기 화면: "+cur.screen.big:cur.k==="pos"?cur.t:"";
+  const whoLbl=cur.n?"해설":cur.k==="staff"?"직원":cur.k==="cu"?"손님":"시스템";
+  $("capText").innerHTML='<span class="who">'+whoLbl+'</span>'+esc(cap);
+  $("dots").innerHTML=sc.steps.map((s,j)=>'<button type="button" class="dot k-'+s.k+(j<step?' done':'')+(j===step?' now':'')+'" data-j="'+j+'" aria-label="'+(j+1)+'단계"></button>').join("");
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>일시정지':'<svg viewBox="0 0 16 16"><path d="M3 2v12l11-6z"/></svg>재생';
+  timers();
+}
+function orb(who){ const o=$("orb"); if(who) o.dataset.who=who; else delete o.dataset.who; }
+
+/* ---------- playback ---------- */
+async function runStep(my){
+  const st=S[SC].steps[step];
+  render();
+  if(talk(st)&&$("tTalk").checked){ orb(st.k); await say(clipId(SC,step),st.t,st.k,my); }
+  if(my!==token) return;
+  if(st.n&&$("tNarr").checked){ orb("nr"); $("capText").innerHTML='<span class="who">해설</span>'+esc(st.n); await say(clipId(SC,step,1),st.n,"nr",my); }
+  orb(null);
+  if(my!==token) return;
+  await wait(base(st));
+}
+async function loop(){
+  const my=++token; playing=true; render();
+  while(my===token){
+    await runStep(my);
+    if(my!==token) return;
+    if(step<S[SC].steps.length-1) step++;
+    else if($("tAll").checked&&SC<S.length-1){ SC++; step=0; }
+    else { playing=false; token++; render(); return; }
+  }
+}
+function pause(){ token++; playing=false; stopAudio(); orb(null); render(); }
+function go(si,j){ const was=playing; token++; stopAudio(); SC=si; step=Math.max(0,Math.min(j,S[si].steps.length-1)); playing=false; render(); if(was) loop(); }
+
+$("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" data-i="'+i+'"><span class="no">'+pad(i+1)+'</span>'+esc(s.ko)+'<small>'+esc(s.en)+'</small></button>').join("");
+$("scen").addEventListener("click",e=>{ const b=e.target.closest(".chip"); if(b) go(+b.dataset.i,0); });
+$("dots").addEventListener("click",e=>{ const b=e.target.closest(".dot"); if(b) go(SC,+b.dataset.j); });
+$("bPlay").addEventListener("click",()=>playing?pause():loop());
+$("bPrev").addEventListener("click",()=>{ if(step>0) go(SC,step-1); else if(SC>0) go(SC-1,S[SC-1].steps.length-1); });
+$("bNext").addEventListener("click",()=>{ if(step<S[SC].steps.length-1) go(SC,step+1); else if(SC<S.length-1) go(SC+1,0); });
+$("bRestart").addEventListener("click",()=>go(0,0));
+$("speed").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; speed=+b.dataset.v; [...$("speed").children].forEach(x=>x.setAttribute("aria-checked",x===b)); if(curAudio) curAudio.playbackRate=speed; timers(); });
+["tTalk","tNarr"].forEach(id=>$(id).addEventListener("change",timers));
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea,summary")) return;
+  if(e.key===" "){ e.preventDefault(); playing?pause():loop(); }
+  else if(e.key==="ArrowRight") $("bNext").click();
+  else if(e.key==="ArrowLeft") $("bPrev").click();
+  else if(/^[1-5]$/.test(e.key)) $("speed").children[+e.key-1].click();
+});
+render();
+})();
+</script>
+
+</body></html>

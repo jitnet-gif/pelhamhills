@@ -1,0 +1,346 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>티타임 대기자 명단 흐름</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* 레이아웃: 위에서 아래로 흐르는 세 구간(등록 → 자리 찾기 → 답장), 각 구간은 레인 + 단계 카드 */
+:root{
+  --bg:#f3f6f3; --panel:#ffffff; --ink:#15231b; --muted:#5a6b61; --line:#d3ddd6;
+  --green:#1f6b45; --green-soft:#e2efe7; --amber:#b86e00; --amber-soft:#fbefd9;
+  --red:#b23a3a; --red-soft:#f7e3e1; --blue:#2a5f9e; --blue-soft:#e3ecf7;
+  --sans:"IBM Plex Sans KR",system-ui,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1712; --panel:#17221b; --ink:#e4ece6; --muted:#9db0a4; --line:#2c3b32;
+  --green:#6fcf98; --green-soft:#1c3326; --amber:#f0b54d; --amber-soft:#3a2d14;
+  --red:#ef8a84; --red-soft:#3d1f1d; --blue:#8db8ec; --blue-soft:#1b2a3d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1712; --panel:#17221b; --ink:#e4ece6; --muted:#9db0a4; --line:#2c3b32;
+  --green:#6fcf98; --green-soft:#1c3326; --amber:#f0b54d; --amber-soft:#3a2d14;
+  --red:#ef8a84; --red-soft:#3d1f1d; --blue:#8db8ec; --blue-soft:#1b2a3d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:16px;padding-block:32px 56px;display:flex;flex-direction:column;gap:40px}
+h1{font-size:clamp(26px,4.5vw,38px);line-height:1.2;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:22px;margin:0;text-wrap:balance}
+h3{font-size:15px;margin:0}
+p{margin:0}
+.lede{color:var(--muted);max-width:62ch;margin-top:10px}
+code,.mono{font-family:var(--mono);font-size:.88em}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--green);font-weight:700}
+section{display:flex;flex-direction:column;gap:18px}
+.sec-head{display:flex;gap:14px;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:8px}
+.sec-num{font-family:var(--mono);font-weight:600;font-size:22px;color:var(--green)}
+
+/* 상태 띠 */
+.states{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font-family:var(--mono);font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.s-wait{color:var(--green);background:var(--green-soft)}
+.s-off{color:var(--amber);background:var(--amber-soft)}
+.s-book{color:var(--blue);background:var(--blue-soft)}
+.s-exp,.s-can{color:var(--red);background:var(--red-soft)}
+.arrow{color:var(--muted);font-family:var(--mono)}
+
+/* 흐름 */
+.flow{display:grid;gap:12px}
+.lanes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.box .who{font-size:12px;color:var(--muted)}
+.box ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.down{display:flex;justify-content:center;color:var(--muted);font-size:20px;line-height:1}
+.gate{border-left:4px solid var(--green)}
+.hold{border:2px solid var(--amber);background:var(--amber-soft)}
+.note{font-size:13px;color:var(--muted)}
+.checks{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.check{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.check b{font-size:14px}
+.check .fail{font-size:12.5px;color:var(--red)}
+
+/* DB 줄 */
+.row-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow-x:auto}
+.row-card table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+.row-card th,.row-card td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.row-card th{font-family:var(--mono);font-weight:600;color:var(--green);white-space:nowrap;width:1%}
+.row-card tr:last-child td,.row-card tr:last-child th{border-bottom:0}
+.row-card .ex{font-family:var(--mono)}
+.row-cap{font-size:12px;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--line);background:var(--green-soft)}
+
+/* 문자 말풍선 */
+.sms{display:flex;flex-direction:column;gap:8px;max-width:440px}
+.bub{padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.45}
+.bub.in{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px;align-self:flex-start}
+.bub.out{background:var(--green);color:var(--bg);border-bottom-right-radius:4px;align-self:flex-end}
+
+/* 결과 세 갈래 */
+.outcomes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.out{border-top:4px solid var(--line)}
+.out.yes{border-top-color:var(--blue)}
+.out.no,.out.none{border-top-color:var(--red)}
+.timer{display:flex;align-items:center;gap:12px}
+.timer svg{flex:none}
+.two{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;align-items:start}
+.status-box{border:1px dashed var(--amber);border-radius:8px;padding:14px 16px;background:var(--amber-soft);font-size:14px}
+
+@media (max-width:760px){
+  .lanes,.two,.outcomes{grid-template-columns:1fr}
+  .checks{grid-template-columns:1fr 1fr}
+}
+@media (max-width:420px){.checks{grid-template-columns:1fr}}
+
+/* 해설 재생 */
+:root{--hl:#7a4fd6;--hl-soft:rgba(122,79,214,.14);--term:#14201a;--term-ink:#e1ebe4;--term-dim:#87a092;--term-key:#9be0b8}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--hl:#b9a0ff;--hl-soft:rgba(185,160,255,.16);--term:#0a110d;--term-ink:#d9e4dc;--term-dim:#738a7d;--term-key:#9be0b8}}
+:root[data-theme="dark"]{--hl:#b9a0ff;--hl-soft:rgba(185,160,255,.16);--term:#0a110d;--term-ink:#d9e4dc;--term-dim:#738a7d;--term-key:#9be0b8}
+.lanes.three{grid-template-columns:repeat(3,1fr)}
+.player{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--term);color:var(--term-ink);border-radius:12px;padding:12px 14px;display:grid;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.pctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pbtn{font:inherit;font-weight:700;font-size:13px;height:36px;min-width:36px;padding:0 12px;border-radius:8px;border:1px solid var(--term-dim);background:transparent;color:var(--term-ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.pbtn.main{background:var(--hl);border-color:var(--hl);color:#fff;min-width:118px}
+.pbtn:hover{border-color:var(--term-ink)}
+.pbtn:focus-visible,.pdot:focus-visible,.speed button:focus-visible{outline:2px solid var(--term-key);outline-offset:2px}
+.pbtn svg{width:13px;height:13px;fill:currentColor}
+.speed{display:inline-flex;border:1px solid var(--term-dim);border-radius:8px;overflow:hidden}
+.speed button{font:inherit;font-family:var(--mono);font-size:12px;font-weight:600;border:0;background:transparent;color:var(--term-ink);height:34px;padding:0 10px;cursor:pointer}
+.speed button[aria-checked="true"]{background:var(--term-ink);color:var(--term)}
+.who{font-size:11.5px;color:var(--term-dim);margin-left:auto;display:flex;align-items:center;gap:8px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:16px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-dim);display:block}
+.player.on .eq i{background:var(--term-key);animation:eq .8s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.3s}.eq i:nth-child(4){animation-delay:.1s}
+@keyframes eq{0%,100%{height:4px}50%{height:15px}}
+.pcap{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start}
+.pno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:2px 8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pcap p{font-size:clamp(15px,1.8vw,17px);font-weight:500;line-height:1.5;min-height:3em}
+.pdots{display:flex;flex-wrap:wrap;gap:4px}
+.pdot{width:22px;height:6px;border-radius:3px;border:0;padding:0;background:#33463b;cursor:pointer}
+.pdot.done{background:var(--term-dim)}
+.pdot.now{background:var(--term-key);transform:scaleY(1.6)}
+.tg{transition:box-shadow .3s;scroll-margin-top:230px}
+.tg.lit{box-shadow:0 0 0 3px var(--hl),0 0 0 8px var(--hl-soft);border-radius:10px}
+@media (max-width:760px){.lanes.three{grid-template-columns:1fr}.who{margin-left:0;width:100%}.tg{scroll-margin-top:290px}}
+@media (prefers-reduced-motion:reduce){.player.on .eq i{animation:none;height:10px}.tg{transition:none}}
+</style>
+
+<div class="wrap">
+  <header id="t-head" class="tg">
+    <div class="eyebrow">Pelham Hills · 티타임 대기자 명단</div>
+    <h1>대기자 명단은 이렇게 만들어지고, 이렇게 자리를 받는다</h1>
+    <p class="lede">그날 티타임이 다 찼을 때, 손님이 먼저 원하면 <code>pelham_tee_waitlist</code> 표에 한 줄이 생깁니다. 자리가 비면 먼저 온 사람에게 15분 동안 자리를 잡아 두고 문자를 보냅니다.</p>
+  </header>
+  <div class="player" id="player" role="region" aria-label="음성 해설">
+    <div class="pctl">
+      <button class="pbtn main" id="pPlay" type="button">▶ 해설 듣기</button>
+      <button class="pbtn" id="pPrev" type="button" aria-label="이전" title="이전 (←)"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+      <button class="pbtn" id="pNext" type="button" aria-label="다음" title="다음 (→)"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+      <button class="pbtn" id="pRestart" type="button">처음부터</button>
+      <div class="speed" id="pSpeed" role="radiogroup" aria-label="속도">
+        <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+        <button type="button" role="radio" aria-checked="false" data-v="1.2">1.2×</button>
+        <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      </div>
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="pWho">해설 · Hope (경쾌한 여성 목소리)</span></span>
+    </div>
+    <div class="pcap"><span class="pno" id="pNo">1 / 16</span><p id="pCap" aria-live="polite">안녕하세요! 오늘은 펠햄힐스 티타임 대기자 명단이 어떻게 만들어지고, 빈자리가 어떻게 다시 채워지는지 같이 볼게요.</p></div>
+    <div class="pdots" id="pDots"></div>
+  </div>
+
+
+  <div class="box tg" id="t-states" style="gap:10px">
+    <h3>한 줄의 일생 (status 칸)</h3>
+    <div class="states">
+      <span class="chip s-wait">waiting</span><span class="arrow">→</span>
+      <span class="chip s-off">offered</span><span class="arrow">→</span>
+      <span class="chip s-book">booked</span>
+      <span class="arrow">또는</span><span class="chip s-exp">expired</span>
+      <span class="arrow">또는</span><span class="chip s-can">cancelled</span>
+    </div>
+    <p class="note">waiting 기다리는 중 · offered 자리를 잡아 두고 문자 보냄 · booked YES 로 예약됨 · expired 15분 안에 답 없음 · cancelled NO 로 답함</p>
+  </div>
+
+  <!-- 1. 등록 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">1</span><h2>등록: 줄이 생기는 순간</h2></div>
+
+    <div class="flow">
+      <div class="lanes tg" id="t-lanes1">
+        <div class="box">
+          <div class="who">입구 ①</div>
+          <h3>전화 AI 비서 (ElevenLabs)</h3>
+          <p class="note"><code>find_tee_times</code> 결과가 비면 "다른 날" 또는 "대기자 명단"을 제안. 손님이 예라고 할 때만 <code>join_waitlist</code> 도구를 부릅니다.</p>
+        </div>
+        <div class="box">
+          <div class="who">입구 ②</div>
+          <h3>문자 예약 비서</h3>
+          <p class="note">그날이 꽉 찼고 손님이 "자리 나면 알려 달라"고 할 때만 같은 <code>join_waitlist</code> 도구를 부릅니다. 보낸 번호가 곧 연락처.</p>
+        </div>
+      </div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="box gate tg" id="t-gate1">
+        <h3><code>POST /voice/tools/join-waitlist</code></h3>
+        <p class="note">두 입구 모두 이 한 함수(<code>voice.join_waitlist</code>)로 모입니다. 받는 값: 날짜, 인원 1–4, 성(필수), 이름, 원하는 시간대(earliest·latest), 9/18홀, 전화번호.</p>
+      </div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="checks tg" id="t-checks1">
+        <div class="check"><b>날짜 확인</b><span class="note">"tomorrow"도 실제 날짜로 바꾸고, 예약 가능한 날인지 봅니다.</span></div>
+        <div class="check"><b>시간대 형식</b><span class="note"><code>9:00 AM</code> 꼴만 받음.</span><span class="fail">"9am" → 422. 그냥 저장하면 시간대 조건이 조용히 무시되기 때문.</span></div>
+        <div class="check"><b>전화번호 있음</b><span class="note">발신번호로 문자를 보내야 하므로 필수.</span><span class="fail">없으면 422, 프로샵 연결 안내.</span></div>
+        <div class="check"><b>중복 아님</b><span class="note">같은 번호가 같은 날 이미 waiting 이면 새 줄을 만들지 않고 "이미 등록됨"이라고 답합니다.</span></div>
+      </div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="two">
+        <div class="row-card tg" id="t-row">
+          <div class="row-cap">insert 되는 한 줄 (예시 값)</div>
+          <table>
+            <tr><th>date</th><td class="ex">2026-10-11</td></tr>
+            <tr><th>earliest / latest</th><td><span class="ex">9:00 AM / 11:30 AM</span><br><span class="note">비우면 그날 아무 때나</span></td></tr>
+            <tr><th>party_size · holes</th><td class="ex">2 · 18</td></tr>
+            <tr><th>last_name · first_name</th><td class="ex">Lee · Sam</td></tr>
+            <tr><th>phone</th><td class="ex">+1905…</td></tr>
+            <tr><th>status</th><td><span class="chip s-wait">waiting</span></td></tr>
+            <tr><th>consented_at</th><td>등록 요청 시각 = 문자 수신 동의 시각</td></tr>
+            <tr><th>created_at</th><td>줄 순서의 기준 (먼저 온 사람 먼저)</td></tr>
+          </table>
+        </div>
+        <div class="box tg" id="t-rules">
+          <h3>등록 규칙</h3>
+          <ul>
+            <li>손님이 <b>먼저 요청할 때만</b> 넣습니다. 번호를 보관하고 문자를 보내는 일이라서입니다.</li>
+            <li>표는 service_role 로만 접근(RLS 켜짐). 웹 화면이나 직원 화면에서 등록하는 길은 아직 없습니다.</li>
+            <li>실내 골프(시뮬레이터)는 대기자 명단이 없습니다.</li>
+            <li>등록 직후 손님에게 "자리가 나면 15분 잡아 두고 문자, YES 로 예약"이라고 안내합니다.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 자리 찾기 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">2</span><h2>자리가 비면: 잡아 두고 문자</h2></div>
+    <div class="flow">
+      <div class="lanes three tg" id="t-lanes2">
+        <div class="box"><div class="who">깨우는 것 ①</div><h3>1분 루프</h3><p class="note">서버 시작 때 도는 <code>_reminder_loop</code>. 웹 손님 취소·직원 취소처럼 서버가 모르는 취소도 여기서 잡힙니다.</p></div>
+        <div class="box"><div class="who">깨우는 것 ②</div><h3>전화 취소 직후</h3><p class="note"><code>cancel_booking</code> 이 끝나면 바로 한 번 더.</p></div>
+        <div class="box"><div class="who">깨우는 것 ③</div><h3>문자 "C 코드" 취소 · NO 답장 직후</h3><p class="note">다음 사람이 1분을 기다리지 않게.</p></div>
+      </div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="box gate tg" id="t-gate2">
+        <h3><code>waitlist_offers.sweep()</code> 한 번 돌 때</h3>
+        <ul>
+          <li>15분이 지난 offered 줄은 <span class="chip s-exp">expired</span> 로 넘깁니다.</li>
+          <li>클럽 시각 <b>오전 7시 – 오후 9시</b>에만 새 제안. 새벽에 난 자리는 아침 첫 패스가 겁니다.</li>
+          <li>날짜별로, 먼저 등록한 사람부터 그 사람에게 맞는 <b>그날 첫 슬롯</b>을 찾습니다.</li>
+        </ul>
+      </div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="checks tg" id="t-checks2">
+        <div class="check"><b>시간대 안</b><span class="note">earliest–latest 사이 (분으로 비교).</span></div>
+        <div class="check"><b>막힌 시각 아님</b><span class="note">직원이 blocked 로 막은 티타임은 건너뜀.</span></div>
+        <div class="check"><b>여유 시간</b><span class="note">티오프가 지금 + 15분 홀드 + 2시간 이후.</span></div>
+        <div class="check"><b>정원</b><span class="note">4명 − 이미 찬 인원 ≥ 대기 인원.</span></div>
+      </div>
+      <div class="note">한 번호에 살아 있는 제안은 하나만. 수신 거부(STOP)한 번호는 건너뜁니다.</div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="two">
+        <div class="box hold tg" id="t-hold">
+          <div class="timer">
+            <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true">
+              <circle cx="27" cy="27" r="22" fill="none" stroke="var(--line)" stroke-width="6"/>
+              <circle cx="27" cy="27" r="22" fill="none" stroke="var(--amber)" stroke-width="6" stroke-dasharray="138.2" stroke-dashoffset="0" transform="rotate(-90 27 27)"/>
+              <text x="27" y="32" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" font-weight="600" fill="var(--ink)">15</text>
+            </svg>
+            <div>
+              <h3>자리를 15분 잡아 둠</h3>
+              <p class="note">티 시트에 진짜 예약 레코드(<code>source = voice_hold</code>, 회색, 인원만큼 Guest)를 넣고 <code>holdExpiresAt</code> 을 15분 뒤로. 그동안 웹·전화에서는 그 자리가 안 보입니다. notes 의 <code>waitlist:&lt;id&gt;</code> 로 대기 줄과 연결.</p>
+            </div>
+          </div>
+        </div>
+        <div class="flow" style="gap:8px">
+          <p class="note">그다음 대기 줄을 <span class="chip s-wait">waiting</span> → <span class="chip s-off">offered</span> 로 바꾸고 문자를 보냅니다 (동시에 두 패스가 돌면 진 쪽이 홀드를 걷음).</p>
+          <div class="sms tg" id="t-sms" aria-label="문자 예시">
+            <div class="bub in">Pelham Hills Golf Club: a tee time opened on Sunday, October 11 at 9:43 AM for 2 players. We're holding it for you for 15 minutes. Reply YES to book it, or NO to pass.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 답장 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">3</span><h2>손님 답장: 세 갈래</h2></div>
+    <p class="note">짧은 답(3단어 이하)의 첫 단어만 봅니다. "Yes but can I do 10am" 은 예약으로 읽지 않습니다. 이 번호에 걸린 제안이 없으면 문자 비서가 대화를 이어받습니다.</p>
+    <div class="outcomes">
+      <div class="box out yes tg" id="t-yes">
+        <div class="who">YES · Y · BOOK</div>
+        <h3>예약 확정</h3>
+        <p class="note">홀드를 진짜 예약으로 바꿈: 첫 플레이어에 손님 이름·번호, 파란색, <code>source = voice</code>(리마인더·"C 코드" 취소 그대로). 카트는 묻지 않았으니 체크인 때 확인하라고 직원 메모.</p>
+        <div><span class="chip s-book">booked</span></div>
+        <div class="sms"><div class="bub out">Pelham Hills: booked 2 players, Sunday, October 11 at 9:43 AM. Code 7F3A21. Reply C 7F3A21 to cancel.</div></div>
+      </div>
+      <div class="box out no tg" id="t-no">
+        <div class="who">NO · N · PASS</div>
+        <h3>넘김</h3>
+        <p class="note">홀드를 바로 지우고, 즉시 다음 패스를 돌려 다음 대기자에게 같은 자리를 겁니다. 이 손님은 그날 명단에서 빠집니다.</p>
+        <div><span class="chip s-can">cancelled</span></div>
+      </div>
+      <div class="box out none tg" id="t-none">
+        <div class="who">15분 동안 답 없음</div>
+        <h3>다음 사람에게</h3>
+        <p class="note">홀드가 저절로 만료돼 정원 계산에서 빠지고, 다음 패스가 줄을 expired 로 바꾼 뒤 같은 자리를 다음 대기자에게 겁니다. 늦게 YES 를 보내면 "다음 분께 넘어갔다"는 답장.</p>
+        <div><span class="chip s-exp">expired</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="status-box tg" id="t-status">
+    <b>지금 상태 (2026-10-06)</b> — 등록(1단계)과 표 <code>0014</code> 는 운영 중입니다. 15분 홀드 + YES 확정(2·3단계, <code>waitlist_offers.py</code>)은 작업 트리에만 있고 아직 커밋·배포 전입니다. 문자 발송은 Twilio 가 켜져 있을 때만 돕니다.
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const N=[{"id": "n01", "target": "t-head", "t": "안녕하세요! 오늘은 펠햄힐스 티타임 대기자 명단이 어떻게 만들어지고, 빈자리가 어떻게 다시 채워지는지 같이 볼게요."}, {"id": "n02", "target": "t-states", "t": "대기자 한 줄은 상태가 다섯 가지예요. 기다리는 중, 자리를 제안받은 중, 그리고 마지막은 예약됨, 만료, 취소 중 하나로 끝나요."}, {"id": "n03", "target": "t-lanes1", "t": "먼저 등록부터요. 입구는 두 개예요! 전화 AI 비서랑 문자 예약 비서. 그날이 꽉 찼고, 손님이 먼저 원할 때만 대기자로 올려요."}, {"id": "n04", "target": "t-gate1", "t": "두 입구 모두 똑같은 함수 하나, 조인 웨이트리스트로 모여요."}, {"id": "n05", "target": "t-checks1", "t": "저장하기 전에 네 가지를 확인해요. 날짜가 맞는지, 시간대를 정해진 형식으로 적었는지, 문자 보낼 번호가 있는지, 그리고 같은 날 이미 줄을 서 있지 않은지요."}, {"id": "n06", "target": "t-row", "t": "다 통과하면 표에 한 줄이 쏙 생겨요. 상태는 웨이팅이고, 등록한 시각이 문자 수신 동의 시각으로 남아요. 순서는 먼저 온 사람이 먼저!"}, {"id": "n07", "target": "t-rules", "t": "참고로 웹이나 직원 화면에서 등록하는 길은 아직 없고요, 실내 골프에는 대기자 명단이 없어요."}, {"id": "n08", "target": "t-lanes2", "t": "이제 자리가 비었을 때예요. 서버가 1분마다 빈자리를 살펴보고, 전화나 문자로 취소가 들어오면 기다리지 않고 바로 한 번 더 봐요."}, {"id": "n09", "target": "t-gate2", "t": "제안 문자는 아침 7시부터 저녁 9시 사이에만 보내요. 새벽에 문자 받으면 곤란하잖아요? 그리고 먼저 등록한 사람부터, 그 사람한테 맞는 첫 자리를 찾아요."}, {"id": "n10", "target": "t-checks2", "t": "맞는 자리의 조건은 네 가지예요. 원하는 시간대 안이고, 막힌 시각이 아니고, 티오프까지 두 시간 십오 분 넘게 남았고, 인원이 다 들어갈 것!"}, {"id": "n11", "target": "t-hold", "t": "찾았다! 그 자리를 15분 동안 찜해 둬요. 티시트에 회색 홀드가 들어가서, 그동안은 웹이나 전화에서 아무도 못 가져가요."}, {"id": "n12", "target": "t-sms", "t": "그리고 손님한테 문자가 슝 날아가요. 15분 동안 잡아 뒀으니, 예스라고 답하면 바로 예약된다고요."}, {"id": "n13", "target": "t-yes", "t": "손님이 예스라고 답하면? 홀드가 진짜 예약으로 바뀌고, 확인 코드가 담긴 문자가 바로 가요."}, {"id": "n14", "target": "t-no", "t": "노라고 답하면 잡아 둔 자리를 바로 풀어서, 다음 대기자한테 넘겨요."}, {"id": "n15", "target": "t-none", "t": "15분 동안 답이 없으면 만료! 그 자리는 자동으로 다음 사람한테 가요. 사람 손 하나 안 대고 빈자리가 다시 채워지는 거죠."}, {"id": "n16", "target": "t-status", "t": "마지막으로 지금 상태예요. 대기자 등록은 벌써 쓰고 있고, 15분 홀드랑 예스 확정은 아직 배포 전이에요. 들어 주셔서 고마워요!"}];
+const $=id=>document.getElementById(id);
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+let idx=0,playing=false,run=0,audio=null,rate=1;
+const dots=N.map((n,i)=>{const b=document.createElement("button");b.type="button";b.className="pdot";b.setAttribute("aria-label",(i+1)+"번째 해설");b.onclick=()=>go(i,playing);$("pDots").appendChild(b);return b});
+function show(i,scroll){
+  idx=Math.max(0,Math.min(N.length-1,i));
+  $("pNo").textContent=(idx+1)+" / "+N.length;
+  $("pCap").textContent=N[idx].t;
+  dots.forEach((d,j)=>{d.classList.toggle("now",j===idx);d.classList.toggle("done",j<idx)});
+  document.querySelectorAll(".tg.lit").forEach(e=>e.classList.remove("lit"));
+  const el=$(N[idx].target);
+  if(el){el.classList.add("lit");if(scroll!==false)el.scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"})}
+}
+function stop(){run++;if(audio){audio.onended=null;audio.pause();audio=null}if("speechSynthesis" in window)speechSynthesis.cancel()}
+function setPlaying(v){playing=v;$("pPlay").textContent=v?"❚❚ 일시정지":(idx>0?"▶ 이어 듣기":"▶ 해설 듣기");$("player").classList.toggle("on",v)}
+function speakFallback(text,my,done){
+  if(!("speechSynthesis" in window)){setTimeout(()=>my===run&&done(),Math.max(2500,text.length*120/rate));return}
+  const u=new SpeechSynthesisUtterance(text);u.lang="ko-KR";u.rate=rate;u.pitch=1.15;
+  const ko=speechSynthesis.getVoices().filter(v=>/^ko/i.test(v.lang));
+  u.voice=ko.find(v=>/female|SunHi|Sun-Hi|Yuna|Heami|여성/i.test(v.name))||ko[0]||null;
+  u.onend=()=>my===run&&done();u.onerror=()=>my===run&&done();
+  speechSynthesis.speak(u);
+}
+function playStep(){
+  const my=++run,n=N[idx];
+  const next=()=>{if(my!==run)return;if(idx<N.length-1){show(idx+1);setTimeout(()=>{if(my===run)playStep()},400)}else{setPlaying(false)}};
+  const a=new Audio("audio/"+n.id+".mp3");audio=a;a.playbackRate=rate;a.preservesPitch=true;a.onended=next;
+  a.play().catch(()=>{if(my!==run)return;audio=null;$("pWho").textContent="해설 · 브라우저 음성(대체)";speakFallback(n.t,my,next)});
+}
+function go(i,keep){stop();show(i);setPlaying(keep);if(keep)playStep()}
+$("pPlay").onclick=()=>{if(playing){stop();setPlaying(false)}else{setPlaying(true);show(idx);playStep()}};
+$("pPrev").onclick=()=>go(idx-1,playing);
+$("pNext").onclick=()=>go(idx+1,playing);
+$("pRestart").onclick=()=>go(0,true);
+$("pSpeed").querySelectorAll("button").forEach(b=>b.onclick=()=>{rate=+b.dataset.v;$("pSpeed").querySelectorAll("button").forEach(x=>x.setAttribute("aria-checked",String(x===b)));if(audio)audio.playbackRate=rate});
+document.addEventListener("keydown",e=>{if(e.target.closest&&e.target.closest("input,textarea,select,button"))return;
+  if(e.key===" "){e.preventDefault();$("pPlay").click()}else if(e.key==="ArrowRight")$("pNext").click();else if(e.key==="ArrowLeft")$("pPrev").click()});
+show(0,false);
+})();
+</script>
+
+</body></html>

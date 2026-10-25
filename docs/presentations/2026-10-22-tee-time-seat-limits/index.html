@@ -1,0 +1,809 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Tee Time Seat Limits</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- membership sale mocks (prefixed ms-) ---- */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px}
+.seg.lang svg{width:20px;height:18px;flex:0 0 auto}
+.seg.lang svg path{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.seg.lang svg text{fill:currentColor;font-family:var(--sans);font-weight:700;font-size:8.5px}
+.ms-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:8px}
+.ms-file{border:1px solid var(--scr-line);background:var(--scr-paper);padding:9px;display:grid;gap:7px;align-content:start}
+.ms-file .hd{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
+.ms-file .hd small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-file .hd b{font-size:14px}
+.ms-file .btns{display:grid;gap:4px;justify-items:end}
+.ms-file dl{margin:0;display:grid;gap:5px;font-size:10.5px}
+.ms-file dt{font-weight:700;color:var(--scr-muted)}
+.ms-file dd{margin:0}
+.ms-tagm{font-size:9px;font-weight:700;padding:1px 6px;background:#ECECF0;color:#4E5560}
+.ms-tagm.on{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.ms-red{color:var(--scr-red);font-weight:700}
+.ms-okt{color:var(--scr-ok);font-weight:700}
+.ms-modal{background:var(--scr-paper);width:min(440px,100%);max-height:100%;overflow:hidden;display:grid;gap:7px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.ms-modal small.ey{font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-modal h4{margin:0;font-size:14px}
+.ms-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ms-dates div{display:grid;gap:2px;font-size:9px;font-weight:700;color:var(--scr-muted)}
+.ms-dates span{border:1px solid var(--scr-line);padding:4px 5px;font-weight:400;color:var(--scr-ink);font-size:10.5px;font-family:var(--mono)}
+.ms-dates span.off{background:#F7F7F8}
+.ms-dates span.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.2)}
+.ms-list{border:1px solid var(--scr-line);max-height:170px;overflow:hidden}
+.ms-list div{display:flex;justify-content:space-between;gap:6px;padding:4px 7px;border-bottom:1px solid #EEF0F2;font-size:10.5px}
+.ms-list div i{font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ms-list div.pick{background:var(--scr-accent);color:#fff;font-weight:700}
+.ms-foot{display:flex;justify-content:flex-end;gap:5px}
+.ms-note{font-size:9px;color:var(--scr-muted);text-align:right}
+.ms-map{display:grid;gap:6px;padding:4px}
+.ms-map .rw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center;font-size:10.5px}
+.ms-map .rw span{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 7px;min-width:0}
+.ms-map .rw span b{display:block;font-size:11px}
+.ms-map .rw span small{display:block;color:var(--scr-muted);font-size:9px}
+.ms-map .rw em{font-style:normal;text-align:center;color:var(--scr-accent);font-weight:700}
+.ms-map .hd{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.ms-map .rw.hot span:last-child{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-paid{background:var(--scr-ok-soft);color:var(--scr-ok);padding:8px;display:grid;gap:2px;font-size:11px}
+.ms-paid b{font-size:13px}
+.ms-rule{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px 8px;display:grid;gap:2px;font-size:10.5px}
+.ms-rule b{font-size:11px}
+.ms-rule.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-rule.warn{border-color:#E2A5A5;background:var(--scr-red-soft)}
+@media (max-width:560px){.ms-grid{grid-template-columns:minmax(0,1fr)}.ms-dates{grid-template-columns:minmax(0,1fr)}}
+.ph.pick{background:var(--violet-soft);color:var(--violet)}
+.ph.pay{background:var(--blue-soft);color:var(--blue)}
+.lnote{font-size:12px;color:var(--muted)}
+/* ---- tee capacity (ts-) ---- */
+.ph.rule{background:var(--green-soft);color:var(--green)}
+.ph.guest{background:var(--blue-soft);color:var(--blue)}
+.ph.desk{background:var(--violet-soft);color:var(--violet)}
+.ts-strip{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin:8px 0}
+.ts-seat{border:1px solid var(--scr-line);background:var(--scr-paper);min-height:46px;display:grid;align-content:space-between;padding:3px 4px}
+.ts-seat.x{border-style:dashed}
+.ts-seat small{font-size:9px;color:var(--scr-muted)}
+.ts-seat b{font-size:9px;font-family:var(--mono)}
+.ts-seat.on.w{background:#E2ECF5;color:#2D5E8C;border-color:#2D5E8C}
+.ts-seat.on.p{background:#E6F4EA;color:#1F6B3A;border-color:#1F6B3A}
+.ts-seat.on.c{background:var(--scr-accent-soft);color:var(--scr-accent);border-color:var(--scr-accent)}
+.ts-bands{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ts-band{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 7px;display:grid;gap:2px;font-size:10.5px;opacity:.45;transition:opacity .3s}
+.ts-band.on{opacity:1}
+.ts-band.std.on{border-color:#2D5E8C;background:#E2ECF5}
+.ts-band.ext.on{border-color:var(--scr-accent);background:var(--scr-accent-soft);border-style:dashed}
+.ts-band b{font-family:var(--mono);font-size:12px}
+.ts-who{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:8px}
+.ts-who div{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:1px;font-size:10.5px;opacity:.45}
+.ts-who div.on{opacity:1}
+.ts-who b{font-size:13px}
+.ts-pub{background:#FBF9F4;padding:10px;display:grid;gap:6px;color:#1F2328}
+.ts-pub .hd{display:flex;justify-content:space-between;gap:6px;align-items:baseline;flex-wrap:wrap}
+.ts-pub .hd span{font-size:10.5px;color:#6B7280}
+.ts-slot{display:flex;justify-content:space-between;align-items:center;gap:6px;border:1px solid #D8D1C3;background:#fff;padding:7px 9px;font-size:11px}
+.ts-slot small{display:block;font-size:9.5px;color:#6B7280}
+.ts-slot.hot{border-color:#2F5D3A;box-shadow:0 0 0 2px rgba(47,93,58,.25)}
+.ts-gone{font-size:10.5px;color:#8A1F1F;margin:0}
+.ts-call{display:grid;gap:6px}
+.ts-call div{max-width:85%;padding:6px 8px;font-size:11px;animation:rise .35s ease-out}
+.ts-call div small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
+.ts-call .c{justify-self:start;background:var(--scr-paper);border:1px solid var(--scr-line)}
+.ts-call .a{justify-self:end;background:var(--scr-accent);color:#fff}
+.ts-code{font-family:var(--mono);font-size:10px;overflow-wrap:anywhere}
+.ts-mini{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+.ts-mini span{border:1px solid var(--line);text-align:center;font-family:var(--mono);font-size:11px;padding:4px 0;color:var(--muted)}
+.ts-mini span.x{border-style:dashed}
+.ts-mini span.on{font-weight:700;color:var(--fg,inherit)}
+.ts-mini span.on.w{background:var(--blue-soft);color:var(--blue)}
+.ts-mini span.on.p{background:var(--ok-soft);color:var(--ok)}
+.ts-mini span.on.c{background:var(--violet-soft);color:var(--violet)}
+@media (max-width:560px){.ts-bands,.ts-who{grid-template-columns:minmax(0,1fr)}}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Vercel · Supabase RPC · Stripe</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 티타임 정원 · 나레이터 프레젠테이션",
+  h1:"한 티타임 8자리, 그중 <b>4자리만 온라인·전화</b>",
+  lede:"티시트는 한 티타임에 8명까지 받아요. 앞 4자리는 온라인 예약, 전화 예약, 카운터 어디서나 잡을 수 있고, 뒤 4자리는 카운터 직원만 넣을 수 있어요. 왼쪽은 화면, 가운데는 뒤에서 하는 검사, 오른쪽은 8:00 AM 티타임의 자리판이에요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 7장면",laneScreen:"화면",laneLog:"뒤에서 일어나는 일",laneLedger:"8:00 AM 자리판",
+  ledgerSub:"pelham_tee_bookings · 같은 시각 인원 합계",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 검사가 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"이름과 시각은 예시예요. 규칙은 2026-10-20 마이그레이션 0052_staff_eight_players.sql과 backend/api/routes/tee_sheet.py(손님 4 · 직원 8), voice.py, 온라인 빈자리 계산 0051을 기준으로 했어요. 2026-10-22에 코드를 읽어 확인했고, 실제 예약으로 다시 해 본 것은 아니에요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Tee time capacity · narrated walkthrough",
+  h1:"Eight seats per tee time, <b>four online and by phone</b>",
+  lede:"The tee sheet holds up to 8 players per tee time. The first 4 seats can be booked online, by phone or at the counter. The last 4 can only be added by counter staff. Left: the screen. Middle: the checks behind it. Right: the seat board for the 8:00 AM tee time.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 7 scenes",laneScreen:"Screen",laneLog:"Behind the scenes",laneLedger:"8:00 AM seat board",
+  ledgerSub:"pelham_tee_bookings · players at one time",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Checks appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. The speech-bubble buttons (가 / Aa) restart the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Names and times are examples. The rules follow migration 0052_staff_eight_players.sql (2026-10-20), backend/api/routes/tee_sheet.py (guests 4 · staff 8), voice.py and the online availability in 0051. Checked by reading the code on 2026-10-22, not by booking again."}
+};
+
+const L=(ko,en)=>({ko,en});
+const SRC={w:{ko:"온라인",en:"Online"},p:{ko:"전화",en:"Phone"},c:{ko:"카운터",en:"Counter"}};
+const used=s=>s.replace(/\./g,"").length;
+function frame(url,title,tab,body){return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app'+url+'</span></div><div class="posbar"><span><small>PELHAM HILLS</small><b>'+title+'</b></span><span class="st">'+tab+'</span></div><div class="posbody">'+body+'</div></div>'}
+
+/* 8자리 띠 */
+function strip(s,hot){
+ return '<div class="ts-strip">'+s.split("").map((c,i)=>'<div class="ts-seat '+(c==="."?"":"on "+c)+(i>=4?" x":"")+(hot===i?" hot":"")+'"><small>'+(i+1)+'</small><b>'+(c==="."?"":({w:"WEB",p:"TEL",c:"DESK"})[c])+'</b></div>').join("")+'</div>';
+}
+function ruleScreen(p){
+ const s="........";
+ const k=LANG;
+ const a=p>.25,b=p>.55;
+ return frame("/teesheet","8:00 AM · Tue Oct 27","Tee sheet",
+  '<div class="sh">'+(k==="ko"?"한 티타임의 자리":"Seats in one tee time")+'</div>'+strip(s)+
+  '<div class="ts-bands"><div class="ts-band std'+(a?" on":"")+'"><b>1 – 4</b><span>'+(k==="ko"?"온라인 · 전화 · 카운터":"Online · Phone · Counter")+'</span></div>'+
+  '<div class="ts-band ext'+(b?" on":"")+'"><b>5 – 8</b><span>'+(k==="ko"?"카운터만 (워크인)":"Counter only (walk-in)")+'</span></div></div>'+
+  '<div class="ts-who">'+[["w",4],["p",4],["c",8]].map(r=>'<div class="'+(p>.75?"on":"")+'"><span>'+SRC[r[0]][k]+'</span><b>'+(k==="ko"?"최대 ":"up to ")+r[1]+'</b></div>').join("")+'</div>');
+}
+/* 손님 웹 예약 */
+function bookScreen(o){
+ const rows=[["7:50 AM",o.r750],["8:00 AM",o.r800],["8:10 AM",4]].filter(r=>r[1]>0);
+ return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app/book/tee-time</span></div><div class="ts-pub"><div class="hd"><b>Book a tee time</b><span>Tue, Oct 27 · '+(o.party||2)+' players</span></div>'+
+  rows.map(r=>'<div class="ts-slot'+(o.hot===r[0]?" hot":"")+'"><span><b>'+r[0]+'</b><small>18 holes · $62.00</small></span><span>'+(r[1]<4?r[1]+" spot"+(r[1]===1?"":"s")+" left":"4 spots")+'</span></div>').join("")+
+  (o.gone?'<p class="ts-gone">'+(LANG==="ko"?"8:00 AM은 목록에서 빠졌어요.":"8:00 AM is no longer listed.")+'</p>':"")+
+  (o.done?'<div class="ms-paid"><b>Booked · 8:00 AM · 2 players</b><span>Confirmation sent by text</span></div>':"")+'</div></div>';
+}
+/* 전화 */
+function phoneScreen(n){
+ const lines=[
+  ["c","Hi, can I get 8 o'clock Tuesday for four?"],
+  ["a","8:00 has two spots left. I can do 8:10 for four, or 8:00 for two."],
+  ["c","Two at 8:00 is fine, then."],
+  ["a","Done. Two players at 8:00 AM Tuesday. You'll get a text."]
+ ];
+ return frame("/admin/calls","Phone assistant","Live call",'<div class="ts-call">'+lines.slice(0,n).map(l=>'<div class="'+l[0]+'"><small>'+(l[0]==="c"?"Caller":"Assistant")+'</small>'+l[1]+'</div>').join("")+'</div>');
+}
+/* 직원 예약 창 */
+function deskScreen(o){
+ const n=o.n||0;
+ const pl=["Kim · walk-in","Lee · walk-in","Park · walk-in"].slice(0,n);
+ const lbl=o.full?"8:00 AM · $62.00 · full":"8:00 AM · $62.00 · 4 full · +4 extra";
+ return frame("/teesheet","New booking","Tee sheet",
+  '<div class="ms-modal" style="width:100%;box-shadow:none;border:1px solid var(--scr-line)"><small class="ey">Tee time</small><div class="search on">'+lbl+'</div>'+
+  '<small class="ey">Players ('+Math.min(n,4)+'/4)</small><div class="ms-list">'+(pl.length?pl.map(x=>'<div><span>'+x+'</span><i>Public</i></div>').join(""):'<div><span style="color:var(--scr-muted)">—</span></div>')+'</div>'+
+  '<div class="ms-foot"><span class="sbtn">Cancel</span><span class="sbtn pri'+(o.save?" hot":"")+'">Book '+n+' player'+(n===1?"":"s")+'</span></div>'+
+  (o.saved?'<div class="ms-paid"><b>Booked · 8:00 AM · 7 of 8 seats</b><span>Seats 5–7 are counter-only extras</span></div>':"")+'</div>');
+}
+function guardScreen(p){
+ const k=LANG;
+ const R=[
+  [k==="ko"?"온라인 빈자리":"Online availability","greatest(4 − taken, 0)","0051"],
+  [k==="ko"?"온라인 예약 · 변경":"Online book · change","pelham_tee_require_capacity → 4","0034 · 0052"],
+  [k==="ko"?"전화 · 대기자":"Phone · waitlist","require_tee_time_capacity(limit=4)","voice.py"],
+  [k==="ko"?"직원 티시트":"Staff tee sheet","limit=STAFF_PLAYERS_PER_TEE_TIME (8)","tee_sheet.py"],
+  [k==="ko"?"마지막 방어선":"Last line","trigger pelham_tee_capacity_guard → 8","0017 · 0052"]
+ ];
+ return frame("/teesheet",k==="ko"?"정원 검사":"Capacity checks","Server",'<div style="display:grid;gap:6px">'+R.map((r,i)=>'<div class="ms-rule '+(i<Math.ceil(p*5.5)?(i>=3?"warn":"hot"):"")+'"><b>'+r[0]+'</b><span class="ts-code">'+r[1]+'</span><small style="color:var(--scr-muted)">'+r[2]+'</small></div>').join("")+'</div>');
+}
+function noteScreen(n){
+ const k=LANG;
+ const R=k==="ko"?[
+  ["카운터가 먼저 채워도 같아요","카운터가 5명을 넣으면 온라인 남은 자리는 0이에요. 4 − 5는 0으로 잘려요.",""],
+  ["손님이 예약을 바꿀 때도 4","변경으로 인원을 늘려도 4명을 넘지 못해요.",""],
+  ["직원 계정으로 공개 예약 화면을 쓰면","DB는 로그인한 사람이 직원이면 8을 받아요. 화면이 4 기준이라 그런 시각은 안 보이고, 손님에겐 영향이 없어요.","warn"],
+  ["할 일 없음","코드는 0052부터 이 규칙이에요. 4명 넘게 잡힌 온라인·전화 예약을 보면 날짜와 시각을 알려 주세요.",""]
+ ]:[
+  ["Same when the counter fills first","If the counter adds 5, online has 0 left. 4 − 5 is clipped to 0.",""],
+  ["Guest changes stop at 4 too","Changing a booking cannot push it past 4.",""],
+  ["Staff using the public booking page","The database allows 8 when the signed-in user is staff. The page counts to 4, so those times do not show. Guests are not affected.","warn"],
+  ["Nothing to do","The code has worked this way since 0052. If an online or phone booking goes past 4, send the date and time.",""]
+ ];
+ return frame("/teesheet",k==="ko"?"알아 둘 점":"Notes","Rules",'<div style="display:grid;gap:6px">'+R.map((r,i)=>'<div class="ms-rule '+(i<n?(r[2]||"hot"):"")+'"><b>'+r[0]+'</b><span>'+r[1]+'</span></div>').join("")+'</div>');
+}
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"rule",ko:"규칙",en:"The rule",
+ screen:(l,p)=>ruleScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"PLAYERS_PER_TEE_TIME",ep:"= 4",why:L("손님이 직접 잡는 길(온라인·전화·문자·대기자)의 한도예요.","The limit for every guest path: online, phone, text and waitlist.")},
+  {at:.45,tag:"rpc",name:"STAFF_PLAYERS_PER_TEE_TIME",ep:"= 8",why:L("직원 티시트만 4명을 더 넣을 수 있어요. 단체·동반 손님용이에요(0052, 2026-10-20).","Only the staff tee sheet can add 4 more, for groups and walk-ins (0052, 2026-10-20).")},
+  {at:.75,tag:"ui",name:"seats taken",ep:"sum of players at the same time",why:L("예약이 여러 건이어도 같은 시각의 인원을 모두 더해서 세요.","Every booking at the same time counts toward the total.")}
+ ],
+ ledger:[{at:0,s:"........"}]},
+
+{a:"web",ph:"guest",ko:"온라인 예약",en:"Online booking",
+ screen:(l,p)=>bookScreen({r750:3,r800:4,hot:p>.3?"8:00 AM":"",done:p>.65}),
+ log:[
+  {at:.12,tag:"rpc",name:"pelham_tee_availability",ep:"remaining = greatest(4 − taken, 0)",why:L("손님 화면은 4에서 뺀 자리만 보여요. 0이면 목록에서 빠져요.","The guest page shows 4 minus seats taken. At 0 the time is hidden.")},
+  {at:.35,tag:"key",name:"8:00 AM",ep:"2 players"},
+  {at:.55,tag:"rpc",name:"pelham_tee_require_capacity",ep:"0 + 2 ≤ 4 · ok",why:L("손님이라 한도는 4예요.","A guest, so the limit is 4.")},
+  {at:.68,tag:"ui",name:"booked",ep:"seats 1–2"}
+ ],
+ ledger:[{at:0,s:"........"},{at:.65,s:"ww......",flash:["seat"]}]},
+
+{a:"phone",ph:"guest",ko:"전화 예약",en:"Phone booking",
+ screen:(l,p)=>phoneScreen(Math.min(4,1+Math.floor(p*4.2))),
+ log:[
+  {at:.1,tag:"rpc",name:"party_size",ep:"1 – 4 only",why:L("전화 비서는 처음부터 1~4명만 받아요.","The phone assistant only accepts 1 to 4 players.")},
+  {at:.3,tag:"rpc",name:"find_tee_times",ep:"seats = 4 − taken = 2",why:L("8:00은 두 자리라 넷은 안 되고, 8:10을 권해요.","8:00 has two seats, so four won't fit there; it offers 8:10.")},
+  {at:.6,tag:"rpc",name:"require_tee_time_capacity",ep:"2 + 2 ≤ 4 · ok"},
+  {at:.8,tag:"ui",name:"booked",ep:"seats 3–4 · 4 of 4 guest seats used"}
+ ],
+ ledger:[{at:0,s:"ww......"},{at:.78,s:"wwpp....",flash:["seat"]}]},
+
+{a:"full",ph:"guest",ko:"손님 쪽은 마감",en:"Closed to guests",
+ screen:(l,p)=>bookScreen({r750:3,r800:0,gone:true}),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_tee_availability",ep:"8:00 → remaining 0",why:L("자리판엔 4자리가 비어 있지만, 손님 쪽 남은 자리는 0이에요.","Four seats are still empty, but guests see 0 left.")},
+  {at:.45,tag:"rpc",name:"phone",ep:"8:00 is skipped",why:L("전화로 8:00을 물어도 다른 시각을 권해요.","Asked for 8:00 by phone, the assistant offers another time.")},
+  {at:.7,tag:"rpc",name:"409",ep:"8:00 only holds 4 players",why:L("화면을 거치지 않고 요청을 보내도 서버가 막아요.","Even a request that skips the page is refused by the server.")}
+ ],
+ ledger:[{at:0,s:"wwpp...."}]},
+
+{a:"desk",ph:"desk",ko:"카운터 워크인",en:"Counter walk-ins",
+ screen:(l,p)=>deskScreen({n:Math.min(3,Math.floor(p*4.5)),save:p>.6&&p<.75,saved:p>=.75}),
+ log:[
+  {at:.12,tag:"ui",name:"BookingDialog",ep:"8:00 AM · 4 full · +4 extra",why:L("직원 창은 앞 4자리가 찼고 추가 4자리가 남았다고 보여 줘요.","The staff window shows the first 4 are full and 4 extra seats remain.")},
+  {at:.4,tag:"key",name:"3 walk-ins",ep:"Kim · Lee · Park"},
+  {at:.65,tag:"rpc",name:"require_tee_time_capacity",ep:"4 + 3 ≤ 8 · ok",why:L("직원 길이라 한도가 8이에요.","The staff path, so the limit is 8.")},
+  {at:.78,tag:"rpc",name:"pelham_tee_capacity_guard",ep:"trigger · 7 ≤ 8",why:L("저장 직전 DB 트리거가 한 번 더 세요.","The database trigger counts again just before saving.")}
+ ],
+ ledger:[{at:0,s:"wwpp...."},{at:.75,s:"wwppccc.",flash:["seat"]}]},
+
+{a:"guard",ph:"rule",ko:"어디서 막나",en:"Where it is enforced",
+ screen:(l,p)=>guardScreen(p),
+ log:[
+  {at:.12,tag:"ui",name:"guest page",ep:"hides times with 0 left"},
+  {at:.32,tag:"rpc",name:"pelham_is_staff()",ep:"staff → 8 · else → 4",why:L("DB 함수가 부르는 사람을 보고 한도를 정해요.","The database function picks the limit from who is calling.")},
+  {at:.55,tag:"rpc",name:"backend",ep:"limit=4 by default",why:L("전화·문자·대기자는 백엔드가 기본값 4로 검사해요.","Phone, text and waitlist are checked by the backend with the default of 4.")},
+  {at:.8,tag:"rpc",name:"trigger",ep:"never more than 8",why:L("어느 길로 들어와도 8명은 못 넘어요.","Whatever the path, 8 is the ceiling.")}
+ ],
+ ledger:[{at:0,s:"wwppccc."}]},
+
+{a:"note",ph:"rule",ko:"알아 둘 점",en:"Notes",
+ screen:(l,p)=>noteScreen(Math.min(4,Math.ceil(p*4.4))),
+ log:[
+  {at:.15,tag:"rpc",name:"greatest(4 − 5, 0)",ep:"= 0"},
+  {at:.35,tag:"rpc",name:"guest change",ep:"limit 4 (0012 · 0034)"},
+  {at:.6,tag:"local",name:"staff signed in on /book",ep:"DB limit 8 · page shows 0",why:L("이론상 틈이에요. 손님 예약에는 영향이 없어요.","A gap in theory only. Guest bookings are not affected.")},
+  {at:.85,tag:"ui",name:"status",ep:"already live · nothing to change"}
+ ],
+ ledger:[{at:0,s:"ccccc..."}]}
+];
+
+const PH={rule:{ko:"규칙",en:"Rule"},guest:{ko:"손님",en:"Guest"},desk:{ko:"카운터",en:"Counter"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"DEVICE",stripe:"TERMINAL",key:"INPUT"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;const s=st.s||"........";
+  const n=used(s);const guest=Math.max(4-n,0);const desk=8-n;
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const rows=a=>'<div class="lrows">'+a.map(r=>'<div class="'+(r[2]||"")+'"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>').join("")+'</div>';
+  let h=card("seat",k==="ko"?"자리":"Seats","8:00 AM · Tue Oct 27",pill(n>=8?"bad":n>=4?"wait":"ok",n+" / 8"),
+    '<div class="ts-mini">'+s.split("").map((c,i)=>'<span class="'+(c==="."?"":"on "+c)+(i>=4?" x":"")+'">'+(c==="."?i+1:({w:"W",p:"T",c:"D"})[c])+'</span>').join("")+'</div>'+
+    '<p class="lnote">'+(k==="ko"?"W 온라인 · T 전화 · D 카운터. 점선 칸은 카운터 전용.":"W online · T phone · D counter. Dashed seats are counter-only.")+'</p>');
+  h+=card("g",k==="ko"?"손님 쪽 남은 자리":"Left for guests",k==="ko"?"온라인 · 전화 · 문자":"online · phone · text",pill(guest?"ok":"bad",guest?String(guest):(k==="ko"?"마감":"closed")),
+    rows([["limit","4"],["taken",String(n)],["remaining","greatest(4 − "+n+", 0) = "+guest,"cur"]]));
+  h+=card("d",k==="ko"?"카운터 남은 자리":"Left at the counter",k==="ko"?"직원 티시트":"staff tee sheet",pill(desk?"vi":"bad",String(desk)),
+    rows([["limit","8"],["taken",String(n)],["remaining","8 − "+n+" = "+desk,"cur"]]));
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"ov": {"ko": 16.9, "en": 15.1}, "web": {"ko": 12.1, "en": 11.3}, "phone": {"ko": 16.5, "en": 14.4}, "full": {"ko": 14.3, "en": 13.3}, "desk": {"ko": 13.6, "en": 14.9}, "guard": {"ko": 18.1, "en": 15.9}, "note": {"ko": 20.3, "en": 19.3}};
+const NARR={"ko": {"ov": "티시트는 한 티타임에 여덟 자리를 보여 줘요. 하지만 여덟 자리가 다 똑같지는 않아요. 앞 네 자리는 온라인, 전화, 카운터 어디서나 잡을 수 있고, 뒤 네 자리는 카운터 직원만 넣을 수 있어요. 그래서 온라인과 전화는 최대 네 명, 카운터는 최대 여덟 명이에요.", "web": "손님이 웹에서 화요일 여덟 시에 두 명을 예약해요. 손님 화면은 4에서 이미 찬 자리를 뺀 만큼만 보여 줘요. 0 더하기 2는 4 이하라서 통과하고, 1번과 2번 자리가 채워져요.", "phone": "이번엔 전화로 여덟 시에 네 명을 원해요. 전화 비서도 4에서 찬 자리를 빼서 세니까, 여덟 시엔 두 자리뿐이라고 말하고 여덟 시 십 분을 권해요. 손님이 두 명으로 바꾸면 3번, 4번 자리가 채워지고, 손님 쪽 네 자리가 다 찼어요.", "full": "자리판엔 아직 네 자리가 비어 있어요. 하지만 손님 쪽 남은 자리는 0이에요. 그래서 웹 예약 목록에서 여덟 시가 빠지고, 전화로 물어도 다른 시각을 권해요. 화면을 건너뛰고 요청을 보내도 서버가 409로 막아요.", "desk": "카운터에 워크인 세 명이 와요. 직원 예약 창은 앞 네 자리가 찼고 추가 네 자리가 남았다고 보여 줘요. 직원 길은 한도가 8이라 4 더하기 3, 일곱 명으로 저장돼요. 저장 직전엔 DB 트리거가 한 번 더 세요.", "guard": "정리하면 이래요. 손님 화면은 남은 자리가 0인 시각을 숨기고, DB 함수는 부르는 사람이 직원이면 8, 아니면 4를 한도로 써요. 전화, 문자, 대기자는 백엔드가 기본값 4로 검사하고, 마지막으로 트리거가 어떤 길이든 8명을 넘지 못하게 막아요.", "note": "알아 둘 점이에요. 카운터가 먼저 다섯 명을 넣어도 손님 쪽은 0자리로 닫혀요. 손님이 예약을 바꿀 때도 4명까지예요. 직원 계정으로 로그인한 채 공개 예약 화면을 쓰면 DB는 이론상 8을 받지만, 화면이 그 시각을 보여 주지 않아요. 이 규칙은 이미 들어가 있어서 바꿀 건 없어요."}, "en": {"ov": "The tee sheet shows eight seats per tee time, but they are not all the same. The first four can be booked online, by phone or at the counter. The last four can only be added by counter staff. So online and phone stop at four players, and the counter goes up to eight.", "web": "A guest books two players online for eight o'clock Tuesday. The guest page shows four minus the seats already taken. Zero plus two is within four, so it goes through and seats one and two are filled.", "phone": "Next, a caller wants eight o'clock for four. The phone assistant also counts four minus seats taken, so it says eight has only two spots and offers eight ten. The caller takes two at eight, seats three and four fill, and the guest seats are all used.", "full": "Four seats on the board are still empty, but guests now have zero left. Eight o'clock drops off the online list, and a caller asking for it is offered another time. Even a request that skips the page is refused by the server with a 409.", "desk": "Three walk-ins arrive at the counter. The staff booking window shows the first four seats are full and four extra seats remain. The staff path has a limit of eight, so four plus three saves as seven. Just before saving, the database trigger counts once more.", "guard": "To sum up. The guest page hides times with zero seats left. The database function uses a limit of eight for staff and four for everyone else. Phone, text and waitlist are checked by the backend with the default of four. And the trigger keeps every path at eight or fewer.", "note": "A few notes. If the counter fills five seats first, guests still see zero. Guests changing a booking also stop at four. If staff use the public booking page while signed in, the database would allow eight in theory, but the page does not show those times. The rule is already live, so nothing needs to change."}};
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phts-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phts-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phts-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phts-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

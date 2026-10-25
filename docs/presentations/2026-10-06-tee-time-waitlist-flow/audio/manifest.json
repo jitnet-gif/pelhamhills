@@ -1,0 +1,69 @@
+{
+ "voice": "elevenlabs:Hope",
+ "clips": [
+  {
+   "id": "n01",
+   "file": "n01.mp3"
+  },
+  {
+   "id": "n02",
+   "file": "n02.mp3"
+  },
+  {
+   "id": "n03",
+   "file": "n03.mp3"
+  },
+  {
+   "id": "n04",
+   "file": "n04.mp3"
+  },
+  {
+   "id": "n05",
+   "file": "n05.mp3"
+  },
+  {
+   "id": "n06",
+   "file": "n06.mp3"
+  },
+  {
+   "id": "n07",
+   "file": "n07.mp3"
+  },
+  {
+   "id": "n08",
+   "file": "n08.mp3"
+  },
+  {
+   "id": "n09",
+   "file": "n09.mp3"
+  },
+  {
+   "id": "n10",
+   "file": "n10.mp3"
+  },
+  {
+   "id": "n11",
+   "file": "n11.mp3"
+  },
+  {
+   "id": "n12",
+   "file": "n12.mp3"
+  },
+  {
+   "id": "n13",
+   "file": "n13.mp3"
+  },
+  {
+   "id": "n14",
+   "file": "n14.mp3"
+  },
+  {
+   "id": "n15",
+   "file": "n15.mp3"
+  },
+  {
+   "id": "n16",
+   "file": "n16.mp3"
+  }
+ ]
+}

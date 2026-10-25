@@ -1,0 +1,909 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Marketing Texts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- membership sale mocks (prefixed ms-) ---- */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px}
+.seg.lang svg{width:20px;height:18px;flex:0 0 auto}
+.seg.lang svg path{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.seg.lang svg text{fill:currentColor;font-family:var(--sans);font-weight:700;font-size:8.5px}
+.ms-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:8px}
+.ms-file{border:1px solid var(--scr-line);background:var(--scr-paper);padding:9px;display:grid;gap:7px;align-content:start}
+.ms-file .hd{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
+.ms-file .hd small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-file .hd b{font-size:14px}
+.ms-file .btns{display:grid;gap:4px;justify-items:end}
+.ms-file dl{margin:0;display:grid;gap:5px;font-size:10.5px}
+.ms-file dt{font-weight:700;color:var(--scr-muted)}
+.ms-file dd{margin:0}
+.ms-tagm{font-size:9px;font-weight:700;padding:1px 6px;background:#ECECF0;color:#4E5560}
+.ms-tagm.on{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.ms-red{color:var(--scr-red);font-weight:700}
+.ms-okt{color:var(--scr-ok);font-weight:700}
+.ms-modal{background:var(--scr-paper);width:min(440px,100%);max-height:100%;overflow:hidden;display:grid;gap:7px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.ms-modal small.ey{font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-modal h4{margin:0;font-size:14px}
+.ms-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ms-dates div{display:grid;gap:2px;font-size:9px;font-weight:700;color:var(--scr-muted)}
+.ms-dates span{border:1px solid var(--scr-line);padding:4px 5px;font-weight:400;color:var(--scr-ink);font-size:10.5px;font-family:var(--mono)}
+.ms-dates span.off{background:#F7F7F8}
+.ms-dates span.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.2)}
+.ms-list{border:1px solid var(--scr-line);max-height:170px;overflow:hidden}
+.ms-list div{display:flex;justify-content:space-between;gap:6px;padding:4px 7px;border-bottom:1px solid #EEF0F2;font-size:10.5px}
+.ms-list div i{font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ms-list div.pick{background:var(--scr-accent);color:#fff;font-weight:700}
+.ms-foot{display:flex;justify-content:flex-end;gap:5px}
+.ms-note{font-size:9px;color:var(--scr-muted);text-align:right}
+.ms-map{display:grid;gap:6px;padding:4px}
+.ms-map .rw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center;font-size:10.5px}
+.ms-map .rw span{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 7px;min-width:0}
+.ms-map .rw span b{display:block;font-size:11px}
+.ms-map .rw span small{display:block;color:var(--scr-muted);font-size:9px}
+.ms-map .rw em{font-style:normal;text-align:center;color:var(--scr-accent);font-weight:700}
+.ms-map .hd{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.ms-map .rw.hot span:last-child{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-paid{background:var(--scr-ok-soft);color:var(--scr-ok);padding:8px;display:grid;gap:2px;font-size:11px}
+.ms-paid b{font-size:13px}
+.ms-rule{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px 8px;display:grid;gap:2px;font-size:10.5px}
+.ms-rule b{font-size:11px}
+.ms-rule.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-rule.warn{border-color:#E2A5A5;background:var(--scr-red-soft)}
+@media (max-width:560px){.ms-grid{grid-template-columns:minmax(0,1fr)}.ms-dates{grid-template-columns:minmax(0,1fr)}}
+.ph.pick{background:var(--violet-soft);color:var(--violet)}
+.ph.pay{background:var(--blue-soft);color:var(--blue)}
+.lnote{font-size:12px;color:var(--muted)}
+/* ---- tee capacity (ts-) ---- */
+.ph.rule{background:var(--green-soft);color:var(--green)}
+.ph.guest{background:var(--blue-soft);color:var(--blue)}
+.ph.desk{background:var(--violet-soft);color:var(--violet)}
+.ts-strip{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin:8px 0}
+.ts-seat{border:1px solid var(--scr-line);background:var(--scr-paper);min-height:46px;display:grid;align-content:space-between;padding:3px 4px}
+.ts-seat.x{border-style:dashed}
+.ts-seat small{font-size:9px;color:var(--scr-muted)}
+.ts-seat b{font-size:9px;font-family:var(--mono)}
+.ts-seat.on.w{background:#E2ECF5;color:#2D5E8C;border-color:#2D5E8C}
+.ts-seat.on.p{background:#E6F4EA;color:#1F6B3A;border-color:#1F6B3A}
+.ts-seat.on.c{background:var(--scr-accent-soft);color:var(--scr-accent);border-color:var(--scr-accent)}
+.ts-bands{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ts-band{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 7px;display:grid;gap:2px;font-size:10.5px;opacity:.45;transition:opacity .3s}
+.ts-band.on{opacity:1}
+.ts-band.std.on{border-color:#2D5E8C;background:#E2ECF5}
+.ts-band.ext.on{border-color:var(--scr-accent);background:var(--scr-accent-soft);border-style:dashed}
+.ts-band b{font-family:var(--mono);font-size:12px}
+.ts-who{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:8px}
+.ts-who div{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:1px;font-size:10.5px;opacity:.45}
+.ts-who div.on{opacity:1}
+.ts-who b{font-size:13px}
+.ts-pub{background:#FBF9F4;padding:10px;display:grid;gap:6px;color:#1F2328}
+.ts-pub .hd{display:flex;justify-content:space-between;gap:6px;align-items:baseline;flex-wrap:wrap}
+.ts-pub .hd span{font-size:10.5px;color:#6B7280}
+.ts-slot{display:flex;justify-content:space-between;align-items:center;gap:6px;border:1px solid #D8D1C3;background:#fff;padding:7px 9px;font-size:11px}
+.ts-slot small{display:block;font-size:9.5px;color:#6B7280}
+.ts-slot.hot{border-color:#2F5D3A;box-shadow:0 0 0 2px rgba(47,93,58,.25)}
+.ts-gone{font-size:10.5px;color:#8A1F1F;margin:0}
+.ts-call{display:grid;gap:6px}
+.ts-call div{max-width:85%;padding:6px 8px;font-size:11px;animation:rise .35s ease-out}
+.ts-call div small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
+.ts-call .c{justify-self:start;background:var(--scr-paper);border:1px solid var(--scr-line)}
+.ts-call .a{justify-self:end;background:var(--scr-accent);color:#fff}
+.ts-code{font-family:var(--mono);font-size:10px;overflow-wrap:anywhere}
+.ts-mini{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+.ts-mini span{border:1px solid var(--line);text-align:center;font-family:var(--mono);font-size:11px;padding:4px 0;color:var(--muted)}
+.ts-mini span.x{border-style:dashed}
+.ts-mini span.on{font-weight:700;color:var(--fg,inherit)}
+.ts-mini span.on.w{background:var(--blue-soft);color:var(--blue)}
+.ts-mini span.on.p{background:var(--ok-soft);color:var(--ok)}
+.ts-mini span.on.c{background:var(--violet-soft);color:var(--violet)}
+@media (max-width:560px){.ts-bands,.ts-who{grid-template-columns:minmax(0,1fr)}}
+/* Calls & SMS mock */
+.cx{display:grid;grid-template-columns:62px 1fr;min-height:250px;font-size:10.5px}
+.cx-side{background:#141414;color:#e9e9ee;padding:8px 6px;display:grid;align-content:start;gap:5px;font-size:9.5px}
+.cx-side b{font-size:10px;margin-bottom:4px}
+.cx-side span{padding:3px 4px;opacity:.75}
+.cx-side span.on{background:#4533ff;opacity:1;color:#fff}
+.cx-main{padding:8px;display:grid;align-content:start;gap:7px;min-width:0}
+.cx-h{font-weight:700;font-size:12px}
+.cx-lede{color:var(--scr-muted);line-height:1.45;transition:background .3s}
+.cx-tabs{display:flex;gap:4px}
+.cx-tabs span{border:1px solid var(--scr-line);padding:3px 8px;font-weight:700}
+.cx-tabs span.on{background:#1f2430;color:#fff;border-color:#1f2430}
+.cx-met{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.cx-met div{border:1px solid var(--scr-line);padding:4px 5px;background:var(--scr-paper)}
+.cx-met small{display:block;color:var(--scr-muted);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-met b{font-size:14px}
+.cx-row{display:grid;grid-template-columns:62px 1fr auto auto;gap:6px;align-items:center;border:1px solid var(--scr-line);padding:5px 6px;background:var(--scr-paper)}
+.cx-row small{display:block;color:var(--scr-muted)}
+.cx-row .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-badge{padding:1px 5px;font-weight:700;font-size:9.5px;white-space:nowrap}
+.cx-badge.ok{background:#e3f4e8;color:#1d7a3e}.cx-badge.no{background:#fde8e8;color:#b42318}.cx-badge.inf{background:#eceef2;color:#4a5160}
+.cx-btn{border:1px solid var(--scr-line);padding:2px 6px;font-weight:700;white-space:nowrap}
+.cx-link{color:#4533ff;font-weight:700;white-space:nowrap}
+.cx-new{animation:cxflash 1.1s ease}
+@keyframes cxflash{0%{background:#fff3b0}100%{background:transparent}}
+.cx-dl{display:grid;grid-template-columns:70px 1fr;gap:3px 8px}
+.cx-dl dt{color:var(--scr-muted);font-weight:700}
+.cx-dl dd{margin:0}
+.cx-sec{font-size:9px;font-weight:700;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.04em}
+.cx-bub{max-width:85%;padding:4px 6px;background:#f0f1f3}
+.cx-bub.c{justify-self:end;background:#e6e3ff}
+.cx-tool{color:#4533ff;font-weight:700}
+.cx-sms{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;border:1px solid var(--scr-line);padding:5px 6px;background:var(--scr-paper)}
+.cx-sms small{display:block;color:var(--scr-muted)}
+.cx-st{font-weight:700;font-size:9.5px;white-space:nowrap}
+.cx-st.ok{color:#1d7a3e}.cx-st.bad{color:#b42318}.cx-st.mid{color:#8a6100}
+.cx-gl{display:grid;gap:3px;font-size:11px}
+.cx-gl div{display:grid;grid-template-columns:1fr 14px 1fr;gap:4px;align-items:baseline}
+.cx-gl s{color:var(--muted,#888);text-decoration-thickness:1px}
+.cx-gl i{font-style:normal;opacity:.5;text-align:center}
+.cx-gl b{font-weight:600}
+/* ---- marketing mock (mk-) ---- */
+.mk{font-size:10.5px;background:#f4f4f6;min-height:240px}
+.mk-top{display:flex;justify-content:space-between;gap:6px;align-items:baseline;padding:7px 9px;background:#fff;border-bottom:1px solid var(--scr-line)}
+.mk-top b{font-size:12px}
+.mk-top span{color:var(--scr-muted);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-tabs{display:flex;gap:10px;padding:0 9px;background:#fff;border-bottom:1px solid var(--scr-line);overflow:hidden}
+.mk-tabs span{padding:5px 0;font-weight:700;color:#4e5560;white-space:nowrap}
+.mk-tabs span.on{color:#4533ff;box-shadow:inset 0 -2px #4533ff}
+.mk-body{padding:8px;display:grid;gap:7px;align-content:start;background:#fff;margin:8px;min-width:0}
+.mk-h{font-weight:700;font-size:12px;display:flex;gap:6px;align-items:center}
+.mk-seg{display:flex;gap:0}
+.mk-seg span{border:1px solid var(--scr-line);padding:3px 10px;font-weight:700}
+.mk-seg span.on{background:#4533ff;border-color:#4533ff;color:#fff}
+.mk-f{display:grid;gap:2px;min-width:0}
+.mk-f small{font-weight:700;font-size:9px}
+.mk-f>span{border:1px solid #d4d4d8;padding:5px 6px;min-height:22px;overflow-wrap:anywhere}
+.mk-type i{display:inline-block;width:1px;height:11px;background:#1f2328;vertical-align:-1px;margin-left:1px;animation:mkblink 1s steps(1) infinite}
+@keyframes mkblink{50%{opacity:0}}
+.mk-prev{display:grid;gap:3px}
+.mk-prev small{font-weight:700;font-size:9px;color:var(--scr-muted)}
+.mk-bub{background:#e9e9eb;border-radius:12px;padding:7px 9px;max-width:92%;line-height:1.4;animation:cxflash 1.1s ease}
+.mk-g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mk-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;text-align:center}
+.mk-stats div{border:1px solid var(--scr-line);padding:4px 2px;display:grid}
+.mk-stats div.strong{background:#eeebff;border-color:#4533ff;color:#4533ff}
+.mk-stats b{font-size:14px}
+.mk-stats small{font-size:8.5px;color:var(--scr-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-rows{border:1px solid #ececf0}
+.mk-rows div{display:grid;grid-template-columns:1fr auto 70px;gap:6px;padding:4px 6px;border-bottom:1px solid #ececf0}
+.mk-rows div.off{color:var(--scr-muted)}
+.mk-rows div span:last-child{text-align:right;font-weight:700}
+.mk-rows em{font-style:normal;font-size:8.5px;background:#e3f4e8;color:#1d7a3e;padding:0 4px}
+.mk-rules{display:grid;gap:4px}
+.mk-rules div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;border:1px solid var(--scr-line);padding:5px 6px;opacity:.3;transition:opacity .3s}
+.mk-rules div.on{opacity:1}
+.mk-rules div.ok b{color:#1d7a3e}.mk-rules div.no b{color:#b42318}.mk-rules div.one b{color:#4533ff}
+.mk-confirm{display:grid;gap:8px;line-height:1.45;font-size:11px}
+.mk-confirm div{display:flex;gap:6px;justify-content:flex-end}
+.mk-go{background:#4533ff;color:#fff;font-weight:700;padding:4px 10px}
+.mk-pill{font-style:normal;font-size:9px;background:#eeebff;color:#4533ff;padding:1px 6px}
+.mk-bar{height:8px;background:#ececf0}
+.mk-bar i{display:block;height:100%;background:#4533ff;transition:width .3s}
+.mk-clock{font-size:9.5px;color:var(--scr-muted)}
+.mk-split{display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:4px;align-items:center}
+.mk-arrow{text-align:center;font-weight:700;font-size:18px;color:var(--scr-muted);opacity:.3}
+.mk-arrow.on{opacity:1;color:#4533ff}
+.mk-dim{opacity:.45;transition:opacity .3s}
+.mk-hot{box-shadow:0 0 0 2px #4533ff;transition:box-shadow .3s}
+.mk-split .mk{min-height:150px}
+.mk-split .cx{min-height:150px}
+.mk-phone{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1fr);gap:8px;align-items:start}
+.mk-ph{background:#fff;border:6px solid #1f2328;border-radius:18px;padding:8px;display:grid;gap:6px;font-size:10.5px;min-height:200px;align-content:start}
+.mk-ph small{text-align:center;font-weight:700;color:var(--scr-muted)}
+.mk-in{background:#e9e9eb;border-radius:12px;padding:6px 8px;max-width:90%}
+.mk-out{background:#2f7cf6;color:#fff;border-radius:12px;padding:6px 10px;justify-self:end;font-weight:700;animation:cxflash 1.1s ease}
+@media (max-width:560px){.mk-split,.mk-phone{grid-template-columns:minmax(0,1fr)}.mk-arrow{transform:rotate(90deg)}}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Fly · Supabase · Twilio</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 마케팅 문자 · 나레이터 프레젠테이션",
+  h1:"손님에게 <b>마케팅 문자</b>를 보내는 법 (Twilio)",
+  lede:"마케팅 문자는 Calls & SMS가 아니라 마케팅 사이트(/marketing)에서 보내요. 받는 사람은 캐나다 규정(CASL·CRTC)에 맞춰 서버가 골라요. 왼쪽은 화면, 가운데는 뒤에서 일어나는 일, 오른쪽은 이 장면의 규칙이에요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 7장면",laneScreen:"화면",laneLog:"뒤에서 일어나는 일",laneLedger:"규칙",
+  ledgerSub:"서버가 지키는 것",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 서버가 하는 일이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"근거: backend/api/routes/marketing.py, backend/api/routes/sms.py, supabase/migrations/0047_marketing.sql, frontend/components/marketing/MarketingApp.tsx. 실제 서버에 Twilio 키가 들어 있는지는 확인하지 않았어요. 화면의 손님·숫자는 예시예요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Marketing texts · narrated walkthrough",
+  h1:"Sending <b>marketing texts</b> to customers (Twilio)",
+  lede:"Marketing texts go out from the marketing site (/marketing), not from Calls & SMS. The server picks who can receive them under Canadian rules (CASL and CRTC). Left: the screen. Middle: what happens behind it. Right: the rules for this scene.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 7 scenes",laneScreen:"Screen",laneLog:"What happens behind",laneLedger:"Rules",
+  ledgerSub:"What the server enforces",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Server steps appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. The speech-bubble buttons (가 / Aa) restart the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Sources: backend/api/routes/marketing.py, backend/api/routes/sms.py, supabase/migrations/0047_marketing.sql, frontend/components/marketing/MarketingApp.tsx. Whether the live server has the Twilio keys was not checked. Customers and numbers on screen are examples."}
+};
+
+const L=(ko,en)=>({ko,en});
+const T=(ko,en)=>LANG==="ko"?ko:en;
+function mframe(tab,body){
+ return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills.vercel.app/marketing</span></div><div class="mk"><div class="mk-top"><b>Marketing</b><span>Emmeline · admin@pelhamhills.ca</span></div><div class="mk-tabs">'+["New campaign","Campaigns","Consent","Opt-outs"].map((t,i)=>'<span class="'+(i===tab?"on":"")+'">'+t+'</span>').join("")+'</div><div class="mk-body">'+body+'</div></div></div>';
+}
+function whereScreen(p){
+ const two=p>.45;
+ return '<div class="mk-split"><div class="pos'+(two?" mk-dim":"")+'"><div class="urlbar"><i></i><span>/admin/calls</span></div><div class="cx"><div class="cx-side"><b>pelhamhills</b><span>Tee Sheet</span><span class="on">Calls &amp; SMS</span></div><div class="cx-main"><div class="cx-h">Calls &amp; SMS</div><div class="cx-tabs"><span class="on">Calls</span><span>Texts</span><span>Opt-outs</span></div><div class="cx-lede">'+T("통화·문자 기록을 보는 곳 — 보내기 버튼은 없어요.","A log of calls and texts — there is no send button.")+'</div></div></div></div>'+
+  '<div class="mk-arrow'+(two?" on":"")+'">→</div>'+
+  '<div class="pos'+(two?" mk-hot":" mk-dim")+'"><div class="urlbar"><i></i><span>/marketing</span></div><div class="mk"><div class="mk-top"><b>Marketing</b></div><div class="mk-tabs"><span class="on">New campaign</span><span>Campaigns</span></div><div class="mk-body"><div class="cx-lede">'+T("캠페인을 만들고 보내는 곳. 로그인이 따로 있고, 명단에 있는 계정만 열려요.","Where campaigns are written and sent. Separate sign-in; only listed accounts can open it.")+'</div></div></div></div></div>';
+}
+function composeScreen(p){
+ const msg="Fall special: 18 holes + cart $59 weekdays after 2pm. Book at pelhamhills.ca";
+ const n=Math.min(msg.length,Math.round(msg.length*Math.min(1,p*1.8)));
+ const shown=msg.slice(0,n);
+ return mframe(0,'<div class="mk-h">1. Message</div><div class="mk-seg"><span class="on">Text</span><span>AI call</span></div>'+
+  '<label class="mk-f"><small>Campaign name</small><span>Fall weekday special</span></label>'+
+  '<label class="mk-f"><small>Message · '+n+' / 320</small><span class="mk-type">'+esc(shown)+'<i></i></span></label>'+
+  (p>.55?'<div class="mk-prev"><small>What the customer sees</small><div class="mk-bub"><b>Pelham Hills Golf:</b> '+esc(msg)+' <b>Reply STOP to opt out.</b></div></div>':''));
+}
+function whoScreen(p){
+ const seg=p<.35?"All customers":"Regulars (5+ rounds)";
+ const st=p<.35?[412,138,6,51]:[96,9,2,4];
+ const rows=[["Sam Lee","Member",22,1,""],["Ana Ruiz","",7,1,""],["Tom Park","",9,0,"Opted out"],["Kim Diaz","",5,0,"No consent"]];
+ return mframe(0,'<div class="mk-h">2. Who gets it</div><div class="mk-g2"><label class="mk-f"><small>Group</small><span class="'+(p>=.35?"cx-new":"")+'">'+seg+' ▾</span></label><label class="mk-f"><small>At least this many rounds</small><span>0</span></label></div>'+
+  '<div class="mk-stats">'+[["Will receive",st[0],1],["No consent",st[1]],["Opted out",st[2]],["No phone",st[3]]].map(s=>'<div class="'+(s[2]?"strong":"")+'"><b>'+s[1]+'</b><small>'+s[0]+'</small></div>').join("")+'</div>'+
+  (p>.6?'<div class="mk-rows">'+rows.map(r=>'<div class="'+(r[3]?"":"off")+'"><span>'+r[0]+(r[1]?' <em>'+r[1]+'</em>':'')+'</span><span>'+r[2]+' rounds</span><span>'+(r[3]?"✓":r[4])+'</span></div>').join("")+'</div>':''));
+}
+function consentScreen(p){
+ const R=[
+  [T("sms_ok = true","sms_ok = true"),T("문자 동의 표시가 있음","Marked as agreed to texts"),"ok"],
+  [T("표시 없음 + 회원 또는 라운드 기록","No mark + member or played a round"),T("기존 거래 관계로 봄","Counts as an existing business relationship"),"ok"],
+  [T("표시 없음 + 기록 없음","No mark + no history"),"No consent","no"],
+  ["sms_ok = false",T("언제나 뺌","Always left out"),"no"],
+  [T("STOP 한 번호","Number that replied STOP"),"Opted out","no"],
+  [T("같은 번호 두 사람","Two people, one number"),T("캠페인당 한 번만","Once per campaign"),"one"]
+ ];
+ const n=Math.min(R.length,Math.ceil(p*R.length*1.15));
+ return mframe(2,'<div class="mk-h">'+T("문자를 받을 수 있나?","Can this customer get texts?")+'</div><div class="mk-rules">'+R.map((r,i)=>'<div class="'+(i<n?"on "+r[2]:"")+'"><span>'+r[0]+'</span><b>'+(r[2]==="ok"?"✓ ":r[2]==="no"?"✕ ":"1× ")+r[1]+'</b></div>').join("")+'</div>');
+}
+function sendScreen(p){
+ const total=96,sent=Math.round(total*Math.max(0,Math.min(1,(p-.3)/.6)));
+ const confirm=p<.3;
+ return mframe(confirm?0:1,confirm?
+  '<div class="mk-confirm">Send <b>text</b> “Fall weekday special” to <b>96</b> phone numbers now? Sent texts and calls cannot be taken back.<div><span class="cx-btn">Back</span><span class="mk-go">Yes, send now</span></div></div>'
+  :'<div class="mk-h">Fall weekday special <em class="mk-pill">'+(sent<total?"Sending":"Sent")+'</em></div><div class="mk-bar"><i style="width:'+(sent/total*100).toFixed(1)+'%"></i></div><div class="mk-stats">'+[["Sent",sent,1],["Queued",total-sent],["Skipped",0],["Failed",0]].map(s=>'<div class="'+(s[2]?"strong":"")+'"><b>'+s[1]+'</b><small>'+s[0]+'</small></div>').join("")+'</div>'+
+  '<div class="mk-clock">'+T("보내는 시각","Sending hours")+': <b>Weekdays 9:00 AM–9:30 PM, weekends 10:00 AM–6:00 PM</b></div>');
+}
+function stopScreen(p){
+ const step=p<.3?0:p<.6?1:2;
+ return '<div class="mk-phone"><div class="mk-ph"><small>Pelham Hills Golf</small>'+
+  '<div class="mk-in">Pelham Hills Golf: Fall special: 18 holes + cart $59… Reply STOP to opt out.</div>'+
+  (step>=1?'<div class="mk-out">STOP</div>':'')+
+  '</div><div class="pos"><div class="urlbar"><i></i><span>/admin/calls · Opt-outs</span></div><div class="cx-main" style="padding:8px">'+
+  '<div class="cx-tabs"><span>Calls</span><span>Texts</span><span class="on">Opt-outs</span></div>'+
+  (step>=2?'<div class="cx-row cx-new" style="grid-template-columns:1fr auto"><span>(905) 555-0142<small>reply · Oct 22</small></span><b>sms</b></div>':'<div class="cx-lede" style="text-align:center">No opted-out numbers.</div>')+
+  '</div></div></div>';
+}
+function checkScreen(n){
+ const R=LANG==="ko"?[
+  ["코드는 준비됨","화면(/marketing), 서버 발송, 동의·STOP 처리가 이미 들어 있어요.","hot"],
+  ["Twilio 키 — 확인 필요","Fly 서버에 TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, 발신 번호(또는 Messaging Service)가 있어야 해요. 마케팅 화면에서 문자가 켜짐으로 보이면 돼요.","warn"],
+  ["누가 여나","지금 명단은 admin@pelhamhills.ca 하나예요. 매니저를 넣으려면 SQL 한 줄.",""],
+  ["Twilio 번호 등록 — 확인 필요","캐나다로 대량 문자를 보낼 때 발신 번호 등록이 필요할 수 있어요. Twilio 콘솔에서 확인.","warn"]
+ ]:[
+  ["Code is ready","The /marketing screen, server sending, consent and STOP handling are all in place.","hot"],
+  ["Twilio keys — to check","The Fly server needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and a sender number (or Messaging Service). If texts show as on in the marketing screen, it is set.","warn"],
+  ["Who can open it","Right now only admin@pelhamhills.ca is on the list. One SQL line adds the manager.",""],
+  ["Twilio number registration — to check","Bulk texts to Canadian numbers may need the sender number registered. Check in the Twilio console.","warn"]
+ ];
+ return '<div class="pos"><div class="urlbar"><i></i><span>checklist</span></div><div class="posbody" style="display:grid;gap:6px">'+R.map((r,i)=>'<div class="ms-rule '+(i<n?(r[2]||"hot"):"")+'"><b>'+r[0]+'</b><span>'+r[1]+'</span></div>').join("")+'</div></div>';
+}
+
+/* 장면별 규칙 */
+const RULES={
+ where:[["Calls & SMS","기록만 봄 (통화·문자·STOP 번호)","Logs only (calls, texts, STOP numbers)"],["/marketing","캠페인 만들고 보냄","Write and send campaigns"],["명단","pelham_marketing_viewers 계정만","Only pelham_marketing_viewers accounts"]],
+ compose:[["320자","문자 본문 최대 길이","Max message length"],["앞머리","Pelham Hills Golf: 자동","\"Pelham Hills Golf:\" added"],["끝","Reply STOP to opt out. 자동","\"Reply STOP to opt out.\" added"]],
+ who:[["Group","전체·회원·비회원·단골(5+)·올해 신규","All · Members · Non-members · Regulars (5+) · New"],["Rounds","최소 라운드 수","Minimum rounds"],["직접 고르기","한 명씩 골라 보낼 수도 있음","Or pick people one by one"]],
+ consent:[["CASL","동의 또는 기존 거래 관계","Consent or existing business relationship"],["STOP","다음 캠페인부터 자동 제외","Left out of every later campaign"],["같은 번호","한 번만","Only once"]],
+ send:[["시각","평일 9:00–21:30 · 주말 10:00–18:00","Weekdays 9:00–21:30 · weekends 10:00–18:00"],["속도","1초에 1건","One text per second"],["시각 끝","멈춤 → 다음 날 다시 누르면 이어서","Pauses → press again next day to resume"],["두 번 누름","한 줄만 돈다","Only one run"]],
+ stop:[["STOP 등","STOP·UNSUBSCRIBE·QUIT…","STOP · UNSUBSCRIBE · QUIT…"],["START","문자 수신거부 풀림","Removes the text opt-out"],["보이는 곳","Calls & SMS → Opt-outs","Calls & SMS → Opt-outs"]],
+ check:[]
+};
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"where",ph:"where",ko:"어디서 보내나",en:"Where to send",
+ screen:(l,p)=>whereScreen(p),
+ log:[
+  {at:.12,tag:"ui",name:"/admin/calls",ep:"Calls · Texts · Opt-outs",why:L("통화와 문자 기록, STOP 번호를 보는 곳이에요.","Where you see calls, texts and STOP numbers.")},
+  {at:.45,tag:"ui",name:"/marketing",ep:"New campaign · Campaigns · Consent · Opt-outs",why:L("보내는 건 여기서 해요.","Sending happens here.")},
+  {at:.75,tag:"rpc",name:"pelham_staff_marketing_access",ep:"0047",why:L("명단 밖 계정이면 서버가 막아요.","The server blocks accounts not on the list.")}
+ ],
+ ledger:[{at:0,g:"where"}]},
+
+{a:"compose",ph:"write",ko:"문자 쓰기",en:"Write the text",
+ screen:(l,p)=>composeScreen(p),
+ log:[
+  {at:.15,tag:"ui",name:"Text",ep:"channel: sms"},
+  {at:.4,tag:"rpc",name:"length ≤ 320",ep:"pelham_marketing_campaign_create",why:L("넘으면 저장되지 않아요.","Longer text is refused.")},
+  {at:.6,tag:"rpc",name:"sms_body()",ep:"marketing.py",why:L("보낸 곳과 수신거부 방법을 자동으로 붙여요(CASL).","Adds the sender and opt-out line automatically (CASL).")}
+ ],
+ ledger:[{at:0,g:"compose"}]},
+
+{a:"who",ph:"who",ko:"받는 사람",en:"Who gets it",
+ screen:(l,p)=>whoScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_marketing_audience",ep:"segment · min_rounds · search"},
+  {at:.4,tag:"ui",name:"Regulars (5+ rounds)",ep:"96 will receive",why:L("받을 수 없는 사람은 까닭과 함께 세어 보여 줘요.","People who can't receive it are counted with the reason.")},
+  {at:.7,tag:"ui",name:"customer list",ep:"✓ / Opted out / No consent"}
+ ],
+ ledger:[{at:0,g:"who"}]},
+
+{a:"consent",ph:"who",ko:"동의 규칙",en:"Consent rules",
+ screen:(l,p)=>consentScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_marketing_candidates",ep:"ok · reason",why:L("손님마다 보낼 수 있는지 서버가 판단해요.","The server decides for each customer.")},
+  {at:.5,tag:"rpc",name:"pelham_marketing_prefs",ep:"sms_ok · call_ok",why:L("Consent 탭에서 손님별로 표시를 바꿀 수 있어요.","Change a customer's mark in the Consent tab.")},
+  {at:.8,tag:"rpc",name:"distinct on (phone)",ep:"one per number"}
+ ],
+ ledger:[{at:0,g:"consent"}]},
+
+{a:"send",ph:"send",ko:"보내기",en:"Send",
+ screen:(l,p)=>sendScreen(p),
+ log:[
+  {at:.12,tag:"ui",name:"Yes, send now",ep:"POST /marketing/campaigns/{id}/send"},
+  {at:.35,tag:"rpc",name:"pelham_marketing_claim",ep:"10 at a time",why:L("집을 때마다 STOP 한 번호를 다시 빼요.","Re-checks STOP numbers every time it picks people.")},
+  {at:.55,tag:"stripe",name:"Twilio",ep:"send_sms · 1/sec"},
+  {at:.8,tag:"rpc",name:"status callback",ep:"sent → delivered / failed"}
+ ],
+ ledger:[{at:0,g:"send"}]},
+
+{a:"stop",ph:"send",ko:"STOP 답장",en:"STOP replies",
+ screen:(l,p)=>stopScreen(p),
+ log:[
+  {at:.3,tag:"stripe",name:"Twilio",ep:"POST /sms/inbound",why:L("손님 답장이 서버로 들어와요.","The guest's reply reaches the server.")},
+  {at:.5,tag:"rpc",name:"pelham_marketing_optout_record",ep:"source: reply"},
+  {at:.7,tag:"ui",name:"Opt-outs",ep:"Calls & SMS",why:L("이 번호에는 어떤 문자도 다시 나가지 않아요.","No texts of any kind go to this number again.")}
+ ],
+ ledger:[{at:0,g:"stop"}]},
+
+{a:"check",ph:"ready",ko:"지금 상태",en:"Status",
+ screen:(l,p)=>checkScreen(Math.min(4,Math.ceil(p*4.4))),
+ log:[
+  {at:.15,tag:"key",name:"code",ep:"already on main"},
+  {at:.4,tag:"local",name:"TWILIO_*",ep:"Fly secrets — not checked",why:L("마케팅 화면에서 문자 켜짐 여부를 보세요.","Check whether texts show as on in the marketing screen.")},
+  {at:.7,tag:"local",name:"Twilio console",ep:"sender registration — not checked"}
+ ],
+ ledger:[{at:0,g:"check"}]}
+];
+
+const PH={where:{ko:"위치",en:"Where"},write:{ko:"쓰기",en:"Write"},who:{ko:"대상",en:"Audience"},send:{ko:"발송",en:"Send"},ready:{ko:"준비",en:"Ready"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"CHECK",stripe:"TWILIO",key:"CODE"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;const g=st.g||"where";
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  let h="";
+  if(RULES[g].length){
+    h+=card("r",k==="ko"?"이 장면의 규칙":"Rules in this scene","",pill("ok",String(RULES[g].length)),
+      '<div class="lrows">'+RULES[g].map(r=>'<div class="cur"><span>'+esc(r[0])+'</span><span>'+esc(k==="ko"?r[1]:r[2])+'</span></div>').join("")+'</div>');
+  }
+  h+=card("s",k==="ko"?"상태":"Status","",pill("wait",k==="ko"?"확인 필요":"to check"),
+    '<div class="lrows"><div class="cur"><span>'+(k==="ko"?"코드":"Code")+'</span><span>✓</span></div><div><span>Twilio '+(k==="ko"?"키":"keys")+'</span><span>'+(k==="ko"?"확인 안 함":"not checked")+'</span></div><div><span>'+(k==="ko"?"번호 등록":"Number registration")+'</span><span>'+(k==="ko"?"확인 안 함":"not checked")+'</span></div></div>');
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"where": {"ko": 17.2, "en": 18.1}, "compose": {"ko": 16.7, "en": 16.6}, "who": {"ko": 18.8, "en": 18.0}, "consent": {"ko": 16.4, "en": 16.7}, "send": {"ko": 18.3, "en": 17.4}, "stop": {"ko": 17.5, "en": 17.4}, "check": {"ko": 17.8, "en": 15.8}};
+const NARR={"ko": {"where": "네, 손님에게 마케팅 문자를 보낼 수 있어요. 다만 Calls and SMS 화면은 통화와 문자 기록을 보는 곳이라 보내기 버튼이 없어요. 문자는 마케팅 사이트, 슬래시 marketing에서 보내요. 로그인이 따로 있고, 명단에 있는 계정만 열려요. 지금은 Emmeline의 admin 계정 하나예요.", "compose": "New campaign 탭에서 Text를 고르고 캠페인 이름과 문자를 써요. 문자는 삼백이십 자까지예요. 보낼 때 앞에는 Pelham Hills Golf가, 끝에는 Reply STOP to opt out이 자동으로 붙어요. 아래 미리보기에서 손님이 받을 문자를 그대로 볼 수 있어요.", "who": "다음은 받는 사람이에요. 전체, 회원, 비회원, 단골, 올해 신규 중에서 그룹을 고르고, 최소 라운드 수나 이름으로 좁힐 수 있어요. 받을 사람 수와 함께, 동의가 없거나 수신을 거부했거나 번호가 없어서 빠지는 사람 수도 바로 보여요. 한 명씩 골라서 보낼 수도 있어요.", "consent": "누가 받을 수 있는지는 서버가 캐나다 규정에 맞춰 정해요. 문자 동의 표시가 있으면 받아요. 표시가 없으면 회원이거나 라운드 기록이 있는 손님만 받아요. 동의를 거절했거나 STOP으로 답한 번호는 항상 빠져요. 같은 번호를 쓰는 두 사람은 한 번만 받아요.", "send": "Yes, send now를 누르면 서버가 Twilio로 일 초에 한 건씩 보내요. 보낼 수 있는 시각은 평일 아침 아홉 시부터 밤 아홉 시 반, 주말은 오전 열 시부터 오후 여섯 시까지예요. 보내는 도중 시각이 끝나면 멈추고, 다음 날 다시 누르면 남은 사람에게 이어서 보내요.", "stop": "손님이 STOP으로 답하면 Twilio가 그 답장을 서버로 보내고, 서버가 그 번호를 수신거부 목록에 적어요. 그 번호에는 다음 캠페인부터 문자가 나가지 않아요. 이 목록은 Calls and SMS 화면의 Opt-outs 탭에서 볼 수 있어요. START로 답하면 다시 풀려요.", "check": "정리하면, 코드는 이미 다 들어가 있어요. 다만 실제 서버에 Twilio 키가 들어 있는지는 확인하지 않았어요. 마케팅 화면에서 문자가 켜짐으로 보이면 바로 보낼 수 있어요. 캐나다로 대량 문자를 보낼 때는 Twilio 번호 등록이 필요할 수 있으니 콘솔에서 한 번 확인해 주세요."}, "en": {"where": "Yes, you can send marketing texts to customers. But the Calls and SMS page is a log of calls and texts, so it has no send button. Texts go out from the marketing site, slash marketing. It has its own sign-in and only listed accounts can open it. Right now that is Emmeline's admin account.", "compose": "In the New campaign tab, choose Text and write a campaign name and the message. The message can be up to three hundred twenty characters. Pelham Hills Golf is added at the start and Reply STOP to opt out at the end automatically. The preview below shows exactly what the customer will get.", "who": "Next is who gets it. Pick a group: all customers, members, non-members, regulars or new this year, and narrow it by minimum rounds or a name. You see how many will receive it, and how many are left out for no consent, opting out, or no phone. You can also pick people one by one.", "consent": "The server decides who can receive it under Canadian rules. Customers marked as agreeing to texts get it. With no mark, only members or customers who have played a round get it. Anyone who declined or replied STOP is always left out. Two people sharing one number get it once.", "send": "When you press Yes, send now, the server sends through Twilio, one text per second. Sending hours are nine a.m. to nine thirty p.m. on weekdays and ten a.m. to six p.m. on weekends. If the hours end mid-campaign it pauses, and pressing send again the next day picks up where it left off.", "stop": "When a customer replies STOP, Twilio passes the reply to the server, and the server adds that number to the opt-out list. No texts go to that number from the next campaign on. You can see the list in the Opt-outs tab of the Calls and SMS page. Replying START removes it.", "check": "To sum up, the code is already in place. What I did not check is whether the live server has the Twilio keys. If texts show as on in the marketing screen, you can send right away. Bulk texts to Canadian numbers may need the Twilio number registered, so please check that once in the console."}};
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phmk-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phmk-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phmk-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phmk-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

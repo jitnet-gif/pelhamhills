@@ -1,0 +1,506 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>펠햄힐스 온라인 결제 브리핑</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: status board (실제 진행 상태) + scene chips + presenter bar + narration band, over a three-lane stage —
+   화면(손님 휴대폰·터미널) · 뒤에서 일어나는 일(API·SQL·카드사 로그) · 남은 일 체크리스트. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#C2502A; --flag-soft:#FBE5DB;
+  --blue:#2D5E8C; --blue-soft:#E2ECF5; --violet:#5B3FD0; --violet-soft:#ECE7FF;
+  --sand:#8F6A1F; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6; --bad:#A33A3A; --bad-soft:#F8E1E1;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-line:#2E3F35;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222; --bad:#F09090; --bad-soft:#3A1C1C;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222; --bad:#F09090; --bad-soft:#3A1C1C;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mono{font-family:var(--mono)}
+
+.top{display:grid;gap:4px}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--green)}
+.top .lede{color:var(--muted);max-width:80ch;font-size:13.5px}
+
+/* status board */
+.board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.st{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:grid;gap:4px;align-content:start;transition:border-color .3s,box-shadow .3s}
+.st.pulse{border-color:var(--flag);box-shadow:0 0 0 3px var(--flag-soft)}
+.st .hd{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.st h3{font-size:13.5px;font-weight:700}
+.st .big{font-family:var(--mono);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.st small{font-size:11.5px;color:var(--muted)}
+.pill{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.done{background:var(--ok-soft);color:var(--ok)}
+.pill.you{background:var(--sand-soft);color:var(--sand)}
+.pill.block{background:var(--bad-soft);color:var(--bad)}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip small{font-weight:400;color:var(--muted);font-size:11.5px}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no,.chip[aria-pressed="true"] small{color:var(--paper);opacity:.85}
+.chip .grp{width:6px;height:6px;border-radius:50%;background:var(--blue)}
+.chip .grp.ops{background:var(--flag)}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:118px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--mono);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.elb{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--sand-soft);color:var(--sand);font-family:var(--mono);white-space:nowrap}
+.elb.on{background:var(--violet-soft);color:var(--violet)}
+
+/* narration */
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.cap .stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.55;min-height:1.55em}
+.cap .who{display:block;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+.timer{display:grid;gap:3px;min-width:170px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-line);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:18px;height:6px;border-radius:3px;border:0;background:var(--term-line);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key)!important;transform:scaleY(1.5)}
+
+/* stage */
+.stage{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.15fr) minmax(0,.8fr);gap:12px;height:clamp(560px,72vh,760px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* screen lane */
+.screenwrap{padding:16px;display:grid;justify-items:center;align-content:start;min-height:100%}
+.phone{width:100%;max-width:330px;border:8px solid var(--ink);border-radius:30px;background:var(--sunk);overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.phone .url{font-family:var(--mono);font-size:10.5px;color:var(--muted);background:var(--paper);border-bottom:1px solid var(--line);padding:7px 10px;display:flex;gap:6px;align-items:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.phone .url i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:0 0 auto}
+.phone .url.anet i{background:var(--blue)}
+.phone .body{padding:14px;display:grid;gap:10px;font-size:12.5px}
+.ph-h{font-weight:700;font-size:15px}
+.ph-card{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:6px}
+.ph-k{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--sand);text-transform:uppercase}
+.rows{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-variant-numeric:tabular-nums}
+.rows .t{border-top:1px solid var(--line);padding-top:4px;margin-top:2px}
+.rows b{font-weight:700}
+.ph-btn{background:var(--green);color:var(--paper);border-radius:6px;text-align:center;font-weight:700;padding:9px;font-size:13px}
+.ph-btn.red{background:var(--paper);color:var(--bad);border:1px solid var(--bad)}
+.ph-btn.blue{background:var(--blue)}
+.ph-note{font-size:10.5px;color:var(--muted)}
+.ph-ok{background:var(--ok-soft);border:1px solid var(--ok);color:var(--ok);border-radius:6px;padding:10px 12px;display:grid;gap:4px}
+.ph-warn{background:var(--sand-soft);border:1px solid var(--sand);color:var(--sand);border-radius:6px;padding:10px 12px;display:grid;gap:4px}
+.ph-big{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--ink)}
+.field{border:1px solid var(--line);background:var(--paper);border-radius:4px;padding:7px 9px;font-family:var(--mono);font-size:12px;color:var(--ink)}
+.fl{font-size:10.5px;color:var(--muted);margin-bottom:-6px}
+.spin{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+.spin i{display:block;height:100%;width:35%;background:var(--green);animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+
+.termwin{width:100%;background:var(--term);color:var(--term-ink);border-radius:10px;overflow:hidden;font-family:var(--mono);font-size:12px;line-height:1.6}
+.termwin .tb{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--term-line);color:var(--term-dim);font-size:11px}
+.termwin .tb i{width:9px;height:9px;border-radius:50%;background:var(--term-line)}
+.termwin pre{margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.termwin .c{color:var(--term-key)}
+.termwin .s{color:var(--term-str)}
+.termwin .d{color:var(--term-dim)}
+.termwin .e{color:#F09090}
+
+/* log lane */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent.cur{border-color:var(--blue)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em}
+.tag.api{background:var(--blue-soft);color:var(--blue)}
+.tag.sql{background:var(--green-soft);color:var(--green)}
+.tag.anet{background:var(--violet-soft);color:var(--violet)}
+.tag.hook{background:var(--flag-soft);color:var(--flag)}
+.tag.git{background:var(--sand-soft);color:var(--sand)}
+.tag.note{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.ent .body{padding:6px 10px 9px;font-size:12.5px}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.json.req{border-bottom:1px dashed var(--term-line)}
+.json .hl{background:rgba(242,196,139,.18);border-radius:3px;outline:1px solid var(--term-str)}
+
+/* checklist lane */
+.todo{display:grid;gap:6px;padding:12px;align-content:start}
+.item{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;padding:8px 10px;border-radius:8px;border:1px solid transparent;transition:background .25s,border-color .25s}
+.item.focus{border-color:var(--flag);background:var(--flag-soft)}
+.item .mk{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:var(--mono)}
+.item.done .mk{background:var(--ok);color:var(--paper)}
+.item.you .mk{border:2px solid var(--sand);color:var(--sand)}
+.item.block .mk{background:var(--bad);color:var(--paper)}
+.item.later .mk{border:2px dashed var(--line);color:var(--muted)}
+.item b{display:block;font-size:13px}
+.item small{display:block;font-size:11.5px;color:var(--muted)}
+.item code{font-family:var(--mono);font-size:11px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 4px;overflow-wrap:anywhere}
+.legend{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px}
+
+@media (max-width:1180px){
+  .board{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:560px}
+  .col.todo-col{grid-column:1 / -1;height:auto}
+}
+@media (max-width:760px){
+  .board{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:520px}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow">Pelham Hills Golf Club · 온라인 결제(Authorize.net) · 2026-10-09 · 커밋 1c51e44</div>
+    <h1>온라인 결제 <b>브리핑</b></h1>
+    <p class="lede">손님이 예약 사이트에서 티타임·실내 골프 요금을 미리 낼 수 있게 됐어요(선택 결제). 앞의 네 장면은 돈이 어떻게 움직이는지, 뒤의 네 장면은 커밋·푸시·배포와 테스트 방법이에요. 오른쪽 체크리스트는 지금 실제로 끝난 일과 남은 일을 그대로 보여 줘요.</p>
+  </header>
+
+  <section class="board" aria-label="진행 상태">
+    <article class="st" id="b-build"><div class="hd"><h3>구현</h3><span class="pill done">완료</span></div><div class="big">14 파일</div><small>SQL 0020 · FastAPI · 예약 화면 3곳 + 결제 결과 화면</small></article>
+    <article class="st" id="b-test"><div class="hd"><h3>테스트</h3><span class="pill done">통과</span></div><div class="big">497 + 41</div><small>백엔드 pytest 전체(결제 20) · 로컬 Postgres SQL 시나리오</small></article>
+    <article class="st" id="b-commit"><div class="hd"><h3>커밋</h3><span class="pill done">완료</span></div><div class="big">1c51e44</div><small>결제 작업만. 단말기 작업(118c253)과 섞지 않음</small></article>
+    <article class="st" id="b-push"><div class="hd"><h3>푸시</h3><span class="pill block">권한 거절</span></div><div class="big">403</div><small>이 맥의 GitHub 계정에 저장소 쓰기 권한이 없음</small></article>
+    <article class="st" id="b-deploy"><div class="hd"><h3>배포</h3><span class="pill you">직접 실행</span></div><div class="big">4 단계</div><small>SQL Editor → Fly 배포 → 시크릿 → 웹훅</small></article>
+  </section>
+
+  <nav class="scen" id="scen" aria-label="장면"></nav>
+
+  <div class="bar" role="toolbar" aria-label="재생 제어">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" title="이전 단계 (←)" aria-label="이전 단계"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" title="다음 단계 (→)" aria-label="다음 단계"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button">처음부터</button>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl">속도</span>
+    <div class="seg" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tNarr" checked> 한국어 해설 음성</label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> 8개 연속 재생</label>
+    <span class="spacer"></span>
+    <span class="elb" id="elBadge" title="ElevenLabs · Hope">음성 파일 0 / 0</span>
+  </div>
+
+  <div class="cap">
+    <span class="stepno" id="stepno">1 / 1</span>
+    <p id="capText" aria-live="polite"></p>
+    <div class="timer" aria-label="진행">
+      <div class="tline"><span class="tl">이 장면</span><span class="tv" id="tmScen">0 / 0</span></div>
+      <div class="tline"><span class="tl">전체</span><span class="tv" id="tmAll">0 / 0</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-label="화면">
+      <div class="head"><h2 id="scrTitle">화면</h2><span class="mono" style="color:var(--muted);font-size:11px" id="scrSub"></span></div>
+      <div class="scroll"><div class="screenwrap" id="screen"></div></div>
+    </section>
+    <section class="col" aria-label="뒤에서 일어나는 일">
+      <div class="head"><h2>뒤에서 일어나는 일</h2><span class="mono" style="color:var(--muted);font-size:11px">FastAPI · Supabase · Authorize.net</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col todo-col" aria-label="남은 일">
+      <div class="head"><h2>체크리스트</h2><span class="mono" style="color:var(--muted);font-size:11px">실제 상태</span></div>
+      <div class="scroll"><div class="todo" id="todo"></div>
+        <div class="legend"><span class="pill done">완료</span><span class="pill you">직접 할 일</span><span class="pill block">막힘</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>금액·명령·함수 이름은 실제 코드와 같아요(0020_online_payments.sql, payments.py, authorize_net.py, PayOnline.tsx). 손님 이름, 확인 코드, invoice, 거래 ID는 테스트에서 쓴 예시예요. 그린피 $47.79 × 2명 = $95.58, HST 13% $12.43, 합계 $108.01.</p>
+    <p>해설 음성은 ElevenLabs의 Hope 목소리(eleven_multilingual_v2)로, 이전 시뮬레이터들과 같은 목소리예요. 단축키: Space 재생·일시정지, ← → 단계 이동, 1–4 속도.</p>
+  </footer>
+</div>
+
+<script type="application/json" id="deck">
+{
+"todo":[
+ {"id":"impl","st":"done","t":"구현","d":"SQL 0020 · FastAPI 결제 라우터 · 예약 화면"},
+ {"id":"pytest","st":"done","t":"백엔드 테스트 497개 통과","d":"<code>pytest backend/tests</code> — 결제 20개 포함, 네트워크 없음"},
+ {"id":"sqltest","st":"done","t":"SQL 시나리오 41개 통과","d":"로컬 Postgres에 0001–0020. 0019가 있든 없든 통과"},
+ {"id":"commit","st":"done","t":"커밋 1c51e44","d":"14개 파일. 결제 작업만 담음"},
+ {"id":"push","st":"block","t":"git push origin main","d":"maibauntourph-collab 계정 403. 쓰기 권한 있는 계정으로 푸시 → Vercel이 프론트 자동 배포"},
+ {"id":"sql","st":"you","t":"Supabase SQL Editor에서 0020 실행","d":"파일 전체를 붙여 한 번. 다시 실행해도 안전"},
+ {"id":"fly","st":"you","t":"Fly 백엔드 배포","d":"<code>flyctl deploy --remote-only -a pelham-hills-api</code> — 자동 실행은 권한 정책이 막음"},
+ {"id":"secrets","st":"you","t":"Authorize.net 샌드박스 키","d":"<code>flyctl secrets set AUTHORIZE_NET_*</code> — 넣는 순간 Pay 버튼이 보임"},
+ {"id":"hook","st":"you","t":"웹훅 등록","d":"Merchant Interface → Webhooks → <code>/payments/online/webhook</code>"},
+ {"id":"e2e","st":"you","t":"샌드박스로 끝까지 결제·환불","d":"4111 1111 1111 1111 · CVV 123"},
+ {"id":"prod","st":"later","t":"운영 전환","d":"실제 가맹점(CAD) 키 + <code>AUTHORIZE_NET_ENV=production</code>"}
+],
+"scenarios":[
+{"ko":"결제하기","en":"Pay","grp":"flow","steps":[
+ {"k":"screen","v":"pay","n":"티타임 예약을 마치면 확정 화면 아래에 'Pay now' 칸이 생겨요. 결제는 선택이라, 안 누르면 지금처럼 프로 샵에서 내면 돼요."},
+ {"k":"log","tag":"api","name":"POST /payments/online/checkout","ep":"브라우저 → FastAPI (Fly)","req":{"code":"T4E7858394","email":"ben@example.com"},"res":{"forwarded_to":"pelham_online_pay_start"},"mark":"code","n":"버튼을 누르면 화면은 확인 코드와 이메일만 보내요. 금액은 보내지 않아요."},
+ {"k":"log","tag":"sql","name":"pelham_online_pay_start","ep":"Supabase · service_role 전용","req":{"p_code":"T4E7858394","p_email":"ben@example.com"},"res":{"invoice":"PHW3F9A21C07B44","subtotal":9558,"tax":1243,"amount":10801,"status":"pending"},"mark":"amount","n":"금액은 데이터베이스가 정해요. 그린피 두 명에 HST를 더해 108달러 1센트예요. 이 숫자가 그대로 카드사로 가요."},
+ {"k":"log","tag":"anet","name":"getHostedPaymentPageRequest","ep":"apitest.authorize.net","req":{"transactionType":"authCaptureTransaction","amount":"108.01","order":{"invoiceNumber":"PHW3F9A21C07B44"}},"res":{"token":"Fz7k…(15분 유효)"},"mark":"invoiceNumber","n":"FastAPI가 Authorize.net에서 결제 폼 토큰을 받아요. invoice 번호가 나중에 결과를 찾는 열쇠예요."},
+ {"k":"screen","v":"form","n":"손님은 Authorize.net이 호스팅하는 결제 페이지로 넘어가 카드를 입력해요. 카드 번호는 우리 사이트, 서버, 데이터베이스 어디에도 오지 않아요."},
+ {"k":"screen","v":"checking","n":"결제가 끝나면 우리 사이트의 결과 화면으로 돌아와요. 돌아온 주소에는 결과가 없어서, 화면이 서버에 물어봐요."},
+ {"k":"log","tag":"anet","name":"getUnsettledTransactionList → getTransactionDetails","ep":"FastAPI → Authorize.net","req":{"invoiceNumber":"PHW3F9A21C07B44"},"res":{"transId":"80000000001","responseCode":1,"authAmount":108.01,"cardNumber":"XXXX1111","cardType":"Visa"},"mark":"responseCode","n":"서버는 브라우저 말을 믿지 않고, 카드사에 직접 거래를 다시 물어서 확인해요."},
+ {"k":"log","tag":"sql","name":"pelham_online_pay_complete","ep":"한 트랜잭션","req":{"invoice":"PHW3F9A21C07B44","trans_id":"80000000001","amount":10801},"res":{"status":"approved","receipt_no":"PH-20261009-0007","bill":"station online · card · entry online"},"mark":"status","n":"승인이 확인되면 프로 샵 결제와 똑같이 계산서 한 장을 만들어요. 티 시트의 두 사람은 결제됨으로 바뀌어요."},
+ {"k":"screen","v":"received","focus":"impl","n":"손님 화면에는 결제 완료와 영수증 번호가 떠요. 프로 샵에 와서 더 낼 것이 없다고 알려 줘요."}
+]},
+{"ko":"창을 닫아도","en":"Webhook","grp":"flow","steps":[
+ {"k":"screen","v":"closed","n":"손님이 결제하고 Continue를 누르지 않은 채 창을 닫으면 어떻게 될까요?"},
+ {"k":"log","tag":"hook","name":"POST /payments/online/webhook","ep":"Authorize.net → FastAPI","req":{"X-ANET-Signature":"sha512=9C1E…","eventType":"net.authorize.payment.authcapture.created","payload":{"id":"80000000002"}},"res":{"signature":"HMAC-SHA512 일치"},"mark":"X-ANET-Signature","n":"카드사가 웹훅으로 직접 알려 줘요. 서명 키로 만든 HMAC 값이 맞지 않으면 401로 돌려보내요."},
+ {"k":"log","tag":"sql","name":"pelham_online_pay_complete","ep":"결과 화면과 같은 함수","req":{"trans_id":"80000000002"},"res":{"status":"approved"},"n":"결과 화면 쪽과 웹훅 쪽 둘 다 같은 함수를 불러요. 두 번 와도 장부에는 한 번만 적혀요."},
+ {"k":"log","tag":"note","name":"DB가 잠깐 안 닿으면","res":{"http":503,"authorize_net":"최대 10번 다시 보냄"},"n":"데이터베이스가 잠깐 안 닿으면 503을 돌려줘요. 그러면 카드사가 나중에 다시 보내요."}
+]},
+{"ko":"되돌림","en":"Reversal","grp":"flow","steps":[
+ {"k":"screen","v":"pay2","n":"손님이 결제 폼에 있는 사이, 프로 샵이 같은 예약의 돈을 먼저 받았다고 해 볼게요."},
+ {"k":"log","tag":"sql","name":"pelham_online_pay_complete","ep":"다시 확인","res":{"status":"orphaned","needs_reversal":true,"response_text":"Not recorded: This booking has already been paid."},"mark":"needs_reversal","n":"데이터베이스가 기록 직전에 예약을 다시 봐요. 이미 냈거나, 취소됐거나, 가격이 바뀌었으면 장부에 쓰지 않아요."},
+ {"k":"log","tag":"anet","name":"voidTransaction","ep":"FastAPI → Authorize.net","req":{"refTransId":"80000000003"},"res":{"responseCode":"1"},"n":"그리고 그 결제를 바로 무효로 돌려요. 돈만 받고 장부에 없는 상태를 남기지 않아요."},
+ {"k":"screen","v":"returned","n":"손님에게는 결제가 예약에 붙지 못해 카드로 돌려줬다고 알려 줘요."}
+]},
+{"ko":"취소·환불","en":"Refund","grp":"flow","steps":[
+ {"k":"screen","v":"lookup","n":"온라인으로 낸 손님이 My Booking에서 예약을 열면 결제 내역과 'Cancel and refund' 버튼이 보여요."},
+ {"k":"log","tag":"sql","name":"pelham_online_refund_begin","ep":"코드 + 이메일 확인","res":{"deadline":"시작 24시간 전까지","refund_started_at":"지금"},"mark":"deadline","n":"시작 24시간 전까지만 열려요. 진행 중 표시를 남겨서 두 번 환불하지 않게 해요."},
+ {"k":"log","tag":"anet","name":"정산 전 → voidTransaction","ep":"transactionStatus: capturedPendingSettlement","req":{"refTransId":"80000000001"},"res":{"responseCode":"1"},"n":"그날 밤 정산 전이면 거래를 무효로 해요. 명세서에서 아예 사라져요."},
+ {"k":"log","tag":"anet","name":"정산 후 → refundTransaction","ep":"transactionStatus: settledSuccessfully","req":{"amount":"108.01","payment":{"creditCard":{"cardNumber":"1111","expirationDate":"XXXX"}},"refTransId":"80000000001"},"res":{"responseCode":"1","transId":"80000000009"},"mark":"amount","n":"정산이 끝났으면 전액 환불해요. 카드 끝 네 자리만 있으면 돼요."},
+ {"k":"log","tag":"sql","name":"pelham_online_refund_finish","ep":"cancel_booking: true","res":{"bill":"refunded","players":"unpaid","booking":"cancelled"},"n":"계산서는 환불됨, 예약은 취소로 바뀌고 자리가 다시 열려요."},
+ {"k":"screen","v":"refunded","n":"카드사가 실패하면 예약은 그대로 두고 프로 샵 전화번호를 안내해요."},
+ {"k":"log","tag":"note","name":"직원이 환불할 때","res":{"POS Refund":"막힘 (카드에 돈이 안 돌아가므로)","Authorize.net 관리 화면 Refund":"웹훅 refund.created → 계산서 환불, 예약은 유지"},"n":"직원은 POS가 아니라 Authorize.net 관리 화면에서 환불해요. 그러면 웹훅이 장부를 맞춰요."}
+]},
+{"ko":"커밋","en":"Commit","grp":"ops","steps":[
+ {"k":"term","title":"터미널 · pelhamhills","lines":["<span class='c'>$</span> git status --short","<span class='d'> M</span> backend/main.py","<span class='d'> M</span> frontend/app/book/{tee-time,indoor,lookup}/page.tsx","<span class='d'>??</span> backend/api/routes/payments.py","<span class='d'>??</span> backend/services/authorize_net.py","<span class='d'>??</span> backend/tests/test_payments.py","<span class='d'>??</span> frontend/app/book/pay/page.tsx","<span class='d'>??</span> frontend/components/booking/PayOnline.tsx","<span class='d'>??</span> frontend/lib/booking/payments.ts","<span class='d'>??</span> supabase/migrations/0020_online_payments.sql","<span class='d'>??</span> docs/online-payments-authorize-net-2026-10-09.md"],"n":"커밋할 파일은 열네 개예요. 데이터베이스, 백엔드, 예약 화면, 문서와 환경변수 예시까지예요."},
+ {"k":"log","tag":"git","name":"118c253 (다른 세션)","ep":"카드 단말기 DX8000 연동","res":{"포함":"아니오 — 이미 별도 커밋"},"n":"작업하는 사이에 다른 세션이 카드 단말기 작업을 따로 커밋했어요. 결제 커밋에는 섞지 않았어요."},
+ {"k":"term","title":"터미널 · pelhamhills","lines":["<span class='c'>$</span> git add <span class='d'>(14 files)</span>","<span class='c'>$</span> git commit","<span class='s'>[main 1c51e44]</span> Let golfers pay for tee times and indoor golf online with Authorize.net","<span class='d'> 14 files changed</span>","","<span class='c'>$</span> git status -sb","## main...origin/main <span class='s'>[ahead 3]</span>"],"focus":"commit","n":"커밋은 1c51e44예요. 아직 푸시하지 않은 커밋이 세 개 있어요."}
+]},
+{"ko":"푸시","en":"Push","grp":"ops","steps":[
+ {"k":"term","title":"터미널 · pelhamhills","lines":["<span class='c'>$</span> git push origin main","<span class='e'>remote: Permission to jitnet-gif/pelhamhills.git denied to maibauntourph-collab.</span>","<span class='e'>fatal: ... The requested URL returned error: 403</span>"],"focus":"push","n":"푸시는 거절됐어요. 이 맥에 로그인된 깃허브 계정에는 저장소에 쓸 권한이 없어요."},
+ {"k":"term","title":"해결 — 권한 있는 계정으로","lines":["<span class='c'>$</span> gh auth login        <span class='d'># jitnet-gif 저장소 쓰기 권한이 있는 계정</span>","<span class='c'>$</span> gh auth setup-git","<span class='c'>$</span> git push origin main","   04f49a5  확인 번호 숫자·바코드 문자","   118c253  카드 단말기 연동","   1c51e44  온라인 결제"],"focus":"push","n":"권한 있는 계정으로 로그인한 뒤 다시 푸시하면 돼요. 커밋 세 개가 함께 올라가요."},
+ {"k":"log","tag":"git","name":"GitHub → Vercel","ep":"vercel[bot] · Production","res":{"자동 배포":"main 푸시마다","프론트엔드":"/book/pay 포함 정적 export"},"n":"푸시하면 버셀이 프론트엔드를 자동으로 배포해요. 키가 없으면 Pay 버튼은 숨어 있어서 먼저 배포돼도 안전해요."}
+]},
+{"ko":"배포","en":"Deploy","grp":"ops","steps":[
+ {"k":"term","title":"① Supabase · SQL Editor","lines":["<span class='d'>-- supabase/migrations/0020_online_payments.sql 전체 붙여넣기 → Run</span>","<span class='d'>-- 0005·0008·0012 가 없으면 무엇이 빠졌는지 말하고 멈춘다</span>","","<span class='s'>Success. No rows returned</span>"],"focus":"sql","n":"첫째, 수파베이스 SQL 에디터에 공공이공 파일을 붙여 한 번 실행해요. 운영 프로젝트는 연결된 계정 밖이라 직접 해 주셔야 해요."},
+ {"k":"term","title":"② Fly · 백엔드","lines":["<span class='c'>$</span> flyctl deploy --remote-only -a pelham-hills-api","<span class='d'>...</span>","<span class='s'>✓ Machine started · health check / passing</span>"],"focus":"fly","n":"둘째, 플라이에 백엔드를 배포해요. 운영 배포라서 자동 실행은 권한 정책이 막았어요."},
+ {"k":"term","title":"③ Fly · 시크릿 (샌드박스)","lines":["<span class='c'>$</span> flyctl secrets set -a pelham-hills-api \\","    AUTHORIZE_NET_API_LOGIN_ID=<span class='s'>…</span> \\","    AUTHORIZE_NET_TRANSACTION_KEY=<span class='s'>…</span> \\","    AUTHORIZE_NET_SIGNATURE_KEY=<span class='s'>…</span> \\","    AUTHORIZE_NET_ENV=sandbox"],"focus":"secrets","n":"셋째, 샌드박스 키를 넣어요. 키가 들어가는 순간 예약 화면에 Pay 버튼이 나타나요."},
+ {"k":"log","tag":"api","name":"GET /payments/online/config","ep":"배포 확인","res":{"enabled":true,"environment":"sandbox"},"mark":"enabled","n":"이 주소로 켜졌는지 확인해요. 키는 밖으로 내보내지 않아요."},
+ {"k":"term","title":"④ Authorize.net · Webhooks","lines":["Endpoint  https://pelham-hills-api.fly.dev/api/v1/payments/online/webhook","Events    authcapture.created · refund.created","          void.created · fraud.approved","Status    <span class='s'>Active</span>"],"focus":"hook","n":"넷째, 카드사 관리 화면에서 웹훅 주소를 등록해요. 손님이 창을 닫거나 직원이 환불할 때 바로 반영돼요."},
+ {"k":"log","tag":"note","name":"사이트 도메인이 바뀌면","res":{"ALLOWED_ORIGINS":"기본 목록 + 새 도메인 (예: pelhamhills.com)"},"n":"사이트를 다른 도메인에서 열면 그 주소를 CORS 허용 목록에 넣어야 해요."}
+]},
+{"ko":"테스트","en":"Test","grp":"ops","steps":[
+ {"k":"term","title":"백엔드 · pytest","lines":["<span class='c'>$</span> python -m pytest backend/tests/test_payments.py -q","<span class='s'>20 passed</span> in 0.44s","<span class='c'>$</span> python -m pytest backend/tests -q","<span class='s'>497 passed</span> in 14.85s"],"focus":"pytest","n":"백엔드 테스트는 카드사와 데이터베이스를 가짜로 바꿔 끼워 네트워크 없이 돌아요. 결제 테스트 스무 개를 포함해 사백구십칠 개가 통과했어요."},
+ {"k":"term","title":"SQL · 로컬 Postgres 18","lines":["ok - tee total = 3 × green fee + HST","ok - approved · all players paid on tee sheet","ok - idempotent · still one bill","ok - second approval on a paid booking → reversal","ok - POS refund of online bill blocked","ok - refund finish → voided · tee booking cancelled","ok - price changed → reversal · no half-made bill","ok - sim reservation paid · merchant refund recorded","ok - late cancel refused (24 hours)","ok - anon cannot start","<span class='s'>41 / 41</span>  <span class='d'>(0019 있음·없음 둘 다)</span>"],"focus":"sqltest","n":"데이터베이스 규칙은 로컬 포스트그레스에 마이그레이션을 전부 올려 사십일 개 장면으로 확인했어요."},
+ {"k":"screen","v":"card","focus":"e2e","n":"배포 뒤에는 샌드박스 카드로 끝까지 해 봐요. 사 일 일 일 카드, 미래 유효기간, CVV 일이삼이에요. 거절을 보려면 우편번호에 사육이팔이를 넣어요."},
+ {"k":"log","tag":"note","name":"끝까지 확인할 것","res":{"1":"Pay → Payment received","2":"티 시트 플레이어 paid","3":"Reports에 station online 영수증","4":"My Booking → Cancel and refund","5":"Authorize.net에 Void","6":"관리 화면 Refund → 웹훅 → 플레이어 미결제"},"focus":"e2e","n":"결제, 티 시트, 리포트, 취소 환불, 카드사 관리 화면까지 여섯 군데를 차례로 확인하면 돼요."},
+ {"k":"log","tag":"note","name":"운영 전환","res":{"키":"실제 가맹점 (CAD)","AUTHORIZE_NET_ENV":"production"},"focus":"prod","n":"샌드박스에서 다 확인되면 실제 가맹점 키로 바꾸고 환경을 프로덕션으로 바꿔요. 여기까지가 오늘 브리핑이에요."}
+]}
+]
+}
+</script>
+
+<script>
+(function(){
+"use strict";
+const D=JSON.parse(document.getElementById("deck").textContent);
+const S=D.scenarios;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- screens ---------- */
+const URL_BOOK="pelhamhills.vercel.app";
+function phone(url,body,anet){ return '<div class="phone"><div class="url'+(anet?' anet':'')+'"><i></i>'+esc(url)+'</div><div class="body">'+body+'</div></div>'; }
+const payBox='<div class="ph-card"><div class="ph-k">Pay now (optional)</div><div class="rows"><span>Green fee — Ben Lee (9:13 AM)</span><span>$47.79</span><span>Green fee — Guest (9:13 AM)</span><span>$47.79</span><span class="t">Subtotal</span><span class="t">$95.58</span><span>HST 13%</span><span>$12.43</span><b>Total</b><b>$108.01</b></div><div class="ph-btn">Pay $108.01 now</div><div class="ph-note">You enter your card on Authorize.net’s secure page.</div></div>';
+const VIEWS={
+ pay:()=>phone(URL_BOOK+"/book/tee-time",'<div class="ph-h">Your tee time is reserved</div><div class="ph-card"><span>Thu, Oct 15 · <b>9:13 AM</b></span><span>2 players · 18 holes</span><span class="ph-k">Confirmation code</span><span class="mono" style="font-weight:700;color:var(--green)">T4E7858394</span></div>'+payBox),
+ pay2:()=>phone(URL_BOOK+"/book/lookup",'<div class="ph-h">My Booking</div>'+payBox+'<div class="ph-warn"><b>그 사이 프로 샵</b><span>같은 예약을 카운터에서 먼저 결제</span></div>'),
+ form:()=>phone("test.authorize.net/payment/payment",'<div class="ph-h">Pelham Hills Golf Club</div><div class="rows"><span>Order PHW3F9A21C07B44</span><b>$108.01</b></div><div class="fl">Card Number</div><div class="field">4111 1111 1111 1111</div><div class="rows"><span class="fl">Exp</span><span class="fl">CVV</span></div><div class="rows"><div class="field">12/30</div><div class="field">123</div></div><div class="ph-btn blue">Pay $108.01</div><div class="ph-note">Authorize.net 페이지 · 우리 서버는 카드 번호를 보지 않음</div>',true),
+ checking:()=>phone(URL_BOOK+"/book/pay?invoice=PHW3F9A21C07B44",'<div class="ph-h">Payment</div><div class="ph-card"><b>Confirming your payment…</b><span class="ph-note">This usually takes a few seconds.</span><div class="spin"><i></i></div></div>'),
+ received:()=>phone(URL_BOOK+"/book/pay?invoice=PHW3F9A21C07B44",'<div class="ph-h">Payment</div><div class="ph-ok"><b>Payment received</b><span class="ph-big">$108.01</span><span>Visa ending 1111</span><span class="mono">Receipt PH-20261009-0007</span><span>Nothing more to pay at the club.</span></div><div class="ph-btn">View my booking</div>'),
+ closed:()=>phone("test.authorize.net/payment/payment",'<div class="ph-ok"><b>Thank you!</b><span>Transaction ID 80000000002</span></div><div class="ph-btn blue">Back to Pelham Hills</div><div class="ph-warn"><b>손님이 탭을 닫음</b><span>결과 화면으로 돌아오지 않음</span></div>',true),
+ returned:()=>phone(URL_BOOK+"/book/pay?invoice=PHW8C21D0E44A19",'<div class="ph-h">Payment</div><div class="ph-warn"><b>Payment returned</b><span>This payment of $108.01 could not be applied to your booking (it may have changed, or was already paid), so it was returned to your card (Visa ending 1111).</span></div><div class="ph-btn">View my booking</div>'),
+ lookup:()=>phone(URL_BOOK+"/book/lookup?code=T4E7858394",'<div class="ph-h">My Booking</div><div class="ph-card"><div class="ph-k">Tee Time</div><span>Thu, Oct 15 · 9:13 AM · 2 players</span></div><div class="ph-ok"><b>Paid online · $108.01 · Visa ending 1111</b><span>Receipt PH-20261009-0007</span></div><div class="ph-card"><span>You paid online, so changes are made by the pro shop. You can cancel here for a full refund until <b>Wed, Oct 14, 9:13 AM</b>.</span><div class="ph-btn red">Cancel and refund</div></div>'),
+ refunded:()=>phone(URL_BOOK+"/book/lookup?code=T4E7858394",'<div class="ph-h">My Booking</div><div class="ph-ok"><b>Your booking has been cancelled and $108.01 is going back to your Visa ending 1111.</b></div><div class="ph-card"><b>Refunded $108.01</b><span class="ph-note">The charge was cancelled before it settled, so it will drop off your statement.</span></div>'),
+ card:()=>phone("test.authorize.net · sandbox",'<div class="ph-h">샌드박스 테스트 카드</div><div class="fl">승인</div><div class="field">4111 1111 1111 1111</div><div class="rows"><div class="field">미래 날짜</div><div class="field">CVV 123</div></div><div class="fl">거절 보기</div><div class="field">Billing ZIP 46282</div><div class="ph-note">금액은 서버가 정하므로 금액으로 거절을 만들 수 없어요.</div>',true)
+};
+function termHtml(st){ return '<div class="termwin"><div class="tb"><i></i><i></i><i></i><span>'+esc(st.title||"터미널")+'</span></div><pre>'+st.lines.join("\n")+'</pre></div>'; }
+
+/* ---------- checklist ---------- */
+function renderTodo(focus){
+  $("todo").innerHTML=D.todo.map(t=>{
+    const mk={done:"✓",you:"!",block:"✕",later:"·"}[t.st];
+    return '<div class="item '+t.st+(t.id===focus?' focus':'')+'"><span class="mk">'+mk+'</span><div><b>'+esc(t.t)+'</b><small>'+t.d+'</small></div></div>';
+  }).join("");
+}
+
+/* ---------- log ---------- */
+function json(o,mark){
+  return esc(JSON.stringify(o,null,1)).replace(/&quot;([^&]+?)&quot;:/g,(m,k)=>'<span class="k'+(mark&&k===mark?' hl':'')+'">"'+k+'"</span>:')
+    .replace(/: &quot;(.*?)&quot;/g,(m,v)=>': <span class="s">"'+v+'"</span>')
+    .replace(/[{}\[\]]/g,c=>'<span class="d">'+c+'</span>');
+}
+const TAGS={api:"API",sql:"SQL",anet:"카드사",hook:"웹훅",git:"GIT",note:"참고"};
+
+/* ---------- voice: ElevenLabs mp3 (Hope) 먼저, 없으면 브라우저 음성 ---------- */
+const pad=n=>String(n).padStart(2,"0");
+const clipId=(si,j)=>"s"+pad(si+1)+"-"+pad(j+1)+"-n";
+const CLIPS=new Map();
+let narrTotal=0; S.forEach(s=>s.steps.forEach(st=>{ if(st.n) narrTotal++; }));
+function badge(){ const b=$("elBadge"); b.textContent="ElevenLabs 음성 "+CLIPS.size+" / "+narrTotal; b.classList.toggle("on",CLIPS.size>0); }
+(async function(){ try{ const r=await fetch("audio/manifest.json"); if(r.ok){ const m=await r.json(); (m.clips||[]).forEach(c=>CLIPS.set(c.id,"audio/"+c.file)); } }catch(e){} badge(); })();
+let curAudio=null;
+let speed=1, token=0;
+let VOICES=[];
+function loadVoices(){ try{ VOICES=speechSynthesis.getVoices()||[]; }catch(e){ VOICES=[]; } }
+if("speechSynthesis" in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function koVoice(){ const pool=VOICES.filter(v=>v.lang&&v.lang.toLowerCase().startsWith("ko")); return pool.find(v=>/yuna|sora|heami|seoyeon|sunhi|female|google 한국의/i.test(v.name))||pool[0]||null; }
+function est(t){ return t.length/7.5+.6; }
+function stopAudio(){ if(curAudio){ curAudio.pause(); curAudio=null; } try{ speechSynthesis.cancel(); }catch(e){} }
+function say(id,text,my){
+  return new Promise(res=>{
+    if(my!==token) return res();
+    if(!$("tNarr").checked) return setTimeout(res,est(text)*1000/speed);
+    const url=CLIPS.get(id);
+    if(url){ const a=new Audio(url); a.playbackRate=speed; curAudio=a; a.onended=a.onerror=()=>res(); a.play().catch(()=>res()); return; }
+    if(!("speechSynthesis" in window)) return setTimeout(res,est(text)*1000/speed);
+    const u=new SpeechSynthesisUtterance(text); u.lang="ko-KR";
+    const v=koVoice(); if(v) u.voice=v;
+    u.rate=Math.min(2,1.08*speed); u.pitch=1.1;
+    let done=false; const fin=()=>{ if(!done){done=true;res();} };
+    u.onend=fin; u.onerror=fin; setTimeout(fin,(est(text)*1.8+3)*1000/speed);
+    try{ speechSynthesis.speak(u); }catch(e){ fin(); }
+  });
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms/speed));
+
+/* ---------- render ---------- */
+let SC=0, step=0, playing=false;
+const totalSteps=S.reduce((a,s)=>a+s.steps.length,0);
+function render(){
+  const sc=S[SC], cur=sc.steps[step];
+  [...$("scen").children].forEach((c,i)=>c.setAttribute("aria-pressed",i===SC));
+  let screen=null, log="", focus=null;
+  sc.steps.slice(0,step+1).forEach((s,j)=>{
+    const isCur=j===step, nw=isCur?" new":"";
+    if(s.k==="screen"||s.k==="term") screen=s;
+    if(s.focus) focus=s.focus;
+    if(s.k==="log"){
+      log+='<div class="ent'+nw+(isCur?' cur':'')+'"><div class="eh"><span class="tag '+s.tag+'">'+TAGS[s.tag]+'</span><span class="tn">'+esc(s.name)+'</span>'+(s.ep?'<span class="ep">'+esc(s.ep)+'</span>':'')+'</div>'+
+        (s.req?'<div class="json req">'+json(s.req,s.mark)+'</div>':'')+(s.res?'<div class="json">'+json(s.res,s.mark)+'</div>':'')+'</div>';
+    }
+  });
+  if(screen){
+    $("screen").innerHTML='<div class="'+(screen===cur?'new':'')+'" style="width:100%;display:grid;justify-items:center">'+(screen.k==="term"?termHtml(screen):VIEWS[screen.v]())+'</div>';
+    $("scrTitle").textContent=screen.k==="term"?"터미널":"손님 휴대폰";
+    $("scrSub").textContent=screen.k==="term"?(screen.title||""):"예약 사이트";
+  } else { $("screen").innerHTML='<div class="empty">이 장면은 화면 없이 서버 쪽에서만 일어나요</div>'; $("scrTitle").textContent="화면"; $("scrSub").textContent=""; }
+  $("log").innerHTML=log||'<div class="empty">아직 호출이 없어요</div>';
+  renderTodo(focus);
+  const lw=$("logWrap"); lw.scrollTop=lw.scrollHeight;
+  // 상태판 강조
+  const boardFor={commit:"b-commit",push:"b-push",sql:"b-deploy",fly:"b-deploy",secrets:"b-deploy",hook:"b-deploy",pytest:"b-test",sqltest:"b-test",impl:"b-build"};
+  ["b-build","b-test","b-commit","b-push","b-deploy"].forEach(id=>$(id).classList.toggle("pulse",boardFor[cur.focus]===id));
+
+  $("stepno").textContent=(step+1)+" / "+sc.steps.length;
+  $("capText").innerHTML='<span class="who">해설 · '+esc(sc.ko)+'</span>'+esc(cur.n||"");
+  $("dots").innerHTML=sc.steps.map((s,j)=>'<button type="button" class="dot'+(j<step?' done':'')+(j===step?' now':'')+'" data-j="'+j+'" aria-label="'+(j+1)+'단계"></button>').join("");
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>일시정지':'<svg viewBox="0 0 16 16"><path d="M3 2v12l11-6z"/></svg>재생';
+  let before=0; for(let i=0;i<SC;i++) before+=S[i].steps.length;
+  $("tmScen").textContent=(step+1)+" / "+sc.steps.length;
+  $("tmAll").textContent=(before+step+1)+" / "+totalSteps;
+  $("tmBar").style.width=((before+step+1)/totalSteps*100)+"%";
+}
+
+/* ---------- playback ---------- */
+async function loop(){
+  const my=++token; playing=true; render();
+  while(my===token){
+    const st=S[SC].steps[step];
+    if(st.n) await say(clipId(SC,step),st.n,my);
+    if(my!==token) return;
+    await wait(st.k==="log"?700:900);
+    if(my!==token) return;
+    if(step<S[SC].steps.length-1) step++;
+    else if($("tAll").checked&&SC<S.length-1){ SC++; step=0; }
+    else { playing=false; token++; render(); return; }
+    render();
+  }
+}
+function pause(){ token++; playing=false; stopAudio(); render(); }
+function go(si,j){ const was=playing; token++; stopAudio(); SC=si; step=Math.max(0,Math.min(j,S[si].steps.length-1)); playing=false; render(); if(was) loop(); }
+
+$("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" data-i="'+i+'"><span class="grp'+(s.grp==="ops"?' ops':'')+'"></span><span class="no">'+String(i+1).padStart(2,"0")+'</span>'+esc(s.ko)+'<small>'+esc(s.en)+'</small></button>').join("");
+$("scen").addEventListener("click",e=>{ const b=e.target.closest(".chip"); if(b) go(+b.dataset.i,0); });
+$("dots").addEventListener("click",e=>{ const b=e.target.closest(".dot"); if(b) go(SC,+b.dataset.j); });
+$("bPlay").addEventListener("click",()=>playing?pause():loop());
+$("bPrev").addEventListener("click",()=>{ if(step>0) go(SC,step-1); else if(SC>0) go(SC-1,S[SC-1].steps.length-1); });
+$("bNext").addEventListener("click",()=>{ if(step<S[SC].steps.length-1) go(SC,step+1); else if(SC<S.length-1) go(SC+1,0); });
+$("bRestart").addEventListener("click",()=>go(0,0));
+$("speed").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; speed=+b.dataset.v; [...$("speed").children].forEach(x=>x.setAttribute("aria-checked",x===b)); if(curAudio) curAudio.playbackRate=speed; });
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea")) return;
+  if(e.key===" "){ e.preventDefault(); playing?pause():loop(); }
+  else if(e.key==="ArrowRight") $("bNext").click();
+  else if(e.key==="ArrowLeft") $("bPrev").click();
+  else if(/^[1-4]$/.test(e.key)) $("speed").children[+e.key-1].click();
+});
+render();
+})();
+</script>
+
+</body></html>

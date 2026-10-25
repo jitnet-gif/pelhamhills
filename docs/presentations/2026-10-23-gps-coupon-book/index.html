@@ -1,0 +1,915 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>GPS Coupon Book</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- membership sale mocks (prefixed ms-) ---- */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px}
+.seg.lang svg{width:20px;height:18px;flex:0 0 auto}
+.seg.lang svg path{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.seg.lang svg text{fill:currentColor;font-family:var(--sans);font-weight:700;font-size:8.5px}
+/* ---- GolfNow + bill fix mocks (prefixed pf-) ---- */
+.ph.plan{background:var(--green-soft);color:var(--green)}
+.ph.gn{background:var(--flag-soft);color:var(--flag)}
+.ph.fix{background:var(--violet-soft);color:var(--violet)}
+.ph.ship{background:var(--sand-soft);color:var(--sand)}
+.cx-new{animation:cxflash 1.1s ease}
+@keyframes cxflash{0%{background:#fff3b0}100%{background:transparent}}
+@media (prefers-reduced-motion:reduce){.cx-new{animation:none}}
+.pf-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){.pf-two{grid-template-columns:1fr}}
+.pf-card{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:6px;min-width:0;transition:opacity .3s}
+.pf-card.off{opacity:.35}
+.pf-card small{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);font-weight:700}
+.pf-card>b{font-size:15px}
+.pf-card.bad{border-color:var(--scr-red);background:var(--scr-red-soft)}
+.pf-card.good{border-color:var(--scr-ok);background:var(--scr-ok-soft)}
+.pf-li{display:flex;gap:8px;align-items:baseline;font-size:12px}
+.pf-li em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);flex:0 0 auto}
+.pf-flow{display:grid;gap:8px}
+.pf-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pf-node{border:1px solid var(--scr-line);background:var(--scr-paper);border-radius:6px;padding:6px 9px;font-weight:700;font-size:12px;white-space:nowrap}
+.pf-node.gn{border-color:#1a7f4b;color:#1a7f4b}
+.pf-node.cg{border-color:#2d5e8c;color:#2d5e8c}
+.pf-node.us{border-color:var(--scr-accent);color:var(--scr-accent)}
+.pf-node.off{opacity:.35;text-decoration:line-through}
+.pf-arr{font-family:var(--mono);color:var(--scr-muted);font-size:12px}
+.pf-arr.cut{color:var(--scr-red);font-weight:700}
+.pf-cap{font-size:11px;color:var(--scr-muted)}
+.pf-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--scr-red-soft);color:var(--scr-red)}
+.pf-tag.ok{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.pf-tag.ac{background:var(--scr-accent-soft);color:var(--scr-accent)}
+.pf-bill{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.pf-bill h4{margin:0 0 4px;font-size:12px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.pf-l{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums;font-size:12px}
+.pf-l.gone{color:var(--scr-muted);text-decoration:line-through}
+.pf-l.disc{color:var(--scr-ok)}
+.pf-l.tot{border-top:1px solid var(--scr-line);padding-top:5px;margin-top:3px;font-weight:700;font-size:13.5px}
+.pf-l.tot.bad{color:var(--scr-red)}
+.pf-l.tot.ok{color:var(--scr-ok)}
+.pf-step{font-size:11.5px;font-weight:700;color:var(--scr-accent);background:var(--scr-accent-soft);border-radius:6px;padding:5px 8px}
+.pf-field{display:grid;gap:3px;font-size:11px;color:var(--scr-muted)}
+.pf-field span{border:1px solid var(--scr-line);border-radius:5px;padding:5px 8px;background:#fff;color:var(--scr-ink);font-family:var(--mono);font-size:12px}
+.pf-field span.hot{border-color:var(--scr-accent);box-shadow:0 0 0 2px var(--scr-accent-soft)}
+.pf-reader{display:grid;gap:6px;justify-items:center;background:var(--scr-bar);color:#fff;border-radius:10px;padding:14px 10px;text-align:center}
+.pf-reader b{font-size:20px;font-variant-numeric:tabular-nums}
+.pf-reader small{color:#b9c0c8;font-size:11px}
+.pf-err{border:1px solid var(--scr-red);background:var(--scr-red-soft);color:var(--scr-red);border-radius:6px;padding:7px 9px;font-size:11.5px;font-weight:600}
+.pf-dlg{border:1px solid var(--scr-line);background:#fff;border-radius:8px;padding:10px 12px;display:grid;gap:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:12px}
+.pf-dlg .bt{display:flex;gap:6px;justify-content:flex-end}
+.pf-dlg .bt i{font-style:normal;border:1px solid var(--scr-line);border-radius:5px;padding:4px 10px;font-weight:700}
+.pf-dlg .bt i.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.pf-todo{display:grid;gap:6px}
+.pf-todo div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:7px;padding:7px 9px;font-size:12px}
+.pf-todo div.you{border-color:var(--scr-accent)}
+.pf-todo b{display:block}
+.pf-todo small{color:var(--scr-muted);font-size:11px}
+/* ---- API key mocks (prefixed ak-) ---- */
+.pf-card.off2{opacity:.6;border-style:dashed}
+.pf-card code{font-family:var(--mono);font-size:11px}
+.pf-node.cl{border-color:#b4562b;color:#b4562b}
+.pf-node.bill{border-color:var(--scr-muted);color:var(--scr-muted)}
+.ak-term{background:var(--scr-bar);color:#e6ebef;border-radius:8px;padding:9px 11px;font-family:var(--mono);font-size:11.5px;display:grid;gap:3px;margin-bottom:10px;overflow-x:auto;white-space:pre}
+.ak-term .mut{color:#9aa4ad}
+.ak-term .okc{color:#7fd1a0}
+.ak-three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:620px){.ak-three{grid-template-columns:1fr}}
+.ak-phone{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:14px;padding:10px;display:grid;gap:6px;align-content:start;min-width:0}
+.ak-bub{max-width:88%;background:#e9ecef;color:#1d2328;border-radius:12px 12px 12px 3px;padding:6px 9px;font-size:12px;justify-self:start}
+.ak-bub.me{background:var(--scr-accent);color:#fff;border-radius:12px 12px 3px 12px;justify-self:end}
+.ak-cam{display:grid;gap:6px;justify-items:center;background:var(--scr-bar);border-radius:10px;padding:12px;color:#b9c0c8;font-size:11px}
+.ak-shot{width:100%;aspect-ratio:4/3;max-width:100%;border:2px dashed #7fd1a0;border-radius:8px;display:grid;place-items:center;color:#fff;font-weight:700}
+.ak-refs{display:flex;flex-wrap:wrap;gap:5px;align-content:start}
+.ak-refs span{border:1px solid var(--scr-line);background:var(--scr-paper);border-radius:6px;padding:4px 7px;font-size:11px}
+.ak-refs span.hit{border-color:var(--scr-ok);background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700}
+.ak-refs span.mut{border-style:dashed;color:var(--scr-muted)}
+.posbody>.pf-step,.posbody>.pf-card{margin-top:10px}
+.ph.use{background:var(--violet-soft);color:var(--violet)}
+.pf-card .pf-tag{justify-self:start}
+/* ---- coupon book mocks (prefixed cb-) ---- */
+.ph.new{background:var(--violet-soft);color:var(--violet)}
+.cb-phone{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:16px;padding:10px;display:grid;gap:8px;align-content:start;min-width:0}
+.cb-ph-h{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#1f6b3a}
+.cb-ph-h b{color:var(--scr-ink);font-size:13px}
+.cb-ph-h span{color:var(--scr-muted)}
+.cb-intro{margin:0;font-size:11px;color:var(--scr-muted);text-align:center}
+.cb-today{color:#1f6b3a;font-weight:700}
+.cb-code{border:1px solid var(--scr-line);border-radius:10px;padding:6px;text-align:center;display:grid}
+.cb-code small{font-size:9.5px;letter-spacing:.1em;color:var(--scr-muted);font-weight:700}
+.cb-code b{font-family:var(--mono);font-size:22px;letter-spacing:.25em}
+.cb-code span{font-size:10px;color:var(--scr-muted)}
+.cb-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.cb-grid li{aspect-ratio:1;max-width:100%;border:2px dashed var(--scr-line);border-radius:50%;display:grid;place-items:center;font-size:11px;color:var(--scr-muted);overflow:hidden;background:var(--scr-paper)}
+.cb-grid li.gift{border-color:#1f6b3a}
+.cb-grid li.on{border:2px solid transparent;background:#fff}
+.cb-grid li img{width:100%;height:100%;object-fit:contain}
+.cb-pop img{animation:cbpop .6s ease}
+@keyframes cbpop{0%{transform:scale(1.8);opacity:0}60%{opacity:1}100%{}}
+@media (prefers-reduced-motion:reduce){.cb-pop img{animation:none}}
+.cb-big{display:grid;justify-items:center;gap:4px;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px;text-align:center}
+.cb-big img{width:110px;height:auto;max-width:100%}
+.cb-big small{font-size:11px;color:var(--scr-muted)}
+.cb-big code{font-family:var(--mono);font-size:10.5px}
+.cb-free,.cb-mem{display:flex;gap:8px;align-items:center;border:2px solid #1f6b3a;background:var(--scr-ok-soft);border-radius:10px;padding:8px;font-size:18px}
+.cb-mem{border:1px solid var(--scr-line);background:var(--scr-paper);color:#1f6b3a}
+.cb-free span,.cb-mem span{display:grid;font-size:12px;color:var(--scr-ink)}
+.cb-free small,.cb-mem small{font-size:10.5px;color:var(--scr-muted)}
+.cb-desk{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:8px}
+.cb-desk h4{margin:0;font-size:13px}
+.cb-find{display:flex;gap:6px}
+.cb-find span{flex:1;min-width:0;border:1px solid var(--scr-line);border-radius:6px;padding:7px 9px;font-family:var(--mono);font-size:15px;letter-spacing:.2em;background:#fff;color:var(--scr-ink)}
+.cb-find span.hot{border-color:#22a35a;box-shadow:0 0 0 2px #cdeedb}
+.cb-find i,.cb-btns i{font-style:normal;font-weight:700;font-size:11.5px;border-radius:6px;padding:7px 10px;background:#1f6b3a;color:#fff;white-space:nowrap}
+.cb-hold{border:1px solid var(--scr-line);border-radius:7px;padding:9px;display:grid;gap:6px;background:var(--scr-paper)}
+.cb-hold p{margin:0;font-size:12px}
+.cb-hr{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:12px}
+.cb-hr code{font-family:var(--mono);color:var(--scr-muted)}
+.cb-bars,.cb-mini{display:flex;gap:3px}
+.cb-bars span{flex:1;height:14px;border-radius:3px;background:#e4e4e7}
+.cb-bars span.on{background:#1f6b3a}
+.cb-btns{display:flex;flex-wrap:wrap;gap:5px}
+.cb-btns i.go{background:#16a34a}
+.cb-btns i.am{background:#f59e0b}
+.cb-btns i.sk{background:#0284c7}
+.cb-btns i.ln{background:transparent;color:var(--scr-ink);border:1px solid var(--scr-line)}
+.cb-btns i.off,.cb-btns i.done{opacity:.5}
+.cb-badge{margin-left:6px;font-size:10.5px;font-weight:700;background:#e3f1e8;color:#1f6b3a;border-radius:4px;padding:1px 6px}
+.cb-ok{margin:0;font-size:12px;color:#1f6b3a;font-weight:600}
+.cb-mini span{flex:1;height:8px;border-radius:2px;background:var(--line,#ddd);opacity:.5}
+.cb-mini span.on{background:var(--green,#1f6b3a);opacity:1}
+.cb-mini{margin:4px 0 6px}
+.cb-sheet{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px;display:grid;gap:6px;align-content:start;min-width:0}
+.cb-sheet h4{margin:0;font-size:12.5px}
+.cb-seat{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;border:1px solid var(--scr-line);border-radius:6px;padding:6px 8px;font-size:12px}
+.cb-seat span{display:grid;min-width:0}
+.cb-seat small{font-size:10.5px;color:var(--scr-muted)}
+.cb-seat i{font-style:normal;font-weight:700;font-size:11px;border:1px solid var(--scr-line);border-radius:5px;padding:3px 8px}
+.cb-seat.in i{background:#1f6b3a;color:#fff;border-color:#1f6b3a}
+.cb-st{grid-column:1/-1;font-style:normal;font-size:11px;font-weight:700;border-radius:4px;padding:2px 6px;justify-self:start}
+.cb-st.ok{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.cb-st.mut{background:#eceef0;color:var(--scr-muted)}
+.cb-minus{color:var(--scr-red)}
+.pf-two>.pf-card{align-self:start}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">GPS app · Supabase RPC</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · GPS 앱 쿠폰북 · 나레이터 프레젠테이션",
+  h1:"<b>체크인하면 로고 도장 1개</b>, 10개면 <b>1회 무료</b> · 환불하면 하나 빠짐 · 멤버 제외",
+  lede:"GPS 앱 쿠폰북이 어떻게 돌아가는지 장면별로 보여 드려요. 체크인하면 도장이 저절로 찍히고, 환불하면 빠지고, 멤버는 도장도 친구 소개 보상도 없어요. 왼쪽은 화면, 가운데는 뒤에서 일어나는 일, 오른쪽은 쿠폰북 상태와 진행 체크리스트예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"화면",laneLog:"뒤에서 일어나는 일",laneLedger:"체크리스트",
+  ledgerSub:"쿠폰북 · 진행 상태",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 뒤에서 일어나는 일이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"확인한 곳: golf-gps-pelhamhills-seven backend/migrations 0023·0025·0026·0027·0028, frontend/src/pages/Coupons.tsx, components/admin/CouponDesk.tsx, lib/couponBook.ts, pelhamhills 0005·0020·0069·0084. 0026~0028 은 로컬 Postgres 에서 상황별로 시험했어요. 화면 속 이름·코드는 예시예요."},
+ en:{eyebrow:"Pelham Hills Golf Club · GPS app coupon book · narrated walkthrough",
+  h1:"<b>Check in, get a logo stamp</b>, ten = <b>one free round</b> · refunds take one off · members excluded",
+  lede:"How the GPS app coupon book works, scene by scene. Checking in stamps the card automatically, a refund takes the stamp back, and members get neither stamps nor friend rewards. Left: the screen. Middle: what happens behind it. Right: the coupon book state and progress checklist.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Screen",laneLog:"What happens behind",laneLedger:"Checklist",
+  ledgerSub:"Coupon book · progress",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Behind-the-scenes steps appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. The speech-bubble buttons (가 / Aa) restart the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Checked: golf-gps-pelhamhills-seven backend/migrations 0023, 0025, 0026, 0027, 0028, frontend/src/pages/Coupons.tsx, components/admin/CouponDesk.tsx, lib/couponBook.ts, pelhamhills 0005, 0020, 0069, 0084. 0026–0028 were tested case by case on a local Postgres. Names and codes on screen are examples."}
+};
+
+const L=(ko,en)=>({ko,en});
+const T=(ko,en)=>LANG==="ko"?ko:en;
+
+function frame(url,body){return '<div class="pos"><div class="urlbar"><i></i><span>'+url+'</span></div><div class="posbody">'+body+'</div></div>'}
+
+/* 손님 폰의 도장판. n = 찍힌 도장 수, fresh = 방금 찍힌 칸 */
+function stampCard(n,fresh){
+ let h='<ol class="cb-grid">';
+ for(let i=0;i<10;i++){
+  const filled=i<n,last=i===9;
+  h+='<li class="'+(filled?"on":last?"gift":"")+(filled&&i===fresh?" cb-pop":"")+'">'+(filled?'<img src="club-logo.png" alt="" style="transform:rotate('+(((i*37)%25)-12)+'deg)">':last?"🎁":(i+1))+'</li>';
+ }
+ return h+'</ol>';
+}
+function phone(inner){return '<div class="cb-phone"><div class="cb-ph-h">‹ Home<b>Coupon book</b><span>↻</span></div>'+inner+'</div>'}
+const codeBox='<div class="cb-code"><small>YOUR CODE</small><b>K7Q2MX</b><span>Show this at the pro shop</span></div>';
+
+
+function ruleScreen(p){
+ const n=Math.min(3,Math.floor(p*4.2));
+ const intro='<p class="cb-intro">Play 10 rounds, get the next one <b>free</b>. You get a stamp automatically when you check in at the pro shop.</p>';
+ const side='<div class="pf-card"><small>'+T("규칙","Rules")+'</small>'+
+  '<span class="pf-li"><em>1</em>'+T("체크인 1회 = 도장 1개 (자동)","One check-in = one stamp (automatic)")+'</span>'+
+  '<span class="pf-li"><em>2</em>'+T("도장 10개 = 무료 라운드 1회","Ten stamps = one free round")+'</span>'+
+  '<span class="pf-li"><em>3</em>'+T("하루에 도장은 한 번","One stamp per day")+'</span>'+
+  '<span class="pf-li"><em>4</em>'+T("환불하면 도장 하나 빠짐","A refund takes one off")+'</span>'+
+  '<span class="pf-li"><em>5</em>'+T("멤버는 도장·친구 소개 보상 없음","Members: no stamps, no friend rewards")+'</span>'+
+  '<span class="pf-cap">'+T("손님 폰은 보기만 해요. 도장은 서버가 체크인 때 찍어요.","The guest’s phone only views. The server stamps at check-in.")+'</span></div>';
+ return frame("golf-gps-pelhamhills-seven.vercel.app/coupons",'<div class="pf-two">'+phone(intro+codeBox+stampCard(n,n-1))+side+'</div>');
+}
+
+function checkinScreen(p){
+ const st=p<.3?0:p<.65?1:2;
+ const seat=(nm,sub,arr,flag)=>'<div class="cb-seat'+(arr?" in":"")+'"><span><b>'+nm+'</b><small>'+sub+'</small></span><i>'+(arr?"Arrived ✓":"Check in")+'</i>'+(flag||"")+'</div>';
+ const sheet='<div class="cb-sheet"><h4>9:10 AM · 18 holes</h4>'+
+  seat("Dana Lee",T("웹 예약 · dana@example.com","Web booking · dana@example.com"),st>=1,st>=2?'<em class="cb-st ok cx-new">'+T("도장 +1","Stamp +1")+'</em>':"")+
+  seat("Jordan Smith",T("멤버","Member"),st>=1,st>=2?'<em class="cb-st mut cx-new">'+T("멤버 · 도장 없음","Member · no stamp")+'</em>':"")+
+  seat("Guest",T("앱 계정 없음","No app account"),st>=1,st>=2?'<em class="cb-st mut cx-new">'+T("계정 없음 · 넘어감","No account · skipped")+'</em>':"")+'</div>';
+ const how='<div class="pf-card"><small>'+T("어느 앱 계정에 찍나","Which app account")+'</small>'+
+  '<span class="pf-li"><em>1</em>'+T("프로샵 QR 로 이어 둔 계정","Account linked by the pro shop QR")+'</span>'+
+  '<span class="pf-li"><em>2</em>'+T("손님 기록 이메일과 같은 계정","Same email as the customer record")+'</span>'+
+  '<span class="pf-li"><em>3</em>'+T("예약 이메일과 같은 계정","Same email as the booking")+'</span>'+
+  '<span class="pf-cap">'+T("Arrived 버튼, QR·신분증 체크인 어느 길이든 같아요.","Same for the Arrived button and QR or ID check-in.")+'</span></div>';
+ return frame("pelhamhills · tee sheet",'<div class="pf-two">'+sheet+how+'</div>');
+}
+
+function refundScreen(p){
+ const st=p<.3?0:p<.65?1:2;
+ const n=st<2?5:4;
+ const bill='<div class="pf-bill"><h4>Bill PH-20261023-0012 <span class="pf-tag'+(st>=1?"":" ok")+'">'+(st>=1?"Refunded":"Paid")+'</span></h4>'+
+  '<div class="pf-l'+(st>=1?" gone":"")+'"><span>Green fee — Dana Lee (9:10 AM)</span><span>$47.79</span></div>'+
+  '<div class="pf-l tot"><span>'+T("합계","Total")+'</span><span>$54.00</span></div></div>';
+ const ph=phone(stampCard(n,-1)+'<p class="cb-intro">'+(st>=2?'<b class="cb-minus cx-new">'+T("도장 하나 빠짐 · 4/10","One stamp removed · 4/10")+'</b>':"5/10")+'</p>');
+ const side='<div style="display:grid;gap:8px">'+bill+'<div class="pf-card"><small>'+T("같이 빠지는 때","Also removed when")+'</small><span class="pf-li"><em>·</em>'+T("체크인을 잘못 눌러 되돌림","A check-in is undone")+'</span><span class="pf-li"><em>·</em>'+T("친구의 첫 도장이면 소개 보상(카트 무료)도","On a friend’s first stamp, the referral cart too")+'</span><span class="pf-cap">'+T("그 도장으로 채운 무료를 이미 썼으면 도장을 남겨요.","If that stamp completed a free round already used, the stamp stays.")+'</span></div></div>';
+ return frame(T("환불 → 도장 하나 빼기","Refund → one stamp off"),'<div class="pf-two">'+ph+side+'</div>');
+}
+
+function logoScreen(p){
+ const n=p<.3?4:p<.6?5:6;
+ const big='<div class="cb-big"><img src="club-logo.png" alt="Pelham Hills Golf Club logo"><small>'+T("pelhamhills 클럽 로고를 그대로 복사","Copied straight from the pelhamhills club logo")+'</small><code>frontend/public/club-logo.png</code></div>';
+ return frame("…/coupons",'<div class="pf-two">'+phone(stampCard(n,n-1)+'<p class="cb-intro">'+(10-n)+' more rounds to your next free round.<br><span class="cb-today">Stamped today ✓</span></p>')+
+  '<div style="display:grid;gap:8px">'+big+'<div class="pf-card"><small>'+T("예전 → 지금","Before → now")+'</small><span class="pf-li"><em>'+T("전","was")+'</em>'+T("초록 원 + 깃발 아이콘","Green circle + flag icon")+'</span><span class="pf-li"><em>'+T("지금","now")+'</em>'+T("흰 원 + 클럽 로고, 칸마다 살짝 기울임","White circle + club logo, each tilted a little")+'</span></div></div></div>');
+}
+
+function freeScreen(p){
+ const st=p<.35?0:p<.7?1:2;
+ const n=st===0?9:0;
+ const banner=st>=1?'<div class="cb-free cx-new">🎁 <span><b>1 free round ready</b><small>Tell the pro shop when you check in.</small></span></div>':"";
+ const used=st>=2?'<div class="pf-card good cx-new"><small>'+T("계산대","Counter")+'</small><b>'+T("무료 라운드 사용","Use free round")+'</b><span class="pf-cap">'+T("직원이 확인 후 누르면 “그린피를 받지 마세요” 안내가 떠요. 장부에 사용 1줄이 쌓여요.","Staff confirm and the panel says “don’t charge the green fee”. One redeem line goes into the ledger.")+'</span></div>':
+  '<div class="pf-card"><small>'+T("장부 방식","Ledger")+'</small><span class="pf-li"><em>stamp</em>'+T("도장 1줄","one line per stamp")+'</span><span class="pf-li"><em>redeem</em>'+T("무료 사용 1줄","one line per free round")+'</span><span class="pf-cap">'+T("무료 = 도장 수 ÷ 10 − 사용. 판 위 도장 = 도장 수 ÷ 10 의 나머지.","Free = stamps ÷ 10 − used. On the card = stamps mod 10.")+'</span></div>';
+ return frame("…/coupons",'<div class="pf-two">'+phone(banner+stampCard(n,st===0?8:-1)+'<p class="cb-intro">'+(st===0?"1 more round to your next free round.":"10 more rounds to your next free round.")+'</p>')+used+'</div>');
+}
+
+function memberScreen(p){
+ const st=p<.3?0:p<.65?1:2;
+ const how='<div class="pf-card'+(st===0?" cx-new":"")+'"><small>'+T("회원인지 찾는 법","How a member is found")+'</small>'+
+  '<span class="pf-li"><em>1</em>'+T("이 GPS 계정에 이어진 손님 기록 (QR 연결, 0084)","Customer record linked to this GPS account (QR link, 0084)")+'</span>'+
+  '<span class="pf-li"><em>'+T("또는","or")+'</em>'+T("가입 이메일이 같은 손님 기록","Customer record with the same sign-up email")+'</span>'+
+  '<span class="pf-li"><em>→</em>'+T("가장 최근 회원권(취소 제외)이 만료 전이면 회원 (0069 와 같은 규칙)","Latest membership (not cancelled) not yet expired = member (same rule as 0069)")+'</span></div>';
+ const guest=st>=1?phone('<div class="cb-mem cx-new">✔ <span><b>You’re a Pelham Hills member</b><small>Your rounds are on your membership, so the stamp card is for public players.</small></span></div>'):"";
+ const staff=st>=2?'<div class="cb-hold cx-new"><div class="cb-hr"><b>j.smith@example.com <span class="cb-badge">회원 · 도장 없음</span></b><code>R4TW8N</code></div><div class="cb-btns"><i class="go off">회원은 도장 없음</i><i class="ln">되돌리기</i></div></div>':"";
+ return frame(T("멤버는 제외 (0026 · 0028)","Members excluded (0026 · 0028)"),'<div class="pf-two">'+how+(guest||"")+'</div>'+(staff?'<div style="margin-top:10px">'+staff+'</div>':""));
+}
+
+
+function edgeScreen(p){
+ const st=p<.34?0:p<.67?1:2;
+ const c=(on,h,b,t)=>'<div class="pf-card'+(on?" cx-new":"")+'"><small>'+h+'</small><b>'+b+'</b><span class="pf-cap">'+t+'</span></div>';
+ const a=[
+  c(st===0,T("멤버의 친구 소개","Member referrals"),T("막힘","Blocked"),T("친구가 멤버의 코드를 넣으면 거절돼요. 코드를 넣은 뒤 소개한 사람이 멤버가 되면 보상 없이 소개가 지워져요. 멤버 화면에는 초대 칸이 없어요.","A friend can’t enter a member’s code. If the referrer becomes a member later, the referral is dropped with no reward. Members don’t see the invite box.")),
+  c(st===1,T("무료 라운드 쓰는 날","Free round day"),T("체크인 전에 사용 처리","Redeem before check-in"),T("무료로 친 라운드에는 도장이 없어요. 체크인 뒤에 쓰면 그날 도장이 하나 남아요.","A free round earns no stamp. Redeem after check-in and that day’s stamp stays.")),
+  c(st===2,T("멤버권이 끝나면","When a membership ends"),T("다음 날부터 다시 도장","Stamps again from the next day"),T("멤버 되기 전에 모은 무료 라운드는 그대로 쓸 수 있어요. 오늘 날짜가 아닌 예약을 체크인해도 도장은 없어요.","Free rounds earned before joining are kept. Checking in a booking from another day gives no stamp."))
+ ];
+ return frame(T("경계 상황","Edge cases"),'<div class="pf-flow">'+a.slice(0,st+1).join("")+'</div>');
+}
+
+function todoScreen(n){
+ const it=[
+  ["",T("SQL 실행 완료","SQL run"),T("pelhamhills 0084, GPS 0023 · 0025 · 0026 · 0027 (직접 실행하심)","pelhamhills 0084, GPS 0023, 0025, 0026, 0027 (you ran them)"),"ok"],
+  ["you",T("0028 실행 (직접)","Run 0028 (you)"),T("멤버 친구 소개 막기. SQL editor 에 파일 전체를 붙여 한 번.","Blocks member referrals. Paste the whole file into the SQL editor once."),"wait"],
+  ["you",T("커밋 범위 정하기","Decide the commit scope"),T("쿠폰북·QR·체크인 묶음만 올릴지, 코스 데이터 작업까지 같이 올릴지.","Ship only the coupon book, QR and check-in bundle, or the course data work too."),"wait"],
+  ["",T("푸시 → Vercel 배포","Push → Vercel deploys"),T("범위가 정해지면 커밋·푸시하고 배포 상태를 확인해요.","Once the scope is set, I commit, push and check the deploy."),"next"]
+ ];
+ return frame(T("진행 상태","Progress"),'<div class="pf-todo">'+it.slice(0,n).map((x,i)=>'<div class="'+x[0]+(i===n-1?" cx-new":"")+'"><span class="pf-tag '+(x[3]==="ok"?"ok":"ac")+'">'+(x[3]==="ok"?"✓":(i+1))+'</span><span><b>'+x[1]+'</b><small>'+x[2]+'</small></span></div>').join("")+'</div>');
+}
+
+const NOTE={
+ rule:["도장은 손님 폰이 아니라 서버가 찍어요. 폰이 찍을 수 있으면 집에서 열 번 누르면 공짜예요.","The server stamps, not the phone. If the phone could, ten taps at home would be a free round."],
+ checkin:["앱 계정과 예약이 이어지지 않은 손님은 직원이 /fnb 에서 손으로 찍어요.","Guests whose booking isn’t tied to an app account are stamped by hand at /fnb."],
+ logo:["로고는 앱과 함께 오프라인 캐시에 들어가요.","The logo is cached offline with the app."],
+ free:["무료 라운드는 체크인 전에 사용 처리해요.","Redeem the free round before check-in."],
+ refund:["환불 함수가 상태를 바꾸는 순간 트리거가 돌아요. 온라인 환불도 같아요.","The trigger runs when the refund changes the bill status, online refunds too."],
+ member:["화면이 막는 것과 별개로 서버가 도장을 거절해요.","Apart from the screens, the server itself refuses the stamp."],
+ edge:["쿠폰북 쪽 오류가 나도 체크인·환불은 그대로 진행돼요.","A coupon error never blocks the check-in or refund."],
+ todo:["0028 은 0027 뒤에 실행해야 해요. 순서가 틀리면 파일이 알려 주고 멈춰요.","Run 0028 after 0027. Out of order, the file stops and says why."]
+};
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"rule",ph:"plan",ko:"규칙",en:"The rules",
+ screen:(l,p)=>ruleScreen(p),
+ log:[
+  {at:.12,tag:"ui",name:"/coupons",ep:"my_coupon_book()",why:L("처음 열면 서버가 6자리 코드를 만들어요.","On first open the server makes a 6-character code.")},
+  {at:.45,tag:"local",name:"coupon_entries",ep:"kind = stamp | redeem",why:L("숫자를 덮어쓰지 않고 한 줄씩 쌓아요.","Lines are added, never overwritten.")},
+  {at:.75,tag:"local",name:"STAMPS_PER_FREE",ep:"10"}
+ ],
+ ledger:[{at:0,g:"rule",n:3}]},
+
+{a:"checkin",ph:"new",ko:"체크인 = 자동 도장",en:"Check-in stamps",
+ screen:(l,p)=>checkinScreen(p),
+ log:[
+  {at:.1,tag:"ui",name:"tee sheet",ep:"Arrived · QR · ID scan"},
+  {at:.3,tag:"local",name:"pelham_tee_bookings",ep:"player arrived false → true"},
+  {at:.5,tag:"rpc",name:"pelham_coupon_on_checkin",ep:"trigger · 0027",why:L("체크인하는 길이 여러 개라도 예약 저장 한 곳에서 잡아요.","Several check-in paths, one place that catches them: the booking save.")},
+  {at:.68,tag:"rpc",name:"coupon_owner_for_player",ep:"QR link → email"},
+  {at:.85,tag:"rpc",name:"coupon_give_stamp",ep:"member? · today? · free round today?"}
+ ],
+ ledger:[{at:0,g:"checkin",n:4},{at:.65,n:5,flash:["c"]}]},
+
+{a:"logo",ph:"new",ko:"로고 도장",en:"Logo stamps",
+ screen:(l,p)=>logoScreen(p),
+ log:[
+  {at:.15,tag:"local",name:"club-logo.png",ep:"468×460 · from pelhamhills"},
+  {at:.45,tag:"rpc",name:"couponBook.ts",ep:"STAMP_LOGO = '/club-logo.png'"},
+  {at:.75,tag:"ui",name:"Coupons.tsx",ep:"<img> · rotate −12°…+12°",why:L("고무도장처럼 칸마다 각도가 달라요.","Each cell is tilted like a rubber stamp.")}
+ ],
+ ledger:[{at:0,g:"logo",n:4},{at:.3,n:5,flash:["c"]},{at:.6,n:6,flash:["c"]}]},
+
+{a:"free",ph:"plan",ko:"10개 → 1회 무료",en:"Ten → one free",
+ screen:(l,p)=>freeScreen(p),
+ log:[
+  {at:.15,tag:"local",name:"stamps = 10",ep:"free_left = 1 · on_card = 0"},
+  {at:.5,tag:"ui",name:"/coupons",ep:"1 free round ready"},
+  {at:.8,tag:"rpc",name:"coupon_redeem(p_owner)",ep:"+1 redeem",why:L("남은 무료가 없으면 서버가 거절해요.","Refused if there’s no free round left.")}
+ ],
+ ledger:[{at:0,g:"free",n:9},{at:.35,n:0,f:1,flash:["c"]},{at:.7,n:0,f:0,flash:["c"]}]},
+
+{a:"refund",ph:"new",ko:"환불 → 하나 빼기",en:"Refund → one off",
+ screen:(l,p)=>refundScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_staff_bill_refund",ep:"paid → refunded"},
+  {at:.4,tag:"rpc",name:"pelham_coupon_on_refund",ep:"trigger · 0027",why:L("그 계산서의 선수 줄로 그날 찍힌 도장을 찾아요.","Finds the stamps through the bill’s player lines.")},
+  {at:.7,tag:"rpc",name:"coupon_drop_stamp",ep:"−1 stamp"}
+ ],
+ ledger:[{at:0,g:"refund",n:5},{at:.65,n:4,flash:["c"]}]},
+
+{a:"member",ph:"new",ko:"멤버는 제외",en:"Members excluded",
+ screen:(l,p)=>memberScreen(p),
+ log:[
+  {at:.1,tag:"rpc",name:"coupon_is_member(owner)",ep:"0026",why:L("pelhamhills 고객 명부와 회원권을 같은 DB 에서 봐요.","Reads the pelhamhills customer list and memberships in the same database.")},
+  {at:.35,tag:"local",name:"pelham_customers",ep:"gps_user_id = owner OR email"},
+  {at:.5,tag:"local",name:"pelham_memberships",ep:"latest · not cancelled · not expired"},
+  {at:.7,tag:"ui",name:"coupon_summary",ep:"is_member: true · can_refer: false"},
+  {at:.88,tag:"rpc",name:"coupon_give_stamp",ep:"reason: member"}
+ ],
+ ledger:[{at:0,g:"member",n:0,m:1}]},
+
+{a:"edge",ph:"new",ko:"경계 상황",en:"Edge cases",
+ screen:(l,p)=>edgeScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"coupon_set_referrer",ep:"member code → refused · 0028"},
+  {at:.5,tag:"local",name:"redeem today",ep:"→ no stamp"},
+  {at:.8,tag:"local",name:"expires_on < today",ep:"→ not a member"}
+ ],
+ ledger:[{at:0,g:"edge",n:0,m:1}]},
+
+{a:"todo",ph:"ship",ko:"진행 상태",en:"Progress",
+ screen:(l,p)=>todoScreen(Math.min(4,Math.ceil(p*4.4))),
+ log:[
+  {at:.12,tag:"key",name:"SQL editor",ep:"0084 · 0023 · 0025 · 0026 · 0027 ✓"},
+  {at:.35,tag:"key",name:"SQL editor",ep:"0028"},
+  {at:.6,tag:"key",name:"git commit · push",ep:"waiting for the scope"},
+  {at:.85,tag:"ui",name:"Vercel",ep:"auto-deploy after push"}
+ ],
+ ledger:[{at:0,g:"todo",n:3}]}
+];
+
+const PH={plan:{ko:"규칙",en:"Rules"},new:{ko:"이번 변경",en:"New"},ship:{ko:"할 일",en:"Next"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"DATA",stripe:"IN",key:"STEP"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;const g=st.g||"rule";
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const r=(cur,a,b)=>'<div class="'+(cur?"cur":"")+'"><span>'+esc(a)+'</span><span>'+esc(b)+'</span></div>';
+  const mem=!!st.m;
+  const dots='<div class="cb-mini">'+Array.from({length:10},(_,i)=>'<span class="'+(i<(st.n||0)?"on":"")+'"></span>').join("")+'</div>';
+  let h=card("c",k==="ko"?"이 손님의 쿠폰북":"This guest’s book","",mem?pill("vi",k==="ko"?"멤버":"Member"):pill("ok",k==="ko"?"일반 손님":"Public"),
+    (mem?'<p class="lnote">'+(k==="ko"?"도장판·초대 칸 대신 멤버 안내":"Member notice instead of the card and invite")+'</p>':dots)+
+    '<div class="lrows">'+r(!mem,k==="ko"?"도장":"Stamps",mem?"—":(st.n||0)+"/10")+r(g==="free",k==="ko"?"남은 무료":"Free left",String(st.f||0))+'</div>');
+  const D=k==="ko"?"완료":"done";
+  h+=card("s",k==="ko"?"진행 상태":"Progress","",pill(g==="todo"?"wait":"none",k==="ko"?"코드·시험 완료":"code · tested"),
+    '<div class="lrows">'+r(g==="checkin",k==="ko"?"체크인 자동 도장":"Check-in stamps",D)+r(g==="refund",k==="ko"?"환불 차감":"Refund takes one off",D)+r(g==="logo",k==="ko"?"로고 도장":"Logo stamps",D)+r(g==="member"||g==="edge",k==="ko"?"멤버 제외·소개 막기":"Members excluded · no referrals",D)+r(g==="todo",k==="ko"?"0028 실행":"Run 0028",k==="ko"?"직접":"you")+r(g==="todo",k==="ko"?"커밋·배포":"Commit · deploy",k==="ko"?"범위 대기":"scope?")+'</div>');
+  h+=card("n",k==="ko"?"알아 둘 것":"Good to know","",pill("none",k==="ko"?"메모":"note"),'<p class="lnote">'+esc(k==="ko"?NOTE[g][0]:NOTE[g][1])+'</p>');
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"rule": {"ko": 13.6, "en": 13.5}, "checkin": {"ko": 18.9, "en": 19.3}, "logo": {"ko": 13.1, "en": 12.3}, "free": {"ko": 13.1, "en": 11.5}, "refund": {"ko": 13.6, "en": 14.6}, "member": {"ko": 16.5, "en": 16.6}, "edge": {"ko": 17.4, "en": 15.5}, "todo": {"ko": 11.8, "en": 12.8}};
+const NARR={"ko": {"rule": "GPS 앱 쿠폰북 규칙이에요. 체크인할 때마다 도장이 하나 저절로 찍히고, 도장 열 개가 모이면 다음 한 번이 무료예요. 하루에 도장은 한 번이고, 환불하면 하나 빠져요. 멤버는 도장도, 친구 소개 보상도 없어요.", "checkin": "티 시트에서 손님이 체크인되는 순간 서버가 도장을 찍어요. Arrived 버튼이든 QR, 신분증 체크인이든 같아요. 서버는 프로샵 QR 로 이은 계정, 손님 기록 이메일, 예약 이메일 순서로 앱 계정을 찾아요. 멤버이거나 앱 계정이 없는 손님은 넘어가요.", "logo": "도장 칸에는 이제 깃발 아이콘 대신 펠럼 힐스 클럽 로고가 찍혀요. 펠럼 힐스 사이트의 로고 파일을 그대로 GPS 앱에 복사했고, 진짜 고무도장처럼 칸마다 살짝씩 기울어져 있어요.", "free": "도장이 열 개가 되면 손님 화면에 무료 라운드 한 번이 준비됐다고 떠요. 다음에 올 때 계산대에서 직원이 무료 라운드 사용을 누르면, 그린피를 받지 말라는 안내가 나오고 장부에 사용 한 줄이 쌓여요.", "refund": "그 선수가 든 계산서를 환불하면, 그날 체크인으로 찍힌 도장이 하나 빠져요. 체크인을 잘못 눌러 되돌릴 때도 빠져요. 다만 그 도장으로 채운 무료 라운드를 이미 썼다면, 장부가 마이너스가 되지 않게 도장을 남겨요.", "member": "멤버는 쿠폰북에서 빠져요. 서버가 이 앱 계정에 이어진 손님 기록이나 같은 이메일의 기록을 찾고, 만료되지 않은 멤버십이 있으면 멤버로 봐요. 멤버 화면에는 도장판과 초대 칸 대신 멤버 안내가 나오고, 서버도 도장을 거절해요.", "edge": "멤버의 친구 소개도 막았어요. 친구가 멤버의 코드를 넣으면 거절되고, 코드를 넣은 뒤에 소개한 사람이 멤버가 되면 보상 없이 소개가 지워져요. 무료 라운드는 체크인 전에 사용 처리해야 그 라운드에 도장이 안 찍혀요. 멤버십이 끝나면 다음 날부터 다시 도장을 받아요.", "todo": "SQL 은 0027 까지 실행하셨어요. 멤버 친구 소개를 막는 0028 을 하나 더 실행하시면 돼요. 그다음 커밋 범위가 정해지면, 커밋하고 푸시해서 Vercel 배포까지 확인할게요."}, "en": {"rule": "Here are the coupon book rules. Each check-in adds one stamp automatically, and ten stamps make the next round free. There's one stamp per day, and a refund takes one off. Members get no stamps and no friend rewards.", "checkin": "The moment a guest is checked in on the tee sheet, the server stamps the card. It's the same for the Arrived button and for QR or ID check-in. The server looks for the app account in this order: the account linked by the pro shop QR, the customer record's email, then the booking email. Members and guests without an app account are skipped.", "logo": "The stamp cells now show the Pelham Hills club logo instead of a flag icon. The logo file was copied straight from the Pelham Hills site into the GPS app, and each stamp tilts a little, like a real rubber stamp.", "free": "At ten stamps, the guest's screen says one free round is ready. On the next visit, staff tap use free round at the counter. The panel says not to charge the green fee, and one redeem line goes into the ledger.", "refund": "When the bill that covers that player is refunded, the stamp from that day's check-in comes off. Undoing a check-in takes it off too. But if that stamp completed a free round that was already used, the stamp stays, so the ledger never goes negative.", "member": "Members are left out of the coupon book. The server finds the customer record linked to this app account, or one with the same email, and if it has a membership that hasn't expired, that's a member. Members see a member notice instead of the stamp card and invite box, and the server refuses the stamp.", "edge": "Member referrals are blocked too. A friend can't enter a member's code, and if the referrer becomes a member after the code was entered, the referral is dropped with no reward. Redeem a free round before check-in, so that round gets no stamp. When a membership ends, stamps start again the next day.", "todo": "You've run the SQL through 0027. Run one more file, 0028, which blocks member referrals. Once the commit scope is decided, I'll commit, push, and check the Vercel deploy."}};
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phcb-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phcb-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phcb-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phcb-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

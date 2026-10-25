@@ -1,0 +1,865 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone Call Scenarios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* Pro shop admin mock — keeps a light look in both themes */
+.ad{--ai:#1F2328;--am:#6B7280;--al:#D4D4D8;--as:#F2F2F4;--av:#4533FF;background:#F2F2F4;color:var(--ai);border:1px solid var(--al);border-radius:10px;overflow:hidden;font-size:12px}
+.ad .urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#E4E4E8;border-bottom:1px solid var(--al);font-family:var(--mono);font-size:10.5px;color:var(--am);min-width:0}
+.ad .urlbar i{width:8px;height:8px;border-radius:50%;background:#C9CDD2;flex:none}
+.ad .urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#111315;color:#fff;padding:7px 12px;font-size:12px;font-weight:700}
+.adbar small{color:rgba(255,255,255,.6);font-weight:500;font-size:10.5px}
+.adbody{padding:10px;display:grid;gap:8px;min-width:0}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chips span{border:1px solid var(--al);background:#fff;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap}
+.chips span.on{background:#111315;color:#fff;border-color:#111315}
+.box{background:#fff;border:1px solid var(--al);padding:10px;display:grid;gap:6px;min-width:0}
+.box h5{margin:0;font-size:13px}
+.box p{margin:0;color:var(--am);font-size:11px;line-height:1.5}
+.eyeb{font-size:9.5px;font-weight:800;letter-spacing:.12em;color:var(--am);text-transform:uppercase}
+.pw{height:34px;border:1px solid var(--al);display:flex;align-items:center;padding:0 10px;font-family:var(--mono);letter-spacing:.2em;font-size:13px}
+.btnp{background:var(--av);color:#fff;text-align:center;font-weight:800;padding:8px}
+.errn{border:1px solid #F0B4B4;background:#FDF0F0;color:#8A1F1F;padding:6px 8px;font-size:11px}
+.cc{background:#fff;border:1px solid var(--al);min-width:0}
+.cch{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;border-bottom:1px solid #ECECF0;padding:6px 8px;font-size:11px}
+.cch .t{margin-left:auto;color:var(--am);font-variant-numeric:tabular-nums}
+.cch .by{width:100%;color:var(--am);font-size:10.5px}
+.op{font-size:10px;font-weight:800;padding:1px 6px}
+.op.ins{background:#E3F4E8;color:#1F6B3A}.op.upd{background:#FFF1CC;color:#8A5A00}.op.del{background:#FDE2E2;color:#8A1F1F}
+.ccb{padding:6px 8px;display:grid;gap:5px}
+.hist{margin:0;padding:0;list-style:none;font-size:11px}
+.dt{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}
+.dt th{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--am);text-align:left;padding:3px 4px;border-bottom:1px solid #ECECF0}
+.dt td{padding:3px 4px;border-bottom:1px solid #F2F2F4;vertical-align:top;word-break:break-all}
+.dt td.f{font-family:var(--mono);font-size:9.5px;color:#3F434A}
+.dt td.b{color:#8A1F1F}.dt td.b s{text-decoration-thickness:1px}.dt td.a{color:#1F6B3A}
+.dt tr.hot td{background:#FFF6DD}
+.hot{outline:2.5px solid #F2A33A;outline-offset:2px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(242,163,58,.25)}}
+.tee{background:#fff;border:1px solid var(--al);padding:8px;display:grid;gap:4px}
+.tee .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}
+.tee .pl{display:flex;gap:4px;flex-wrap:wrap}
+.tee .pl span{border:1px solid var(--al);padding:2px 6px;font-weight:700;font-size:11px}
+.tee .pl span.gone{opacity:.35;text-decoration:line-through}
+.tee .hl{border-top:1px dashed var(--al);padding-top:4px;font-size:10.5px;color:var(--am)}
+.vanish{opacity:.25;filter:grayscale(1)}
+.xmark{color:#B42318;font-weight:800;font-size:12px}
+.flow{display:grid;gap:6px}
+.fstep{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--al);padding:7px 9px;font-size:11.5px}
+.fstep b{font-family:var(--mono);font-size:10.5px}
+.fstep .n{flex:none;width:20px;height:20px;border-radius:50%;background:#111315;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800}
+.fstep.on{border-color:var(--av);box-shadow:0 0 0 2px rgba(69,51,255,.15)}
+.tbls{display:flex;flex-wrap:wrap;gap:4px}
+.tbls span{font-family:var(--mono);font-size:9.5px;background:#fff;border:1px solid var(--al);padding:2px 5px}
+.tbls span.on{background:#E3F4E8;border-color:#9BD2AE}
+.who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.who div{background:#fff;border:1px solid var(--al);padding:8px;text-align:center;font-size:11px}
+.who div b{display:block;font-size:13px}
+.who div.no{opacity:.45}
+.ad .plan{background:#fff;border:1px solid var(--al);padding:10px}
+.plan .done li{color:var(--ok)}
+.lc.lcdim{opacity:.5}.lc.lcon{border-color:var(--green)}
+.plan{display:grid;gap:4px;font-size:13px;color:#1F2328}
+.plan h3{margin:8px 0 2px;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.plan code{font-family:var(--mono);font-size:11.5px;background:#F2F2F4;padding:1px 4px;border-radius:4px}
+.plan .q li{color:#B5461F;font-weight:600}
+.plan .done li{color:#1F6B3A}
+/* phone call mock */
+.pc{background:#0F1A14;color:#E8F0EA;border-radius:14px;padding:10px;display:grid;gap:6px;font-size:11.5px;min-width:0}
+.pc .top{display:flex;justify-content:space-between;font-size:10.5px;color:#9FB8A8}
+.pc .b{max-width:88%;padding:6px 9px;border-radius:10px;line-height:1.45}
+.pc .b.ag{background:#1E3326;justify-self:start}
+.pc .b.us{background:#E8F0EA;color:#14231A;justify-self:end}
+.pc .tc{justify-self:center;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid #3A5A46;color:#BFD6C6}
+.pc .tc.x{border-color:#E06A5A;color:#FFB3A8;background:rgba(224,106,90,.12)}
+.pc .tc.ok{border-color:#5BC08A;color:#A9EBC5;background:rgba(91,192,138,.12)}
+.pc .dim{opacity:.35}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal div{background:#fff;border:1px solid var(--al);text-align:center;padding:4px 0;font-size:10.5px;font-variant-numeric:tabular-nums}
+.cal div.in{background:#E3F4E8;border-color:#9BD2AE}
+.cal div.td{background:#111315;color:#fff}
+.cal div.edge{outline:2px solid #1F6B3A}
+.cal div.ask{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F;font-weight:800}
+.cal div.hd{background:transparent;border:0;color:var(--am);font-size:9.5px}
+.js{font-family:var(--mono);font-size:10.5px;background:#fff;border:1px solid var(--al);padding:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.js .k{color:#6B7280}.js .bad{color:#B42318;font-weight:700}.js .good{color:#1F6B3A;font-weight:700}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.two h6{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--am)}
+.rows{display:grid;gap:3px}
+.rows div{display:flex;justify-content:space-between;gap:6px;background:#fff;border:1px solid var(--al);padding:4px 7px;font-size:10.5px}
+.rows div b{font-family:var(--mono);font-weight:600}
+.rows div.w{background:#FFF1CC;border-color:#F2C46A}
+.rows div.x{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F}
+.rows div.n{background:#E3F4E8;border-color:#9BD2AE}
+.big{font-size:20px;font-weight:800;font-family:var(--mono)}
+@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}}
+.h6d{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6B7280)}
+.fstep.bad{border-color:#E06A5A;box-shadow:0 0 0 2px rgba(224,106,90,.18)}
+.ln{background:#fff;border:1px solid var(--al);border-left:4px solid #1F6B3A;padding:9px 11px;display:grid;gap:4px;min-width:0}
+.ln.new{border-left-color:#4533FF}
+.ln.no{border-left-color:#B42318}
+.ln .w{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--am)}
+.ln .en{font-size:13px;font-weight:600;color:#1F2328;line-height:1.45}
+.ln .ko{font-size:11.5px;color:#4B5563;line-height:1.45}
+.ln.dim{opacity:.35}
+.lns{display:grid;gap:6px}
+/* scenario cards */
+.cs{display:grid;gap:5px}
+.ce{background:#fff;border:1px solid var(--al);border-left:4px solid #1F6B3A;padding:7px 10px;display:grid;gap:3px;min-width:0;transition:opacity .3s}
+.ce.no{border-left-color:#B42318}.ce.warn{border-left-color:#C98A00}.ce.hand{border-left-color:#4533FF}
+.ce.dim{opacity:.3}
+.ch{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;color:#1F2328}
+.cp{flex:none;font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:99px;background:#E3F4E8;color:#1F6B3A}
+.cp.no{background:#FDE2E2;color:#8A1F1F}.cp.warn{background:#FFF1CC;color:#8A5A00}.cp.hand{background:#E8E5FF;color:#3326B8}
+.cd{font-size:11.5px;color:#4B5563;line-height:1.45}
+.cq{font-size:11.5px;color:#1F2328;font-style:italic;background:#F6F7F8;padding:3px 7px;border-radius:4px}
+.mapg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.mg{background:#fff;border:1px solid var(--al);padding:10px 8px;display:grid;gap:3px;opacity:.35;transition:opacity .3s}
+.mg.on{opacity:1;border-color:#1F6B3A}
+.mg b{font-size:13px}.mg span{font-size:10.5px;color:#6B7280}
+@media (max-width:520px){.mapg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pol{display:grid;gap:3px;padding:8px}
+.pr{display:grid;grid-template-columns:minmax(0,7.5em) minmax(0,1fr) auto;gap:8px;align-items:center;background:#fff;border:1px solid var(--al);padding:5px 8px;font-size:11.5px;transition:opacity .3s}
+.pr b{font-size:11.5px}.pr span{color:#374151}
+.pr i{font-style:normal;font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:99px;background:#E3F4E8;color:#1F6B3A}
+.pr.wait{background:#FFFBEF;border-color:#F2C46A}.pr.wait i{background:#FFF1CC;color:#8A5A00}
+.pr.dim{opacity:.3}
+.lay{display:grid;gap:5px}
+.ly{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;border:1px solid #D4D4D8;padding:6px 8px;border-left:4px solid #1F6B3A}
+.ly.bad{border-left-color:#B42318}
+.ly b{font-size:12px}.ly span{grid-column:1;font-size:11px;color:#4B5563}
+.ly em{grid-column:2;grid-row:1/3;align-self:center;font-style:normal;font-size:10px;font-weight:800;color:#1F6B3A}
+.ly.bad em{color:#B42318}
+.plan li.dim{opacity:.35}
+.ph.map,.ph.pol{background:var(--green-soft);color:var(--green)}
+.ph.book,.ph.chg{background:var(--blue-soft);color:var(--blue)}
+.ph.sim,.ph.ask{background:var(--violet-soft);color:var(--violet)}
+.ph.ppl,.ph.end{background:var(--flag-soft);color:var(--flag)}
+.ph.plan{background:var(--green-soft);color:var(--green)}
+
+.bub{width:18px;height:15px;margin-right:4px;vertical-align:-3px}
+</style></head><body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Fly · ElevenLabs · Supabase</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const L=(ko,en)=>({ko,en});
+const T=(x,l)=>typeof x==="string"?x:x[l];
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 전화 예약 비서(ElevenLabs) · 시나리오·정책·적용 계획",
+  h1:"손님 전화, <b>모든 경우</b>와 우리 정책",
+  lede:"손님이 골프장에 전화해서 생길 수 있는 경우를 모두 모았어요. 예약이 잘 될 때, 안 될 때, 찾기·바꾸기·취소, 실내 시뮬레이터, 물어보기, 사람이 필요할 때, 통화 마무리까지요. 그다음 우리 정책을 한 표로 나열하고, 이것을 ElevenLabs 에 어떻게 넣을지 계획을 세웠어요. 왼쪽은 경우와 비서가 하는 일, 가운데는 그걸 정하는 규칙, 오른쪽은 실제 전화에 반영됐는지예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 10장면",laneScreen:"경우 · 비서가 하는 일",laneLog:"정하는 규칙",laneLedger:"실제 전화 반영",
+  ledgerSub:"2026-10-21 확인 · 서버는 최신, ElevenLabs 규칙 블록은 키 권한 대기",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 규칙이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"출처: backend/api/routes/voice.py · voice_sim.py(도구와 거절 문장), ops/elevenlabs/agent.json(프롬프트·연결 조건), scripts/attach_voice_tools.py(규칙 블록). 상태 확인 2026-10-21 04시경 UTC: Fly pelham-hills-api v34 실행 중(03:43Z 배포, 커밋 9959085 이후). .env 의 ElevenLabs 키로 에이전트 조회 시 401 — convai_read 권한 없음. .env 에 ELEVENLABS_AGENT_ID 도 없어요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Phone booking assistant (ElevenLabs) · Scenarios, policies, rollout plan",
+  h1:"Every kind of <b>phone call</b>, and our policies",
+  lede:"Everything that can happen when a guest phones the club: bookings that work, bookings that can't happen, finding, changing and cancelling, the indoor simulator, questions, needing a person, and ending the call. Then our policies in one table, and a plan for putting them into ElevenLabs. Left: the case and what the assistant does. Middle: the rule behind it. Right: whether it is live on the phone.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 10 scenes",laneScreen:"Case · what the assistant does",laneLog:"Rule behind it",laneLedger:"Live on the phone",
+  ledgerSub:"Checked 2026-10-21 · server current, ElevenLabs rules block waiting on key access",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Rules appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Sources: backend/api/routes/voice.py and voice_sim.py (tools and refusal lines), ops/elevenlabs/agent.json (prompt, transfer conditions), scripts/attach_voice_tools.py (rules block). Status checked around 04:00 UTC on 2026-10-21: Fly pelham-hills-api v34 running (deployed 03:43Z, after commit 9959085). The ElevenLabs key in .env gets 401 reading the agent (no convai_read), and .env has no ELEVENLABS_AGENT_ID."}
+};
+
+// cases: [at, kind(ok|no|warn|hand), situation, what it does, english line or ""]
+const PILL={ok:L("처리","Handled"),no:L("거절·대안","Refuse + offer"),warn:L("조심","Careful"),hand:L("사람에게","To a person")};
+function cases(list,l,p){
+  return '<div class="cs">'+list.map(x=>'<div class="ce '+x[1]+(p>=x[0]?"":" dim")+'"><div class="ch"><b>'+esc(T(x[2],l))+'</b><span class="cp '+x[1]+'">'+esc(PILL[x[1]][l])+'</span></div><div class="cd">'+esc(T(x[3],l))+'</div>'+(x[4]?'<div class="cq">“'+esc(x[4])+'”</div>':"")+'</div>').join("")+'</div>'}
+
+const MAP=[
+ ["book",L("티타임 예약","Book a tee time"),L("잘 될 때 · 안 될 때","works · can't")],
+ ["chg",L("찾기·바꾸기·취소","Find · change · cancel"),L("번호+성 확인","number + last name")],
+ ["sim",L("실내 시뮬레이터","Indoor simulator"),L("예약·취소","book · cancel")],
+ ["ask",L("물어보기","Questions"),L("요금·주소·분실물","price · address · lost item")],
+ ["ppl",L("사람이 필요할 때","Needs a person"),L("연결 · 콜백","transfer · callback")],
+ ["end",L("말투·마무리","Manner · ending"),L("망설임 · 끊기","pauses · hang-up")]
+];
+
+const S=[
+ {a:"ov",ph:"map",ko:"전화로 오는 일, 한 장 지도",en:"Every call, one map",
+  screen:(l,p)=>'<div class="ad"><div class="adbody"><div class="eyeb">'+(l==="ko"?"첫 인사 → identify_caller → 무엇을 원하나요?":"Greeting → identify_caller → what do they want?")+'</div><div class="mapg">'+MAP.map((m,i)=>'<div class="mg'+(p>=i/7?" on":"")+'"><b>'+esc(m[1][l])+'</b><span>'+esc(m[2][l])+'</span></div>').join("")+'</div><div class="eyeb">'+(l==="ko"?"모든 경우의 공통 규칙":"Common to every case")+'</div><div class="tbls"><span class="on">'+(l==="ko"?"사실은 도구에서만":"facts only from tools")+'</span><span class="on">'+(l==="ko"?"질문은 하나씩":"one question at a time")+'</span><span class="on">'+(l==="ko"?"모르면 지어내지 않음":"never invent")+'</span></div></div></div>',
+  log:[{at:.1,tag:"rpc",name:"identify_caller",ep:L("첫 턴에 한 번","once, first turn"),why:L("발신번호로 이름·회원 여부·다가오는 예약 수·직원 근무 여부를 알려 줘요. 인사에만 써요.","Name, member, upcoming bookings and whether staff are on duty, from caller ID. Used only for the greeting.")},
+       {at:.45,tag:"ui",name:L("통화는 6갈래","Six kinds of call"),ep:L("다음 장면부터 하나씩","one per scene next")},
+       {at:.8,tag:"local",name:L("도구 17개","17 tools"),ep:"tee 13 · sim 4 · + end_call · transfer"}],
+  focus:["repo","fly"]},
+
+ {a:"book",ph:"book",ko:"티타임 예약 — 잘 될 때",en:"Booking a tee time — happy path",
+  screen:(l,p)=>cases([
+   [0,"ok",L("질문 다섯 개","Five questions"),L("회원인지 → 날짜 → 인원(1–4) → 카트 → 오전·오후·저녁, 하나씩","member → day → players (1–4) → cart → morning/afternoon/evening, one at a time"),"Are you a member with us?"],
+   [.2,"ok",L("시간 두세 개 읽기","Read two or three times"),L("find_tee_times 결과에서만, 최대 5개 중 두세 개","only from find_tee_times, two or three of up to five"),"I have seven forty-three or eight ten in the morning."],
+   [.4,"ok",L("고르면 바로 잡기","Hold the moment they pick"),L("hold_tee_time — 3분 동안 자리를 잠가요","hold_tee_time locks the seats for 3 minutes"),""],
+   [.55,"ok",L("이름·성·번호","Name and number"),L("번호는 발신번호, 다른 번호면 한 자리씩 읽고 확인","caller ID unless they give another, read back digit by digit"),""],
+   [.7,"ok",L("확정·코드·요금","Confirm, code, price"),L("확인번호를 한 글자씩. 비회원은 get_rates 총액(카트·세금 포함), 회원은 요금 말하지 않음","code one character at a time; non-member hears the get_rates total with cart and tax; members hear no price"),""],
+   [.85,"warn",L("도중에 바뀜","They change their mind"),L("인원·날짜·시간대가 바뀌면 release_hold 후 다시 검색","players, day or part of day changes → release_hold, search again"),""]],l,p),
+  log:[{at:.1,tag:"ui",name:L("회원 여부 매번 먼저","Member question first, every time"),ep:L("남의 예약일 수 있어서","may book for someone else")},
+       {at:.4,tag:"rpc",name:"hold_tee_time",ep:"HOLD_TTL 180s",why:L("이름을 받는 사이에 웹 손님이 같은 자리를 사지 못하게 해요.","Stops a web buyer taking the seats while the name is taken.")},
+       {at:.7,tag:"rpc",name:"confirm_booking",ep:L("확인 문자 + 바코드","text + barcode"),why:L("회원이라고 말해도 요금제는 안 바꾸고 메모만 남겨요. 체크인 때 프로 샵이 고쳐요.","Saying 'member' only adds a note; the pro shop sets the rate at check-in.")}],
+  focus:["fly"]},
+
+ {a:"nobook",ph:"book",ko:"예약이 안 되는 경우",en:"When it can't be booked",
+  screen:(l,p)=>cases([
+   [0,"no",L("9홀을 원함","Wants nine holes"),L("어느 요일이든 전화로 안 받음 → 18홀 권함, 연결 안 함","no day, by phone → offer eighteen, no transfer"),"Sorry, we can't book nine holes over the phone."],
+   [.13,"no",L("2주(14일) 넘는 날","More than 14 days out"),L("가장 먼 날을 도구가 알려 줌 → 그날이나 그 전","tool names the furthest day → offer it or earlier"),"We can only book up to two weeks ahead."],
+   [.26,"no",L("지난 날짜·지난 시각","A past day or time"),L("'이미 지났어요' → 다른 시간","'already passed' → another time"),""],
+   [.38,"no",L("그날이 꽉 참","The day is full"),L("다른 날 또는 대기 명단(원할 때만)","another day, or the waitlist if they want it"),""],
+   [.5,"no",L("행사로 닫힌 시간","Closed for an event"),L("닫힌 이유를 말하고 다른 시간","say why, offer another time"),""],
+   [.62,"warn",L("통화 중 남이 가져감 · 홀드 만료","Taken meanwhile · hold expired"),L("짧게 사과 → 다시 검색·잡기","brief apology → search and hold again"),""],
+   [.74,"hand",L("5명 이상","More than four"),L("티 하나는 4명 → 프로 샵(시간 외는 콜백)","a tee time holds 4 → pro shop (callback after hours)"),""],
+   [.86,"hand",L("저장 실패","Save failed"),L("한 번만 다시 → 또 실패면 콜백 또는 연결","retry once → callback or transfer"),""]],l,p),
+  log:[{at:.05,tag:"local",name:"PHONE_NINE_HOLES = False",ep:"2026-10-20"},
+       {at:.2,tag:"rpc",name:"require_bookable_date",ep:"BOOKING_WINDOW_DAYS 14",why:L("'시스템 문제'라고 하지 않아요. 더 먼 날도 권하지 않아요.","Never 'a system problem'; never a later day.")},
+       {at:.45,tag:"rpc",name:"join_waitlist",ep:L("자리 나면 15분 잡고 문자, YES 먼저","spot held 15 min, text, first YES wins")},
+       {at:.85,tag:"rpc",name:L("거절은 200 + message","Refusals: 200 + message"),ep:"ToolRoute",why:L("같은 도구·같은 값은 두 번까지만 불러요.","Same tool, same details: at most twice.")}],
+  focus:["fly"]},
+
+ {a:"chg",ph:"chg",ko:"찾기 · 바꾸기 · 취소",en:"Find, change, cancel",
+  screen:(l,p)=>cases([
+   [0,"warn",L("내 예약 알려 주세요","What's my booking?"),L("전화번호와 성을 둘 다 받아 lookup_booking. 발신번호만으로는 안 보여 줌","ask phone number AND last name → lookup_booking; caller ID alone shows nothing"),""],
+   [.15,"hand",L("못 찾음","Not found"),L("다른 철자는 한 번만 → 프로 샵","one more spelling at most → pro shop"),""],
+   [.28,"no",L("성이 안 맞음","Last name doesn't match"),L("바꾸지도 취소하지도 않음","no change, no cancel"),""],
+   [.4,"ok",L("인원 바꾸기","Change players"),L("modify_booking — 그 시간에 자리가 있을 때만","modify_booking, only if the tee time has room"),""],
+   [.52,"no",L("시간 바꾸기","Move the time"),L("못 바꿈 → 취소하고 새로 예약한다고 분명히","can't → cancel and book again, said plainly"),""],
+   [.64,"ok",L("취소","Cancel"),L("preview 로 먼저 확인 → 읽어 주고 '네' → 취소, 문자 발송","preview first → read back → clear yes → cancel, text sent"),"Would you like me to cancel that?"],
+   [.78,"hand",L("티오프 2시간 안","Within two hours"),L("전화 비서는 취소·변경 못 함 → 프로 샵","assistant can't → pro shop"),""],
+   [.9,"warn",L("수수료 물음 · 이미 취소됨","Asks the fee · already cancelled"),L("수수료는 말하지 않음 · '이미 취소됐어요'","never state a fee · 'already cancelled'"),""]],l,p),
+  log:[{at:.05,tag:"rpc",name:"lookup_booking",ep:L("번호 + 성","number + last name"),why:L("이 통화에서 조회된 예약만 바꾸거나 취소할 수 있어요. 남의 id 를 넣어도 막혀요.","Only a booking found on this call can be changed or cancelled.")},
+       {at:.6,tag:"rpc",name:"cancel_booking · preview",ep:L("두 번 부름","called twice")},
+       {at:.78,tag:"local",name:"CANCEL_CUTOFF_MINUTES 120",ep:L("카트·환불은 사람이","carts and refunds need a person")},
+       {at:.9,tag:"ui",name:L("문자로도 취소","Cancel by text too"),ep:L("'C 코드' 답장, 2시간 전까지","reply 'C code', up to 2 h")}],
+  focus:["fly"]},
+
+ {a:"sim",ph:"sim",ko:"실내 시뮬레이터",en:"Indoor simulator",
+  screen:(l,p)=>cases([
+   [0,"ok",L("베이 예약","Book a bay"),L("날짜 → 몇 시간(1–5) → 몇 명(1–4) → 대략 몇 시","day → hours (1–5) → players (1–4) → rough time"),""],
+   [.2,"ok",L("시간 고르면 바로 예약","Book right after they pick"),L("홀드 없음. 이름·성 받고 book_sim_bay. 오른손·왼손은 묻지 않음","no hold; name then book_sim_bay; never ask left/right-handed"),""],
+   [.38,"ok",L("요금","Price"),L("베이 한 칸 가격 + HST, 현장 결제. 확인 코드 문자","one price per bay + HST, paid at the club; code by text"),""],
+   [.55,"warn",L("티타임인지 시뮬레이터인지 모호","Tee time or simulator?"),L("모르면 물어봄. 도구를 섞어 쓰지 않음","ask; never mix the tools"),""],
+   [.7,"no",L("24시간 안 취소","Cancel within 24 hours"),L("전화 비서는 못 함 → 프로 샵","assistant can't → pro shop"),""],
+   [.85,"no",L("꽉 참 · 시간 옮기기","Full · move the time"),L("시뮬레이터는 대기 명단 없음 · 취소 후 재예약","no simulator waitlist · cancel and rebook"),""]],l,p),
+  log:[{at:.1,tag:"rpc",name:"find_sim_times · book_sim_bay",ep:"MAX_HOURS 5 · MAX_PLAYERS 4"},
+       {at:.7,tag:"rpc",name:"cancel_sim_booking",ep:L("24시간 전까지","up to 24 h before")},
+       {at:.85,tag:"ui",name:L("시스템이 안 닿으면","System unreachable"),ep:L("프로 샵으로","offer the pro shop")}],
+  focus:["fly"]},
+
+ {a:"ask",ph:"ask",ko:"물어보기: 요금 · 문자 · 분실물",en:"Questions: prices, texts, lost items",
+  screen:(l,p)=>cases([
+   [0,"ok",L("얼마예요?","How much?"),L("날짜를 먼저 받고 get_rates 총액만(주말 요금 다름). 외워서 말하지 않음","get the date, read the get_rates total (weekends differ); never from memory"),""],
+   [.17,"warn",L("회원 요금","Member price"),L("말하지 않음 — 우리가 모름 → 프로 샵","not quoted — we don't have it → pro shop"),""],
+   [.32,"ok",L("어디예요? · 온라인 예약","Where are you? · Book online"),L("send_info_sms: 주소+지도 또는 예약 링크. 발신번호로만, 통화당 2개","address + map, or booking link; caller's number only; 2 per call"),""],
+   [.48,"no",L("발신번호 없음","No caller ID"),L("문자 못 보냄 → 말로 읽어 줌","can't text → read it aloud"),""],
+   [.62,"ok",L("물건 두고 감","Left something behind"),L("report_lost_item: 무엇·모양·언제·어디 → 참조번호 한 글자씩","what · looks like · when · where → reference read one character at a time"),""],
+   [.76,"warn",L("'제 물건 있어요?'","'Do you have it?'"),L("볼 수 없음. 있다고 말하지 않음. 나오면 문자 준다고","can't see it; never say found; staff text if it turns up"),""],
+   [.9,"hand",L("영업시간·메뉴·주차·수수료","Hours · menu · parking · fees"),L("확정된 값이 없음 → 지어내지 않고 사람에게","not confirmed → never invent, offer a person"),"I want to get that right — let me put you through."]],l,p),
+  log:[{at:.05,tag:"rpc",name:"get_rates",ep:"HST 13%"},
+       {at:.35,tag:"rpc",name:"send_info_sms",ep:"MAX_INFO_SMS_PER_CALL 2",why:L("문구는 바꿀 수 없어요. 클럽이 확인한 사실만 보내요.","Fixed wording; only facts the club confirmed.")},
+       {at:.65,tag:"rpc",name:"report_lost_item",ep:L("직원 Lost & Found 화면","staff lost-and-found screen")},
+       {at:.9,tag:"stripe",name:L("클럽 확인 필요","Needs the club"),ep:L("영업시간·메뉴·주차·수수료","hours · menu · parking · fee")}],
+  focus:["fly","club"]},
+
+ {a:"ppl",ph:"ppl",ko:"사람이 필요할 때",en:"When a person is needed",
+  screen:(l,p)=>cases([
+   [0,"hand",L("연결하는 경우","When we transfer"),L("사람 요청 · 회원 가입·결제 · 리그 · 토너먼트·단체 · 레슨 · 식당 · 환불 · 5명 이상 · 2시간 안 취소 · 조회 실패 · 도구에 없는 것","asks for a person · membership · leagues · tournaments/outings · lessons · restaurant · refunds · 5+ players · cancel within 2 h · failed lookup · anything without a tool"),""],
+   [.3,"ok",L("직원 근무 중","Staff on duty"),L("한 줄 말하고 transfer_to_number 한 번","one line, transfer_to_number once"),"I'll connect you to the pro shop now, please stay on the line."],
+   [.55,"no",L("근무 시간 밖","After hours"),L("연결하지 않음 → 이름·성·용건 받아 request_callback","never transfer → name, last name, need → request_callback"),"Our pro shop staff aren't in right now; they're here from 8 AM to 6 PM."],
+   [.8,"warn",L("연결 실패","Transfer failed"),L("사과하고 콜백 받기","apologise, take a callback"),""]],l,p),
+  log:[{at:.1,tag:"rpc",name:"transfer_to_number",ep:L("조건: staff_available","only if staff_available")},
+       {at:.55,tag:"rpc",name:"request_callback",ep:L("리포트 · Phone callbacks","Reports · Phone callbacks"),why:L("정확한 시간은 약속하지 않아요. 번호 끝 네 자리로 확인해 줘요.","No exact time promised; confirms the last four digits.")},
+       {at:.6,tag:"stripe",name:"PRO_SHOP_HOURS 08:00–18:00",ep:L("기본값 · 클럽 확인 전","default · not confirmed")}],
+  focus:["club","eleven"]},
+
+ {a:"end",ph:"end",ko:"말투 · 특수 상황 · 끊기",en:"Manner, edge cases, ending",
+  screen:(l,p)=>cases([
+   [0,"ok",L("망설임 '음…'","Hesitation 'um…'"),L("끼어들지 않음. 한 번만 말하고 기다림","don't jump in; say once, then wait"),"Take your time — I'll wait."],
+   [.15,"warn",L("모르는 번호 · 번호 공유","Unknown or shared number"),L("이름 없이 반갑게. 추측하지 않고 번호도 읽지 않음","greet without a name; never guess or read the number"),""],
+   [.3,"warn",L("날짜를 말로('다음 화요일')","Spoken date ('next Tuesday')"),L("오늘·내일만 그대로, 나머지는 월·일을 다시 물음","only today/tomorrow pass through; ask month and day"),""],
+   [.45,"ok",L("예약 끝","After a booking"),L("'다른 건요?' 없이 끊어도 되는지 → '네'면 같은 턴에 end_call","no 'anything else?'; ask to hang up → on yes, end_call in that turn"),"You're all set. Is it okay if I hang up now?"],
+   [.65,"ok",L("예약 없는 통화","Call without a booking"),L("'다른 건요?' 한 번 → 작별 → end_call","'anything else?' once → goodbye → end_call"),"Thanks for calling Pelham Hills, have a great day. Goodbye!"],
+   [.82,"hand",L("도구를 너무 많이 부름","Too many tool calls"),L("한 통화 80회 넘으면 프로 샵으로","over 80 in one call → pro shop"),""]],l,p),
+  log:[{at:.05,tag:"ui",name:"turn_eagerness: patient",ep:L("ElevenLabs 설정","agent setting")},
+       {at:.3,tag:"rpc",name:"resolve_date",ep:L("날짜를 추측하지 않음","never guesses a date")},
+       {at:.5,tag:"rpc",name:"end_call",ep:L("작별 뒤 무슨 말이든 바로","after goodbye, whatever they say")},
+       {at:.82,tag:"local",name:"MAX_CALLS_PER_CONVERSATION 80",ep:L("최후 방어선","last line of defence")}],
+  focus:["eleven"]},
+
+ {a:"policy",ph:"pol",ko:"우리 정책 한눈에",en:"Our policies at a glance",
+  screen:(l,p)=>{const R=[
+   ["ok",L("예약 범위","Booking window"),L("오늘 ~ 14일 앞 (웹과 같음)","today to 14 days (same as web)")],
+   ["ok",L("전화 홀 수","Holes by phone"),L("18홀만 · 9홀 안 받음","18 only · no nine")],
+   ["ok",L("한 티타임","One tee time"),L("1–4명 · 5명+ 프로 샵","1–4 players · 5+ pro shop")],
+   ["ok",L("자리 잡기","Seat hold"),L("3분","3 minutes")],
+   ["ok",L("본인 확인","Identity check"),L("전화번호 + 성, 같은 통화 조회","number + last name, looked up on this call")],
+   ["ok",L("취소·변경","Cancel · change"),L("티오프 2시간 전까지 · 시간 이동은 취소 후 재예약","up to 2 h before · moving = cancel + rebook")],
+   ["ok",L("요금","Prices"),L("도구 총액만 · HST 13% · 회원은 말하지 않음","tool total only · HST 13% · none for members")],
+   ["ok",L("대기 명단","Waitlist"),L("원할 때만 · 자리 나면 15분 · YES 먼저","only if asked · 15 min · first YES")],
+   ["ok",L("시뮬레이터","Simulator"),L("1–5시간 · 1–4명 · 24시간 전까지 취소 · 대기 없음","1–5 h · 1–4 players · cancel 24 h before · no waitlist")],
+   ["ok",L("문자","Texts"),L("주소·예약 링크만 · 발신번호로 · 통화당 2개","address or link only · caller's number · 2 per call")],
+   ["ok",L("분실물","Lost items"),L("접수만 · 찾았다고 말하지 않음","report only · never say found")],
+   ["wait",L("직원 시간","Staff hours"),L("8–18시 (기본값)","8 AM–6 PM (default)")],
+   ["wait",L("모르는 정보","Unknown facts"),L("영업시간·메뉴·주차·취소 수수료·회원 요금","hours · menu · parking · cancel fee · member rates")]];
+   return '<div class="ad"><div class="pol">'+R.map((r,i)=>'<div class="pr '+r[0]+(p>=i/(R.length+1)?"":" dim")+'"><b>'+esc(r[1][l])+'</b><span>'+esc(r[2][l])+'</span><i>'+(r[0]==="ok"?(l==="ko"?"정함":"set"):(l==="ko"?"클럽 확인":"confirm"))+'</i></div>').join("")+'</div></div>'},
+  log:[{at:.1,tag:"local",name:L("11개는 코드에 정해짐","11 are set in code"),ep:"voice.py · voice_sim.py"},
+       {at:.88,tag:"stripe",name:L("2개는 클럽 확인 필요","2 need the club"),ep:L("확인 전엔 지어내지 않고 연결","until then: never invent, transfer"),why:L("직원 시간 기본값이 틀리면 직원이 있는데 콜백만 받거나, 없는데 연결하려 해요.","If the default staff hours are wrong, it takes callbacks while staff are in, or transfers when no one is there.")}],
+  focus:["repo","club"]},
+
+ {a:"plan",ph:"plan",ko:"ElevenLabs 적용 계획",en:"Rollout plan for ElevenLabs",
+  screen:(l,p)=>{const K=l==="ko";return '<div class="ad"><div class="plan">'+
+   '<h3>'+(K?"정책이 들어가는 세 곳":"Three places a policy lives")+'</h3><div class="lay">'+
+   '<div class="ly ok"><b>'+(K?"① 서버 (Fly)":"① Server (Fly)")+'</b><span>'+(K?"숫자·거절을 강제 — 에이전트가 실수해도 막음":"enforces numbers and refusals, even if the agent slips")+'</span><em>'+(K?"v34 반영됨":"v34 live")+'</em></div>'+
+   '<div class="ly bad"><b>'+(K?"② 프롬프트 규칙 블록":"② Prompt rules block")+'</b><span>'+(K?"무엇을 어떻게 말할지":"what to say, and how")+'</span><em>'+(K?"키 권한 대기":"waiting on key")+'</em></div>'+
+   '<div class="ly bad"><b>'+(K?"③ 에이전트 설정":"③ Agent settings")+'</b><span>'+(K?"첫 인사 · 연결 조건 · end_call · 끼어들기":"first message · transfer rule · end_call · turn eagerness")+'</span><em>'+(K?"키 권한 대기":"waiting on key")+'</em></div></div>'+
+   '<h3>'+(K?"해 주셔야 할 것":"For you")+'</h3><ul class="q">'+
+   '<li class="'+(p>=.25?"":"dim")+'">'+(K?"1. 클럽 확인: 직원 전화 시간, 영업시간·주차 등 알려도 되는 사실, 취소 수수료 유무":"1. Club to confirm: staff phone hours, facts we may share (hours, parking), whether there is a cancel fee")+'</li>'+
+   '<li class="'+(p>=.35?"":"dim")+'">'+(K?"2. ElevenLabs 키에 convai_read · convai_write 권한 추가 (+ .env 에 ELEVENLABS_AGENT_ID)":"2. Give the ElevenLabs key convai_read and convai_write (and put ELEVENLABS_AGENT_ID in .env)")+'</li></ul>'+
+   '<h3>'+(K?"그 뒤 제가 할 것":"Then I do")+'</h3><ul>'+
+   '<li class="'+(p>=.5?"":"dim")+'">'+(K?"3. 확인된 직원 시간을 Fly secret PRO_SHOP_HOURS 로":"3. Set the confirmed hours as Fly secret PRO_SHOP_HOURS")+'</li>'+
+   '<li class="'+(p>=.6?"":"dim")+'">4. <code>attach_voice_tools.py --dry-run</code> → <code>--apply</code> '+(K?"— 도구 17개와 규칙 블록을 올림(옛 프롬프트는 건드리지 않음)":"— uploads 17 tools and the rules block (leaves the old prompt alone)")+'</li>'+
+   '<li class="'+(p>=.7?"":"dim")+'">'+(K?"5. 대시보드의 옛 8천 자 프롬프트에서 없는 도구 이름(check_availability 등) 정리":"5. Clean old tool names (check_availability etc.) out of the 8,000-character dashboard prompt")+'</li>'+
+   '<li class="'+(p>=.8?"":"dim")+'">'+(K?"6. 시나리오별 테스트 전화 12통 — 이 프레젠테이션 2–8장면이 체크리스트":"6. Twelve test calls by scenario — scenes 2–8 are the checklist")+'</li>'+
+   '<li class="'+(p>=.9?"":"dim")+'">'+(K?"7. Calls & SMS 에서 녹음·요약을 주 1회 확인, 틀린 말은 규칙 블록에 한 줄씩 추가":"7. Review recordings on Calls & SMS weekly; fix each wrong line in the rules block")+'</li></ul></div></div>'},
+  log:[{at:.1,tag:"local",name:"Fly v34",ep:"03:43Z ✓"},
+       {at:.3,tag:"stripe",name:"ElevenLabs key",ep:"401 · convai_read"},
+       {at:.6,tag:"rpc",name:"attach_voice_tools.py",ep:L("더하기만 함","additive only"),why:L("손으로 만든 프롬프트·목소리·지식베이스는 그대로 두고, 표시된 블록만 갈아 끼워요. 다시 돌려도 덧붙지 않아요.","Keeps the hand-made prompt, voice and knowledge base; swaps only the marked block. Safe to re-run.")},
+       {at:.85,tag:"ui",name:L("테스트 전화","Test calls"),ep:L("9홀 · 15일 뒤 · 꽉 참 · 취소 · 시간 외","nine · day 15 · full · cancel · after hours")}],
+  focus:["fly","eleven","club"]}
+];
+
+S.forEach(s=>{s.ledger=s.ledger||[{at:0}];});
+const PH={map:{ko:"지도",en:"Map"},book:{ko:"예약",en:"Book"},chg:{ko:"변경",en:"Change"},sim:{ko:"시뮬",en:"Sim"},ask:{ko:"문의",en:"Ask"},ppl:{ko:"사람",en:"People"},end:{ko:"마무리",en:"Ending"},pol:{ko:"정책",en:"Policy"},plan:{ko:"계획",en:"Plan"}};
+const TAGS={ui:"SAY",rpc:"TOOL",local:"CODE",stripe:"PENDING",key:"INPUT"};
+
+const ITEMS=[
+ {id:"repo",src:L("저장소","Repository"),sub:"main · 9959085",st:["ok",L("반영됨","Done")],rows:[[L("도구·거절 문장·규칙 블록","tools · refusal lines · rules block"),""]]},
+ {id:"fly",src:L("서버 (Fly)","Server (Fly)"),sub:"pelham-hills-api v34",st:["ok",L("최신","Current")],rows:[[L("9홀 거절 · 14일 · 2시간 · 콜백","nine · 14 days · 2 h · callbacks"),""]]},
+ {id:"eleven",src:L("ElevenLabs 에이전트","ElevenLabs agent"),sub:"attach_voice_tools.py",st:["bad",L("키 권한 없음","Key lacks access")],rows:[["401 convai_read",""],[L("규칙 블록 아직 안 올라감","rules block not uploaded"),""]]},
+ {id:"club",src:L("클럽 확인","Club decisions"),sub:L("직원 시간 · 알려도 되는 사실","staff hours · shareable facts"),st:["wait",L("확인 필요","To confirm")],rows:[[L("확인 전엔 지어내지 않고 연결","until then: no guessing, transfer"),""]]}
+];
+function renderLedger(p){
+  const k=LANG;const f=new Set(S[SC].focus||[]);
+  $("ledger").innerHTML=ITEMS.map(it=>'<div class="lc'+(f.has(it.id)?" flash lcon":" lcdim")+'"><div class="r1"><span class="src">'+esc(it.src[k])+'<em>'+esc(typeof it.sub==="string"?it.sub:it.sub[k])+'</em></span><span class="pill '+it.st[0]+'">'+esc(it.st[1][k])+'</span></div><div class="lrows">'+it.rows.map(r=>'<div><span>'+esc(typeof r[0]==="string"?r[0]:r[0][k])+'</span><span></span></div>').join("")+'</div></div>').join("");
+}
+
+const DUR={"ov": {"ko": 27.4, "en": 29.3}, "book": {"ko": 30.3, "en": 32.0}, "nobook": {"ko": 31.5, "en": 29.0}, "chg": {"ko": 29.5, "en": 30.5}, "sim": {"ko": 24.8, "en": 26.4}, "ask": {"ko": 29.2, "en": 28.8}, "ppl": {"ko": 27.4, "en": 29.9}, "end": {"ko": 29.6, "en": 28.8}, "policy": {"ko": 30.3, "en": 32.4}, "plan": {"ko": 34.0, "en": 30.0}};
+const NARR={"ko": {"ov": "손님이 골프장에 전화하면 생길 수 있는 일을 모두 모았어요. 전화 비서는 첫 턴에 발신번호로 누구인지, 지금 직원이 있는지부터 확인해요. 그다음 통화는 여섯 갈래로 나뉘어요. 티타임 예약, 찾기와 바꾸기와 취소, 실내 시뮬레이터, 물어보기, 사람이 필요할 때, 그리고 마무리예요. 모든 경우에 공통인 규칙은 세 가지예요. 시간과 요금은 도구가 준 것만 말하고, 질문은 하나씩 하고, 모르면 지어내지 않아요.", "book": "예약이 잘 될 때의 흐름이에요. 회원인지, 날짜, 인원, 카트, 시간대를 하나씩 물어요. 빈 시간을 두세 개 읽어 주고, 손님이 고르면 바로 3분 동안 자리를 잡아요. 그 사이 웹에서 다른 손님이 사가지 못하게요. 이름과 번호를 받고 확정하면 확인번호를 한 글자씩 읽고, 비회원에게는 카트와 세금을 포함한 총액을 알려 줘요. 회원에게는 요금을 말하지 않아요. 도중에 인원이나 날짜가 바뀌면 잡은 자리를 풀고 다시 찾아요.", "nobook": "예약이 안 되는 경우들이에요. 9홀은 어느 요일이든 전화로 받지 않고 18홀을 권해요. 2주가 넘는 날은 가장 먼 날을 알려 주고 그날이나 그 전을 권해요. 지난 시간, 꽉 찬 날, 행사로 닫힌 시간도 이유를 말하고 대안을 줘요. 꽉 찬 날은 손님이 원하면 대기 명단에 올려요. 통화 중에 누가 자리를 가져가면 짧게 사과하고 다시 찾아요. 다섯 명 이상이면 프로 샵으로, 저장이 실패하면 한 번만 다시 하고 콜백을 받아요.", "chg": "예약을 찾거나 바꾸거나 취소할 때는 천천히 가요. 전화번호와 성을 둘 다 받아야 예약을 보여 줘요. 발신번호만으로는 안 돼요. 못 찾으면 한 번만 더 해 보고 프로 샵으로 넘겨요. 인원은 바꿀 수 있지만 시간은 못 옮겨요. 그때는 취소하고 새로 잡는다고 분명히 말해요. 취소는 먼저 미리 보기로 확인하고, 읽어 주고, 네라는 답을 들은 뒤에 해요. 티오프 두 시간 안이면 프로 샵이 처리해요. 취소 수수료는 말하지 않아요.", "sim": "실내 시뮬레이터는 티타임과 따로예요. 날짜, 몇 시간인지, 몇 명인지, 대략 몇 시인지 물어요. 한 번에 한 시간에서 다섯 시간, 한 명에서 네 명까지예요. 자리 잡기 없이 고르면 바로 예약하고, 오른손 왼손은 묻지 않아요. 요금은 베이 한 칸 가격에 세금이 붙고 현장에서 내요. 취소는 시작 24시간 전까지만 전화로 되고, 시뮬레이터는 대기 명단이 없어요.", "ask": "물어보는 전화예요. 요금은 날짜를 먼저 받고 도구가 준 총액만 읽어요. 주말은 요금이 달라요. 회원 요금은 우리가 모르니 말하지 않아요. 주소나 온라인 예약 링크는 문자로 보낼 수 있어요. 발신번호로만, 한 통화에 두 개까지예요. 물건을 두고 갔다면 접수하고 참조번호를 한 글자씩 읽어 줘요. 찾았다고는 절대 말하지 않아요. 영업시간, 메뉴, 주차, 수수료는 확정된 값이 없어서 지어내지 않고 사람에게 연결해요.", "ppl": "사람이 필요한 경우예요. 사람을 원할 때, 회원 가입, 리그, 토너먼트, 레슨, 식당, 환불, 다섯 명 이상, 두 시간 안 취소, 조회 실패, 도구에 없는 일이요. 직원이 근무 중이면 한 줄 말하고 한 번만 연결해요. 근무 시간 밖이면 연결하지 않고, 이름과 성과 용건을 받아 콜백 명단에 남겨요. 지금 직원 시간은 오전 8시부터 오후 6시인데, 이건 기본값이라 클럽 확인이 필요해요.", "end": "말투와 특수한 상황이에요. 손님이 음 하고 망설이면 끼어들지 않고, 천천히 하시라고 한 번만 말해요. 모르는 번호면 이름 없이 반갑게 인사해요. 다음 화요일 같은 말은 추측하지 않고 월과 일을 다시 물어요. 예약이 끝나면 다른 건 없냐고 묻지 않고, 끊어도 되는지 물은 뒤 네라고 하면 바로 끊어요. 예약이 없는 통화는 다른 건 없냐고 한 번 묻고 인사하고 끊어요. 한 통화에서 도구를 80번 넘게 부르면 프로 샵으로 넘겨요.", "policy": "우리 정책을 한 표로 나열했어요. 예약은 2주 앞까지, 전화는 18홀만, 한 티타임은 네 명까지, 자리 잡기는 3분, 본인 확인은 전화번호와 성, 취소와 변경은 두 시간 전까지예요. 요금은 도구 총액만, 대기 명단은 원할 때만, 시뮬레이터는 24시간 전 취소, 문자는 두 종류, 분실물은 접수만이에요. 열한 개는 코드에 정해져 있어요. 직원 전화 시간과, 영업시간이나 수수료처럼 알려도 되는 정보 두 가지는 클럽 확인이 필요해요.", "plan": "ElevenLabs 적용 계획이에요. 정책은 세 곳에 들어가요. 서버는 숫자와 거절을 강제하고, 지금 최신이에요. 프롬프트 규칙 블록과 에이전트 설정은 아직 못 올렸어요. ElevenLabs 키에 에이전트를 읽고 쓰는 권한이 없어서예요. 그래서 먼저 두 가지를 부탁드려요. 클럽에서 직원 시간과 알려도 되는 정보를 확인해 주시고, 키에 권한을 추가해 주세요. 그러면 제가 직원 시간을 서버에 넣고, 미리 보기로 차이를 확인한 뒤 규칙 블록을 올리고, 옛 프롬프트를 정리하고, 시나리오별로 테스트 전화를 해 볼게요."}, "en": {"ov": "This gathers everything that can happen when a guest phones the club. On its first turn the assistant checks the caller ID: who is calling, and whether staff are in. Then a call goes one of six ways: booking a tee time; finding, changing or cancelling; the indoor simulator; questions; needing a person; and ending the call. Three rules hold everywhere: times and prices come only from the tools, one question at a time, and never make anything up.", "book": "Here is a booking that goes smoothly. The assistant asks, one at a time: member or not, the day, how many players, cart, and part of the day. It reads two or three open times, and the moment the guest picks one it holds the seats for three minutes, so a web buyer can't take them. It takes the name and number, confirms, reads the code one character at a time, and gives non-members the total with cart and tax. Members hear no price. If the players or day change, it releases the hold and searches again.", "nobook": "These are the cases where a booking can't happen. Nine holes are never booked by phone, on any day; the assistant offers eighteen. A day more than two weeks out gets the furthest bookable day instead. Past times, full days and event closures get a reason and an alternative, and a full day can go on the waitlist if the guest wants. If someone takes the seats mid-call, a short apology and a new search. More than four players goes to the pro shop, and a failed save is retried once, then a callback.", "chg": "Finding, changing or cancelling goes slowly. The assistant needs both the phone number and the last name before it shows anything; caller ID alone is not enough. If nothing is found, one more try, then the pro shop. Players can be changed, but a tee time can't be moved: it says plainly that means cancelling and rebooking. A cancel is previewed, read back, and done only after a clear yes. Within two hours of tee off the pro shop handles it. It never states a cancellation fee.", "sim": "The indoor simulator is booked separately from tee times. The assistant asks the day, how many hours, how many players, and roughly when: one to five hours, one to four players. There is no hold; once they pick a time it books right away, and it never asks about left or right handed. The price is one price for the bay plus HST, paid at the club. Phone cancels work up to 24 hours before, and there is no simulator waitlist.", "ask": "Now questions. For a price it gets the date first and reads only the tool's total; weekends differ. Member rates are unknown to us, so it does not quote them. It can text our address or the online booking link, only to the caller's number and at most two per call. A lost item is logged and the reference read back one character at a time, and it never says the item was found. Opening hours, menu, parking and fees are not confirmed, so it never makes them up and offers a person.", "ppl": "When a person is needed: the guest asks for one, membership, leagues, tournaments, lessons, the restaurant, refunds, more than four players, a cancel within two hours, a failed lookup, or anything without a tool. If staff are on duty, it says one line and transfers once. After hours it never transfers; it takes the first name, last name and the need as a callback. Staff hours are set to 8 AM to 6 PM, but that is a default the club still has to confirm.", "end": "Manner and edge cases. If the guest hesitates, it does not jump in; it says take your time, once. An unknown number gets a warm greeting with no name. A phrase like next Tuesday is never guessed; it asks for the month and day. After a booking it skips anything else, asks if it may hang up, and ends the call on yes. A call with no booking gets anything else once, then goodbye. More than eighty tool calls in one call goes to the pro shop.", "policy": "Our policies in one table. Bookings up to two weeks ahead, eighteen holes only by phone, four players per tee time, a three minute hold, identity by phone number and last name, cancels and changes up to two hours before. Prices only from the tool, the waitlist only on request, simulator cancels 24 hours before, two kinds of text, and lost items logged only. Eleven are set in code. Two need the club: staff phone hours, and which facts like opening hours or fees we may share.", "plan": "The rollout plan for ElevenLabs. A policy lives in three places. The server enforces the numbers and refusals, and it is current. The prompt rules block and the agent settings are not uploaded yet, because the ElevenLabs key has no permission to read or write the agent. So two things first, from you: have the club confirm staff hours and shareable facts, and add that permission to the key. Then I set the staff hours on the server, preview the difference, upload the rules block, clean up the old prompt, and make test calls for each scenario."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phsc-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phsc-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(typeof e.name==="object"?e.name[LANG]:e.name)+'</span><span class="ep">'+esc(typeof e.ep==="object"?e.ep[LANG]:(e.ep||""))+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phsc-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phsc-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script></body></html>
+</body></html>

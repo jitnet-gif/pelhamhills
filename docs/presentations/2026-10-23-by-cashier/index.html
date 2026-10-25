@@ -1,0 +1,1031 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Pelham Hills By Cashier</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- membership sale mocks (prefixed ms-) ---- */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px}
+.seg.lang svg{width:20px;height:18px;flex:0 0 auto}
+.seg.lang svg path{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.seg.lang svg text{fill:currentColor;font-family:var(--sans);font-weight:700;font-size:8.5px}
+/* ---- GolfNow + bill fix mocks (prefixed pf-) ---- */
+.ph.plan{background:var(--green-soft);color:var(--green)}
+.ph.gn{background:var(--flag-soft);color:var(--flag)}
+.ph.fix{background:var(--violet-soft);color:var(--violet)}
+.ph.ship{background:var(--sand-soft);color:var(--sand)}
+.cx-new{animation:cxflash 1.1s ease}
+@keyframes cxflash{0%{background:#fff3b0}100%{background:transparent}}
+@media (prefers-reduced-motion:reduce){.cx-new{animation:none}}
+.pf-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){.pf-two{grid-template-columns:1fr}}
+.pf-card{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:6px;min-width:0;transition:opacity .3s}
+.pf-card.off{opacity:.35}
+.pf-card small{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);font-weight:700}
+.pf-card>b{font-size:15px}
+.pf-card.bad{border-color:var(--scr-red);background:var(--scr-red-soft)}
+.pf-card.good{border-color:var(--scr-ok);background:var(--scr-ok-soft)}
+.pf-li{display:flex;gap:8px;align-items:baseline;font-size:12px}
+.pf-li em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);flex:0 0 auto}
+.pf-flow{display:grid;gap:8px}
+.pf-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pf-node{border:1px solid var(--scr-line);background:var(--scr-paper);border-radius:6px;padding:6px 9px;font-weight:700;font-size:12px;white-space:nowrap}
+.pf-node.gn{border-color:#1a7f4b;color:#1a7f4b}
+.pf-node.cg{border-color:#2d5e8c;color:#2d5e8c}
+.pf-node.us{border-color:var(--scr-accent);color:var(--scr-accent)}
+.pf-node.off{opacity:.35;text-decoration:line-through}
+.pf-arr{font-family:var(--mono);color:var(--scr-muted);font-size:12px}
+.pf-arr.cut{color:var(--scr-red);font-weight:700}
+.pf-cap{font-size:11px;color:var(--scr-muted)}
+.pf-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--scr-red-soft);color:var(--scr-red)}
+.pf-tag.ok{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.pf-tag.ac{background:var(--scr-accent-soft);color:var(--scr-accent)}
+.pf-bill{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.pf-bill h4{margin:0 0 4px;font-size:12px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.pf-l{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums;font-size:12px}
+.pf-l.gone{color:var(--scr-muted);text-decoration:line-through}
+.pf-l.disc{color:var(--scr-ok)}
+.pf-l.tot{border-top:1px solid var(--scr-line);padding-top:5px;margin-top:3px;font-weight:700;font-size:13.5px}
+.pf-l.tot.bad{color:var(--scr-red)}
+.pf-l.tot.ok{color:var(--scr-ok)}
+.pf-step{font-size:11.5px;font-weight:700;color:var(--scr-accent);background:var(--scr-accent-soft);border-radius:6px;padding:5px 8px}
+.pf-field{display:grid;gap:3px;font-size:11px;color:var(--scr-muted)}
+.pf-field span{border:1px solid var(--scr-line);border-radius:5px;padding:5px 8px;background:#fff;color:var(--scr-ink);font-family:var(--mono);font-size:12px}
+.pf-field span.hot{border-color:var(--scr-accent);box-shadow:0 0 0 2px var(--scr-accent-soft)}
+.pf-reader{display:grid;gap:6px;justify-items:center;background:var(--scr-bar);color:#fff;border-radius:10px;padding:14px 10px;text-align:center}
+.pf-reader b{font-size:20px;font-variant-numeric:tabular-nums}
+.pf-reader small{color:#b9c0c8;font-size:11px}
+.pf-err{border:1px solid var(--scr-red);background:var(--scr-red-soft);color:var(--scr-red);border-radius:6px;padding:7px 9px;font-size:11.5px;font-weight:600}
+.pf-dlg{border:1px solid var(--scr-line);background:#fff;border-radius:8px;padding:10px 12px;display:grid;gap:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:12px}
+.pf-dlg .bt{display:flex;gap:6px;justify-content:flex-end}
+.pf-dlg .bt i{font-style:normal;border:1px solid var(--scr-line);border-radius:5px;padding:4px 10px;font-weight:700}
+.pf-dlg .bt i.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.pf-todo{display:grid;gap:6px}
+.pf-todo div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:7px;padding:7px 9px;font-size:12px}
+.pf-todo div.you{border-color:var(--scr-accent)}
+.pf-todo b{display:block}
+.pf-todo small{color:var(--scr-muted);font-size:11px}
+/* ---- API key mocks (prefixed ak-) ---- */
+.pf-card.off2{opacity:.6;border-style:dashed}
+.pf-card code{font-family:var(--mono);font-size:11px}
+.pf-node.cl{border-color:#b4562b;color:#b4562b}
+.pf-node.bill{border-color:var(--scr-muted);color:var(--scr-muted)}
+.ak-term{background:var(--scr-bar);color:#e6ebef;border-radius:8px;padding:9px 11px;font-family:var(--mono);font-size:11.5px;display:grid;gap:3px;margin-bottom:10px;overflow-x:auto;white-space:pre}
+.ak-term .mut{color:#9aa4ad}
+.ak-term .okc{color:#7fd1a0}
+.ak-three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:620px){.ak-three{grid-template-columns:1fr}}
+.ak-phone{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:14px;padding:10px;display:grid;gap:6px;align-content:start;min-width:0}
+.ak-bub{max-width:88%;background:#e9ecef;color:#1d2328;border-radius:12px 12px 12px 3px;padding:6px 9px;font-size:12px;justify-self:start}
+.ak-bub.me{background:var(--scr-accent);color:#fff;border-radius:12px 12px 3px 12px;justify-self:end}
+.ak-cam{display:grid;gap:6px;justify-items:center;background:var(--scr-bar);border-radius:10px;padding:12px;color:#b9c0c8;font-size:11px}
+.ak-shot{width:100%;aspect-ratio:4/3;max-width:100%;border:2px dashed #7fd1a0;border-radius:8px;display:grid;place-items:center;color:#fff;font-weight:700}
+.ak-refs{display:flex;flex-wrap:wrap;gap:5px;align-content:start}
+.ak-refs span{border:1px solid var(--scr-line);background:var(--scr-paper);border-radius:6px;padding:4px 7px;font-size:11px}
+.ak-refs span.hit{border-color:var(--scr-ok);background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700}
+.ak-refs span.mut{border-style:dashed;color:var(--scr-muted)}
+.posbody>.pf-step,.posbody>.pf-card{margin-top:10px}
+.ph.use{background:var(--violet-soft);color:var(--violet)}
+.pf-card .pf-tag{justify-self:start}
+/* ---- coupon book mocks (prefixed cb-) ---- */
+.ph.new{background:var(--violet-soft);color:var(--violet)}
+.cb-phone{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:16px;padding:10px;display:grid;gap:8px;align-content:start;min-width:0}
+.cb-ph-h{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#1f6b3a}
+.cb-ph-h b{color:var(--scr-ink);font-size:13px}
+.cb-ph-h span{color:var(--scr-muted)}
+.cb-intro{margin:0;font-size:11px;color:var(--scr-muted);text-align:center}
+.cb-today{color:#1f6b3a;font-weight:700}
+.cb-code{border:1px solid var(--scr-line);border-radius:10px;padding:6px;text-align:center;display:grid}
+.cb-code small{font-size:9.5px;letter-spacing:.1em;color:var(--scr-muted);font-weight:700}
+.cb-code b{font-family:var(--mono);font-size:22px;letter-spacing:.25em}
+.cb-code span{font-size:10px;color:var(--scr-muted)}
+.cb-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.cb-grid li{aspect-ratio:1;max-width:100%;border:2px dashed var(--scr-line);border-radius:50%;display:grid;place-items:center;font-size:11px;color:var(--scr-muted);overflow:hidden;background:var(--scr-paper)}
+.cb-grid li.gift{border-color:#1f6b3a}
+.cb-grid li.on{border:2px solid transparent;background:#fff}
+.cb-grid li img{width:100%;height:100%;object-fit:contain}
+.cb-pop img{animation:cbpop .6s ease}
+@keyframes cbpop{0%{transform:scale(1.8);opacity:0}60%{opacity:1}100%{}}
+@media (prefers-reduced-motion:reduce){.cb-pop img{animation:none}}
+.cb-big{display:grid;justify-items:center;gap:4px;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px;text-align:center}
+.cb-big img{width:110px;height:auto;max-width:100%}
+.cb-big small{font-size:11px;color:var(--scr-muted)}
+.cb-big code{font-family:var(--mono);font-size:10.5px}
+.cb-free,.cb-mem{display:flex;gap:8px;align-items:center;border:2px solid #1f6b3a;background:var(--scr-ok-soft);border-radius:10px;padding:8px;font-size:18px}
+.cb-mem{border:1px solid var(--scr-line);background:var(--scr-paper);color:#1f6b3a}
+.cb-free span,.cb-mem span{display:grid;font-size:12px;color:var(--scr-ink)}
+.cb-free small,.cb-mem small{font-size:10.5px;color:var(--scr-muted)}
+.cb-desk{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:8px}
+.cb-desk h4{margin:0;font-size:13px}
+.cb-find{display:flex;gap:6px}
+.cb-find span{flex:1;min-width:0;border:1px solid var(--scr-line);border-radius:6px;padding:7px 9px;font-family:var(--mono);font-size:15px;letter-spacing:.2em;background:#fff;color:var(--scr-ink)}
+.cb-find span.hot{border-color:#22a35a;box-shadow:0 0 0 2px #cdeedb}
+.cb-find i,.cb-btns i{font-style:normal;font-weight:700;font-size:11.5px;border-radius:6px;padding:7px 10px;background:#1f6b3a;color:#fff;white-space:nowrap}
+.cb-hold{border:1px solid var(--scr-line);border-radius:7px;padding:9px;display:grid;gap:6px;background:var(--scr-paper)}
+.cb-hold p{margin:0;font-size:12px}
+.cb-hr{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:12px}
+.cb-hr code{font-family:var(--mono);color:var(--scr-muted)}
+.cb-bars,.cb-mini{display:flex;gap:3px}
+.cb-bars span{flex:1;height:14px;border-radius:3px;background:#e4e4e7}
+.cb-bars span.on{background:#1f6b3a}
+.cb-btns{display:flex;flex-wrap:wrap;gap:5px}
+.cb-btns i.go{background:#16a34a}
+.cb-btns i.am{background:#f59e0b}
+.cb-btns i.sk{background:#0284c7}
+.cb-btns i.ln{background:transparent;color:var(--scr-ink);border:1px solid var(--scr-line)}
+.cb-btns i.off,.cb-btns i.done{opacity:.5}
+.cb-badge{margin-left:6px;font-size:10.5px;font-weight:700;background:#e3f1e8;color:#1f6b3a;border-radius:4px;padding:1px 6px}
+.cb-ok{margin:0;font-size:12px;color:#1f6b3a;font-weight:600}
+.cb-mini span{flex:1;height:8px;border-radius:2px;background:var(--line,#ddd);opacity:.5}
+.cb-mini span.on{background:var(--green,#1f6b3a);opacity:1}
+.cb-mini{margin:4px 0 6px}
+.cb-sheet{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px;display:grid;gap:6px;align-content:start;min-width:0}
+.cb-sheet h4{margin:0;font-size:12.5px}
+.cb-seat{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;border:1px solid var(--scr-line);border-radius:6px;padding:6px 8px;font-size:12px}
+.cb-seat span{display:grid;min-width:0}
+.cb-seat small{font-size:10.5px;color:var(--scr-muted)}
+.cb-seat i{font-style:normal;font-weight:700;font-size:11px;border:1px solid var(--scr-line);border-radius:5px;padding:3px 8px}
+.cb-seat.in i{background:#1f6b3a;color:#fff;border-color:#1f6b3a}
+.cb-st{grid-column:1/-1;font-style:normal;font-size:11px;font-weight:700;border-radius:4px;padding:2px 6px;justify-self:start}
+.cb-st.ok{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.cb-st.mut{background:#eceef0;color:var(--scr-muted)}
+.cb-minus{color:var(--scr-red)}
+.pf-two>.pf-card{align-self:start}
+/* rate deck mocks (.rt-) */
+.ph.now{background:var(--ok-soft);color:var(--ok)}
+.rt-steps{display:grid;gap:8px}
+.rt-step{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px}
+.rt-step em{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--green);color:var(--paper);display:grid;place-items:center;font-weight:700;font-size:13px}
+.rt-step span{display:grid;min-width:0}.rt-step b{font-size:14px;color:var(--scr-ink)}.rt-step small{font-size:12px;color:var(--scr-muted)}
+.rt-step code{font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);white-space:nowrap}
+@media (max-width:560px){.rt-step{grid-template-columns:28px 1fr}.rt-step code{grid-column:2}}
+.rt-ticks{position:relative;height:14px;margin:0 0 4px 0;font-size:10px;color:var(--scr-muted)}
+.rt-ticks span{position:absolute;transform:translateX(-50%)}
+.rt-row{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:8px 10px;display:grid;gap:6px;margin-bottom:8px}
+.rt-row.live{outline:2px solid var(--green);outline-offset:-1px}
+.rt-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.rt-meta b{font-size:13px;color:var(--scr-ink)}.rt-meta small{font-size:11px;color:var(--scr-muted)}
+.rt-now{font-size:10px;background:var(--green);color:var(--paper);padding:1px 7px;border-radius:99px;margin-left:4px}
+.rt-bands{position:relative;height:34px;border-radius:6px;overflow:hidden;background:var(--scr-bg)}
+.rt-band{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;padding-left:7px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;line-height:1.1;white-space:nowrap;overflow:hidden;border-right:2px solid var(--scr-paper);transition:filter .3s}
+.rt-band small{font-size:9.5px;font-weight:500;opacity:.85}
+.rt-band.k0{background:#1E5A3F;color:#fff}.rt-band.k1{background:#4F8C5C;color:#fff}.rt-band.k2{background:#A7C79A;color:#15211B}
+.rt-band.hot{box-shadow:inset 0 0 0 3px #F2C48B}
+.rt-nine{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--scr-muted)}
+.rt-n9{position:relative;flex:1;height:7px}.rt-n9 i{position:absolute;top:0;bottom:0;right:0;border-radius:4px;background:var(--flag)}
+.rt-nine b{font-family:var(--mono);color:var(--scr-ink);white-space:nowrap}
+.rt-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px}
+.rt-tile{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:8px 10px;display:grid;gap:1px}
+.rt-tile small{font-size:11px;color:var(--scr-muted)}.rt-tile b{font-family:var(--mono);font-size:20px;color:var(--green)}.rt-tile span{font-size:11px;color:var(--scr-muted)}
+.rt-year{display:grid;gap:4px}
+.rt-yb{position:relative;height:40px;border-radius:6px;overflow:visible;background:var(--scr-bg)}
+.rt-seg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden}
+.rt-seg.sh{background:var(--sand-soft);color:var(--sand)}.rt-seg.rg{background:#2F7A47;color:#fff}.rt-seg.of{color:var(--scr-muted)}
+.rt-today{position:absolute;top:-5px;bottom:-5px;width:3px;background:var(--flag);border-radius:2px}
+.rt-mo{display:grid;grid-template-columns:repeat(12,1fr);font-size:10px;color:var(--scr-muted)}.rt-mo span{border-left:1px solid var(--scr-line);padding-left:3px}
+.rt-mxw{overflow-x:auto}
+.rt-mx,.rt-pl{border-collapse:collapse;width:100%;background:var(--scr-paper);border-radius:8px;font-size:12px;color:var(--scr-ink)}
+.rt-mx{min-width:440px}.rt-pl{min-width:420px}
+.rt-mx th,.rt-mx td,.rt-pl th,.rt-pl td{padding:8px 6px;border-bottom:1px solid var(--scr-line);text-align:center}
+.rt-mx th,.rt-pl th{font-size:11px;color:var(--scr-muted);font-weight:600}
+.rt-mx td:first-child{text-align:left;font-weight:600;white-space:nowrap}
+.rt-pl td,.rt-pl th{text-align:left;vertical-align:top}.rt-pl td:first-child{font-weight:600}
+.rt-pl tr.z td:nth-child(2){color:var(--green);font-weight:700}
+.rt-chip{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap}
+.rt-chip.wd{background:var(--green-soft);color:var(--green)}.rt-chip.fr{background:#4F8C5C;color:#fff}.rt-chip.we{background:#1E5A3F;color:#fff}
+.rt-chip.sh{background:var(--sand-soft);color:var(--sand)}.rt-chip.sp{border:1px dashed var(--green);color:var(--green)}
+.rt-three{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.rt-r{font-family:var(--mono);margin-left:auto}
+.rt-three .pf-li{justify-content:space-between}
+.rt-sheet{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:8px 10px;display:grid;gap:4px}
+.rt-sh{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;color:var(--scr-ink);padding-bottom:4px;border-bottom:1px solid var(--scr-line)}
+.rt-slot{display:flex;justify-content:space-between;font-size:13px;padding:4px 2px;color:var(--scr-ink)}
+.rt-slot b{font-family:var(--mono)}.rt-slot b.bad{color:var(--scr-red)}.rt-slot b.ok{color:var(--scr-ok)}
+/* ---- By cashier mocks (prefixed bc-) ---- */
+.bc-nav{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11.5px;color:var(--scr-muted)}
+.bc-nav .on{color:var(--scr-ink);font-weight:600}.bc-nav b{color:var(--scr-accent)}
+.bc-panel{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:6px;overflow:hidden}
+.bc-ph{font-weight:700;font-size:13px;padding:8px 10px;border-bottom:1px solid var(--scr-line)}
+.bc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;padding:8px;min-height:30px}
+.bc-card{border:1px solid var(--scr-line);padding:10px;display:grid;gap:8px;min-width:0;background:var(--scr-paper);transition:box-shadow .3s}
+.bc-card.bc-glow{box-shadow:0 0 0 2px var(--scr-accent-soft)}
+.bc-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.bc-top>div:first-child{min-width:0}
+.bc-card h4{margin:0;font-size:14px;font-weight:700;color:var(--scr-ink)}
+.bc-card p{margin:2px 0 0;font-size:11.5px;color:var(--scr-muted)}
+.bc-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.bc-right b{font-size:15px;font-variant-numeric:tabular-nums;color:var(--scr-ink)}
+.bc-prn{width:34px;height:32px;border:1px solid var(--scr-line);display:grid;place-items:center;color:var(--scr-ink)}
+.bc-prn svg{width:18px;height:18px}
+.bc-tx{font-size:12px;font-weight:700;color:#4533ff}
+.bc-hi{outline:2px solid #f2b705;outline-offset:2px;border-radius:3px;background:#fff3b0;color:var(--scr-ink)!important}
+.bc-callout{background:#fff3b0;border:1px solid #e3c34a;border-radius:8px;padding:10px 12px;font-size:13px;color:#3d3200}
+.bc-cap{margin-top:4px}
+.bc-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+@media (max-width:560px){.bc-two{grid-template-columns:1fr}}
+.bc-bills,.bc-bins{display:grid;gap:6px;min-width:0}
+.bc-bills small,.bc-bins small{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);font-weight:700}
+.bc-bill{display:flex;gap:8px;align-items:baseline;font-size:12px;padding:6px 8px;border:1px dashed var(--scr-line);border-radius:6px;opacity:.35;transition:all .3s;min-width:0}
+.bc-bill span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bc-bill.on{opacity:1;border-style:solid}
+.bc-bill em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--scr-muted)}
+.bc-bin{padding:8px;border:1px solid var(--scr-line);border-radius:6px;display:grid;gap:2px;opacity:.5}
+.bc-bin.on{opacity:1}.bc-bin b{font-size:12.5px}.bc-bin span{font-size:12px;letter-spacing:2px;min-height:14px}
+.bc-c0.on{border-color:#2f7d4f;background:#e9f5ee}.bc-c0 span{color:#2f7d4f}
+.bc-c1.on{border-color:#3d5bd9;background:#ecf0ff}.bc-c1 span{color:#3d5bd9}
+.bc-c2.on{border-color:#b5651d;background:#fbf0e4}.bc-c2 span{color:#b5651d}
+.bc-c3.on{border-color:#8a8f98;background:#f1f2f4}.bc-c3 span{color:#6b7280}
+.bc-eq{display:grid;gap:6px}
+.bc-eq>div{display:grid;grid-template-columns:40px 1fr auto;gap:8px;align-items:baseline;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:6px;padding:8px 10px}
+.bc-eq b{font-size:18px;font-variant-numeric:tabular-nums}.bc-eq em{font-style:normal;font-size:12px;color:var(--scr-muted)}
+.bc-strike{color:var(--scr-red)!important}
+.bc-lines{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-size:11.5px}
+.bc-lines li{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+.bc-lines li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bc-lines i{font-style:normal;font-variant-numeric:tabular-nums}.bc-lines small{color:var(--scr-muted);font-size:11px}
+.bc-lines li.bc-rf span{text-decoration:line-through;color:var(--scr-muted)}.bc-lines li.bc-rf b{color:#8a1f1f}
+.bc-lines li.bc-click{background:#ecebff;color:#4533ff}
+.bc-lines .bc-more{color:var(--scr-muted)}
+.bc-receipt{display:grid;gap:2px;background:var(--scr-paper);border:1px solid #4533ff;border-radius:8px;padding:10px 12px;font-size:12px}
+.bc-receipt small{color:var(--scr-muted)}.bc-receipt span{font-family:var(--mono);font-size:11px;color:#8a1f1f}
+.bc-modal{display:grid;gap:8px;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:12px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.bc-modal label{display:grid;grid-template-columns:48px 1fr;gap:8px;align-items:center;font-size:12px}
+.bc-modal label span{color:var(--scr-muted)}
+.bc-modal label i{font-style:normal;border:1px solid var(--scr-line);padding:5px 8px;border-radius:4px;font-family:var(--mono);font-size:11.5px}
+.bc-modal label.bc-chk{display:flex;gap:6px}.bc-modal label.bc-chk i{border:0;padding:0}
+.bc-btn{justify-self:start;background:var(--scr-ink);color:var(--scr-paper);padding:6px 14px;border-radius:4px;font-weight:700;font-size:12px}
+.bc-slip{background:#fff;color:#111;border:1px dashed #bbb;padding:10px 12px;font-family:var(--mono);font-size:10.5px;display:grid;gap:3px;max-width:260px}
+.bc-slip .c{text-align:center;font-size:13px}
+.bc-slip>div{display:flex;justify-content:space-between;gap:6px}.bc-slip .bd{font-weight:700}
+.bc-slip i{font-style:normal;font-weight:700;margin-top:4px;border-bottom:1px solid #ddd}
+.bc-slip hr{border:0;border-top:1px dashed #bbb;margin:2px 0;width:100%}
+.bc-tl{position:relative;display:grid;gap:10px;padding-top:22px;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:26px 10px 12px}
+.bc-ticks{position:absolute;left:74px;right:10px;top:6px;height:14px}
+.bc-ticks span{position:absolute;transform:translateX(-50%);font-size:10px;color:var(--scr-muted);white-space:nowrap}
+.bc-lane{display:grid;grid-template-columns:56px 1fr;gap:8px;align-items:center;font-size:12px}
+.bc-lane>div{position:relative;height:22px;background:repeating-linear-gradient(90deg,transparent 0 calc(25% - 1px),var(--scr-line) calc(25% - 1px) 25%)}
+.bc-bar{position:absolute;top:2px;bottom:2px;border-radius:4px}
+.bc-bar.bc-c0{background:#2f7d4f}.bc-bar.bc-c1{background:#3d5bd9}.bc-bar.bc-c2{background:#b5651d}
+.bc-ov{position:absolute;top:-4px;bottom:-4px;background:rgba(242,183,5,.25);border-left:1px dashed #d4a000;border-right:1px dashed #d4a000;pointer-events:none}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Browser · sales[] · receipt printer</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · Sales report · By cashier · 나레이터 프레젠테이션",
+  h1:"<b>계산서의 Cashier 이름</b>으로 나눠서, <b>한 사람씩 마감표</b>를 찍어요",
+  lede:"Sales report 의 Daily close 아래 ‘By cashier’ 칸을 장면별로 설명해요. 스크린샷의 10월 23일 값(Claudio · Dustin · James)을 그대로 씁니다. 왼쪽은 화면, 가운데는 뒤에서 세는 순서, 오른쪽은 숫자 대조와 알아 둘 것이에요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"화면",laneLog:"뒤에서 세는 순서",laneLedger:"숫자 대조",
+  ledgerSub:"2026-10-23 · 스크린샷 값",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 화면이 계산서를 세는 순서가 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"확인한 곳: frontend/components/reports/CashierShifts.tsx, ShiftReportPrint.tsx, lib/reports/shiftReport.ts (커밋 3180ef3). 이름·시각·금액은 스크린샷 값이고, 펼친 거래 줄과 영수증 번호는 모양을 보여 주는 예시예요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Sales report · By cashier · narrated walkthrough",
+  h1:"Split by the <b>Cashier name on each bill</b>, then print <b>one shift report per person</b>",
+  lede:"The ‘By cashier’ panel under Daily close in the Sales report, scene by scene, using the Oct 23 numbers from the screenshot (Claudio, Dustin, James). Left: the screen. Middle: the order bills are counted. Right: the numbers checked and what to know.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Screen",laneLog:"How bills are counted",laneLedger:"Numbers check",
+  ledgerSub:"2026-10-23 · screenshot values",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"The steps the screen takes to count the bills appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. The speech-bubble buttons (가 / Aa) restart the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Checked: frontend/components/reports/CashierShifts.tsx, ShiftReportPrint.tsx, lib/reports/shiftReport.ts (commit 3180ef3). Names, times and totals are from the screenshot; the expanded transaction lines and receipt numbers are examples of the layout."}
+};
+
+const L=(ko,en)=>({ko,en});
+const T=(ko,en)=>LANG==="ko"?ko:en;
+
+function frame(url,body){return '<div class="pos"><div class="urlbar"><i></i><span>'+url+'</span></div><div class="posbody">'+body+'</div></div>'}
+
+const PEOPLE=[
+ {n:"Claudio Frasca",t:"8:45 AM – 1:24 PM",c:15,r:0,tot:"$1,127.02"},
+ {n:"Dustin Lariviere",t:"11:00 AM – 1:55 PM",c:23,r:0,tot:"$831.49"},
+ {n:"James Helmkay",t:"11:59 AM – 3:25 PM",c:10,r:1,tot:"$292.87"}
+];
+const PRN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4H7zM4 8h16a1 1 0 0 1 1 1v7h-4v4H7v-4H3V9a1 1 0 0 1 1-1zm5 8v2h6v-2z" fill="currentColor"/></svg>';
+
+/* 스크린샷 모양의 담당자 카드. opt: hi(강조 칸 이름), open(펼친 줄 html), dimOthers, glow */
+function card(i,opt){
+ opt=opt||{};const p=PEOPLE[i];const hi=opt.hi||"";
+ const k=s=>hi===s?" bc-hi":"";
+ return '<section class="bc-card'+(opt.glow?" bc-glow":"")+(opt.off?" bc-off":"")+'"><div class="bc-top"><div><h4 class="'+k("name")+'">'+p.n+'</h4><p><span class="'+k("time")+'">'+p.t+'</span> · <span class="'+k("count")+'">'+p.c+' sale(s)</span>'+(p.r?' · <span class="'+k("ref")+'">'+p.r+' refunded</span>':"")+'</p></div>'+
+  '<div class="bc-right"><b class="'+k("tot")+'">'+p.tot+'</b><span class="bc-prn'+k("prn")+'">'+PRN+'</span></div></div>'+
+  '<div class="bc-tx'+k("tx")+'">'+(opt.open?"▼":"▶")+' Transactions ('+(p.c+p.r)+')</div>'+(opt.open||"")+'</section>';
+}
+function panel(inner){return '<div class="bc-panel"><div class="bc-ph">By cashier — 2026-10-23</div><div class="bc-grid">'+inner+'</div></div>'}
+function cap(t,extra){return '<p class="pf-cap cx-new bc-cap"'+(extra||"")+'>'+t+'</p>'}
+
+function ovScreen(p){
+ const n=p<.2?0:p<.4?1:p<.6?2:3;
+ const nav='<div class="bc-nav"><span>Reports</span>›<span>Sales report</span>›<span class="on">Daily close</span>›<b>By cashier</b></div>';
+ return frame("pelhamhills · admin/reports/sales",nav+panel([0,1,2].map(i=>i<n?card(i,{}):"").join(""))+
+  (p>.75?cap(T("세 사람 합계 $2,251.38 = 그날 매출 (세금 포함, 환불 뺀 값)","Three people total $2,251.38 = the day’s sales (tax incl., refunds out)")):""));
+}
+function groupScreen(p){
+ const bills=[["8:45","Claudio Frasca",0],["11:00","dustin lariviere",1],["11:02","Claudio  Frasca",0],["11:59","James Helmkay",2],["12:10","DUSTIN LARIVIERE",1],["2:40","—",3]];
+ const n=Math.min(bills.length,Math.floor(p*7.5));
+ const col=["bc-c0","bc-c1","bc-c2","bc-c3"];
+ let h='<div class="bc-two"><div class="bc-bills"><small>'+T("계산서 (시각 순)","Bills (by time)")+'</small>'+bills.map((b,i)=>'<div class="bc-bill '+(i<n?col[b[2]]+" on":"")+'"><em>'+b[0]+'</em><span>Cashier: <b>'+b[1]+'</b></span></div>').join("")+'</div>';
+ h+='<div class="bc-bins"><small>'+T("묶음","Groups")+'</small>';
+ const names=["Claudio Frasca","Dustin Lariviere","James Helmkay",T("이름 없음 → 맨 뒤","No cashier name → last")];
+ names.forEach((nm,g)=>{const cnt=bills.slice(0,n).filter(b=>b[2]===g).length;h+='<div class="bc-bin '+col[g]+(cnt?" on":"")+'"><b>'+nm+'</b><span>'+"●".repeat(cnt)+'</span></div>'});
+ h+='</div></div>';
+ return frame("pelhamhills · By cashier",h+(p>.6?cap(T("대·소문자, 띄어쓰기 개수는 무시하고 같은 사람으로 묶어요. 이름이 없는 계산서는 ‘No cashier name’ 칸으로 맨 뒤에 가요. (예시 계산서)","Case and extra spaces are ignored, so these count as one person. Bills with no name go to a ‘No cashier name’ card at the end. (Example bills)")):""));
+}
+function cardScreen(p){
+ const hi=p<.25?"name":p<.45?"time":p<.65?"count":p<.85?"tot":"prn";
+ const lab={name:T("계산서 Cashier 칸에 적힌 이름","Name typed in the bill’s Cashier field"),time:T("첫 계산 ~ 마지막 계산 시각 (출퇴근 시각 아님)","First sale – last sale (not clock-in/out)"),count:T("환불 안 된 계산서 수","Bills not refunded"),tot:T("그 사람 매출 · 세금 포함 · 환불 뺌","Their sales · tax incl. · refunds out"),prn:T("이 사람 근무 마감표 인쇄","Print this person’s shift report")}[hi];
+ return frame("pelhamhills · By cashier",panel(card(0,{hi,glow:true}))+'<div class="bc-callout cx-new" key="'+hi+'"><b>'+lab+'</b></div>');
+}
+function refundScreen(p){
+ const st=p<.3?0:p<.6?1:2;
+ const rows=[["10","sale(s)","$292.87",""],["1","refunded",T("합계에서 뺌","left out"),"bc-strike"],["11","Transactions","",""]];
+ let h=panel(card(2,{hi:st===0?"count":st===1?"ref":"tx",glow:true}));
+ h+='<div class="bc-eq">'+rows.slice(0,st+1).map((r,i)=>'<div class="'+(i===st?"cx-new":"")+'"><b>'+r[0]+'</b><span>'+r[1]+'</span><em class="'+r[3]+'">'+r[2]+'</em></div>').join("")+'</div>';
+ return frame("pelhamhills · By cashier",h+(st===2?cap(T("10건 + 환불 1건 = 거래 11줄. 환불 줄은 목록에 남지만 금액은 괄호로 표시하고 합계에 넣지 않아요.","10 sales + 1 refund = 11 lines. The refund stays in the list, shown in brackets, and is not in the total.")):""));
+}
+function listScreen(p){
+ const lines=[["11:59 AM","PH-…-0031","Pro Shop","Card","$46.00",0],["12:20 PM","PH-…-0034","Snack Bar","Cash","$8.50",0],["12:48 PM","PH-…-0037","Pro Shop","Debit","$66.00",0],["1:15 PM","PH-…-0040","Pro Shop","Card","($40.00)",1],["1:32 PM","PH-…-0042","Snack Bar","Split","$21.75",0]];
+ const n=p<.25?0:Math.min(lines.length,Math.floor((p-.2)*9));
+ const open=n?'<ul class="bc-lines">'+lines.slice(0,n).map((l,i)=>'<li class="'+(l[5]?"bc-rf":"")+(i===3&&p>.7?" bc-click":"")+'"><span><i>'+l[0]+'</i> · '+l[1]+' <small>· '+l[2]+' · '+l[3]+'</small></span><b>'+l[4]+'</b></li>').join("")+'<li class="bc-more">… '+T("6줄 더","6 more")+'</li></ul>':"";
+ let h=panel(card(2,{hi:n?"":"tx",open,glow:true}));
+ if(p>.72)h+='<div class="bc-receipt cx-new"><small>'+T("줄을 누르면","Click a line →")+'</small><b>'+T("영수증 상세 창","Receipt detail")+'</b><span>PH-…-0040 · REFUNDED</span></div>';
+ return frame("pelhamhills · By cashier",h+cap(T("8건 이하면 처음부터 펼쳐져 있고, 9건 이상이면 접혀 있어요. 그래서 스크린샷은 셋 다 접혀 있어요. (펼친 줄은 예시)","Lists of 8 or fewer start open; 9 or more start closed — that’s why all three are closed in the screenshot. (Lines are examples)")));
+}
+function printScreen(p){
+ const st=p<.3?0:p<.62?1:2;
+ let h='';
+ if(st===0)h=panel(card(0,{hi:"prn",glow:true}));
+ else{
+  h='<div class="bc-two"><div class="bc-modal'+(st===1?" cx-new":"")+'"><b>Print shift report</b>'+
+   [["Staff","Claudio Frasca"],["Start","08:45"],["End","13:24"]].map(f=>'<label><span>'+f[0]+'</span><i>'+f[1]+'</i></label>').join("")+
+   '<label class="bc-chk"><i>☑</i>'+T("계산서 줄 같이 찍기","Include transactions")+'</label><span class="bc-btn">Print</span></div>';
+  if(st===2){
+   const r=(a,b,cl)=>'<div class="'+(cl||"")+'"><span>'+a+'</span><span>'+b+'</span></div>';
+   h+='<div class="bc-slip cx-new"><b class="c">Shift Report</b>'+r("Staff","Claudio Frasca")+r("Start – End","8:45 AM – 1:24 PM")+
+    '<i>SALES (TAX INCL.)</i>'+r("Total Sales ×15","$1,127.02","bd")+r("Tee Sheet · Pro Shop …","")+
+    '<i>PAYMENTS</i>'+r(T("Cash (현금 계정만)","Cash (cash accounts only)"),"")+r("Card · Debit · Rain check","")+
+    '<hr>'+r("Refund ×0","$0.00","bd")+'<i>TRANSACTIONS (15)</i>'+r("8:45 AM · …0003 · Card","…")+r("…","")+'</div>';
+  }
+  h+='</div>';
+ }
+ return frame("pelhamhills · Shift report print",h+(st>=1?cap(T("이름·시작·끝은 카드 값으로 미리 채워져요. 고쳐서 찍어도 돼요.","Staff, start and end are filled from the card. You can change them before printing.")):""));
+}
+function overlapScreen(p){
+ const H0=8,H1=16,pc=h=>(h-H0)/(H1-H0)*100;
+ const bars=[["Claudio",8.75,13.4,"bc-c0"],["Dustin",11,13.92,"bc-c1"],["James",11.98,15.42,"bc-c2"]];
+ const n=Math.min(3,Math.floor(p*5)+1);
+ let h='<div class="bc-tl"><div class="bc-ticks">'+[8,10,12,14,16].map(x=>'<span style="left:'+pc(x)+'%">'+(x<12?x+" AM":x===12?"12 PM":(x-12)+" PM")+'</span>').join("")+'</div>';
+ const ov=p>.55?'<span class="bc-ov" style="left:'+pc(11.98)+'%;width:'+(pc(13.4)-pc(11.98))+'%"></span>':"";
+ bars.slice(0,n).forEach(b=>{h+='<div class="bc-lane"><b>'+b[0]+'</b><div><span class="bc-bar '+b[3]+'" style="left:'+pc(b[1])+'%;width:'+(pc(b[2])-pc(b[1]))+'%"></span>'+ov+'</div></div>'});
+ h+='</div>';
+ return frame("pelhamhills · By cashier",h+(p>.55?cap(T("12시~1시 반엔 세 사람이 같이 계산했어요. 계산대(서랍)는 클럽에 하나뿐이라 시간이 겹쳐도 정상이에요.","Around noon to 1:30 all three rang sales. There is one register (drawer) for the club, so overlap is normal.")):"")+
+  (p>.8?'<div class="pf-card cx-new" style="margin-top:8px"><small>'+T("근무 시간 · 팁은 여기 아님","Hours and tips are not here")+'</small><span class="pf-cap">'+T("근무 시간·팁 나누기는 현금 계정 화면의 Staff closeout (0010) 에서 해요.","Hours and tip split live in Staff closeout (0010) on the cash-account screen.")+'</span></div>':""));
+}
+function closeScreen(p){
+ const steps=[
+  [T("각자 끝날 때","When each person leaves"),T("By cashier 에서 자기 카드 🖨 → 마감표 출력","Print their card 🖨 → shift report")],
+  [T("마지막 사람","Last person"),T("Register close: 서랍 하나 현금 세기 (Pro Shop)","Register close: count the one drawer (Pro Shop)")],
+  [T("대조","Check"),T("세 사람 합 = Daily close 매출 $2,251.38","Sum of three = Daily close sales $2,251.38")],
+  [T("이름 없음 카드?","No-name card?"),T("있으면 누가 받았는지 영수증 열어 확인","If any, open the receipts to find who rang them")]
+ ];
+ const n=Math.min(4,Math.floor(p*4.6)+1);
+ return frame("pelhamhills · end of day",'<div class="rt-steps">'+steps.slice(0,n).map((s,i)=>'<div class="rt-step'+(i===n-1?" cx-new":"")+'"><em>'+(i+1)+'</em><span><b>'+s[0]+'</b><small>'+s[1]+'</small></span></div>').join("")+'</div>');
+}
+
+const EX={
+ ov:[["Claudio Frasca","$1,127.02"],["Dustin Lariviere","$831.49"],["James Helmkay","$292.87"],[L("합계","Total"),"$2,251.38"]],
+ group:[[L("묶는 기준","Grouped by"),L("계산서 Cashier 칸","Bill’s Cashier field")],[L("무시","Ignored"),L("대소문자 · 공백","Case · spaces")],[L("순서","Order"),L("첫 계산 시각","First sale time")],[L("이름 없음","No name"),L("맨 뒤 카드","Last card")]],
+ card:[[L("이름","Name"),"Claudio Frasca"],[L("첫 ~ 끝","First – last"),"8:45 AM – 1:24 PM"],[L("계산서","Bills"),"15"],[L("매출 (세금 포함)","Sales (tax incl.)"),"$1,127.02"]],
+ refund:[["sale(s)","10"],["refunded","1"],["Transactions","11"],[L("합계","Total"),L("$292.87 (환불 제외)","$292.87 (refund out)")]],
+ list:[[L("한 줄","One line"),L("시각 · 영수증 · 계산대 · 결제","Time · receipt · station · payment")],[L("환불","Refund"),L("취소선 · (금액)","Struck · (amount)")],[L("펼침","Open"),L("8건 이하","8 or fewer")],[L("클릭","Click"),L("영수증 상세","Receipt detail")]],
+ print:[["Staff","Claudio Frasca"],["Start","08:45"],["End","13:24"],["Total Sales ×15","$1,127.02"],[L("줄","Lines"),"15"]],
+ overlap:[["Claudio","8:45 – 1:24"],["Dustin","11:00 – 1:55"],["James","11:59 – 3:25"],[L("겹침","Overlap"),"11:59 – 1:24"]],
+ close:[[L("1 각자 출력","1 Each prints"),L("3장","3 slips")],[L("2 서랍 마감","2 Drawer close"),L("1번","Once")],[L("3 대조","3 Check"),"$2,251.38"]]
+};
+const NOTE={
+ ov:["Daily close 날짜를 바꾸면 그날 계산서로 다시 세요. 숫자는 화면이 받은 계산서에서 바로 계산해요.","Change the Daily close date and it recounts from that day’s bills, right in the browser."],
+ group:["이름 철자가 다르면(예: Jim / James) 다른 사람으로 나와요. 계산서에 이름을 같게 적는 게 중요해요.","Different spellings (Jim / James) show as two people. Keep the name the same on every bill."],
+ card:["시간은 출퇴근이 아니라 첫 계산과 마지막 계산 시각이에요.","Times are first and last sale, not clock-in and clock-out."],
+ refund:["환불된 계산서도 처음 계산한 사람의 목록에 남아요. 금액만 합계에서 빠져요.","A refunded bill stays in the list of whoever first rang it; only its amount leaves the total."],
+ list:["줄을 누르면 영수증 창이 열려서 다시 인쇄하거나 환불을 볼 수 있어요.","Clicking a line opens the receipt, where you can reprint it or see the refund."],
+ print:["일반 Reports 계정은 Cash 줄이 안 찍혀요(블라인드 카운트 0046). 현금 계정이면 팁 나누기도 붙어요.","Regular Reports accounts don’t see the Cash line (blind count, 0046). Cash accounts also get the tip split."],
+ overlap:["이 패널은 ‘누가 무엇을 팔았나’ 용이에요. 현금은 서랍 하나로 한 번에 맞춰요.","This panel answers ‘who sold what’. Cash is balanced once, for the one drawer."],
+ close:["수표·e-Transfer 줄(0085)은 아직 작업 중이라 반영 전이에요.","Cheque and e-Transfer lines (0085) are still in progress and not live yet."]
+};
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"plan",ko:"By cashier 칸은 어디?",en:"Where By cashier lives",
+ screen:(l,p)=>ovScreen(p),
+ log:[
+  {at:.1,tag:"ui",name:"Sales report",ep:"Daily close · 2026-10-23",why:L("Reports → Sales report 에서 날짜를 고르면 아래에 By cashier 칸이 나와요.","Pick a date in Reports → Sales report; By cashier appears below.")},
+  {at:.35,tag:"local",name:"sales[]",ep:"that day’s bills",why:L("화면이 그날 계산서를 모두 받아 와요.","The screen loads every bill for that day.")},
+  {at:.7,tag:"key",name:"groupByCashier",ep:"3 cards",why:L("계산서를 담당자 이름으로 나눠 카드 3장을 만들어요.","Splits the bills by cashier name into three cards.")}
+ ],
+ ledger:[{at:0,g:"ov",ex:"ov",n:1},{at:.3,n:2},{at:.5,n:3},{at:.75,n:4,flash:["c"]}]},
+
+{a:"group",ph:"plan",ko:"이름으로 묶기",en:"Grouping by name",
+ screen:(l,p)=>groupScreen(p),
+ log:[
+  {at:.08,tag:"local",name:"sort",ep:"created_at ↑",why:L("계산서를 결제 시각 순으로 줄 세워요.","Sorts bills by payment time.")},
+  {at:.3,tag:"key",name:"cashierKey",ep:"trim · lowercase",why:L("이름의 앞뒤 공백·대소문자를 지워서 같은 사람으로 맞춰요.","Trims spaces and lowercases so one person matches.")},
+  {at:.62,tag:"key",name:"No cashier name",ep:"last card",why:L("이름이 빈 계산서는 따로 모아 맨 뒤에 둬요.","Bills with no name are collected into a last card.")}
+ ],
+ ledger:[{at:0,g:"group",ex:"group",n:1},{at:.3,n:2},{at:.5,n:3},{at:.62,n:4,flash:["c"]}]},
+
+{a:"card",ph:"plan",ko:"카드 한 장 읽기",en:"Reading one card",
+ screen:(l,p)=>cardScreen(p),
+ log:[
+  {at:.1,tag:"ui",name:"name",ep:"Claudio Frasca",why:L("처음 본 철자 그대로 보여요.","Shown with the first spelling seen.")},
+  {at:.3,tag:"ui",name:"first – last",ep:"8:45 AM – 1:24 PM",why:L("첫 계산과 마지막 계산 시각이에요.","First and last sale times.")},
+  {at:.5,tag:"key",name:"count",ep:"15 sale(s)",why:L("환불 안 된 계산서만 세요.","Counts only bills not refunded.")},
+  {at:.7,tag:"key",name:"total",ep:"$1,127.02",why:L("세금 포함 합계, 환불은 빼요.","Tax-included total, refunds left out.")}
+ ],
+ ledger:[{at:0,g:"card",ex:"card",n:1},{at:.3,n:2},{at:.5,n:3},{at:.7,n:4,flash:["c"]}]},
+
+{a:"refund",ph:"now",ko:"환불 1건 (James)",en:"One refund (James)",
+ screen:(l,p)=>refundScreen(p),
+ log:[
+  {at:.1,tag:"key",name:"10 sale(s)",ep:"$292.87",why:L("정상 계산서 10장의 합이에요.","Sum of the 10 normal bills.")},
+  {at:.35,tag:"key",name:"1 refunded",ep:"refunded_at",why:L("환불된 계산서는 따로 세고 합계에서 빼요.","Refunded bills are counted separately and left out of the total.")},
+  {at:.62,tag:"ui",name:"Transactions (11)",ep:"10 + 1",why:L("목록에는 환불까지 11줄이 모두 나와요.","The list shows all 11 lines, refund included.")}
+ ],
+ ledger:[{at:0,g:"refund",ex:"refund",n:1},{at:.35,n:2},{at:.62,n:3},{at:.8,n:4,flash:["c"]}]},
+
+{a:"list",ph:"plan",ko:"거래 목록 펼치기",en:"Opening the transactions",
+ screen:(l,p)=>listScreen(p),
+ log:[
+  {at:.1,tag:"ui",name:"details",ep:"open if ≤ 8",why:L("9건 이상이면 접힌 채로 시작해요.","Starts closed when there are 9 or more.")},
+  {at:.35,tag:"ui",name:"line",ep:"time · receipt · station · payment",why:L("한 줄에 시각, 영수증 번호, 계산대, 결제 수단이 나와요.","Each line: time, receipt number, station, payment.")},
+  {at:.72,tag:"ui",name:"onOpenSale",ep:"receipt modal",why:L("줄을 누르면 그 영수증이 열려요.","Clicking a line opens that receipt.")}
+ ],
+ ledger:[{at:0,g:"list",ex:"list",n:1},{at:.35,n:2},{at:.55,n:3},{at:.72,n:4,flash:["c"]}]},
+
+{a:"print",ph:"fix",ko:"🖨 근무 마감표",en:"🖨 Shift report",
+ screen:(l,p)=>printScreen(p),
+ log:[
+  {at:.1,tag:"ui",name:"Print",ep:"ShiftReportPrint",why:L("프린터 버튼을 누르면 출력 창이 열려요.","The printer button opens the print window.")},
+  {at:.35,tag:"local",name:"filter",ep:"cashier = Claudio",why:L("그 사람 계산서만 남기고, 시작·끝을 카드 값으로 채워요.","Keeps only that person’s bills; start and end come from the card.")},
+  {at:.65,tag:"rpc",name:"receipt printer",ep:"Shift Report",why:L("합계·사업부·결제 수단·환불·거래 줄을 영수증 프린터로 찍어요.","Prints totals, divisions, payments, refunds and lines on the receipt printer.")}
+ ],
+ ledger:[{at:0,g:"print",ex:"print",n:1},{at:.35,n:3},{at:.65,n:5,flash:["c"]}]},
+
+{a:"overlap",ph:"now",ko:"시간이 겹쳐요",en:"Times overlap",
+ screen:(l,p)=>overlapScreen(p),
+ log:[
+  {at:.1,tag:"ui",name:"timeline",ep:"first – last sale",why:L("카드 시간은 계산한 시간대예요.","Card times are when they rang sales.")},
+  {at:.55,tag:"key",name:"one drawer",ep:"0062",why:L("클럽 전체가 계산대 하나를 같이 써요.","The whole club shares one register.")},
+  {at:.8,tag:"local",name:"Staff closeout",ep:"0010 · hours · tips",why:L("근무 시간과 팁은 다른 화면에서 다뤄요.","Hours and tips are handled on another screen.")}
+ ],
+ ledger:[{at:0,g:"overlap",ex:"overlap",n:1},{at:.25,n:2},{at:.4,n:3},{at:.55,n:4,flash:["c"]}]},
+
+{a:"close",ph:"fix",ko:"하루 마감 순서",en:"End-of-day order",
+ screen:(l,p)=>closeScreen(p),
+ log:[
+  {at:.1,tag:"ui",name:"By cashier",ep:"🖨 × 3",why:L("각자 자기 마감표를 찍어요.","Each person prints their own report.")},
+  {at:.32,tag:"ui",name:"Register close",ep:"Pro Shop · one drawer",why:L("현금은 서랍 하나로 한 번만 세요.","Cash is counted once, for the one drawer.")},
+  {at:.55,tag:"key",name:"check",ep:"$2,251.38",why:L("세 사람 합이 그날 매출과 같은지 봐요.","Check the three add up to the day’s sales.")},
+  {at:.78,tag:"key",name:"No cashier name",ep:"if any",why:L("이름 없는 계산서가 있으면 영수증을 열어 확인해요.","If there are unnamed bills, open them to check.")}
+ ],
+ ledger:[{at:0,g:"close",ex:"close",n:1},{at:.32,n:2},{at:.55,n:3,flash:["c"]}]}
+];
+
+const PH={plan:{ko:"보기",en:"Read"},now:{ko:"오늘",en:"Today"},fix:{ko:"마감",en:"Close"}};
+const TAGS={ui:"SCREEN",rpc:"PRINT",local:"DATA",stripe:"IN",key:"COUNT"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;const g=st.g||"ov";
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const r=(cur,a,b)=>'<div class="'+(cur?"cur":"")+'"><span>'+esc(a)+'</span><span>'+esc(b)+'</span></div>';
+  const ex=EX[st.ex||"ov"],n=st.n||1;
+  const tx=v=>typeof v==="string"?v:v[k];
+  let h=card("c",k==="ko"?"이 장면 숫자":"This scene","",pill("ok",k==="ko"?"스크린샷":"screenshot"),
+    '<div class="lrows">'+ex.slice(0,n).map((x,i)=>r(i===n-1,tx(x[0]),tx(x[1]))).join("")+'</div>');
+  h+=card("s",k==="ko"?"그날 합계":"Day totals","",pill("none",k==="ko"?"대조":"check"),
+    '<div class="lrows">'+r(false,"Claudio + Dustin + James","$2,251.38")+r(false,k==="ko"?"계산서":"Bills",k==="ko"?"48장 + 환불 1":"48 + 1 refund")+r(g==="close",k==="ko"?"이름 없는 계산서":"No-name bills",k==="ko"?"없음":"none")+'</div>');
+  h+=card("n",k==="ko"?"알아 둘 것":"Good to know","",pill("none",k==="ko"?"메모":"note"),'<p class="lnote">'+esc(k==="ko"?NOTE[g][0]:NOTE[g][1])+'</p>');
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"ov": {"ko": 20.4, "en": 21.3}, "group": {"ko": 15.1, "en": 14.7}, "card": {"ko": 19.4, "en": 17.1}, "refund": {"ko": 15.1, "en": 15.5}, "list": {"ko": 23.2, "en": 19.3}, "print": {"ko": 19.7, "en": 18.0}, "overlap": {"ko": 18.3, "en": 17.1}, "close": {"ko": 23.0, "en": 20.5}};
+const NARR={"ko": {"ov": "By cashier 칸은 Reports, Sales report 에서 날짜를 고르면 Daily close 아래에 나와요. 그날 계산서를 담당자 이름별로 나눠서 한 사람에 카드 한 장씩 보여 줘요. 10월 23일은 Claudio, Dustin, James 세 사람이고, 세 카드를 더하면 2천 251달러 38센트, 그날 매출과 같아요.", "group": "묶는 기준은 계산서의 Cashier 칸에 적힌 이름이에요. 대문자와 소문자, 띄어쓰기 개수는 무시해서 같은 사람으로 묶어요. 카드는 첫 계산이 빠른 사람부터 나오고, 이름이 비어 있는 계산서는 No cashier name 카드로 맨 뒤에 모여요.", "card": "카드 한 장을 읽어 볼게요. 맨 위는 이름, 그 아래는 첫 계산부터 마지막 계산까지의 시각이에요. 출퇴근 시각이 아니에요. 다음은 환불 안 된 계산서 수, 오른쪽 큰 숫자는 그 사람의 매출로 세금 포함, 환불은 뺀 값이에요. 끝에 있는 프린터 버튼은 그 사람의 근무 마감표를 찍어요.", "refund": "James 카드를 보면 10 sales, 1 refunded 라고 나와요. 정상 계산서 10장의 합이 292달러 87센트이고, 환불된 1장은 합계에서 빠져요. 그래서 거래 목록은 환불까지 포함해 11줄이에요.", "list": "Transactions 를 누르면 그 사람의 계산서가 시각 순으로 펼쳐져요. 한 줄에 시각, 영수증 번호, 계산대, 결제 수단, 금액이 나와요. 환불된 줄은 취소선과 괄호 금액으로 보여요. 8건 이하면 처음부터 펼쳐져 있고, 9건 이상이면 접혀 있어서 스크린샷은 셋 다 접혀 있어요. 줄을 누르면 영수증 창이 열려요.", "print": "프린터 버튼을 누르면 근무 마감표 창이 열려요. 이름, 시작, 끝 시각이 카드 값으로 미리 채워져 있고, 고쳐서 찍을 수도 있어요. 종이에는 세금 포함 총매출, 사업부별 금액, 결제 수단별 금액, 환불, 그리고 계산서 한 줄씩이 찍혀요. 현금 줄은 현금 리포트 계정에서만 나와요.", "overlap": "세 사람의 시간을 겹쳐 보면 12시부터 1시 반까지는 셋이 같이 계산했어요. 클럽에는 계산대와 현금 서랍이 하나뿐이라 시간이 겹쳐도 정상이에요. 이 칸은 누가 무엇을 팔았는지 보는 곳이고, 근무 시간과 팁 나누기는 현금 계정 화면의 Staff closeout 에서 해요.", "close": "하루 마감은 이렇게 하면 돼요. 각자 끝날 때 By cashier 에서 자기 카드의 프린터 버튼으로 마감표를 찍어요. 마지막 사람은 Register close 에서 서랍 하나의 현금을 세요. 세 사람의 합이 Daily close 매출 2천 251달러 38센트와 같은지 보고, 이름 없는 카드가 있으면 영수증을 열어 누가 받았는지 확인해요."}, "en": {"ov": "The By cashier panel appears under Daily close when you pick a date in Reports, Sales report. It splits that day's bills by cashier name, one card per person. On October 23 there are three: Claudio, Dustin and James. The three cards add up to two thousand two hundred fifty-one dollars and thirty-eight cents, the day's sales.", "group": "Bills are grouped by the name in their Cashier field. Upper and lower case and extra spaces are ignored, so they count as one person. Cards are ordered by who rang the first sale, and bills with no name are collected in a No cashier name card at the end.", "card": "Let's read one card. At the top is the name. Below it is the time of the first and last sale, not clock-in and clock-out. Next is the number of bills that were not refunded. The large number on the right is that person's sales, tax included, refunds left out. The printer button prints that person's shift report.", "refund": "James's card says ten sales, one refunded. The ten normal bills add up to two hundred ninety-two dollars and eighty-seven cents, and the refunded bill is left out of the total. That's why the transaction list has eleven lines, including the refund.", "list": "Click Transactions to open that person's bills in time order. Each line shows the time, receipt number, station, payment method and amount. A refunded line is struck through with the amount in brackets. Lists of eight or fewer start open; nine or more start closed, which is why all three are closed in the screenshot. Click a line to open the receipt.", "print": "The printer button opens the shift report window. Staff, start and end are filled in from the card, and you can change them before printing. The slip shows total sales including tax, amounts by division and by payment method, refunds, and one line per bill. The cash line only appears for cash report accounts.", "overlap": "Put the three times side by side and you can see all three were ringing sales from noon to about one thirty. The club has one register and one cash drawer, so overlap is normal. This panel shows who sold what. Hours and tip split are done in Staff closeout on the cash account screen.", "close": "Here's the end-of-day routine. When each person finishes, they print their shift report from their card in By cashier. The last person counts the one drawer in Register close. Check that the three totals add up to the Daily close sales of two thousand two hundred fifty-one dollars and thirty-eight cents, and if there's a No cashier name card, open those receipts to find who rang them."}};
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phbc-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phbc-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phbc-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phbc-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

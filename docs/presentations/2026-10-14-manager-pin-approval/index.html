@@ -1,0 +1,346 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Manager PIN Approval</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: presenter deck — scene chips, a three-lane stage (counter screen · server · status), a dark narration band, a player bar. */
+:root {
+  --bg: #f3f5f1;
+  --panel: #ffffff;
+  --ink: #1b2a20;
+  --muted: #5d6b61;
+  --line: #d4dbd3;
+  --green: #214d2f;
+  --green-soft: #e3eee5;
+  --accent: #4533ff;
+  --warn: #b4232a;
+  --warn-soft: #fdecec;
+  --ok: #157a3a;
+  --ok-soft: #e4f5e9;
+  --amber: #8a5a00;
+  --amber-soft: #fff4d6;
+  --band: #14241a;
+  --band-ink: #eef3ee;
+  --screen: #f2f2f4;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101612; --panel: #18211b; --ink: #e5ece6; --muted: #9aa89d; --line: #2c3a30;
+    --green: #7fc493; --green-soft: #1d3324; --accent: #8c82ff;
+    --warn: #ff8b8f; --warn-soft: #3a1c1e; --ok: #6fd896; --ok-soft: #173322;
+    --amber: #f0c25a; --amber-soft: #3a2f12; --band: #0a110c; --band-ink: #eef3ee; --screen: #202a23;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101612; --panel: #18211b; --ink: #e5ece6; --muted: #9aa89d; --line: #2c3a30;
+  --green: #7fc493; --green-soft: #1d3324; --accent: #8c82ff;
+  --warn: #ff8b8f; --warn-soft: #3a1c1e; --ok: #6fd896; --ok-soft: #173322;
+  --amber: #f0c25a; --amber-soft: #3a2f12; --band: #0a110c; --band-ink: #eef3ee; --screen: #202a23;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.55; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 20px 16px 120px; display: grid; gap: 16px; }
+header h1 { margin: 0; font-size: 22px; text-wrap: balance; color: var(--green); }
+header p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.chip b { font-family: var(--mono); font-weight: 500; color: var(--muted); }
+.chip[aria-current="step"] { background: var(--green); border-color: var(--green); color: var(--panel); }
+.chip[aria-current="step"] b { color: var(--panel); }
+.chip:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, .8fr); gap: 12px; }
+@media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
+.lane { background: var(--panel); border: 1px solid var(--line); padding: 12px; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.lane h2 { margin: 0; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+.lane h2 span { font-family: var(--mono); font-weight: 400; font-size: 11px; color: var(--muted); }
+
+/* ---- counter screen mock ---- */
+.screen { position: relative; background: var(--screen); border: 1px solid var(--line); padding: 12px; min-height: 360px; font-size: 12px; overflow: hidden; }
+.card { background: var(--panel); border: 1px solid var(--line); padding: 8px; width: min(250px, 100%); display: grid; gap: 6px; }
+.card .name { font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; }
+.card .row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; }
+.btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 4px 6px; font: inherit; font-weight: 700; text-align: center; }
+.btn.arrived { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+.btn.dots { padding: 4px 8px; }
+.btn.dots.on { border-color: var(--accent); }
+.line { border: 1px solid var(--line); padding: 4px 6px; display: flex; justify-content: space-between; }
+.menu { position: absolute; left: 150px; top: 112px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 20px rgb(0 0 0 / .15); min-width: 150px; padding: 4px 0; }
+.menu div { padding: 5px 12px; display: flex; gap: 8px; }
+.menu div small { margin-left: auto; color: var(--muted); font-size: 10px; }
+.menu .del { color: var(--warn); }
+.menu .del.press { background: var(--warn-soft); }
+.gone { opacity: .35; text-decoration: line-through; }
+.toast { position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 8px 10px; font-weight: 700; }
+.toast.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid var(--ok); }
+.toast.wait { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber); }
+
+.veil { position: absolute; inset: 0; background: rgb(0 0 0 / .45); display: flex; align-items: center; justify-content: center; padding: 10px; }
+.modal { background: var(--screen); border: 1px solid var(--line); width: 220px; max-width: 100%; color: var(--ink); }
+.modal .top { background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 10px; }
+.modal .top b { font-size: 13px; }
+.modal .top p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.modal .body { padding: 10px; display: grid; gap: 6px; }
+.pinbox { height: 30px; background: var(--panel); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); }
+.pinbox.bad { border-color: var(--warn); }
+.pinbox i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); display: block; }
+.err { color: var(--warn); font-size: 11px; min-height: 14px; }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.pad span { background: var(--panel); border: 1px solid var(--line); text-align: center; padding: 5px 0; font-weight: 700; }
+.acts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.acts span { border: 1px solid var(--line); text-align: center; padding: 5px; font-weight: 700; background: var(--panel); }
+.acts .go { background: var(--accent); border-color: var(--accent); color: #fff; }
+.acts .go.dim { opacity: .4; }
+
+/* ---- server lane ---- */
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.log li { border: 1px solid var(--line); padding: 7px 8px; font-size: 12px; display: grid; gap: 2px; opacity: .38; transition: opacity .25s; }
+.log li.seen { opacity: .75; }
+.log li.now { opacity: 1; border-color: var(--green); background: var(--green-soft); }
+.log .who { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.log code { font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 10.5px; padding: 0 5px; border: 1px solid currentColor; margin-right: 4px; }
+.tag.r { color: var(--warn); }
+.tag.g { color: var(--ok); }
+.tag.a { color: var(--amber); }
+
+/* ---- status lane ---- */
+.facts { display: grid; gap: 8px; }
+.fact { border: 1px solid var(--line); padding: 8px; display: grid; gap: 2px; }
+.fact b { font-size: 12.5px; }
+.fact span { color: var(--muted); font-size: 12px; }
+.pill { justify-self: start; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.pill.done { background: var(--ok-soft); color: var(--ok); }
+.pill.todo { background: var(--amber-soft); color: var(--amber); }
+.pill.no { background: var(--warn-soft); color: var(--warn); }
+.fact.hot { border-color: var(--green); }
+
+/* ---- narration + player ---- */
+.band { background: var(--band); color: var(--band-ink); padding: 14px 16px; display: grid; gap: 4px; min-height: 92px; }
+.band .eyebrow { color: #9fb7a6; }
+.band p { margin: 0; font-size: 15.5px; max-width: 80ch; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--panel); border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; z-index: 5; }
+.bar button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; cursor: pointer; }
+.bar .play { background: var(--green); color: var(--panel); border-color: var(--green); font-weight: 700; min-width: 92px; }
+.bar .seg { display: inline-flex; }
+.bar .seg button[aria-pressed="true"] { background: var(--green-soft); border-color: var(--green); font-weight: 700; }
+.bar .count { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Pelham Hills · 0024 manager approval</div>
+    <h1 id="h1">매니저 승인 요청은 어떻게 전달되나</h1>
+    <p id="lede">선수 삭제를 예로, 직원이 누른 순간부터 매니저 PIN 으로 통과될 때까지. 알림은 매니저 휴대폰이 아니라 같은 계산대 화면에 뜹니다.</p>
+  </header>
+
+  <nav class="chips" id="chips" aria-label="Scenes"></nav>
+
+  <section class="stage">
+    <div class="lane">
+      <h2><span id="l1">계산대 화면</span><span>tee sheet</span></h2>
+      <div class="screen" id="screen"></div>
+    </div>
+    <div class="lane">
+      <h2><span id="l2">뒤에서 일어나는 일</span><span>browser ↔ Supabase</span></h2>
+      <ol class="log" id="log"></ol>
+    </div>
+    <div class="lane">
+      <h2><span id="l3">지금 상태</span><span>2026-10-14</span></h2>
+      <div class="facts" id="facts"></div>
+    </div>
+  </section>
+
+  <section class="band" aria-live="polite">
+    <div class="eyebrow" id="sceneLabel"></div>
+    <p id="narr"></p>
+  </section>
+</div>
+
+<div class="bar">
+  <button id="prev" type="button" aria-label="Previous scene">◀</button>
+  <button id="play" class="play" type="button">▶ 재생</button>
+  <button id="next" type="button" aria-label="Next scene">▶</button>
+  <span class="count" id="count"></span>
+  <span class="seg" id="speed"></span>
+  <span class="seg" id="lang">
+    <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
+    <button type="button" data-lang="en" aria-pressed="false">English</button>
+  </span>
+</div>
+
+<script>
+const T = {
+  ko: {
+    h1: "매니저 승인 요청은 어떻게 전달되나",
+    lede: "선수 삭제를 예로, 직원이 누른 순간부터 매니저 PIN 으로 통과될 때까지. 알림은 매니저 휴대폰이 아니라 같은 계산대 화면에 뜹니다.",
+    lanes: ["계산대 화면", "뒤에서 일어나는 일", "지금 상태"],
+    play: "▶ 재생", pause: "❚❚ 멈춤",
+    titles: ["직원이 Delete", "서버가 거절", "PIN 창이 뜸", "매니저가 PIN", "틀린 PIN", "자동 재전송", "적용 범위·상태"],
+    narr: [
+      "직원이 선수 카드의 점 세 개 메뉴에서 Delete 를 누릅니다. 화면은 평소처럼 서버에 선수를 빼 달라고 요청을 보냅니다.",
+      "서버가 이 요청을 거절합니다. 이 직원에게 지금 이 예약에 대한 매니저 승인이 없기 때문입니다. 거절 메시지 끝에는 무엇을 승인해야 하는지 꼬리표가 붙어 있습니다.",
+      "화면이 그 꼬리표를 읽고, 같은 계산대 화면 한가운데에 매니저 승인 창을 띄웁니다. 매니저의 휴대폰으로 문자나 푸시 알림이 가지는 않습니다. 직원이 매니저를 계산대로 불러야 합니다.",
+      "매니저가 숫자 패드로 자기 PIN 을 입력하고 Approve 를 누릅니다. 서버는 저장된 암호화 해시와 비교하고, 누가 누구의 어떤 일을 승인했는지 기록을 남깁니다.",
+      "PIN 이 틀리면 창에 빨간 글씨로 알려 주고 다시 입력하게 합니다. 십 분 안에 다섯 번 틀리면, 그 직원 계정은 십 분 동안 승인을 받을 수 없습니다.",
+      "PIN 이 맞으면 창이 닫히고, 화면이 처음 요청을 자동으로 다시 보냅니다. 이번에는 통과해서 선수가 빠집니다. 같은 직원, 같은 일, 같은 예약에 대해서는 십 분 동안 다시 묻지 않습니다.",
+      "같은 방식이 환불, 카드 환불, 레인체크, 결제 취소에도 똑같이 적용됩니다. 코드는 배포되어 있고, Supabase 에서 0024 실행과 매니저 PIN 등록을 마치면 켜집니다."
+    ],
+    log: [
+      ["browser → Supabase", "선수 빼기 요청", "pelham_staff_player_remove(booking, player)"],
+      ["Supabase → browser", "<span class='tag r'>428</span>승인 없음", "A manager must approve removing this player. [approval:remove_player:744920d8…]"],
+      ["browser", "꼬리표 읽기 → PIN 창 열기", "action = remove_player · ref = 예약 id"],
+      ["browser → Supabase", "PIN 확인", "pelham_staff_manager_approve(pin, 'remove_player', ref)"],
+      ["Supabase", "<span class='tag a'>기록</span>틀린 시도도 저장", "approved: false · 10분에 5번 → 429 잠금"],
+      ["browser → Supabase", "<span class='tag g'>200</span>같은 요청 다시", "승인 10분 유효 → 선수 삭제 완료"]
+    ],
+    facts: [
+      ["매니저 휴대폰 알림", "없음. 같은 화면에 PIN 창이 뜹니다. 문자 알림이 필요하면 따로 추가해야 합니다.", "no", "보내지 않음"],
+      ["화면 코드", "PIN 창·자동 재전송. main 1657525, Vercel 배포 성공.", "done", "배포됨"],
+      ["Supabase 0024 실행", "SQL editor 에 붙여 넣고 Run. 아직 실행 여부를 확인하지 못했습니다.", "todo", "직접 하실 일"],
+      ["매니저 PIN 등록", "select pelham_manager_pin_set('이름', 'PIN');", "todo", "직접 하실 일"],
+      ["적용 대상", "환불 · 결제 뒤 카드 환불 · 레인체크 발행/무효 · 선수 삭제 · Mark unpaid", "done", "6개 함수"]
+    ],
+    toastWait: "매니저 승인 대기 중…", toastOk: "Levi Griffiths 를 예약에서 뺐습니다",
+    modalMsg: "A manager must approve removing this player.", wrong: "That PIN is not a manager PIN."
+  },
+  en: {
+    h1: "How a manager approval request reaches the counter",
+    lede: "Removing a player, from the tap to the manager's PIN. The prompt appears on the same register screen, not on the manager's phone.",
+    lanes: ["Register screen", "Behind the screen", "Status now"],
+    play: "▶ Play", pause: "❚❚ Pause",
+    titles: ["Staff taps Delete", "Server refuses", "PIN window opens", "Manager enters PIN", "Wrong PIN", "Automatic retry", "Coverage and status"],
+    narr: [
+      "A staff member opens the three-dot menu on a player card and taps Delete. The screen sends the usual request to the server to remove the player.",
+      "The server refuses. This staff member has no manager approval for this reservation right now. The refusal ends with a tag that says exactly what needs approving.",
+      "The screen reads that tag and opens a Manager approval window right on the same register. No text or push notification goes to the manager's phone. Staff call the manager over to the counter.",
+      "The manager types their PIN on the number pad and taps Approve. The server checks it against the stored hash and records who approved what, for whom.",
+      "A wrong PIN shows a red message and asks again. Five wrong PINs in ten minutes lock that staff account out of approvals for ten minutes.",
+      "With the right PIN, the window closes and the screen resends the original request on its own. This time it goes through and the player is removed. The same staff member is not asked again for the same action on the same reservation for ten minutes.",
+      "Refunds, card refunds, rain checks and clearing a payment all work the same way. The code is live. It switches on once 0024 is run in Supabase and the manager PINs are set."
+    ],
+    log: [
+      ["browser → Supabase", "Remove player", "pelham_staff_player_remove(booking, player)"],
+      ["Supabase → browser", "<span class='tag r'>428</span>No approval", "A manager must approve removing this player. [approval:remove_player:744920d8…]"],
+      ["browser", "Read tag → open PIN window", "action = remove_player · ref = booking id"],
+      ["browser → Supabase", "Check PIN", "pelham_staff_manager_approve(pin, 'remove_player', ref)"],
+      ["Supabase", "<span class='tag a'>Logged</span>Wrong tries are kept", "approved: false · 5 in 10 min → 429 lockout"],
+      ["browser → Supabase", "<span class='tag g'>200</span>Same request again", "Approval valid 10 min → player removed"]
+    ],
+    facts: [
+      ["Manager phone alert", "None. The PIN window opens on the same screen. A text alert would be a separate addition.", "no", "Not sent"],
+      ["Screen code", "PIN window and automatic retry. main 1657525, Vercel deploy succeeded.", "done", "Live"],
+      ["Run 0024 in Supabase", "Paste into the SQL editor and Run. Not yet confirmed as run.", "todo", "Your step"],
+      ["Set manager PINs", "select pelham_manager_pin_set('Name', 'PIN');", "todo", "Your step"],
+      ["Covered actions", "Refund · card refund after payment · rain check issue/void · remove player · Mark unpaid", "done", "6 functions"]
+    ],
+    toastWait: "Waiting for manager approval…", toastOk: "Levi Griffiths removed from the reservation",
+    modalMsg: "A manager must approve removing this player.", wrong: "That PIN is not a manager PIN."
+  }
+};
+// 장면마다 서버 줄 몇 개까지 보였나, 지금 줄, 상태 칸에서 강조할 것.
+const LOG_UPTO = [1, 2, 3, 4, 5, 6, 6];
+const FACT_HOT = [null, null, 0, null, null, null, [1, 2, 3, 4]];
+
+let lang = "ko", scene = 0, playing = false, rate = 1;
+const audio = new Audio();
+const $ = (id) => document.getElementById(id);
+
+function card(opts) {
+  return `<div class="card ${opts.gone ? "gone" : ""}">
+    <div class="name"><span>griffiths, levi</span><span style="color:var(--muted);font-weight:400">Public</span></div>
+    <div class="row"><span class="btn arrived">Arrived</span><span class="btn">No show</span><span class="btn dots ${opts.menu ? "on" : ""}">⋮</span></div>
+    <div class="line"><span>18 Hole Green Fee</span><span>$0.00</span></div>
+    <div class="line"><span>Half Cart (18 Holes)</span><span>$0.00</span></div>
+    <div class="line" style="font-weight:700"><span>Paid</span><span>VISA</span></div>
+  </div>`;
+}
+function modal(dots, bad) {
+  const t = T[lang];
+  return `<div class="veil"><div class="modal" role="presentation">
+    <div class="top"><b>Manager approval</b><p>${t.modalMsg}</p></div>
+    <div class="body">
+      <div class="pinbox ${bad ? "bad" : ""}">${dots ? "<i></i>".repeat(dots) : "Manager PIN"}</div>
+      <div class="err">${bad ? t.wrong : ""}</div>
+      <div class="pad">${["1","2","3","4","5","6","7","8","9","Clear","0","⌫"].map((k) => `<span>${k}</span>`).join("")}</div>
+      <div class="acts"><span>Cancel</span><span class="go ${dots >= 4 ? "" : "dim"}">Approve</span></div>
+    </div></div></div>`;
+}
+function screen() {
+  const t = T[lang];
+  const menu = (press) => `<div class="menu"><div>☂ Raincheck <small>Manager</small></div><div>↺ Refund</div><div>▭ Mark unpaid <small>Manager</small></div><div class="del ${press ? "press" : ""}">🗑 Delete <small>Manager</small></div></div>`;
+  switch (scene) {
+    case 0: return card({ menu: true }) + menu(true);
+    case 1: return card({}) + `<div class="toast wait">${t.toastWait}</div>`;
+    case 2: return card({}) + modal(0, false);
+    case 3: return card({}) + modal(4, false);
+    case 4: return card({}) + modal(0, true);
+    case 5: return card({ gone: true }) + `<div class="toast ok">✓ ${t.toastOk}</div>`;
+    default: return card({ menu: true }) + menu(false);
+  }
+}
+function render() {
+  const t = T[lang];
+  document.documentElement.lang = lang;
+  $("h1").textContent = t.h1; $("lede").textContent = t.lede;
+  ["l1", "l2", "l3"].forEach((id, i) => ($(id).textContent = t.lanes[i]));
+  $("chips").innerHTML = t.titles.map((title, i) =>
+    `<button class="chip" type="button" data-i="${i}" ${i === scene ? 'aria-current="step"' : ""}><b>${i + 1}</b>${title}</button>`).join("");
+  $("screen").innerHTML = screen();
+  const upto = LOG_UPTO[scene];
+  $("log").innerHTML = t.log.map((row, i) => {
+    const cls = i < upto ? (i === upto - 1 && scene < 6 ? "now" : "seen") : "";
+    return `<li class="${cls}"><span class="who">${row[0]}</span><b>${row[1]}</b><code>${row[2]}</code></li>`;
+  }).join("");
+  const hot = FACT_HOT[scene];
+  $("facts").innerHTML = t.facts.map((f, i) => {
+    const on = hot !== null && (Array.isArray(hot) ? hot.includes(i) : hot === i);
+    return `<div class="fact ${on ? "hot" : ""}"><span class="pill ${f[2]}">${f[3]}</span><b>${f[0]}</b><span>${f[1]}</span></div>`;
+  }).join("");
+  $("sceneLabel").textContent = `${scene + 1} / 7 · ${t.titles[scene]}`;
+  $("narr").textContent = t.narr[scene];
+  $("count").textContent = `${scene + 1}/7`;
+  $("play").textContent = playing ? t.pause : t.play;
+  document.querySelectorAll("#lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  document.querySelectorAll("#speed button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.rate) === rate)));
+}
+function speak() {
+  audio.src = `audio/${lang}-${scene + 1}.mp3`;
+  audio.playbackRate = rate;
+  audio.play().catch(() => { playing = false; render(); });
+}
+function go(i, keepPlaying = playing) {
+  scene = Math.max(0, Math.min(6, i));
+  playing = keepPlaying;
+  render();
+  if (playing) speak(); else audio.pause();
+}
+audio.addEventListener("ended", () => {
+  if (!playing) return;
+  if (scene < 6) setTimeout(() => playing && go(scene + 1, true), 500);
+  else { playing = false; render(); }
+});
+$("play").onclick = () => { playing = !playing; render(); if (playing) speak(); else audio.pause(); };
+$("prev").onclick = () => go(scene - 1);
+$("next").onclick = () => go(scene + 1);
+$("chips").onclick = (e) => { const b = e.target.closest("[data-i]"); if (b) go(Number(b.dataset.i)); };
+$("speed").innerHTML = [0.9, 1, 1.2].map((r) => `<button type="button" data-rate="${r}">${r}×</button>`).join("");
+$("speed").onclick = (e) => { const b = e.target.closest("[data-rate]"); if (!b) return; rate = Number(b.dataset.rate); audio.playbackRate = rate; render(); };
+$("lang").onclick = (e) => { const b = e.target.closest("[data-lang]"); if (!b) return; lang = b.dataset.lang; render(); if (playing) speak(); };
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight") go(scene + 1);
+  else if (e.key === "ArrowLeft") go(scene - 1);
+  else if (e.key === " " && e.target === document.body) { e.preventDefault(); $("play").click(); }
+});
+render();
+</script>
+
+</body></html>

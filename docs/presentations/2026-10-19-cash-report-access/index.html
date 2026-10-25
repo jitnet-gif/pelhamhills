@@ -1,0 +1,864 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>현금 리포트 권한</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- rate deck additions ---- */
+.ph.date{background:var(--blue-soft);color:var(--blue)}
+.ph.time{background:var(--sand-soft);color:var(--sand)}
+.ph.plan{background:var(--violet-soft);color:var(--violet)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.zero{color:var(--scr-ok);font-weight:700}
+.flow4{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0}
+.f4{flex:1 1 96px;border:1px solid var(--scr-line);background:var(--scr-paper);padding:12px;display:grid;gap:3px;opacity:.4;transition:opacity .3s}
+.f4.on{opacity:1}
+.f4.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.f4 .fn{font-family:var(--mono);font-size:10px;color:var(--scr-muted)}
+.f4 b{font-size:14px}
+.f4 em{font-style:normal;color:var(--scr-muted);font-size:11px}
+.farr{color:var(--scr-muted);font-weight:700}
+.srcnote{font-size:11px;color:var(--scr-muted);border-top:1px solid var(--scr-line);padding-top:8px}
+.strip{background:var(--scr-paper);border:1px solid var(--scr-line);padding:10px;display:grid;gap:6px}
+.strip .mo{display:grid;grid-template-columns:repeat(9,1fr);font:600 10px var(--mono);color:var(--scr-muted)}
+.trk{position:relative;height:30px;background:var(--scr-bg)}
+.trk i{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:flex-start;padding-left:6px;font:700 10.5px var(--sans);font-style:normal;white-space:nowrap;overflow:hidden}
+.trk i.sh{background:#E2ECF5;color:#2D5E8C}
+.trk i.pk{background:#E1EDE5;color:#1E5A3F}
+.trk i.jn{background:#9C7424;top:auto;height:5px}
+.trk b.now{position:absolute;top:-3px;bottom:-3px;width:2px;background:#D4572A}
+.tt{width:100%;border-collapse:collapse;background:var(--scr-paper);border:1px solid var(--scr-line)}
+.tt th,.tt td{padding:6px 8px;border-bottom:1px solid var(--scr-line);text-align:left;font-size:11.5px;vertical-align:top}
+.tt th{font:700 10px var(--mono);color:var(--scr-muted);text-transform:uppercase}
+.tt td{color:var(--scr-ink)}
+.tt .r{text-align:right}
+.tt tr.hot td{background:var(--scr-accent-soft)}
+.tt .sub{display:block;font-style:normal;color:var(--scr-muted);font-size:10.5px}
+.cd{font-weight:700;padding:1px 6px;font-size:11px}
+.cd.weekday_shoulder,.cd.weekend_shoulder{background:#E2ECF5;color:#2D5E8C}
+.cd.weekday,.cd.friday,.cd.weekend{background:#E1EDE5;color:#1E5A3F}
+.cd.june,.cd.hol{background:#F5EDDC;color:#9C7424}
+.shd{font-weight:700;font-size:12px;padding:4px 2px}
+.band{background:#dde7f2;border-top:1px solid #c9d8e8;border-bottom:1px solid #c9d8e8;padding:1px 10px;font-size:10.5px;font-weight:700;color:#4e5560}
+.slot{display:grid;grid-template-columns:72px 70px 1fr;align-items:center;background:var(--scr-paper);border-bottom:1px solid var(--scr-line);padding:6px 10px;transition:background .3s}
+.slot .pr{font-family:var(--mono);color:var(--scr-muted)}
+.slot .who{font-weight:600}
+.slot.hot{background:var(--scr-accent-soft)}
+.slot.hot .pr{color:var(--scr-accent);font-weight:700}
+.bk{background:var(--scr-paper);border:1px solid var(--scr-line);padding:12px;display:grid;gap:8px}
+.bkt{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.bkt b{font-size:18px}
+.bkt span{font:10px var(--mono);color:var(--scr-muted)}
+.hol{display:flex;gap:6px;flex-wrap:wrap}
+.hol button{border:1px solid var(--scr-line);background:var(--scr-paper);padding:8px 12px;font-weight:700;font-size:12px}
+.hol button.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.hol button.on2{border-color:var(--scr-accent);color:var(--scr-accent);background:var(--scr-accent-soft)}
+.hol button.off{opacity:.4;text-decoration:line-through}
+.warn{color:#8a6f30;font-size:11.5px;font-weight:600}
+.okline{color:var(--scr-ok);font-size:11.5px;font-weight:700}
+.pcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.pc{background:var(--scr-paper);border:1px solid var(--scr-line);padding:9px;display:grid;gap:4px;transition:border-color .3s}
+.pc.hot{border-color:var(--scr-accent);box-shadow:0 0 0 2px var(--scr-accent-soft)}
+.pc .plan{font-size:10.5px;border:1px solid var(--scr-line);padding:3px 6px;background:var(--scr-bg)}
+.pc .pl{display:flex;justify-content:space-between;font-size:11.5px}
+.pc em{font-style:normal;font-size:10.5px;color:#8a6f30}
+.tot{display:flex;justify-content:space-between;background:var(--scr-paper);border:1px solid var(--scr-line);padding:8px 10px;font-weight:600}
+.lsnote{font-size:11.5px;color:var(--scr-muted)}
+.lsnote s{color:var(--scr-red)}
+.audit{background:var(--scr-paper);border:1px solid var(--scr-line)}
+.audit div{display:grid;grid-template-columns:62px 1fr;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);font-size:11.5px}
+.audit div:last-child{border-bottom:0}
+.audit div.hot{background:var(--scr-accent-soft)}
+.audit .mono{color:var(--scr-muted)}
+.bill{background:var(--scr-paper);border:1px solid var(--scr-line);display:grid}
+.bill div{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);font-size:11.5px}
+.bill .bh{font:700 10px var(--mono);color:var(--scr-muted);text-transform:uppercase}
+.todo{display:grid;gap:8px}
+.ti{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;background:var(--scr-paper);border:1px solid var(--scr-line);padding:10px}
+.ti .tk{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
+.ti.ok .tk{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.ti.wait .tk{background:#F5EDDC;color:#9C7424}
+.ti.you .tk{background:var(--scr-red-soft);color:var(--scr-red)}
+.ti b{display:block;font-size:12.5px}
+.ti em{font-style:normal;color:var(--scr-muted);font-size:11px}
+/* language toggle: speech-bubble icons */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px;padding:0 12px}
+.bub{width:26px;height:22px;flex:0 0 auto}
+.bub path{fill:currentColor}
+.bub text{font:800 10.5px var(--sans);fill:var(--sunk);text-anchor:middle;dominant-baseline:central}
+.seg.lang button[aria-checked="true"] .bub text{fill:var(--violet)}
+.seg.lang button[aria-checked="true"] .bub path{fill:#fff}
+/* ---- cash deck additions ---- */
+.chiprow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chp{border:1px solid var(--scr-line);background:var(--scr-paper);padding:4px 9px;font-size:11px;font-weight:600}
+.chp.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.lnk{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--scr-accent)}
+.lnk.hot{background:var(--scr-accent-soft);padding:3px 7px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px}
+.sc{background:var(--scr-paper);border:1px solid var(--scr-line);padding:7px 9px;display:grid;gap:2px}
+.sc span{font-size:10px;color:var(--scr-muted)}
+.sc b{font-size:13px}
+.pp{background:var(--scr-paper);border:1px solid var(--scr-line)}
+.pph{font:700 10.5px var(--mono);color:var(--scr-muted);text-transform:uppercase;padding:7px 10px}
+.ppr{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-top:1px solid var(--scr-line);font-size:12px}
+.ppr em{font-style:normal;color:var(--scr-muted);font-size:10.5px}
+.ppr.hot{background:var(--scr-accent-soft);font-weight:700}
+.gone{border:1px dashed var(--scr-line);padding:9px 10px;display:grid;gap:2px;font-size:12px;color:var(--scr-muted)}
+.gone em{font-style:normal;font-size:11px;color:var(--scr-red)}
+.login{display:grid;gap:5px;max-width:300px;background:var(--scr-paper);border:1px solid var(--scr-line);padding:12px}
+.login label{font-size:10.5px;color:var(--scr-muted);font-weight:600}
+.login .inp{border:1px solid var(--scr-line);padding:7px 9px;font-size:13px;min-height:18px}
+.login button{background:var(--scr-bar);color:#fff;border:0;padding:8px;font-weight:700;margin-top:4px}
+.caret{display:inline-block;width:1px;height:13px;background:var(--scr-ink);vertical-align:-2px;margin-left:1px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.map{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;background:var(--scr-accent-soft);padding:8px 10px}
+.deny{background:var(--scr-paper);border:1px solid var(--scr-line);padding:14px;display:grid;gap:6px;max-width:420px}
+.deny p{margin:0;font-size:13px;font-weight:600}
+.deny em{font-style:normal;font-size:11.5px;color:var(--scr-muted)}
+.tt td.red{color:var(--scr-red);font-weight:700}
+.tt td.okc{color:var(--scr-ok);font-weight:700}
+.xl{border:1px solid var(--scr-line);background:var(--scr-paper);overflow-x:auto}
+.xh,.xr{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(64px,1fr)}
+.xh span,.xr span{padding:6px 8px;border-right:1px solid var(--scr-line);font-size:11.5px;text-align:right}
+.xh span{font:700 10px var(--mono);color:var(--scr-muted);background:var(--scr-bg);text-align:right}
+.xh span.hot,.xr span.hot{background:var(--scr-accent-soft);color:var(--scr-accent);font-weight:700}
+.tt td.dim{color:var(--scr-muted)}
+.dropbox{display:grid;gap:4px;background:var(--scr-accent-soft);border:1px solid var(--scr-accent);padding:10px 12px;font-size:12px}
+.dropbox .big{font-size:14px;font-weight:700}
+.red2{color:var(--scr-muted);font-size:11.5px;font-weight:600}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg class="bub" viewBox="0 0 26 22" aria-hidden="true"><path d="M4 1h18a3 3 0 013 3v10a3 3 0 01-3 3H11l-5 4v-4H4a3 3 0 01-3-3V4a3 3 0 013-3z"/><text x="13" y="9.5">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg class="bub" viewBox="0 0 26 22" aria-hidden="true"><path d="M4 1h18a3 3 0 013 3v10a3 3 0 01-3 3H11l-5 4v-4H4a3 3 0 01-3-3V4a3 3 0 013-3z"/><text x="13" y="9.5">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Supabase · 0046_cash_report.sql</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 현금 리포트 권한 · 나레이터 프레젠테이션",
+  h1:"그날의 현금은 <b>Emmeline 만</b>",
+  lede:"현금 숫자를 일반 Reports 에서 빼고 /admin/reports/cash 로 옮긴 변경을 아홉 장면으로 따라가요. 로그인, 두 리포트 화면, 다른 계정이 열었을 때, 서버 잠금(0046), 계산대 블라인드 카운트, 회계 엑셀, 남은 일까지예요. 왼쪽은 화면, 가운데는 서버에서 일어나는 일, 오른쪽은 지금 계정이 볼 수 있는 것이에요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 9장면",laneScreen:"화면",laneLog:"서버에서 일어나는 일",laneLedger:"이 계정이 보는 것",
+  ledgerSub:"계정 · 현금 권한 · 보이는 것 · 반영",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)으로 언어를 바꾸면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"화면의 금액은 설명용 예시예요. 코드: 0046_cash_report.sql · app/admin/reports/cash/page.tsx · components/reports/ReportsView.tsx · lib/teeSheet/session.ts. 2026-10-20 기준 1차분은 커밋 591a278, 계산대 블라인드 카운트는 커밋 전이고 0046 은 Supabase 에서 실행 전이에요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Cash report access · narrated walkthrough",
+  h1:"The day's cash, <b>for Emmeline only</b>",
+  lede:"Nine scenes follow the change that moves cash figures out of the regular Reports and into /admin/reports/cash: sign-in, both report screens, another account trying the page, the server lock (0046), the blind register count, the accounting workbook and what is left. Left: the screen. Middle: what the server does. Right: what this account can see.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 9 scenes",laneScreen:"Screen",laneLog:"On the server",laneLedger:"What this account sees",
+  ledgerSub:"Account · cash access · visible · status",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Entries appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switch language with the speech-bubble buttons (가 / Aa); the current scene restarts in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Amounts on screen are examples. Code: 0046_cash_report.sql · app/admin/reports/cash/page.tsx · components/reports/ReportsView.tsx · lib/teeSheet/session.ts. As of 2026-10-20 the first part is commit 591a278, the blind register count is not committed, and 0046 has not been run in Supabase."}
+};
+
+const L=(ko,en)=>({ko,en});
+
+/* ---------- screen pieces ---------- */
+function shell(body,path,title,who){return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app'+path+'</span></div><div class="posbar"><span><small>PELHAM HILLS</small><b>'+title+'</b></span><span class="st">'+(who||"Pro Shop")+'</span></div><div class="posbody">'+body+'</div></div>'}
+
+function chips(cash){
+ return '<div class="chiprow"><span class="chp on">Daily close</span><span class="chp">Accounting (Excel)</span><span class="chp">Stripe check</span><span class="chp">Bookings</span>'+(cash==="link"?'<span class="lnk hot">Cash report →</span>':cash==="back"?'<span class="lnk">← Reports without cash</span>':"")+'</div>'}
+
+function stats(){
+ return '<div class="stats">'+[["Gross Sales","$3,412.50"],["Discounts","−$120.00"],["Net Sales","$3,292.50"],["Tax · HST","+$428.03"],["Total Collected","$3,720.53"]].map(s=>'<div class="sc"><span>'+s[0]+'</span><b class="mono">'+s[1]+'</b></div>').join("")+'</div>'}
+
+function payPanel(cash,hot){
+ const rows=[["Cash","×14","$612.40","cash"],["Card","×31","$2,409.88",""],["Debit","×9","$698.25",""]];
+ return '<div class="pp"><div class="pph">'+(cash?"By payment":"By payment (cash not shown)")+'</div>'+rows.filter(r=>cash||r[3]!=="cash").map(r=>'<div class="ppr'+(r[3]==="cash"&&hot?" hot":"")+'"><span>'+r[0]+' <em>'+r[1]+'</em></span><b class="mono">'+r[2]+'</b></div>').join("")+'</div>'}
+
+function goneNote(lang,show){
+ if(!show)return"";
+ return '<div class="gone"><s>'+(lang==="ko"?"Close out by staff · Tip split":"Close out by staff · Tip split")+'</s><em>'+(lang==="ko"?"일반 Reports 에서는 그리지 않아요":"Not drawn on regular Reports")+'</em></div>'}
+
+function loginScreen(lang,p){
+ const typed="emmeline".slice(0,Math.max(0,Math.min(8,Math.floor(p*16))));
+ const mapped=p>=.5;
+ return shell('<div class="login"><label>'+(lang==="ko"?"아이디 또는 이메일":"ID or email")+'</label><div class="inp mono">'+esc(typed)+'<i class="caret"></i></div><label>'+(lang==="ko"?"비밀번호":"Password")+'</label><div class="inp mono">••••••••••••••</div><button>Sign in</button></div>'+
+  (mapped?'<div class="map"><span class="mono">emmeline</span><span class="farr">→</span><b class="mono">admin@pelhamhills.ca</b></div><table class="tt"><thead><tr><th>ID</th><th>'+(lang==="ko"?"계정":"Account")+'</th></tr></thead><tbody><tr><td class="mono">hwang</td><td class="mono">proshop@pelhamhills.com</td></tr><tr class="hot"><td class="mono">emmeline</td><td class="mono">admin@pelhamhills.ca</td></tr></tbody></table>':""),"/admin","Sign in","—")}
+
+function reportsScreen(lang,p){
+ return shell(chips(null)+stats()+payPanel(false,false)+goneNote(lang,p>=.55),"/admin/reports","Reports","proshop@")}
+
+function cashScreen(lang,p){
+ if(p<.3)return shell(chips("link")+stats()+payPanel(false,false),"/admin/reports","Reports","admin@");
+ const staff=[["Hwang","$402.40","$402.40","6h 30m"],["Mina","$210.00","$205.00","5h 00m"]];
+ return shell(chips("back")+payPanel(true,true)+
+  '<div class="pph">Close out by staff — 2026-10-19</div><table class="tt"><thead><tr><th>Name</th><th class="r">Expected</th><th class="r">Counted</th><th class="r">Hours</th></tr></thead><tbody>'+
+  staff.map((s,i)=>'<tr class="'+(p>=.6&&i===1?"hot":"")+'"><td>'+s[0]+'</td><td class="r mono">'+s[1]+'</td><td class="r mono">'+s[2]+'</td><td class="r mono">'+s[3]+'</td></tr>').join("")+'</tbody></table>'+
+  (p>=.75?'<div class="tot"><span>Tip pool → by hours</span><b class="mono">$186.00</b></div>':""),"/admin/reports/cash","Cash report","admin@")}
+
+function deniedScreen(lang,p){
+ return shell('<div class="deny"><b>Cash report</b><p>Only the cash report account can open this page.</p><em>Sign in with that account to see cash totals, drawer counts and the tip split. Everything else is on <u>Reports</u>.</em></div>',"/admin/reports/cash","Cash report","proshop@")}
+
+function serverScreen(lang,p){
+ const k=lang==="ko";
+ const rows=[
+  ["pelham_staff_pos_report_daily",k?"cash 줄 빼고 돌려줌":"returns without cash","",k?"전부":"everything"],
+  ["pelham_staff_closeout_report",k?"PT403 거절":"PT403 refused","bad",k?"보임":"shown"],
+  ["pelham_staff_closeout_save",k?"PT403 거절":"PT403 refused","bad",k?"저장":"saves"],
+  ["pelham_staff_closeout_reopen",k?"PT403 거절":"PT403 refused","bad",k?"다시 열기":"reopens"],
+  ["pelham_staff_register_close_report",k?"현금 기대 금액 null":"expected cash null","",k?"전부":"everything"],
+  ["pelham_staff_cash_access","false","",'true']];
+ const n=Math.min(rows.length,1+Math.floor(p*6));
+ return shell('<table class="tt"><thead><tr><th>Function</th><th>proshop@</th><th>admin@</th></tr></thead><tbody>'+rows.slice(0,n).map((r,i)=>'<tr class="'+(i===n-1?"hot":"")+'"><td class="mono">'+r[0]+'</td><td class="'+(r[2]?"red":"")+'">'+r[1]+'</td><td class="okc">'+r[3]+'</td></tr>').join("")+'</tbody></table>'+
+  '<div class="srcnote mono">select * from public.pelham_cash_viewers;<br>→ admin@pelhamhills.ca</div>',"Supabase SQL","0046_cash_report.sql","—")}
+
+function registerScreen(lang,p){
+ const k=lang==="ko";
+ const admin=p>=.72;
+ const counted=p<.25?0:p<.45?412.40:812.40;
+ const rows=[["Cash","$200.00",admin?"$612.40":"—",admin?"$812.40":"—"],["Credit Card","$0.00","$1,604.10","$1,604.10"],["Debit Card","$0.00","$402.25","$402.25"]];
+ const drop=counted>=200?'<div class="dropbox"><span>Keep in drawer <b class="mono">$200.00</b></span><span class="big">Cash sales to hand in <b class="mono">$'+(counted-200).toFixed(2)+'</b></span></div>':'<p class="warn">Less than the $200.00 float — count again.</p>';
+ return shell('<div class="pph">Register - "Pro Shop" Closing Totals</div><table class="tt"><thead><tr><th>Type</th><th class="r">Start</th><th class="r">Payments</th><th class="r">Remaining</th></tr></thead><tbody>'+
+  rows.map((r,i)=>'<tr class="'+(i===0?"hot":"")+'"><td>'+r[0]+'</td><td class="r mono">'+r[1]+'</td><td class="r mono'+(r[2]==="—"?" dim":"")+'">'+r[2]+'</td><td class="r mono'+(r[3]==="—"?" dim":"")+'">'+r[3]+'</td></tr>').join("")+
+  '<tr><td><b>Totals</b></td><td class="r mono">$200.00</td><td class="r mono'+(admin?"":" dim")+'">'+(admin?"$2,618.75":"—")+'</td><td class="r mono'+(admin?"":" dim")+'">'+(admin?"$2,818.75":"—")+'</td></tr></tbody></table>'+
+  '<div class="pph">Cash count · $100×2 $50×4 $20×18 …</div><div class="tot"><span>Total counted</span><b class="mono">$'+counted.toFixed(2)+'</b></div>'+
+  (admin?'<p class="red2">Short $0.00 → '+(k?"과부족은 현금 리포트 계정만":"over/short: cash report account only")+'</p>':drop),"/pos","Close Register",admin?"admin@":"proshop@")}
+
+function excelScreen(lang,p){
+ const cash=p>=.5;
+ const cols=["Date","Net",...(cash?["Cash"]:[]),"Card","Debit"];
+ const row=["10/19","3,720.53",...(cash?["612.40"]:[]),"2,409.88","698.25"];
+ return shell('<div class="xl"><div class="xh">'+cols.map((c,i)=>'<span class="'+(cash&&c==="Cash"?"hot":"")+'">'+c+'</span>').join("")+'</div><div class="xr mono">'+row.map((c,i)=>'<span class="'+(cash&&cols[i]==="Cash"?"hot":"")+'">'+c+'</span>').join("")+'</div></div>'+
+  '<div class="tot"><span>'+(cash?"Total payments (= Net sales)":"Total non-cash payments")+'</span><b class="mono">'+(cash?"$3,720.53":"$3,108.13")+'</b></div>'+
+  '<p class="lsnote">'+(cash?"/admin/reports/cash":"/admin/reports")+' · PelhamHills_Accounting_2026-10-01_to_2026-10-19.xlsx</p>',cash?"/admin/reports/cash":"/admin/reports","Accounting (Excel)",cash?"admin@":"proshop@")}
+
+function todoScreen(lang,p){
+ const k=lang==="ko";
+ const it=[
+  ["ok",k?"코드 작성":"Code written","0046 · /admin/reports/cash · ReportsView · RegisterHome"],
+  ["ok",k?"타입 검사 · 빌드 · 로컬 DB":"Type check · build · local DB",k?"tsc · next build 통과 · 0046 을 로컬 Postgres 에서 계정별로 확인":"tsc and next build pass · 0046 checked per account on local Postgres"],
+  ["wait",k?"커밋 · 배포":"Commit · deploy",k?"1차분은 591a278 로 커밋됨 · 블라인드 카운트는 아직 커밋 전":"first part is commit 591a278 · blind count not committed yet"],
+  ["you",k?"0046_cash_report.sql 실행":"Run 0046_cash_report.sql",k?"Supabase SQL Editor · 한 번 붙여 넣기":"Supabase SQL Editor · paste once"],
+  ["you",k?"admin@pelhamhills.ca 계정 만들기":"Create admin@pelhamhills.ca",k?"SQL 준비됨 · 직원 명단(scorecard_admins) 등록까지 한 번에":"SQL ready · also adds it to the staff list (scorecard_admins)"],
+  ["you",k?"확인":"Check",k?"emmeline 로 로그인 → Reports 오른쪽 위 Cash report →":"Sign in as emmeline → Cash report → on Reports"]
+ ];
+ const n=Math.min(it.length,1+Math.floor(p*7));
+ return shell('<div class="todo">'+it.slice(0,n).map(x=>'<div class="ti '+x[0]+'"><span class="tk">'+(x[0]==="ok"?"✓":x[0]==="wait"?"…":"!")+'</span><div><b>'+x[1]+'</b><em>'+x[2]+'</em></div></div>').join("")+'</div>',"/admin","Status","—")}
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"look",ko:"전체 그림",en:"Overview",
+ screen:(lang,p)=>p<.5?reportsScreen(lang,0):cashScreen(lang,.8),
+ log:[
+  {at:.15,tag:"ui",name:"/admin/reports",ep:"every staff account",why:L("현금 숫자가 없는 리포트예요.","The report without cash figures.")},
+  {at:.5,tag:"ui",name:"/admin/reports/cash",ep:"cash report account only",why:L("현금까지 전부 들어간 리포트예요.","The report with cash included.")},
+  {at:.8,tag:"rpc",name:"0046_cash_report.sql",ep:"server lock",why:L("화면이 아니라 서버가 막아요.","The server enforces it, not just the screen.")}
+ ],
+ ledger:[{at:0,acct:"pro",acc:"no",vis:"plain",st:"code"},{at:.5,acct:"admin",acc:"yes",vis:"all",flash:["acct","acc","vis"]}]},
+
+{a:"login",ph:"home",ko:"emmeline 로그인",en:"Sign in as emmeline",
+ screen:(lang,p)=>loginScreen(lang,p),
+ log:[
+  {at:.2,tag:"key",name:"login",ep:"emmeline"},
+  {at:.5,tag:"local",name:"lib/teeSheet/session.ts",ep:"STAFF_ID_ALIASES",body:{hwang:"proshop@pelhamhills.com",emmeline:"admin@pelhamhills.ca"}},
+  {at:.75,tag:"rpc",name:"GoTrue /token",ep:"email + password",why:L("비밀번호는 Supabase Auth 에만 있어요.","The password lives only in Supabase Auth.")}
+ ],
+ ledger:[{at:0,acct:"none",acc:"none",vis:"none",st:"code"},{at:.75,acct:"admin",flash:["acct"]}]},
+
+{a:"reports",ph:"look",ko:"일반 Reports",en:"Regular Reports",
+ screen:(lang,p)=>reportsScreen(lang,p),
+ log:[
+  {at:.2,tag:"rpc",name:"pelham_staff_pos_report_daily",ep:"proshop@",body:{by_payment:"card, debit",cash_hidden:true}},
+  {at:.55,tag:"ui",name:"SalesReport cash={false}",ep:"no StaffCloseout",why:L("서버가 아직 0046 전이어도 화면이 한 번 더 걸러요.","The screen filters again even before 0046 runs.")}
+ ],
+ ledger:[{at:0,acct:"pro",acc:"no",vis:"plain",st:"code"}]},
+
+{a:"cash",ph:"count",ko:"현금 리포트",en:"Cash report",
+ screen:(lang,p)=>cashScreen(lang,p),
+ log:[
+  {at:.1,tag:"rpc",name:"pelham_staff_cash_access",ep:"admin@",body:{result:true}},
+  {at:.35,tag:"ui",name:"/admin/reports/cash",ep:"ReportsView cash"},
+  {at:.55,tag:"rpc",name:"pelham_staff_closeout_report",ep:"expected · counted cash"},
+  {at:.8,tag:"rpc",name:"tip split",ep:"by minutes worked",why:L("팁 통을 근무시간 비율로 나눠요(0010).","The tip pool is split by hours worked (0010).")}
+ ],
+ ledger:[{at:0,acct:"admin",acc:"yes",vis:"plain",st:"code"},{at:.35,vis:"all",flash:["vis"]}]},
+
+{a:"denied",ph:"refund",ko:"다른 계정",en:"Another account",
+ screen:(lang,p)=>deniedScreen(lang,p),
+ log:[
+  {at:.2,tag:"rpc",name:"pelham_staff_cash_access",ep:"proshop@",body:{result:false}},
+  {at:.55,tag:"ui",name:"/admin/reports/cash",ep:"note only",why:L("리포트를 그리지 않으니 현금 요청도 보내지 않아요.","The report is not drawn, so no cash request is sent.")}
+ ],
+ ledger:[{at:0,acct:"pro",acc:"no",vis:"none",st:"code"}]},
+
+{a:"server",ph:"save",ko:"서버 잠금 0046",en:"Server lock 0046",
+ screen:(lang,p)=>serverScreen(lang,p),
+ log:[
+  {at:.1,tag:"rpc",name:"pelham_cash_viewers",ep:"email list",body:{email:"admin@pelhamhills.ca"}},
+  {at:.3,tag:"rpc",name:"pelham_is_cash_viewer()",ep:"staff + on the list",why:L("이메일은 토큰이 아니라 auth.users 에서 읽어요.","The email is read from auth.users, not the token.")},
+  {at:.55,tag:"rpc",name:"<name>_base",ep:"wrapped like 0024/0026",why:L("원래 함수는 _base 로 옮기고 실행 권한을 걷어요.","The original moves to _base and loses its execute grant.")},
+  {at:.8,tag:"rpc",name:"PT403",ep:"Only the cash report account can see cash figures."}
+ ],
+ ledger:[{at:0,acct:"pro",acc:"no",vis:"plain",st:"code"},{at:.55,st:"sql",flash:["st"]}]},
+
+{a:"register",ph:"reg",ko:"계산대 블라인드 카운트",en:"Blind register count",
+ screen:(lang,p)=>registerScreen(lang,p),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_staff_register_close_report",ep:"proshop@ · cash_blind",body:{payments:null,remaining:null,"close.expected.cash":"(removed)"}},
+  {at:.35,tag:"key",name:"cash count",ep:"denominations"},
+  {at:.5,tag:"ui",name:"CashDrop",ep:"counted − $200 float",why:L("넘길 현금만 보여 주고 맞는지 아닌지는 말하지 않아요.","Shows only the amount to hand in, never whether it matches.")},
+  {at:.75,tag:"rpc",name:"admin@",ep:"full table + over/short",why:L("센 금액은 그대로 저장돼서 엠멀린이 과부족을 봐요.","The count is saved as-is, so Emmeline sees over/short.")}
+ ],
+ ledger:[{at:0,acct:"pro",acc:"no",vis:"plain",st:"code"},{at:.72,acct:"admin",acc:"yes",vis:"all",flash:["acct","acc","vis"]}]},
+
+{a:"excel",ph:"sale",ko:"회계 엑셀",en:"Accounting Excel",
+ screen:(lang,p)=>excelScreen(lang,p),
+ log:[
+  {at:.2,tag:"ui",name:"buildAccountingWorkbook",ep:"{ cash: false }",why:L("Daily·Summary 시트에서 Cash 칸을 빼요.","Drops the Cash column from Daily and Summary.")},
+  {at:.55,tag:"ui",name:"buildAccountingWorkbook",ep:"{ cash: true }",why:L("결제 합 = 순매출(세금 포함).","Payments add up to Net (tax incl.).")}
+ ],
+ ledger:[{at:0,acct:"pro",acc:"no",vis:"plain",st:"code"},{at:.5,acct:"admin",acc:"yes",vis:"all",flash:["acct","acc","vis"]}]},
+
+{a:"todo",ph:"save",ko:"남은 일",en:"What's left",
+ screen:(lang,p)=>todoScreen(lang,p),
+ log:[
+  {at:.15,tag:"ui",name:"npx tsc · next build",ep:"pass"},
+  {at:.35,tag:"ui",name:"git",ep:"591a278 · blind count pending"},
+  {at:.55,tag:"rpc",name:"0046_cash_report.sql",ep:"run once · safe to re-run"},
+  {at:.75,tag:"rpc",name:"create_admin_cash_account.sql",ep:"account + staff list",why:L("세션 스크래치패드에 있어요. 비밀번호가 들어 있어 저장소에는 넣지 않았어요.","Kept in the session scratchpad. It holds the password, so it is not in the repo.")}
+ ],
+ ledger:[{at:0,acct:"admin",acc:"none",vis:"none",st:"code"},{at:.5,st:"sql",flash:["st"]}]}
+];
+
+const PH={look:{ko:"보기",en:"View"},home:{ko:"로그인",en:"Sign-in"},count:{ko:"현금",en:"Cash"},refund:{ko:"차단",en:"Blocked"},save:{ko:"서버·반영",en:"Server"},reg:{ko:"계산대",en:"Register"},sale:{ko:"엑셀",en:"Excel"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"CODE",stripe:"TERMINAL",key:"INPUT"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG==="ko";
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const rows=a=>'<div class="lrows">'+a.map(r=>'<div class="'+(r[2]||"")+'"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>').join("")+'</div>';
+  const A={none:["none",k?"로그인 전":"Signed out","—"],pro:["vi","proshop@pelhamhills.com","hwang"],admin:["ok","admin@pelhamhills.ca","emmeline"]}[st.acct];
+  let h=card("acct",k?"계정":"Account","Supabase Auth",pill(A[0],A[2]),rows([[k?"이메일":"Email",A[1],"cur"]]));
+  const C={none:["none",k?"확인 전":"Not checked"],no:["bad","false"],yes:["ok","true"]}[st.acc];
+  h+=card("acc",k?"현금 권한":"Cash access","pelham_staff_cash_access()",pill(C[0],C[1]),rows([["pelham_cash_viewers",st.acc==="yes"?(k?"명단에 있음":"on the list"):st.acc==="no"?(k?"명단에 없음":"not on the list"):"—"]]));
+  const yes=k?"보임":"shown",no=k?"안 보임":"hidden";
+  const V={none:null,plain:[no,no,no,no],all:[yes,yes,yes,yes]}[st.vis];
+  h+=card("vis",k?"보이는 것":"Visible","/admin/reports · /cash",V?pill(st.vis==="all"?"ok":"wait",st.vis==="all"?(k?"현금 포함":"with cash"):(k?"현금 없음":"no cash")):pill("none","—"),
+    V?rows([[k?"By payment · Cash 줄":"By payment · Cash line",V[0],st.vis==="all"?"cur":""],[k?"계산대 현금 기대·과부족":"Register expected cash",V[0]],[k?"담당자별 마감":"Staff close-out",V[1]],[k?"팁 나누기":"Tip split",V[2]],[k?"엑셀 Cash 칸":"Excel Cash column",V[3]]]):'<p class="lnote">'+(k?"로그인하면 계정에 따라 달라져요.":"Depends on the account once signed in.")+'</p>');
+  const T={code:["wait",k?"코드 작성 · 커밋 전":"Code written · not committed"],sql:["bad",k?"0046 실행 필요":"Run 0046"]}[st.st];
+  h+=card("st",k?"반영 상태":"Status","git · Vercel · Supabase",pill(T[0],T[1]),rows([["git",k?"커밋 전":"not committed"],["Vercel",k?"배포 전":"not deployed"],["0046_cash_report.sql",k?"실행 전":"not run yet","cur"]]));
+  $("ledger").innerHTML=h;
+}
+
+const NARR={"ko": {"ov": "이번에는 현금 리포트를 엠멀린만 볼 수 있게 바꾼 내용을 보여드릴게요. 리포트가 이제 두 개로 나뉘어요. 직원 모두가 보는 일반 리포트에는 현금 숫자가 없어요. 현금까지 들어간 리포트는 어드민 리포트 캐시 페이지에서, 엠멀린 계정만 열 수 있어요.", "login": "먼저 로그인이에요. 로그인 화면에 아이디 emmeline 을 치면 admin@pelhamhills.ca 계정으로 들어가요. 황 아이디가 프로샵 계정으로 연결된 것과 같은 방식이에요. 비밀번호는 코드 어디에도 넣지 않았어요.", "reports": "일반 리포트 화면이에요. 매출, 할인, 세금, 사업부별 숫자는 그대로 보여요. 결제 수단별 합계에서는 현금 줄이 빠지고, 카드와 체크카드만 남아요. 담당자별 마감과 팁 나누기 패널도 이 화면에서는 사라졌어요.", "cash": "엠멀린 계정으로 들어오면 일반 리포트 오른쪽 위에 캐시 리포트 링크가 떠요. 누르면 현금 리포트로 가요. 여기에는 현금 합계, 담당자별 서랍 현금과 센 현금, 그리고 근무시간에 따른 팁 나누기까지 모두 보여요.", "denied": "다른 계정이 같은 주소를 직접 열면 어떻게 될까요? 리포트 대신 이 페이지는 현금 리포트 계정만 열 수 있다는 안내가 나와요. 현금 숫자는 한 줄도 내려오지 않아요.", "server": "화면에서 숨기기만 하면 서버 함수를 직접 불러 현금을 볼 수 있어요. 그래서 0046 마이그레이션이 서버에서 막아요. 명단에 없는 계정에는 일일 리포트의 현금 줄과 계산대 마감의 현금 기대 금액을 빼고 보내요. 담당자별 마감 함수는 403으로 거절해요. 로컬 Postgres에서 계정별로 돌려 확인했어요.", "register": "계산대 마감은 블라인드 카운트로 바뀌었어요. 직원은 서랍을 세고 시작 잔돈 200달러만 남겨요. 나머지는 전부 현금 매출로 넘기고, 화면은 넘길 금액만 알려 줘요. 현금 매출이 얼마여야 하는지, 남는지 모자라는지는 직원에게 보이지 않아요. 그건 엠멀린이 현금 리포트에서 봐요.", "excel": "회계 엑셀도 같은 규칙이에요. 일반 리포트에서 내려받으면 현금 칸이 없고, 합계 이름이 현금 제외 결제 합계로 바뀌어요. 현금 리포트에서 내려받으면 현금 칸이 들어가고, 결제 합계가 순매출과 맞아요.", "todo": "지금 상태예요. 현금 리포트를 나눈 1차분은 커밋되어 있어요. 이번 계산대 블라인드 카운트는 타입 검사, 빌드, 로컬 데이터베이스 검사를 통과했고 아직 커밋 전이에요. 사장님이 하실 일은 Supabase에서 0046 파일을 실행하고, admin 계정 SQL을 실행하는 거예요. 계정 SQL이 직원 명단 등록까지 한 번에 해요."}, "en": {"ov": "This walkthrough shows how the cash report became visible to Emmeline only. Reports are now split in two. The regular report every staff member sees has no cash figures. The report that includes cash lives at admin slash reports slash cash, and only Emmeline's account can open it.", "login": "First, sign-in. Typing the ID emmeline on the sign-in screen logs in as admin at pelhamhills dot c a. It works the same way the hwang ID points at the pro shop account. The password is not stored anywhere in the code.", "reports": "This is the regular Reports screen. Sales, discounts, tax and the division totals look the same. The payment breakdown drops the cash line and keeps card and debit. The staff close-out and tip split panels are gone from this screen.", "cash": "When Emmeline signs in, a Cash report link appears at the top right of Reports. It opens the cash report. Here she sees the cash total, each person's expected and counted drawer cash, and the tip split by hours worked.", "denied": "What if another account opens the same address directly? Instead of the report, it sees a note that only the cash report account can open the page. Not a single cash figure is sent to that browser.", "server": "Hiding cash on screen is not enough, because someone could call the server functions directly. So migration 0046 blocks it on the server. For accounts not on the list, the daily report drops the cash line and Close Register drops the expected cash. The staff close-out functions refuse with a 403. We ran it account by account on a local Postgres to check.", "register": "Close Register is now a blind count. Staff count the drawer and keep only the two hundred dollar float. Everything else goes in as cash sales, and the screen only shows the amount to hand in. Staff do not see what cash sales should be, or whether the drawer is over or short. Emmeline sees that in the cash report.", "excel": "The accounting workbook follows it too. Downloaded from regular Reports, it has no cash column, and the total is labelled total non-cash payments. Downloaded from the cash report, the cash column is back and the payments add up to net sales.", "todo": "Here is where things stand. The first part, splitting out the cash report, is committed. The blind register count passes the type check, build and local database check, and is not committed yet. Left for you: run file 0046 in Supabase, then run the admin account SQL. That SQL also adds the account to the staff list."}};
+const DUR={"ov": {"ko": 16.1, "en": 17.0}, "login": {"ko": 13.4, "en": 12.2}, "reports": {"ko": 14.4, "en": 13.1}, "cash": {"ko": 14.7, "en": 12.4}, "denied": {"ko": 11.1, "en": 11.3}, "server": {"ko": 22.0, "en": 20.3}, "register": {"ko": 19.2, "en": 18.5}, "excel": {"ko": 14.7, "en": 14.1}, "todo": {"ko": 22.6, "en": 20.3}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phcash-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phcash-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phcash-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phcash-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

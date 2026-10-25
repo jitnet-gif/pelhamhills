@@ -1,0 +1,722 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Change Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* Pro shop admin mock — keeps a light look in both themes */
+.ad{--ai:#1F2328;--am:#6B7280;--al:#D4D4D8;--as:#F2F2F4;--av:#4533FF;background:#F2F2F4;color:var(--ai);border:1px solid var(--al);border-radius:10px;overflow:hidden;font-size:12px}
+.ad .urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#E4E4E8;border-bottom:1px solid var(--al);font-family:var(--mono);font-size:10.5px;color:var(--am);min-width:0}
+.ad .urlbar i{width:8px;height:8px;border-radius:50%;background:#C9CDD2;flex:none}
+.ad .urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#111315;color:#fff;padding:7px 12px;font-size:12px;font-weight:700}
+.adbar small{color:rgba(255,255,255,.6);font-weight:500;font-size:10.5px}
+.adbody{padding:10px;display:grid;gap:8px;min-width:0}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chips span{border:1px solid var(--al);background:#fff;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap}
+.chips span.on{background:#111315;color:#fff;border-color:#111315}
+.box{background:#fff;border:1px solid var(--al);padding:10px;display:grid;gap:6px;min-width:0}
+.box h5{margin:0;font-size:13px}
+.box p{margin:0;color:var(--am);font-size:11px;line-height:1.5}
+.eyeb{font-size:9.5px;font-weight:800;letter-spacing:.12em;color:var(--am);text-transform:uppercase}
+.pw{height:34px;border:1px solid var(--al);display:flex;align-items:center;padding:0 10px;font-family:var(--mono);letter-spacing:.2em;font-size:13px}
+.btnp{background:var(--av);color:#fff;text-align:center;font-weight:800;padding:8px}
+.errn{border:1px solid #F0B4B4;background:#FDF0F0;color:#8A1F1F;padding:6px 8px;font-size:11px}
+.cc{background:#fff;border:1px solid var(--al);min-width:0}
+.cch{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;border-bottom:1px solid #ECECF0;padding:6px 8px;font-size:11px}
+.cch .t{margin-left:auto;color:var(--am);font-variant-numeric:tabular-nums}
+.cch .by{width:100%;color:var(--am);font-size:10.5px}
+.op{font-size:10px;font-weight:800;padding:1px 6px}
+.op.ins{background:#E3F4E8;color:#1F6B3A}.op.upd{background:#FFF1CC;color:#8A5A00}.op.del{background:#FDE2E2;color:#8A1F1F}
+.ccb{padding:6px 8px;display:grid;gap:5px}
+.hist{margin:0;padding:0;list-style:none;font-size:11px}
+.dt{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}
+.dt th{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--am);text-align:left;padding:3px 4px;border-bottom:1px solid #ECECF0}
+.dt td{padding:3px 4px;border-bottom:1px solid #F2F2F4;vertical-align:top;word-break:break-all}
+.dt td.f{font-family:var(--mono);font-size:9.5px;color:#3F434A}
+.dt td.b{color:#8A1F1F}.dt td.b s{text-decoration-thickness:1px}.dt td.a{color:#1F6B3A}
+.dt tr.hot td{background:#FFF6DD}
+.hot{outline:2.5px solid #F2A33A;outline-offset:2px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(242,163,58,.25)}}
+.tee{background:#fff;border:1px solid var(--al);padding:8px;display:grid;gap:4px}
+.tee .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}
+.tee .pl{display:flex;gap:4px;flex-wrap:wrap}
+.tee .pl span{border:1px solid var(--al);padding:2px 6px;font-weight:700;font-size:11px}
+.tee .pl span.gone{opacity:.35;text-decoration:line-through}
+.tee .hl{border-top:1px dashed var(--al);padding-top:4px;font-size:10.5px;color:var(--am)}
+.vanish{opacity:.25;filter:grayscale(1)}
+.xmark{color:#B42318;font-weight:800;font-size:12px}
+.flow{display:grid;gap:6px}
+.fstep{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--al);padding:7px 9px;font-size:11.5px}
+.fstep b{font-family:var(--mono);font-size:10.5px}
+.fstep .n{flex:none;width:20px;height:20px;border-radius:50%;background:#111315;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800}
+.fstep.on{border-color:var(--av);box-shadow:0 0 0 2px rgba(69,51,255,.15)}
+.tbls{display:flex;flex-wrap:wrap;gap:4px}
+.tbls span{font-family:var(--mono);font-size:9.5px;background:#fff;border:1px solid var(--al);padding:2px 5px}
+.tbls span.on{background:#E3F4E8;border-color:#9BD2AE}
+.who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.who div{background:#fff;border:1px solid var(--al);padding:8px;text-align:center;font-size:11px}
+.who div b{display:block;font-size:13px}
+.who div.no{opacity:.45}
+.ad .plan{background:#fff;border:1px solid var(--al);padding:10px}
+.plan .done li{color:var(--ok)}
+.lc.lcdim{opacity:.5}.lc.lcon{border-color:var(--green)}
+.plan{display:grid;gap:4px;font-size:13px;color:#1F2328}
+.plan h3{margin:8px 0 2px;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.plan code{font-family:var(--mono);font-size:11.5px;background:#F2F2F4;padding:1px 4px;border-radius:4px}
+.plan .q li{color:#B5461F;font-weight:600}
+.plan .done li{color:#1F6B3A}
+
+.bub{width:18px;height:15px;margin-right:4px;vertical-align:-3px}
+</style></head><body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Vercel · Supabase RPC</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const L=(ko,en)=>({ko,en});
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 리포트 · 변경 기록(Change log)",
+  h1:"지워도 남는 <b>변경 기록</b>",
+  lede:"모든 변경을 바뀌기 전과 바뀐 뒤 그대로 남기고, 예약·선수·계산서를 지워도 기록은 남아요. 매니저와 Emmeline만 따로 정한 비밀번호로 열어 봐요. 왼쪽은 프로 샵 화면, 가운데는 뒤에서 일어나는 일, 오른쪽은 지금 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"프로 샵 화면",laneLog:"뒤에서 일어나는 일",laneLedger:"상태",
+  ledgerSub:"코드 푸시 완료 · SQL 실행 남음",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 기록이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"화면의 예약·선수·계정 이름은 예시예요. 코드는 커밋 079add3 으로 main 에 올라갔고 Vercel 이 자동 배포해요. 장부는 0057 을 SQL editor 에서 실행한 순간부터 쌓여요 — 그 전의 변경은 장부에 없어요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Reports · Change log",
+  h1:"A <b>change log</b> that survives deletes",
+  lede:"Every change is kept exactly as it was before and after, and deleting a booking, player or bill no longer deletes its record. Only managers and Emmeline open it, with a separate password. Left: the pro shop screen. Middle: what happens behind it. Right: where things stand.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Pro shop screen",laneLog:"Behind the scenes",laneLedger:"Status",
+  ledgerSub:"Code pushed · SQL still to run",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Records appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Booking, player and account names on screen are examples. The code is on main as commit 079add3 and Vercel deploys it automatically. The log fills from the moment 0057 runs in the SQL editor — earlier changes are not in it."}
+};
+
+function admin(path,title,body){return '<div class="ad"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app'+path+'</span></div><div class="adbar"><span>'+title+'</span><small>proshop@ · signed in</small></div><div class="adbody">'+body+'</div></div>'}
+function tabs(on){return '<div class="chips">'+["Daily close","Accounting (Excel)","Stripe check","Bookings (web + phone)","🔒 Change log"].map((t,i)=>'<span class="'+(i===on?"on":"")+(i===4&&on===-4?" hot":"")+'">'+t+'</span>').join("")+'</div>'}
+function teeCard(o){o=o||{};
+  return '<div class="tee'+(o.cls?" "+o.cls:"")+'"><div class="row"><b>9:00 AM · Kim group</b><span>18 holes</span></div><div class="pl">'+
+    ["Kim","Lee","Park","Choi"].map(n=>'<span class="'+(o.gone===n?"gone":"")+'">'+n+(o.fee&&n==="Lee"?" $"+o.fee:"")+'</span>').join("")+'</div>'+
+    '<div class="hl">History: '+(o.hist||"Booked by phone.")+'</div></div>'}
+function card(op,what,label,t,by,hist,rows,o){o=o||{};
+  const OPS={insert:["ins","Created"],update:["upd","Changed"],delete:["del","Deleted"]};
+  return '<div class="cc'+(o.hot?" hot":"")+'"><div class="cch"><span class="op '+OPS[op][0]+'">'+OPS[op][1]+'</span><b>'+what+'</b><span>'+label+'</span><span class="t">'+t+'</span><span class="by">by '+by+'</span></div><div class="ccb">'+
+    (hist?'<ul class="hist"><li>• '+esc(hist)+'</li></ul>':'')+
+    '<table class="dt"><thead><tr><th style="width:40%">Field</th><th>Before</th><th>After</th></tr></thead><tbody>'+
+    rows.map(r=>'<tr class="'+(r[3]?"hot":"")+'"><td class="f">'+r[0]+'</td><td class="b">'+(r[1]===null?'—':'<s>'+esc(r[1])+'</s>')+'</td><td class="a">'+(r[2]===null?'—':esc(r[2]))+'</td></tr>').join("")+'</tbody></table></div></div>'}
+function lockScreen(o){o=o||{};
+  return '<div class="box"><span class="eyeb">Managers · Emmeline</span><h5>🔒 Change log</h5><p>'+(o.l==="ko"?"로그인 비밀번호·매니저 PIN 과 다른 변경 기록 비밀번호를 넣어요.":"Enter the change log password — not your sign-in password or manager PIN.")+'</p>'+
+    '<div class="pw'+(o.hotPw?" hot":"")+'">'+(o.dots||"")+'</div>'+(o.err?'<div class="errn">'+o.err+'</div>':'')+'<div class="btnp">Open change log</div></div>'}
+
+const S=[
+ {a:"ov",ph:"why",ko:"왜 필요한가",en:"Why",
+  screen:(l,p)=>admin("/admin/tee-sheet","Tee sheet",
+    p<.35?teeCard({hist:"Player removed: Kim — Double booked (approved by Francis)."}) :
+    p<.65?'<div class="vanish">'+teeCard({hist:"Booked by phone."})+'</div><p class="xmark">✕ '+(l==="ko"?"예약을 지우면 History 도 같이 사라져요":"Delete the booking and its History goes too")+'</p>':
+    teeCard()+'<div class="cc"><div class="cch"><span class="op del">Deleted</span><b>Tee booking</b><span>Kim group · 9:00 AM</span><span class="by">'+(l==="ko"?"이제는 장부에 남아요":"now kept in the log")+'</span></div></div>'),
+  log:[{at:.1,tag:"ui",name:"History = doc.audit",ep:"inside the booking",why:L("기록이 예약 안에 들어 있어요. 무엇을 했는지 한 줄만 있고 전 값은 없어요.","The record lives inside the booking: one line of what was done, no old value.")},
+       {at:.4,tag:"rpc",name:"delete booking",ep:"row gone",why:L("예약 줄이 지워지면 History 도 함께 지워져요.","When the row goes, its History goes with it.")},
+       {at:.7,tag:"local",name:"pelham_change_log",ep:"0057 · new",why:L("이제 따로 된 장부에 전·후가 남아요.","Now a separate log keeps before and after.")}],
+  focus:["capture","delete"]},
+ {a:"capture",ph:"keep",ko:"모든 변경이 자동으로",en:"Every change, automatically",
+  screen:(l,p)=>{const k=p<.3?1:p<.55?2:p<.8?3:4;
+    const steps=[["1",l==="ko"?"직원이 화면에서 무엇이든 바꿈":"Staff change anything on screen","Tee sheet · POS · Retail · Members"],
+                 ["2",l==="ko"?"서버가 테이블 줄을 저장":"The server saves the table row","pelham_staff_* → UPDATE"],
+                 ["3",l==="ko"?"AFTER 트리거가 전·후를 복사":"An AFTER trigger copies before/after","pelham_change_log_capture()"],
+                 ["4",l==="ko"?"장부에 한 줄 — 누가·언제·무엇을":"One log row — who, when, what","pelham_change_log"]];
+    return admin("/admin/reports","Reports",'<div class="flow">'+steps.map((s,i)=>'<div class="fstep'+(i+1===k?" on":"")+'"><span class="n">'+s[0]+'</span><span>'+s[1]+'<br><b>'+s[2]+'</b></span></div>').join("")+'</div>'+
+      '<div class="tbls">'+["tee_bookings","tee_price_overrides","bills","bill_lines","bill_payments","rain_checks","register_closes","retail_products","retail_sales","stock_moves","customers","memberships","sim_reservations","rate_cards","managers","… 29"].map((t,i)=>'<span class="'+(k>=3&&i<15?"on":"")+'">'+t+'</span>').join("")+'</div>')},
+  log:[{at:.1,tag:"key",name:"Green fee · Lee",ep:"$45 → $30"},
+       {at:.3,tag:"rpc",name:"UPDATE pelham_tee_bookings",ep:"id b1"},
+       {at:.55,tag:"local",name:"AFTER UPDATE trigger",ep:"29 tables",why:L("화면이 아니라 DB 가 적어요. 어느 화면·서버에서 바꿔도 빠지지 않아요.","The database writes it, not the screen — nothing slips past, whichever screen or server made the change.")},
+       {at:.8,tag:"local",name:"insert pelham_change_log",ep:"before · after",body:{table:"pelham_tee_bookings",op:"update",actor:"proshop@pelhamhills.ca",changed:"{doc}"}}],
+  focus:["capture"]},
+ {a:"diff",ph:"keep",ko:"전·후를 한눈에",en:"Before and after",
+  screen:(l,p)=>admin("/admin/reports?view=changes","Reports",tabs(4)+card("update","Tee booking","Kim group · 2026-10-20 · 9:00 AM","Oct 20, 2:14:08 PM","proshop@pelhamhills.ca",
+     "Green fee for Lee set to $30.00 (rate plan $45.00) — approved by Francis: Junior event",
+     [["doc.players[Lee#p2].greenFee","45","30",p>.4],["doc.players[Lee#p2].priceOverride.reason",null,"Junior event",p>.6],["doc.players[Lee#p2].priceOverride.manager",null,"Francis",p>.6]])),
+  log:[{at:.15,tag:"ui",name:"Changed · Tee booking",ep:"amber"},
+       {at:.4,tag:"ui",name:"Before → After",ep:"red strike · green",why:L("바뀐 칸만 보여요. 지운 값은 빨간 줄, 새 값은 초록이에요.","Only the changed fields show: the old value struck in red, the new one in green.")},
+       {at:.65,tag:"ui",name:"History line on top",ep:"what + who approved",why:L("예약 History 에 새로 붙은 문장도 위에 같이 보여요.","The new History sentence shows on top too.")}],
+  focus:["diff"]},
+ {a:"delete",ph:"keep",ko:"지워도 남는다",en:"Deleted, still there",
+  screen:(l,p)=>admin("/admin/reports?view=changes","Reports",tabs(4)+(p<.45?
+     card("update","Tee booking","Kim group · 9:00 AM","2:20:31 PM","proshop@pelhamhills.ca","Player removed: Kim — Double booked (approved by Francis).",
+       [["doc.players[Kim#p1].name","Kim",null,true],["doc.players[Kim#p1].greenFee","45",null,true],["doc.players[Kim#p1].phone","905-555-0142",null]]):
+     card("delete","Tee booking","Kim group · 9:00 AM","2:31:02 PM","proshop@pelhamhills.ca",null,
+       [["booking_date","2026-10-20",null],["doc.title","Kim group",null,true],["doc.players[Lee#p2].name","Lee",null],["doc.players[Park#p3].name","Park",null],["status","booked",null]],{hot:true}))),
+  log:[{at:.1,tag:"key",name:"Drag Kim → Delete",ep:"manager PIN"},
+       {at:.3,tag:"local",name:"before_row kept",ep:"player Kim",why:L("선수를 빼도 그 선수의 이름·전화·요금이 전 값으로 남아요.","Removing a player keeps their name, phone and fee as the before value.")},
+       {at:.55,tag:"rpc",name:"DELETE pelham_tee_bookings",ep:"whole booking"},
+       {at:.7,tag:"local",name:"op = delete",ep:"after = —",why:L("예약을 통째로 지워도 지우기 전 줄 전체가 장부에 남아요.","Delete the whole booking and the full row before deletion stays in the log.")}],
+  focus:["delete"]},
+ {a:"open",ph:"open",ko:"비밀번호로 연다",en:"Opened with a password",
+  screen:(l,p)=>admin("/admin/reports?view=changes","Reports",tabs(p<.3?-4:4)+(p<.3?'':
+     '<div class="who"><div><b>Managers</b>'+(l==="ko"?"비밀번호 앎":"know the password")+'</div><div><b>Emmeline</b>/cash '+(l==="ko"?"에도 같은 탭":"has the same tab")+'</div></div>'+lockScreen({l,hotPw:p>.6,dots:p>.6?"••••••••••":""}))),
+  log:[{at:.1,tag:"ui",name:"Reports → 🔒 Change log",ep:"?view=changes"},
+       {at:.35,tag:"stripe",name:"2nd password",ep:"≠ sign-in · ≠ PIN",why:L("로그인만으로는 안 열려요. 변경 기록 비밀번호를 한 번 더 넣어야 해요.","Signing in is not enough — the change log password is asked on top.")},
+       {at:.65,tag:"rpc",name:"pelham_staff_change_log",ep:"p_password",why:L("서버가 bcrypt 해시와 비교해요. 틀리면 한 줄도 주지 않아요.","The server checks it against a bcrypt hash. Wrong means not a single row.")},
+       {at:.85,tag:"ui",name:"state only",ep:"not saved",why:L("화면 메모리에만 들고 있어서 탭을 닫거나 🔒 Lock 을 누르면 다시 물어요.","Held in memory only — closing the tab or pressing 🔒 Lock asks again.")}],
+  focus:["open"]},
+ {a:"guard",ph:"open",ko:"틀리면 잠긴다",en:"Wrong tries lock it",
+  screen:(l,p)=>{const n=Math.min(5,1+Math.floor(p*5.2));
+    const err=n<5?"Wrong password. "+(5-n)+" tries left before a 15-minute lock.":"Too many wrong passwords. Try again in 15 minutes.";
+    return admin("/admin/reports?view=changes","Reports",tabs(4)+lockScreen({l,dots:"•••••",err}))},
+  log:[{at:.1,tag:"rpc",name:"wrong password",ep:"{ ok: false }"},
+       {at:.3,tag:"local",name:"pelham_change_log_attempts",ep:"ok = false",why:L("틀린 시도도 계정·시각과 함께 남아요.","Wrong tries are kept with the account and time.")},
+       {at:.75,tag:"stripe",name:"5 wrong / 15 min",ep:"locked 15 min"},
+       {at:.88,tag:"local",name:"ok = true",ep:"who opened, when",why:L("맞게 연 것도 남아서 누가 언제 장부를 봤는지 알 수 있어요.","Successful opens are kept too, so you can see who looked and when.")}],
+  focus:["guard"]},
+ {a:"safe",ph:"safe",ko:"장부는 고칠 수 없다",en:"The log can't be edited",
+  screen:(l,p)=>admin("/admin/reports?view=changes","Reports",
+    '<div class="box"><h5>'+(l==="ko"?"막아 둔 것":"What is locked down")+'</h5>'+
+    ['UPDATE / DELETE pelham_change_log → <b>error</b>','TRUNCATE pelham_change_log → <b>error</b>','pin_hash · password · token → '+(l==="ko"?"<b>장부에 안 넣음</b>":"<b>never copied</b>"),(l==="ko"?"비밀번호 → <b>bcrypt 해시만</b> · 저장소에 없음":"Password → <b>bcrypt hash only</b> · not in git")].map((t,i)=>'<div class="fstep'+(p>i*.22+.1?" on":"")+'"><span class="n">'+(i+1)+'</span><span>'+t+'</span></div>').join("")+'</div>'),
+  log:[{at:.12,tag:"rpc",name:"delete from pelham_change_log",ep:"ERROR",why:L("직원 함수든 SQL editor 의 실수든 장부 줄을 고치거나 지울 수 없어요.","No staff function or SQL editor slip can edit or delete a log row.")},
+       {at:.45,tag:"local",name:"pelham_change_log_clean()",ep:"*_hash removed",why:L("매니저 PIN 해시 같은 비밀 칸은 처음부터 복사하지 않아요.","Secret columns like the manager PIN hash are never copied.")},
+       {at:.75,tag:"stripe",name:"crypt(…, gen_salt('bf'))",ep:"hash only"}],
+  focus:["safe"]},
+ {a:"todo",ph:"todo",ko:"지금 상태 · 할 일",en:"Status and to-do",
+  screen:(l,p)=>'<div class="ad"><div class="plan"><h3>'+(l==="ko"?"끝난 것":"Done")+'</h3><ul class="done"><li><code>0057_change_log.sql</code> '+(l==="ko"?"— 로컬 Postgres 에서 생성·수정·삭제·잠금 확인":"— checked on a local Postgres: create, change, delete, lock")+'</li><li><code>Reports → 🔒 Change log</code> '+(l==="ko"?"탭 · 커밋 079add3 푸시":"tab · commit 079add3 pushed")+'</li></ul><h3>'+(l==="ko"?"해 주셔야 할 것":"For you to do")+'</h3><ul class="q"><li>'+(l==="ko"?"SQL editor 에 0057 전체를 붙여 실행":"Paste all of 0057 into the SQL editor and run it")+'</li><li>'+(l==="ko"?"이어서 비밀번호 한 줄 실행 (채팅에 드린 SQL)":"Then run the one-line password SQL (given in chat)")+'</li><li>'+(l==="ko"?"매니저·Emmeline 에게 비밀번호 전달":"Give the password to managers and Emmeline")+'</li></ul><h3>'+(l==="ko"?"알아 둘 것":"Good to know")+'</h3><ul><li>'+(l==="ko"?"장부는 0057 실행 순간부터 쌓여요":"The log starts when 0057 runs")+'</li><li>'+(l==="ko"?"한 번에 92일까지 · 200줄씩":"Up to 92 days at a time · 200 rows a page")+'</li></ul></div></div>',
+  log:[{at:.15,tag:"ui",name:"git push origin main",ep:"079add3"},{at:.35,tag:"ui",name:"Vercel",ep:"auto-deploy"},
+       {at:.6,tag:"rpc",name:"0057_change_log.sql",ep:"run in SQL editor"},{at:.8,tag:"stripe",name:"pelham_change_log_password_set",ep:"run once"}],
+  focus:["capture","diff","delete","open","guard","safe"]}
+];
+
+S.forEach(s=>{s.ledger=s.ledger||[{at:0}]});
+const PH={why:{ko:"왜",en:"Why"},keep:{ko:"기록",en:"Record"},open:{ko:"열기",en:"Open"},safe:{ko:"보호",en:"Guard"},todo:{ko:"상태",en:"Status"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"LOG",stripe:"LOCK",key:"INPUT"};
+
+const ITEMS=[
+ {id:"capture",src:L("자동 기록","Automatic capture"),sub:"29 tables · AFTER trigger",st:["wait",L("SQL 실행 전","SQL not run")],rows:[["insert · update · delete",""],[L("누가 · 언제 · 전 · 후","who · when · before · after"),""]]},
+ {id:"diff",src:L("전·후 비교","Before / after"),sub:"ChangeLog.tsx",st:["ok",L("푸시함","Pushed")],rows:[[L("바뀐 칸만","changed fields only"),""],[L("History 문장","History line"),""]]},
+ {id:"delete",src:L("지워도 남음","Kept after delete"),sub:"before_row",st:["wait",L("SQL 실행 전","SQL not run")],rows:[[L("선수 빼기 · 예약 삭제","remove player · delete booking"),""]]},
+ {id:"open",src:L("비밀번호로 열기","Password to open"),sub:"pelham_staff_change_log",st:["bad",L("비밀번호 설정 필요","Set password")],rows:[[L("매니저 · Emmeline","managers · Emmeline"),""],["/admin/reports · /cash",""]]},
+ {id:"guard",src:L("잠금 · 열람 기록","Lockout · access log"),sub:"pelham_change_log_attempts",st:["wait",L("SQL 실행 전","SQL not run")],rows:[["5 / 15 min",""]]},
+ {id:"safe",src:L("고칠 수 없는 장부","Append-only log"),sub:"pelham_change_log_frozen",st:["wait",L("SQL 실행 전","SQL not run")],rows:[["no UPDATE · DELETE · TRUNCATE",""]]}
+];
+function renderLedger(p){
+  const k=LANG;const f=new Set(S[SC].focus||[]);
+  $("ledger").innerHTML=ITEMS.map(it=>'<div class="lc'+(f.has(it.id)?" flash lcon":" lcdim")+'"><div class="r1"><span class="src">'+esc(it.src[k])+'<em>'+esc(it.sub)+'</em></span><span class="pill '+it.st[0]+'">'+esc(it.st[1][k])+'</span></div><div class="lrows">'+it.rows.map(r=>'<div><span>'+esc(typeof r[0]==="string"?r[0]:r[0][k])+'</span><span></span></div>').join("")+'</div></div>').join("");
+}
+
+const DUR={"ov": {"ko": 14.9, "en": 14.2}, "capture": {"ko": 17.9, "en": 17.4}, "diff": {"ko": 17.8, "en": 14.9}, "delete": {"ko": 11.5, "en": 10.6}, "open": {"ko": 17.4, "en": 15.7}, "guard": {"ko": 13.7, "en": 12.4}, "safe": {"ko": 15.2, "en": 15.8}, "todo": {"ko": 13.9, "en": 12.9}};
+const NARR={"ko": {"ov": "지금까지 예약의 History는 예약 안에 들어 있었어요. 그래서 예약을 지우면 기록도 같이 사라졌고, 무엇을 했는지 한 줄만 있을 뿐 바뀌기 전 값은 볼 수 없었어요. 이제는 따로 된 장부, 변경 기록에 전과 후가 남아요.", "capture": "직원이 티 시트, 계산대, 리테일, 회원 화면에서 무엇이든 바꾸면, 서버가 테이블 줄을 저장하는 순간 데이터베이스 트리거가 바뀌기 전 줄과 바뀐 뒤 줄을 통째로 장부에 복사해요. 누가, 언제, 어느 테이블을 바꿨는지도 같이요. 스물아홉 개 테이블에 붙어 있어요.", "diff": "장부에서는 바뀐 칸만 보여요. 지워진 값은 빨간 줄, 새 값은 초록색이에요. 예를 들어 Lee의 그린피가 45달러에서 30달러로 바뀌었고, 사유와 승인한 매니저가 새로 붙었다는 게 한눈에 보여요. 예약 History에 새로 붙은 문장도 위에 같이 나와요.", "delete": "선수를 빼면, 그 선수의 이름, 전화, 요금이 전 값으로 남아요. 예약을 통째로 지워도 지우기 전 줄 전체가 장부에 남아요. 이제 지운다고 기록이 없어지지 않아요.", "open": "장부는 리포트의 자물쇠 탭, Change log에서 봐요. 로그인만으로는 열리지 않고, 로그인 비밀번호나 매니저 PIN과 다른 변경 기록 비밀번호를 한 번 더 넣어야 해요. 매니저와 Emmeline만 알아요. Emmeline의 현금 리포트 사이트에도 같은 탭이 있어요.", "guard": "비밀번호가 틀리면 장부를 한 줄도 주지 않아요. 십오 분 안에 다섯 번 틀리면 십오 분 동안 잠겨요. 틀린 시도도, 맞게 연 것도 계정과 시각이 남아서, 누가 언제 장부를 봤는지 알 수 있어요.", "safe": "장부 자체는 고칠 수도 지울 수도 없어요. 직원 함수든 SQL editor의 실수든 막혀요. 매니저 PIN 해시 같은 비밀 칸은 처음부터 복사하지 않고, 비밀번호는 bcrypt 해시로만 저장돼요. 저장소 코드에도 비밀번호는 없어요.", "todo": "코드는 main에 올라갔고 Vercel이 자동으로 배포해요. 남은 일은 두 가지예요. SQL editor에서 0057 파일을 실행하고, 이어서 비밀번호를 정하는 한 줄을 실행해 주세요. 장부는 그 순간부터 쌓여요."}, "en": {"ov": "Until now a booking's History lived inside the booking. Deleting the booking deleted its record too, and History only said what was done, never what the old value was. Now a separate change log keeps both before and after.", "capture": "Whenever staff change anything on the tee sheet, register, retail or member screens, the moment the server saves the row a database trigger copies the whole row before and after into the log, along with who changed it, when, and which table. It is attached to twenty-nine tables.", "diff": "The log shows only the fields that changed: the old value struck in red, the new one in green. Here you can see Lee's green fee went from forty-five dollars to thirty, with a reason and the approving manager added. The new History sentence shows on top.", "delete": "Remove a player and their name, phone and fee stay as the before value. Delete the whole booking and the full row before deletion stays in the log. Deleting no longer erases the record.", "open": "The log lives in the lock tab on Reports, Change log. Signing in is not enough: you enter a separate change log password, different from the sign-in password and the manager PIN. Only managers and Emmeline know it. Emmeline's cash report site has the same tab.", "guard": "A wrong password returns not a single row. Five wrong tries within fifteen minutes lock it for fifteen minutes. Wrong tries and successful opens are both kept with the account and time, so you can see who looked and when.", "safe": "The log itself cannot be edited or deleted, whether by a staff function or a slip in the SQL editor. Secret columns like the manager PIN hash are never copied, and the password is stored only as a bcrypt hash. It is not in the code repository either.", "todo": "The code is on main and Vercel deploys it automatically. Two things are left: run the 0057 file in the SQL editor, then run the one line that sets the password. The log starts filling from that moment."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phcl-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phcl-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phcl-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phcl-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script></body></html>
+</body></html>

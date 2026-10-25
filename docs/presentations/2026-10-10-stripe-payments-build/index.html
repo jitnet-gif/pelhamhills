@@ -1,0 +1,333 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>골프장 Stripe 결제 구축</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=Noto+Sans+KR:wght@400;500&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: presenter bar pinned on top, scorecard-style sections below; the section being narrated lights up like the current hole */
+:root{
+  --bg:#f5f7f3; --surface:#ffffff; --line:#d9e0d4; --fg:#1b2a1f; --muted:#5b6b5f;
+  --accent:#1f6b3a; --accent-soft:#e3efe6; --flag:#c8452b; --term:#14201a; --term-ink:#dde8e0; --term-dim:#7f9489;
+  --display:"IBM Plex Sans KR","Noto Sans KR",system-ui,sans-serif;
+  --body:"Noto Sans KR","IBM Plex Sans KR",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111813; --surface:#18221b; --line:#2b3a2f; --fg:#e7eee8; --muted:#9db0a2;
+  --accent:#6cc48a; --accent-soft:#1e3325; --flag:#f08a6f; --term:#0a110d; --term-ink:#d6e2da; --term-dim:#6e8277; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111813; --surface:#18221b; --line:#2b3a2f; --fg:#e7eee8; --muted:#9db0a2;
+  --accent:#6cc48a; --accent-soft:#1e3325; --flag:#f08a6f; --term:#0a110d; --term-ink:#d6e2da; --term-dim:#6e8277; color-scheme:dark}
+*{box-sizing:border-box}
+html[data-lang="en"] [lang="ko"],html[data-lang="ko"] [lang="en"]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.65}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:880px;margin:0 auto;padding-inline:16px;padding-block:20px 56px;display:flex;flex-direction:column;gap:36px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;line-height:1.2}
+h2{font-size:20px;font-weight:600;display:flex;align-items:baseline;gap:10px}
+h2 .tag{font-family:var(--mono);font-size:12px;color:var(--flag);letter-spacing:.06em}
+h3{font-size:15px;font-weight:600}
+p{margin:0}
+.muted{color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
+
+/* presenter */
+.presenter{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);padding-block:10px;display:flex;flex-direction:column;gap:8px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.btn{border:1px solid var(--line);background:var(--bg);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:500;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:112px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--bg);height:34px;padding:0 12px;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.spacer{flex:1}
+.src{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+details.vset{position:relative;font-size:13px}
+details.vset summary{cursor:pointer;list-style:none;color:var(--muted);padding:6px 8px;border-radius:6px}
+details.vset summary::-webkit-details-marker{display:none}
+.vbox{position:absolute;right:0;top:100%;margin-top:6px;width:min(340px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.vbox .note{font-size:12px;color:var(--muted)}
+.vbox select{height:34px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:0 8px;max-width:100%}
+.vbox input[type=file]{font-size:12px;max-width:100%}
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:12px 16px}
+.cap .no{font-family:var(--mono);font-size:12px;color:#8fd3ae;border:1px solid var(--term-dim);border-radius:6px;padding:2px 8px;white-space:nowrap}
+.cap p{font-size:15px;line-height:1.6;min-height:1.6em}
+.prog{grid-column:1/-1;display:flex;gap:4px}
+.prog button{flex:1;height:5px;border:0;border-radius:3px;background:#2e3f35;cursor:pointer;padding:0}
+.prog button.done{background:var(--term-dim)}
+.prog button.now{background:#f2c48b}
+
+header{display:flex;flex-direction:column;gap:12px}
+header p{max-width:62ch;color:var(--muted)}
+section,header{scroll-margin-top:190px;border-radius:14px;transition:background .3s,box-shadow .3s}
+.slide.on{background:var(--accent-soft);box-shadow:0 0 0 10px var(--accent-soft)}
+section{display:flex;flex-direction:column;gap:16px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.channel .k{font-family:var(--mono);font-size:12px;color:var(--accent)}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ol.steps li{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+ol.steps li:last-child{border-bottom:1px solid var(--line)}
+.num{font-family:var(--mono);font-size:22px;color:var(--accent);line-height:1.2}
+.fee .v{font-family:var(--mono);font-size:24px;font-variant-numeric:tabular-nums}
+.fee .l{font-size:13px;color:var(--muted)}
+.fee.hl{border-color:var(--accent)}
+.note{font-size:13px;color:var(--muted)}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:420px}
+th,td{padding:11px 16px;text-align:left;border-top:1px solid var(--line);vertical-align:top}
+tr:first-child th,tr:first-child td{border-top:none}
+th{font-weight:500;color:var(--muted);font-size:12px;letter-spacing:.04em}
+td.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.total td{font-weight:500;background:var(--accent-soft)}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-left:6px;font-family:var(--mono)}
+.ship .h{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--flag);flex:none}
+footer{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+footer a{color:var(--accent)}
+@media (max-width:600px){.presenter .src{display:none}section,header{scroll-margin-top:230px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+<div class="presenter">
+  <div class="bar" role="toolbar" aria-label="Presenter">
+    <button class="btn play" id="bPlay" type="button"><span lang="ko">▶ 발표 시작</span><span lang="en">▶ Start</span></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <div class="seg" role="group" aria-label="Speed" id="speed">
+      <button type="button" data-v="1" aria-pressed="true">1×</button>
+      <button type="button" data-v="1.2" aria-pressed="false">1.2×</button>
+      <button type="button" data-v="1.5" aria-pressed="false">1.5×</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="src" id="srcBadge"></span>
+    <div class="seg" role="group" aria-label="Language" id="langSeg">
+      <button type="button" data-l="ko" aria-pressed="true">한국어</button>
+      <button type="button" data-l="en" aria-pressed="false">English</button>
+    </div>
+    <details class="vset">
+      <summary><span lang="ko">음성 설정 ▾</span><span lang="en">Voice ▾</span></summary>
+      <div class="vbox">
+        <label class="note" for="fAudio"><span lang="ko">ElevenLabs 나레이션 파일 불러오기 (ko-1.mp3 … ko-7.mp3, en-1.mp3 … en-7.mp3)</span><span lang="en">Load ElevenLabs narration files (ko-1.mp3 … ko-7.mp3, en-1.mp3 … en-7.mp3)</span></label>
+        <input type="file" id="fAudio" accept="audio/*,.mp3" multiple>
+        <label class="note" for="vSel"><span lang="ko">파일이 없을 때 쓸 브라우저 음성</span><span lang="en">Browser voice used when a file is missing</span></label>
+        <select id="vSel"></select>
+        <p class="note"><span lang="ko">ElevenLabs Hope(경쾌한 여성) 목소리로 만든 파일이 있으면 그 파일을 먼저 재생합니다.</span><span lang="en">Files made with the ElevenLabs Hope voice (upbeat female) play first when available.</span></p>
+      </div>
+    </details>
+  </div>
+  <div class="cap">
+    <span class="no" id="capNo">0 / 7</span>
+    <p id="capText" aria-live="polite"></p>
+    <div class="prog" id="prog"></div>
+  </div>
+</div>
+
+<header class="slide" data-s="1">
+  <span class="eyebrow">Stripe Terminal · Canada · CAD</span>
+  <h1><span lang="ko">골프장 온·오프라인 결제 구축 가이드</span><span lang="en">Golf Club Online &amp; In-Person Payments Guide</span></h1>
+  <p><span lang="ko">직접 개발한 프로그램에 Stripe를 붙여 티타임 예약, 프로샵, 클럽하우스 결제를 한 계정에서 처리하는 절차와 비용, 리더기 배송 조건을 정리했습니다.</span><span lang="en">How to add Stripe to your own software so tee-time bookings, the pro shop and the clubhouse all take payments through one account: setup steps, costs and card-reader shipping.</span></p>
+</header>
+
+<section class="slide" data-s="2">
+  <h2><span class="tag">FRONT</span><span lang="ko">결제가 일어나는 곳</span><span lang="en">Where payments happen</span></h2>
+  <div class="grid">
+    <div class="card channel"><span class="k">ONLINE</span><h3><span lang="ko">온라인</span><span lang="en">Online</span></h3><p class="muted"><span lang="ko">티타임 예약 선결제, 회원권·레슨, 기프트카드</span><span lang="en">Tee-time prepayment, memberships and lessons, gift cards</span></p></div>
+    <div class="card channel"><span class="k">IN-PERSON</span><h3><span lang="ko">오프라인</span><span lang="en">In person</span></h3><p class="muted"><span lang="ko">프로샵, 클럽하우스 F&amp;B, 카트·드라이빙 레인지</span><span lang="en">Pro shop, clubhouse food &amp; drink, carts and driving range</span></p></div>
+    <div class="card channel"><span class="k">UNIFIED</span><h3><span lang="ko">통합 관리</span><span lang="en">One account</span></h3><p class="muted"><span lang="ko">하나의 Stripe 계정에서 매출·고객·정산을 함께 봅니다</span><span lang="en">Sales, customers and payouts together in one Stripe account</span></p></div>
+  </div>
+</section>
+
+<section class="slide" data-s="3">
+  <h2><span class="tag">ROUTE</span><span lang="ko">구축 절차 6단계</span><span lang="en">Six setup steps</span></h2>
+  <ol class="steps">
+    <li><span class="num">01</span><div><h3><span lang="ko">Stripe 캐나다 계정 개설·인증</span><span lang="en">Open and verify a Stripe Canada account</span></h3><p class="muted"><span lang="ko">사업자 정보(BN), 대표자 신원, 캐나다 은행 계좌(정산 받을 계좌)를 등록합니다.</span><span lang="en">Add your business number (BN), owner identity and the Canadian bank account that receives payouts.</span></p></div></li>
+    <li><span class="num">02</span><div><h3><span lang="ko">결제 구조 설계</span><span lang="en">Design the payment flow</span></h3><p class="muted"><span lang="ko">온라인은 Payment Intents 또는 Checkout, 오프라인은 Terminal SDK(JS·iOS·Android·React Native). 두 채널 모두 webhook으로 내 DB와 동기화합니다.</span><span lang="en">Online uses Payment Intents or Checkout; in person uses the Terminal SDK (JS, iOS, Android, React Native). Both sync to your database through webhooks.</span></p></div></li>
+    <li><span class="num">03</span><div><h3><span lang="ko">Sandbox 개발</span><span lang="en">Build in the sandbox</span></h3><p class="muted"><span lang="ko">서버에 connection token 엔드포인트를 만들고, 시뮬레이터 리더로 결제·환불·팁 흐름을 테스트합니다.</span><span lang="en">Add a connection-token endpoint on your server, then test payments, refunds and tips with the simulated reader.</span></p></div></li>
+    <li><span class="num">04</span><div><h3><span lang="ko">Location 등록, 리더기·테스트카드 주문</span><span lang="en">Register a location, order readers and a test card</span></h3><p class="muted"><span lang="ko">대시보드 Terminal → Shop. 주문할 때 Location을 고르면 스마트 리더가 도착 전에 자동 등록됩니다.</span><span lang="en">Dashboard → Terminal → Shop. Pick a location when ordering and smart readers register themselves before they arrive.</span></p></div></li>
+    <li><span class="num">05</span><div><h3><span lang="ko">실기기 테스트 후 Live 키 전환</span><span lang="en">Test on real hardware, then switch to live keys</span></h3><p class="muted"><span lang="ko">Visa, Mastercard, Interac, Apple Pay·Google Pay를 소액으로 실결제해 확인합니다.</span><span lang="en">Run small real payments with Visa, Mastercard, Interac, Apple Pay and Google Pay.</span></p></div></li>
+    <li><span class="num">06</span><div><h3><span lang="ko">운영</span><span lang="en">Run it</span></h3><p class="muted"><span lang="ko">리더 상태 실시간 모니터링, 환불 처리, 일일 정산 리포트.</span><span lang="en">Live reader monitoring, refunds and daily payout reports.</span></p></div></li>
+  </ol>
+</section>
+
+<section class="slide" data-s="4">
+  <h2><span class="tag">FEES</span><span lang="ko">결제 수수료</span><span lang="en">Processing fees</span></h2>
+  <div class="grid">
+    <div class="card fee hl"><span class="l"><span lang="ko">대면 카드 (대부분)</span><span lang="en">In-person cards (most)</span></span><span class="v">2.7% + $0.05</span></div>
+    <div class="card fee"><span class="l"><span lang="ko">Interac 직불</span><span lang="en">Interac debit</span></span><span class="v"><span lang="ko">$0.15 / 건</span><span lang="en">$0.15 / txn</span></span></div>
+    <div class="card fee"><span class="l"><span lang="ko">해외 발행 카드</span><span lang="en">International cards</span></span><span class="v">3.5% + $0.05</span></div>
+    <div class="card fee"><span class="l"><span lang="ko">온라인 카드</span><span lang="en">Online cards</span> <span class="pill"><span lang="ko">확인 필요</span><span lang="en">verify</span></span></span><span class="v">2.9% + $0.30</span></div>
+  </div>
+  <p class="note"><span lang="ko">추가 비용: Tap to Pay(휴대폰 결제) 승인당 +$0.15 · P2PE 선택 시 승인당 +$0.06 · 셀룰러 리더 대당 월 $14 · 거래량이 크면 맞춤 요금 협상 가능</span><span lang="en">Extras: Tap to Pay +$0.15 per authorization · optional P2PE +$0.06 per authorization · cellular readers $14 per reader per month · custom pricing for high volume</span></p>
+</section>
+
+<section class="slide" data-s="5">
+  <h2><span class="tag">GEAR</span><span lang="ko">리더기 선택</span><span lang="en">Choosing readers</span></h2>
+  <div class="tbl"><table>
+    <tr><th><span lang="ko">기기</span><span lang="en">Device</span></th><th><span lang="ko">특징</span><span lang="en">Best for</span></th><th style="text-align:right"><span lang="ko">가격</span><span lang="en">Price</span></th></tr>
+    <tr><td>Stripe Reader S710</td><td class="muted"><span lang="ko">스마트 리더, 자체 앱 실행, 셀룰러 지원 · 코스·카트용</span><span lang="en">Smart reader, runs your app, cellular · course and carts</span></td><td class="n">$419</td></tr>
+    <tr><td>Stripe Reader S700</td><td class="muted"><span lang="ko">스마트 리더, Wi-Fi · 프로샵·클럽하우스</span><span lang="en">Smart reader, Wi-Fi · pro shop and clubhouse</span></td><td class="n">$419</td></tr>
+    <tr><td>BBPOS WisePad 3</td><td class="muted"><span lang="ko">블루투스, 폰·태블릿과 연동</span><span lang="en">Bluetooth, pairs with a phone or tablet</span></td><td class="n">$79</td></tr>
+    <tr><td>Tap to Pay</td><td class="muted"><span lang="ko">iPhone·Android에서 바로 결제, 하드웨어 불필요</span><span lang="en">Take payments on iPhone or Android, no hardware</span></td><td class="n">$0</td></tr>
+  </table></div>
+</section>
+
+<section class="slide" data-s="6">
+  <h2><span class="tag">QUOTE</span><span lang="ko">예시 견적 (온타리오, HST 13%)</span><span lang="en">Sample quote (Ontario, 13% HST)</span></h2>
+  <div class="tbl"><table>
+    <tr><th><span lang="ko">항목</span><span lang="en">Item</span></th><th style="text-align:right"><span lang="ko">금액</span><span lang="en">Amount</span></th></tr>
+    <tr><td><span lang="ko">S710 × 2 (프로샵 + 클럽하우스)</span><span lang="en">S710 × 2 (pro shop + clubhouse)</span></td><td class="n">$838.00</td></tr>
+    <tr><td><span lang="ko">WisePad 3 × 1 (레인지·카트)</span><span lang="en">WisePad 3 × 1 (range or carts)</span></td><td class="n">$79.00</td></tr>
+    <tr><td>HST 13%</td><td class="n">$119.21</td></tr>
+    <tr class="total"><td><span lang="ko">초기 하드웨어 합계 (배송비 별도)</span><span lang="en">Hardware total (shipping extra)</span></td><td class="n">$1,036.21</td></tr>
+    <tr><td><span lang="ko">셀룰러 1대 (코스용)</span><span lang="en">Cellular for 1 reader (course)</span></td><td class="n"><span lang="ko">$14 / 월</span><span lang="en">$14 / mo</span></td></tr>
+    <tr><td><span lang="ko">월 대면 매출 $60,000 · 1,000건 가정 시 수수료</span><span lang="en">Fees on $60,000 in-person sales, 1,000 payments a month</span></td><td class="n"><span lang="ko">약 $1,670 / 월</span><span lang="en">≈ $1,670 / mo</span></td></tr>
+  </table></div>
+  <p class="note"><span lang="ko">수수료 계산: $60,000 × 2.7% = $1,620, 여기에 1,000건 × $0.05 = $50을 더한 값입니다. Interac 비중이 높으면 더 낮아집니다.</span><span lang="en">Fee math: $60,000 × 2.7% = $1,620, plus 1,000 × $0.05 = $50. More Interac payments bring it down.</span></p>
+</section>
+
+<section class="slide" data-s="7">
+  <h2><span class="tag">SHIP</span><span lang="ko">배송·반품 안내 (캐나다)</span><span lang="en">Shipping and returns (Canada)</span></h2>
+  <div class="grid">
+    <div class="card ship"><div class="h"><span class="dot"></span><h3><span lang="ko">주문 마감</span><span lang="en">Order cutoff</span></h3></div><p class="muted"><span lang="ko">태평양시 오후 1시(토론토 오후 4시) 전에 주문하면 당일 처리됩니다.</span><span lang="en">Orders placed before 1:00 PM PT (4:00 PM Toronto) are processed the same day.</span></p></div>
+    <div class="card ship"><div class="h"><span class="dot"></span><h3><span lang="ko">배송 옵션</span><span lang="en">Shipping options</span></h3></div><p class="muted"><span lang="ko">Standard, Express, Priority 중 선택. 배송비와 예상 도착일은 결제 화면에 표시되고, 대량 주문은 화물 배송으로 자동 전환됩니다.</span><span lang="en">Standard, Express or Priority. Cost and delivery estimate show at checkout; large orders switch to freight automatically.</span></p></div>
+    <div class="card ship"><div class="h"><span class="dot"></span><h3><span lang="ko">수령 조건</span><span lang="en">Delivery rules</span></h3></div><p class="muted"><span lang="ko">CA$400 넘는 주문은 수령 서명이 필요합니다. P.O. Box는 안 되고 실제 주소만 가능합니다.</span><span lang="en">Orders over CA$400 need a signature. No P.O. boxes; street addresses only.</span></p></div>
+    <div class="card ship"><div class="h"><span class="dot"></span><h3><span lang="ko">취소·반품</span><span lang="en">Cancel and return</span></h3></div><p class="muted"><span lang="ko">주문 후 최소 30분간 'Pending' 상태에서 취소할 수 있습니다. 30일 안에 원래 포장 그대로면 대시보드에서 셀프 반품(UPS 라벨 발급)이 됩니다.</span><span lang="en">Cancel while the order is Pending (at least 30 minutes). Within 30 days, in original packaging, start a self-service return in the Dashboard and print a UPS label.</span></p></div>
+  </div>
+</section>
+
+<footer>
+  <span lang="ko">기준: </span><span lang="en">Sources: </span><a href="https://stripe.com/en-ca/terminal">stripe.com/en-ca/terminal</a>, <a href="https://docs.stripe.com/terminal/fleet/order-and-return-readers"><span lang="ko">Stripe Terminal 주문·반품 문서</span><span lang="en">Stripe Terminal ordering and returns docs</span></a> <span lang="ko">(2026년 10월 확인). 금액은 모두 캐나다 달러이며, 최종 요금은 Stripe 대시보드에서 확인하세요.</span><span lang="en">(checked October 2026). All amounts in Canadian dollars; confirm final pricing in your Stripe Dashboard.</span>
+</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const N={
+ko:[
+"안녕하세요! 오늘은 캐나다 골프장에서 직접 만든 프로그램으로 온라인, 오프라인 결제를 한 번에 붙이는 방법을 소개해 드릴게요. 절차부터 비용, 배송까지 쭉 따라오세요!",
+"결제가 일어나는 곳은 크게 세 군데예요. 온라인에서는 티타임 예약이랑 회원권, 현장에서는 프로샵과 클럽하우스! 그리고 이 모든 게 Stripe 계정 하나로 모여요.",
+"구축은 여섯 단계면 끝나요. 계정 만들고 인증하고, 결제 구조를 설계하고, 샌드박스에서 개발해요. 그다음 리더기를 주문하고, 실제 카드로 테스트한 뒤 라이브로 바꾸면 바로 운영 시작이에요!",
+"수수료도 간단해요. 현장 카드 결제는 2.7퍼센트에 5센트, 인터락 직불은 건당 15센트예요. 해외 카드는 3.5퍼센트에 5센트, 온라인 카드는 2.9퍼센트에 30센트인데요, 온라인 요금은 대시보드에서 한 번 더 확인해 주세요.",
+"리더기는 쓰는 곳에 맞춰 고르면 돼요. 코스랑 카트에는 셀룰러가 되는 S710, 프로샵에는 S700, 가볍게 쓰려면 79달러짜리 WisePad 3! 휴대폰으로 바로 받는 Tap to Pay도 있어요.",
+"예를 들어 볼까요? S710 두 대에 WisePad 한 대면 세금 포함 약 천삼십육 달러예요. 한 달 현장 매출이 6만 달러라면 수수료는 약 천육백칠십 달러 정도 나와요.",
+"마지막으로 배송이에요! 토론토 시간 오후 4시 전에 주문하면 당일 처리되고, 400달러가 넘으면 받을 때 서명이 필요해요. 사서함 주소는 안 되고, 30일 안에는 셀프 반품도 돼요. 자, 이제 시작해 볼까요?"
+],
+en:[
+"Hi there! Today I'll show you how to add online and in-person payments to the software you built for your golf club in Canada. We'll go through the steps, the costs, and shipping. Let's go!",
+"Payments happen in three places. Online, for tee-time bookings and memberships. In person, at the pro shop and the clubhouse. And all of it comes together in one Stripe account!",
+"Setup takes just six steps. Open and verify your account, design the payment flow, and build in the sandbox. Then order your readers, test with real cards, switch to live keys, and you're up and running!",
+"Fees are simple. In-person cards are two point seven percent plus five cents, and Interac debit is just fifteen cents per payment. International cards are three point five percent plus five cents. Online cards are two point nine percent plus thirty cents, but double-check that one in your dashboard.",
+"Pick readers by where you'll use them. The S710 with cellular for the course and carts, the S700 for the pro shop, or the seventy-nine dollar WisePad 3 for something light. And Tap to Pay lets you take payments right on a phone!",
+"Let's look at an example. Two S710s and one WisePad come to about one thousand thirty-six dollars with tax. If you do sixty thousand dollars a month in person, fees come to around one thousand six hundred seventy dollars.",
+"Finally, shipping! Order before four PM Toronto time and it goes out the same day. Orders over four hundred dollars need a signature, P.O. boxes aren't allowed, and you can return items yourself within thirty days. Okay, let's get started!"
+]};
+const TITLE={ko:"골프장 Stripe 결제 구축",en:"Golf Club Stripe Payments"};
+const $=id=>document.getElementById(id);
+const slides=[...document.querySelectorAll(".slide")];
+const total=slides.length;
+let lang="ko", idx=-1, playing=false, rate=1, audio=null, token=0;
+const uploaded=new Map();
+const bundled=new Map();
+
+function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
+
+/* progress dots */
+for(let i=0;i<total;i++){const b=document.createElement("button");b.type="button";b.setAttribute("aria-label",String(i+1));b.addEventListener("click",()=>go(i,playing));$("prog").appendChild(b);}
+
+function setLang(l){
+  lang=l; document.documentElement.setAttribute("data-lang",l); document.documentElement.lang=l;
+  document.title=TITLE[l];
+  [...$("langSeg").children].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.l===l)));
+  store("gp-lang",l); fillVoices(); render();
+  if(playing){go(idx<0?0:idx,true);}
+}
+function render(){
+  slides.forEach((s,i)=>s.classList.toggle("on",i===idx));
+  [...$("prog").children].forEach((b,i)=>{b.classList.toggle("now",i===idx);b.classList.toggle("done",i<idx)});
+  $("capNo").textContent=(idx<0?0:idx+1)+" / "+total;
+  $("capText").textContent=idx<0?(lang==="ko"?"‘발표 시작’을 누르면 나레이션과 함께 한 섹션씩 설명합니다.":"Press Start to hear each section narrated in turn."):N[lang][idx];
+  $("bPlay").innerHTML=playing?(lang==="ko"?"❚❚ 일시정지":"❚❚ Pause"):(idx<0?(lang==="ko"?"▶ 발표 시작":"▶ Start"):(lang==="ko"?"▶ 계속":"▶ Resume"));
+  const key=lang+"-"+(Math.max(idx,0)+1);
+  $("srcBadge").textContent=(uploaded.has(key)||bundled.get(key)!==false)?"ElevenLabs · Hope":(lang==="ko"?"브라우저 음성":"Browser voice");
+}
+function stopAll(){token++; if(audio){audio.pause();audio=null;} if("speechSynthesis" in window) speechSynthesis.cancel();}
+function go(i,autoplay){
+  stopAll(); idx=Math.max(0,Math.min(total-1,i)); playing=!!autoplay; render();
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  slides[idx].scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"});
+  if(playing) speak(idx);
+}
+function next(){ if(idx<total-1) go(idx+1,true); else {playing=false; render();} }
+
+function speak(i){
+  const my=++token, key=lang+"-"+(i+1);
+  const src=uploaded.get(key)||(bundled.get(key)===false?null:"audio/"+key+".mp3");
+  if(src){
+    audio=new Audio(src); audio.playbackRate=rate;
+    audio.onended=()=>{if(my===token&&playing) setTimeout(()=>{if(my===token&&playing)next()},500)};
+    audio.onerror=()=>{bundled.set(key,false);render();if(my===token){audio=null;tts(i,my)}};
+    audio.play().catch(()=>{if(my===token){audio=null;tts(i,my)}});
+  } else tts(i,my);
+}
+function tts(i,my){
+  if(!("speechSynthesis" in window)){ setTimeout(()=>{if(my===token&&playing)next()}, N[lang][i].length*70/rate); return; }
+  const u=new SpeechSynthesisUtterance(N[lang][i]);
+  const v=pickVoice(); if(v) u.voice=v; u.lang=lang==="ko"?"ko-KR":"en-US"; u.rate=rate*(lang==="ko"?1.05:1.02); u.pitch=1.15;
+  u.onend=()=>{if(my===token&&playing) setTimeout(()=>{if(my===token&&playing)next()},500)};
+  speechSynthesis.speak(u);
+}
+/* voices */
+const FEMALE=/(female|woman|yuna|sora|sunhi|seoyeon|heami|jimin|samantha|ava|allison|aria|jenny|zira|susan|karen|serena|victoria|google us english|google 한국의)/i;
+function langVoices(){ if(!("speechSynthesis" in window)) return []; const p=lang==="ko"?/^ko/i:/^en/i; return speechSynthesis.getVoices().filter(v=>p.test(v.lang)); }
+function pickVoice(){ const list=langVoices(); const saved=load("gp-voice-"+lang); return list.find(v=>v.name===saved)||list.find(v=>FEMALE.test(v.name))||list[0]||null; }
+function fillVoices(){
+  const sel=$("vSel"), list=langVoices(), cur=pickVoice(); sel.innerHTML="";
+  if(!list.length){const o=document.createElement("option");o.textContent=lang==="ko"?"이 브라우저에 한국어 음성이 없습니다":"No English voice in this browser";sel.appendChild(o);return;}
+  list.forEach(v=>{const o=document.createElement("option");o.value=v.name;o.textContent=v.name+" ("+v.lang+")";if(cur&&v.name===cur.name)o.selected=true;sel.appendChild(o);});
+}
+if("speechSynthesis" in window) speechSynthesis.onvoiceschanged=fillVoices;
+$("vSel").addEventListener("change",e=>store("gp-voice-"+lang,e.target.value));
+
+/* audio files */
+$("fAudio").addEventListener("change",e=>{
+  [...e.target.files].forEach(f=>{const m=f.name.toLowerCase().match(/^(ko|en)[-_ ]?(\d+)/); if(m) uploaded.set(m[1]+"-"+Number(m[2]),URL.createObjectURL(f));});
+  render();
+});
+async function probeBundled(){
+  for(const l of ["ko","en"]) for(let i=1;i<=total;i++){
+    const k=l+"-"+i; try{const r=await fetch("audio/"+k+".mp3"); if(r.status===404) bundled.set(k,false);}catch(e){}
+  }
+  render();
+}
+
+/* controls */
+$("bPlay").addEventListener("click",()=>{
+  if(playing){playing=false; stopAll(); render(); return;}
+  if(idx<0){go(0,true);return;}
+  playing=true; render(); speak(idx);
+});
+$("bPrev").addEventListener("click",()=>go(idx<=0?0:idx-1,playing));
+$("bNext").addEventListener("click",()=>go(idx<0?0:idx+1,playing));
+$("speed").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;rate=Number(b.dataset.v);[...$("speed").children].forEach(x=>x.setAttribute("aria-pressed",String(x===b)));if(audio)audio.playbackRate=rate;});
+$("langSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setLang(b.dataset.l);});
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea"))return;
+  if(e.key===" "){e.preventDefault();$("bPlay").click();}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+});
+
+const start=(location.hash==="#en"||location.hash==="#ko")?location.hash.slice(1):(load("gp-lang")||"ko");
+setLang(start==="en"?"en":"ko");
+probeBundled();
+})();
+</script>
+
+</body></html>

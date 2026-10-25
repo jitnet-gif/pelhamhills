@@ -1,0 +1,140 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Shift ID Approval Fix</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one stage card with a scene strip on top, narration panel below, controls at the bottom */
+:root{
+  --bg:#f3f4f8; --panel:#ffffff; --fg:#1d2033; --muted:#5f6480; --line:#dcdfeb;
+  --accent:#5b4fd6; --accent-soft:#ece9ff; --bad:#c0292f; --bad-soft:#fdeaea; --ok:#1d7a4c; --ok-soft:#e3f4ea;
+  --display:"Noto Sans KR",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13141c; --panel:#1d1f2b; --fg:#e9eaf3; --muted:#a2a6c0; --line:#33364a;
+  --accent:#9d94ff; --accent-soft:#2a2650; --bad:#ff7b7f; --bad-soft:#3a1c20; --ok:#5fd39a; --ok-soft:#173326; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13141c; --panel:#1d1f2b; --fg:#e9eaf3; --muted:#a2a6c0; --line:#33364a;
+  --accent:#9d94ff; --accent-soft:#2a2650; --bad:#ff7b7f; --bad-soft:#3a1c20; --ok:#5fd39a; --ok-soft:#173326; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:1.25rem;margin:0;font-weight:800}
+.lang{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.lang button{border:0;background:var(--panel);color:var(--muted);padding:6px 14px;font:600 .85rem var(--display);cursor:pointer}
+.lang button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.strip{display:flex;gap:6px}
+.strip button{flex:1;height:6px;border:0;border-radius:3px;background:var(--line);cursor:pointer;padding:0}
+.strip button.on{background:var(--accent)}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;min-height:300px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font:600 .75rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h2{margin:0;font-size:1.4rem;text-wrap:balance}
+.narr{background:var(--accent-soft);border-radius:10px;padding:14px 16px;line-height:1.7;font-size:1rem}
+.controls{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.controls button{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:9px 16px;font:600 .9rem var(--display);cursor:pointer}
+.controls button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono);font-size:.85rem}
+.err{border:1px solid var(--bad);background:var(--bad-soft);color:var(--bad);border-radius:8px;padding:10px 12px}
+.okbox{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok);border-radius:8px;padding:10px 12px}
+.flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+.node{flex:1 1 150px;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px}
+.node b{font-size:.95rem}.node span{color:var(--muted);font-size:.8rem}
+.node.bad{border-color:var(--bad);background:var(--bad-soft)}
+.node.good{border-color:var(--ok);background:var(--ok-soft)}
+.arrow{align-self:center;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;font-size:.9rem}
+th{color:var(--muted);font-weight:600}
+.pill{display:inline-block;border-radius:99px;padding:2px 9px;font:600 .75rem var(--mono)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.ok{background:var(--ok-soft);color:var(--ok)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;margin:0;font:.85rem/1.6 var(--mono)}
+.steps{display:flex;flex-direction:column;gap:10px;margin:0;padding-left:20px}
+@media (max-width:520px){.arrow{display:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1 id="title"></h1>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="lang-ko" aria-pressed="true">한국어</button>
+      <button id="lang-en" aria-pressed="false">English</button>
+    </div>
+  </header>
+  <div class="strip" id="strip"></div>
+  <section class="stage">
+    <div class="eyebrow" id="eyebrow"></div>
+    <h2 id="heading"></h2>
+    <div id="visual"></div>
+    <div class="narr" id="narr"></div>
+  </section>
+  <div class="controls">
+    <button id="prev"></button>
+    <button id="speak"></button>
+    <button id="next" class="primary"></button>
+  </div>
+</div>
+
+<script>
+const T = {
+  ko:{title:"직원 ID 승인 오류", prev:"◀ 이전", next:"다음 ▶", speak:"🔊 Hope 나레이션", stop:"■ 멈춤", scene:"장면"},
+  en:{title:"Shift ID approval error", prev:"◀ Back", next:"Next ▶", speak:"🔊 Narration by Hope", stop:"■ Stop", scene:"Scene"}
+};
+const flow = (approveBad) => `<div class="flow">
+  <div class="node"><b>Tee Sheet</b><span>pelhamhills.vercel.app</span></div><div class="arrow">→</div>
+  <div class="node ${approveBad?'bad':'good'}"><b>Fly API</b><span class="mono">POST /pos/approve</span></div><div class="arrow">→</div>
+  <div class="node"><b>Pelham Shift</b><span>ID → 이름 / name</span></div><div class="arrow">→</div>
+  <div class="node"><b>Supabase</b><span class="mono">pelham_shift_approve</span></div></div>`;
+const S = [
+  { v:()=>`<div class="err">Staff IDs are not on the server yet. Deploy the API (Fly) first, or type your name.</div>`,
+    ko:{e:"증상",h:"번호를 넣고 Approve 를 누르면 빨간 문구가 뜹니다",n:"선수 삭제 승인 창에 Pelham Shift 번호를 넣고 Approve 를 누르면, 번호가 틀렸다는 말이 아니라 ‘서버에 아직 직원 ID 기능이 없다’는 문구가 나옵니다. 번호 문제가 아니라 서버 문제라는 뜻입니다."},
+    en:{e:"Symptom",h:"Entering the ID and pressing Approve shows a red message",n:"When you type a Pelham Shift ID in the remove-player approval and press Approve, the message does not say the ID is wrong. It says the server does not have staff IDs yet. The problem is the server, not the number."}},
+  { v:()=>flow(false),
+    ko:{e:"흐름",h:"승인은 네 곳을 거칩니다",n:"화면은 번호를 Fly 에 있는 API 서버로 보냅니다. API 는 Pelham Shift 에 그 번호의 직원 이름을 묻고, Supabase 에 승인 기록을 남깁니다. 브라우저가 Pelham Shift 에 직접 물을 수 없어서 꼭 Fly 서버를 거쳐야 합니다."},
+    en:{e:"How it works",h:"An approval passes through four places",n:"The screen sends the ID to the API server on Fly. The API asks Pelham Shift for that staff member's name, then records the approval in Supabase. The browser cannot ask Pelham Shift directly, so it must go through Fly."}},
+  { v:()=>flow(true)+`<table><tr><th>경로 / Route</th><th>Fly 응답 / Reply</th></tr>
+      <tr><td class="mono">/pos/cashier-code</td><td><span class="pill ok">있음 · 422</span></td></tr>
+      <tr><td class="mono">/pos/approve</td><td><span class="pill bad">없음 · 404</span></td></tr></table>`,
+    ko:{e:"원인",h:"Fly 서버가 승인 기능 이전 버전입니다",n:"지금 Fly 에 올라간 서버는 오늘 낮 12시 24분 배포본(v35)입니다. 직원 ID 승인 코드(0077)는 오후 3시 4분에 들어갔습니다. 그래서 Cashier 칸 번호 확인은 되지만, 승인 경로 /pos/approve 는 404 로 없다고 나옵니다. 화면 코드는 이 404 를 보고 ‘서버에 아직 없다’고 안내한 것입니다."},
+    en:{e:"Cause",h:"The Fly server predates the approval feature",n:"The server on Fly is today's 12:24 PM deploy, version 35. The staff ID approval code, 0077, was committed at 3:04 PM. So the Cashier field lookup works, but the approval route /pos/approve returns 404. The screen saw that 404 and said the server doesn't have it yet."}},
+  { v:()=>`<ol class="steps"><li>Fly 배포 / Deploy to Fly<pre>cd ~/pelhamhills
+fly deploy -a pelham-hills-api --remote-only</pre></li>
+      <li>Supabase SQL editor 에서 0077 실행 확인 / Make sure 0077 ran<pre>supabase/migrations/0077_approve_by_shift_id.sql</pre></li></ol>`,
+    ko:{e:"해결",h:"Fly 에 지금 코드를 배포하면 됩니다",n:"코드는 이미 main 에 다 있습니다. 고칠 코드는 없고, 배포만 하면 됩니다. 터미널에서 fly deploy 를 한 번 실행해 주세요. 이 배포로 프로모션 코드(0078) 문자 바코드도 같이 올라갑니다. 0077 SQL 을 아직 안 돌렸다면 SQL editor 에 붙여 한 번 실행합니다."},
+    en:{e:"Fix",h:"Deploy the current code to Fly",n:"All the code is already on main. Nothing needs changing, only a deploy. Run fly deploy once in the terminal. The same deploy also ships the promo code (0078) text barcodes. If 0077 SQL hasn't been run yet, paste it into the SQL editor once."}},
+  { v:()=>`<div class="okbox">✓ Approved by <b>Joe Bendzik</b> — remove player</div>`,
+    ko:{e:"확인",h:"배포 뒤 같은 번호로 다시 해 보세요",n:"배포가 끝나면 브라우저를 새로고침하고 같은 창에서 번호를 다시 넣습니다. 맞는 번호면 그 직원 이름으로 승인되고, 틀린 번호면 ‘그 번호의 직원이 없다’는 말이 나옵니다. 위의 이름은 예시입니다."},
+    en:{e:"Check",h:"After the deploy, try the same ID again",n:"Once the deploy finishes, refresh the browser and enter the ID again. A correct ID approves under that staff member's name; a wrong one says no staff member has that ID. The name above is an example."}}
+];
+let i=0, lang="ko", speaking=false;
+const $=id=>document.getElementById(id);
+const audio=new Audio();
+function stopSpeech(){ audio.pause(); speaking=false; $("speak").textContent=T[lang].speak; }
+function render(){
+  const s=S[i], t=s[lang];
+  document.documentElement.lang=lang;
+  $("title").textContent=T[lang].title;
+  $("eyebrow").textContent=`${T[lang].scene} ${i+1}/${S.length} · ${t.e}`;
+  $("heading").textContent=t.h; $("visual").innerHTML=s.v(); $("narr").textContent=t.n;
+  $("prev").textContent=T[lang].prev; $("next").textContent=T[lang].next; $("speak").textContent=speaking?T[lang].stop:T[lang].speak;
+  $("prev").disabled=i===0; $("next").disabled=i===S.length-1;
+  $("lang-ko").setAttribute("aria-pressed",lang==="ko"); $("lang-en").setAttribute("aria-pressed",lang==="en");
+  $("strip").innerHTML=S.map((_,k)=>`<button class="${k<=i?'on':''}" aria-label="${T[lang].scene} ${k+1}" data-k="${k}"></button>`).join("");
+}
+function speak(){
+  audio.src=`tts/${lang}-${i+1}.mp3`;
+  speaking=true; $("speak").textContent=T[lang].stop;
+  audio.play().catch(stopSpeech);
+}
+audio.onended=()=>{ if(!speaking) return; if(i<S.length-1){ i++; render(); speak(); } else stopSpeech(); };
+function go(k){ i=Math.max(0,Math.min(S.length-1,k)); render(); if(speaking) speak(); }
+$("prev").onclick=()=>go(i-1); $("next").onclick=()=>go(i+1);
+$("speak").onclick=()=> speaking?stopSpeech():speak();
+$("strip").onclick=e=>{ const k=e.target.dataset.k; if(k!=null) go(+k); };
+function setLang(l){ lang=l; try{localStorage.setItem("lang",l)}catch(e){} render(); if(speaking) speak(); }
+$("lang-ko").onclick=()=>setLang("ko"); $("lang-en").onclick=()=>setLang("en");
+document.addEventListener("keydown",e=>{ if(e.key==="ArrowRight") go(i+1); if(e.key==="ArrowLeft") go(i-1); });
+try{ const l=localStorage.getItem("lang"); if(l==="en"||l==="ko") lang=l; }catch(e){}
+render();
+</script>
+
+</body></html>

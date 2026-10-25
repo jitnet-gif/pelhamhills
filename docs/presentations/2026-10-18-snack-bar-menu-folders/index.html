@@ -1,0 +1,740 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head><body>
+<title>스낵바 메뉴 폴더</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* snack bar folders */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.fold{background:var(--scr-bar);color:#fff;border:1px solid var(--scr-bar);min-height:74px;padding:7px;display:flex;flex-direction:column;justify-content:space-between;gap:4px;transition:transform .2s}
+.fold b{font-size:11.5px;line-height:1.15}
+.fold span{display:flex;justify-content:space-between;font-size:9.5px;color:rgba(255,255,255,.7)}
+.fold span i{font-style:normal;color:#fff;font-size:13px;line-height:1}
+.fold.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.35);animation:press 1.2s ease-in-out infinite}
+.fold.dim{opacity:.35}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.pt{border:1px solid var(--scr-line);background:var(--scr-paper);min-height:62px;padding:7px;display:flex;flex-direction:column;justify-content:space-between;gap:4px}
+.pt b{font-size:11px;line-height:1.2}
+.pt span{font-size:9px;color:var(--scr-muted);font-family:var(--mono)}
+.pt.guess{border-color:var(--sand);background:#FFF8EA}
+.pt.guess span{color:#8a6414}
+.crumb{display:flex;gap:6px;align-items:center;font-weight:700;font-size:11.5px}
+.crumb a{color:var(--scr-accent)}
+.crumb em{font-style:normal;color:#9ca3af}
+.flat{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:3px}
+.flat i{display:block;border:1px solid var(--scr-line);background:var(--scr-paper);font-style:normal;font-size:8px;padding:3px;height:30px;overflow:hidden;line-height:1.15;color:#3f434a}
+.ovsplit{display:grid;gap:8px}
+.ovlbl{font-size:10.5px;font-weight:700;color:var(--scr-muted)}
+.ovlbl.red{color:var(--scr-red)}
+.ovlbl.ok{color:var(--scr-ok)}
+.flist{display:grid;gap:3px;font-size:12px}
+.flist div{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:6px;align-items:center;padding:2px 4px;border-radius:6px}
+.flist div.cur{background:var(--violet-soft);color:var(--violet);font-weight:700}
+.flist div.done{color:var(--muted)}
+.flist div b{font-variant-numeric:tabular-nums}
+.flist .ck{font-size:11px;text-align:center}
+.ph.drink{background:var(--violet-soft);color:var(--violet)}
+.ph.food{background:var(--sand-soft);color:var(--sand)}
+.ph.todo{background:var(--flag-soft);color:var(--flag)}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko">한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en">English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">0031 SQL · menuGroups.ts</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 스낵바 계산대 · 나레이터 프레젠테이션",
+  h1:"스낵바 메뉴, <b>폴더 11개</b>로",
+  lede:"스낵바 상품 94개를 Lightspeed처럼 Beer, Grab & Go 같은 폴더로 나눴어요. 아홉 장면으로 폴더 순서와 폴더마다 들어간 상품을 보여 드려요. 왼쪽은 계산대 화면, 가운데는 뒤에서 정해지는 것, 오른쪽은 폴더 목록과 남은 일이에요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 9장면",laneScreen:"스낵바 계산대 화면",laneLog:"뒤에서 정해지는 것",laneLedger:"폴더 · 남은 일",
+  ledgerSub:"11개 폴더 · 94개 상품",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"상품 이름·SKU는 2026-10-18에 받은 스낵바 목록(94개) 그대로예요. 가격은 그 목록에 없어서 화면에 넣지 않았어요. 폴더 이름은 Lightspeed 원래 이름이 아니라 새로 정한 것이에요. 기준: 커밋 d124f47 (0031_snack_bar_menu_groups.sql · menuGroups.ts). 화면 코드는 Vercel에 배포됐고, 0031 SQL 실행은 아직 남아 있어요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Snack bar register · narrated walkthrough",
+  h1:"The snack bar menu in <b>11 folders</b>",
+  lede:"The 94 snack bar products are now split into Lightspeed-style folders such as Beer and Grab & Go. Nine scenes show the folder order and what goes in each one. Left: the register screen. Middle: what decides it. Right: the folder list and what's left to do.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 9 scenes",laneScreen:"Snack bar register",laneLog:"What decides it",laneLedger:"Folders · to do",
+  ledgerSub:"11 folders · 94 products",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Items appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Product names and SKUs are the snack bar list received on 2026-10-18 (94 items). That list had no prices, so none are shown. The folder names are new, not Lightspeed's originals. Based on commit d124f47 (0031_snack_bar_menu_groups.sql · menuGroups.ts). The screen code is deployed on Vercel; running the 0031 SQL is still to do."}
+};
+
+/* 폴더와 상품 — 0031 그대로. g: 짐작한 상품 */
+const F=[
+ ["Specials",[["Pelham Hills Lager + Hot Dog Special","LS-455"],["Pelham Hills Lager with Hotdog","LS-457"],["Pelham Hills Lager with Sausage","LS-456"]]],
+ ["Beer",[["$8 Corona","LS-427"],["Bench Berry Fields","LS-403"],["Bench Old School Lager","LS-404"],["Blackburn Amber","LS-142"],["Blackburn IPA","LS-144"],["Bud Light","LS-134"],["Budweiser","LS-135"],["Canadian","LS-402"],["Coors Original","LS-443"],["Corona","LS-400"],["Corona Zero","LS-352"],["Lost Craft Wonder Wheat","LS-420"],["Moosehead","LS-138"],["PH Local Light","LS-388"],["Pelham Hills Lager","LS-445"],["Pelham Hills Light Lager","LS-419"],["Pure Drive","LS-442",1],["Silver Smith Motueka Pils","LS-318"],["Silver Smith Nut Brown Ale","LS-317"],["Silver Smith The Black Lager","LS-319"],["Small Can Beer","LS-454"],["Triple Bogey Lager","LS-253"],["Triple Bogey Ultra","LS-254"],["Wonder Wheat","LS-389"]]],
+ ["Coolers & Cocktails",[["Caesar","LS-431"],["Golden Water Hazard","LS-430",1],["Niagara Cider Company","LS-150"],["Raspberry Lemon Setlzer","LS-421"],["Raspberry Lemon Zested","LS-387",1],["Strongbow","LS-151"],["Triple Bogey Transfusion","LS-153"],["White Claw Black Berry","LS-321"],["White Claw Black Cherry","LS-320"]]],
+ ["Pop",[["7up","LS-383"],["Diet Pepsi","LS-304"],["Dr Pepper","LS-385"],["Ginger Ale","016600010240"],["Iced Tea","LS-382"],["Moutain Dew","LS-381"],["Orange Crush","LS-292"],["Pepsi","LS-291"],["Pepsi Zero","LS-384"],["Root Beer","LS-293"]]],
+ ["Sports & Energy",[["Celcius Orange","LS-394"],["Celcius Peach Vibes","LS-395"],["Cool Blue","LS-397"],["Cool Blue Zero","LS-299"],["Energy Drink","LS-359"],["Fruit Punch","LS-302",1],["G orange","055577420249"],["G zroo Blew cool","057271163095"],["Gatorade 591 mL","GTR-591"],["Lemon- Lime","LS-399"],["Lemon- Lime Zero","LS-301"],["Orange Zero","LS-300"]]],
+ ["Juice & Water",[["$3 Juice Bottle","LS-428"],["Apple Juice","LS-296"],["Cranberry Cocktail","LS-303"],["Orange Juice","LS-297"],["Strawberry Kiwi","LS-298",1],["Water Bottle","LS-358"]]],
+ ["Coffee & Tea",[["Coffee","LS-356"],["Tea","LS-357"]]],
+ ["Grill",[["B.L.T","LS-365"],["Back Bacon Bun","LS-366"],["Cheeseburger","LS-363"],["Clubhouse Sandwich","LS-364"],["Hamburger","LS-362"],["HotDog","LS-361"],["Sausage","LS-429"],["Toasted Western","LS-367"],["Wrap","LS-448"]]],
+ ["Noodles & Dumplings",[["Buldak","LS-451"],["Dumplings (6pcs)","LS-449"],["Sin Noodle","LS-450"],["Soon Noodle","LS-453"],["Udon Noodle","LS-452"]]],
+ ["Sides & Extras",[["Bacon","LS-372"],["Cheese","LS-371"],["French Fries","LS-368"],["Gravy","LS-370"],["Onion Rings","LS-369"]]],
+ ["Grab & Go",[["Brownie","LS-375"],["Chips","LS-379"],["Chocolate Bar","LS-377"],["Clif Bar","CLIF-BAR"],["Cookie","LS-376"],["Mentos","LS-446"],["Muffin","LS-374"],["Nuts","LS-380"],["Waffle (2pcs)","LS-447"]]]
+];
+const FI=Object.fromEntries(F.map((f,i)=>[f[0],i]));
+const ALL=F.flatMap(f=>f[1]).sort((a,b)=>a[0].localeCompare(b[0]));
+const TOTAL=ALL.length;
+
+function shell(body,search){return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app/pos/snack-bar</span></div><div class="posbar"><span><small>PELHAM HILLS POS</small><b>Snack Bar / Bev Cart</b></span><span class="st">Pro Shop <i>Snack Bar</i></span></div><div class="postabs"><span class="on">Register</span><span>Products</span></div><div class="posbody"><div class="search'+(search?" on":"")+'">'+(search?esc(search)+"▌":"Search name, SKU or barcode")+'</div>'+body+'</div></div>'}
+function folders(o){o=o||{};return '<div class="fgrid">'+F.map((f,i)=>{const n=f[1].length;const cls=o.hot===f[0]?" hot":(o.upto!=null&&i>o.upto?" dim":"");return '<div class="fold'+cls+'"><b>'+esc(f[0])+'</b><span>'+n+' item'+(n===1?"":"s")+'<i>›</i></span></div>'}).join("")+'</div>'}
+function inside(name,o){o=o||{};const f=F[FI[name]];
+ return '<div class="crumb"><a>← Food &amp; Beverage</a><em>/</em><span>'+esc(name)+'</span></div><div class="pgrid">'+f[1].map(p=>'<div class="pt'+(o.guess&&p[2]?" guess":"")+'"><b>'+esc(p[0])+'</b><span>'+esc(p[1])+'</span></div>').join("")+'</div>'}
+function flat(){return '<div class="flat">'+ALL.map(p=>'<i>'+esc(p[0])+'</i>').join("")+'</div>'}
+function searchHit(q){const hits=ALL.filter(p=>p[0].toLowerCase().includes(q.toLowerCase()));return '<div class="pgrid">'+hits.map(p=>'<div class="pt"><b>'+esc(p[0])+'</b><span>'+esc(p[1])+'</span></div>').join("")+'</div>'}
+function guesses(){const g=F.flatMap(f=>f[1].filter(p=>p[2]).map(p=>[p[0],p[1],f[0]]));
+ return '<div class="sh">Products · placed by name</div><div class="pgrid">'+g.map(p=>'<div class="pt guess"><b>'+esc(p[0])+'</b><span>'+esc(p[1])+' → '+esc(p[2])+'</span></div>').join("")+'</div>'}
+
+const L=(ko,en)=>({ko,en});
+const cnt=n=>F[FI[n]][1].length;
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"look",ko:"전체 구성",en:"Overview",
+ screen:(lang,p)=>shell(p<.45?'<div class="ovlbl red">'+(lang==="ko"?"전: 94개가 한 화면에":"Before: 94 items on one screen")+'</div>'+flat():'<div class="ovlbl ok">'+(lang==="ko"?"후: 폴더 11개":"After: 11 folders")+'</div>'+folders()),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_retail_products",ep:"category = 'Food & Beverage' · 94 rows",why:L("매장 POS에서 옮긴 스낵바 상품. 지금까지 menu_group이 모두 비어 있었어요.","Snack bar products moved over from the old POS. Every menu_group was empty.")},
+  {at:.5,tag:"rpc",name:"0031_snack_bar_menu_groups.sql",ep:"update … set menu_group",why:L("SKU로 상품을 집어 폴더 이름을 채워요. id가 아니라서 DB가 달라도 맞아요.","Picks each product by SKU and fills in its folder. Not by id, so it works on any database.")},
+  {at:.8,tag:"ui",name:"0030 folders",ep:"menu_group → folder tile",why:L("폴더 화면은 0030에서 이미 만들었어요. 이번엔 이름만 채웠어요.","The folder screen came with 0030. This change only fills in the names.")}
+ ],
+ st:{cur:-1,done:-1}},
+
+{a:"folders",ph:"look",ko:"폴더 순서",en:"Folder order",
+ screen:(lang,p)=>p<.78?shell(folders({upto:Math.floor(p/.7*11)})):shell(searchHit("lager"),"lager"),
+ log:[
+  {at:.15,tag:"ui",name:"SNACK_BAR_GROUPS",ep:"menuGroups.ts · fixed order",why:L("이 목록의 폴더가 이 순서로 앞에 와요. 목록에 없는 폴더는 그 뒤에 이름순이에요.","Folders in this list come first, in this order. Any other folder follows alphabetically.")},
+  {at:.4,tag:"ui",name:"GroupButton",ep:"dark tile · \"N items ›\"",why:L("상품 카드와 같은 크기지만 검은 판이라 '들어가는 버튼'으로 보여요.","Same size as a product card, but dark, so it reads as a button that opens.")},
+  {at:.8,tag:"key",name:"Search \"lager\"",ep:"skips the folders",why:L("검색할 때는 폴더 밖으로 바로 찾아 줘요.","Searching ignores the folders and finds items directly.")}
+ ],
+ st:{cur:-1,done:-1,all:1}},
+
+{a:"beer",ph:"drink",ko:"Specials · Beer",en:"Specials · Beer",
+ screen:(lang,p)=>shell(p<.12?folders({hot:"Beer"}):p<.72?inside("Beer"):inside("Specials")),
+ log:[
+  {at:.12,tag:"key",name:"Beer",ep:cnt("Beer")+" items"},
+  {at:.35,tag:"rpc",name:"menu_group = 'Beer'",ep:"LS-400 · LS-445 · LS-134 …",why:L("무알코올 Corona Zero도 맥주 옆에 두었어요.","Non-alcoholic Corona Zero sits with the beers.")},
+  {at:.72,tag:"rpc",name:"menu_group = 'Specials'",ep:"LS-455 · LS-456 · LS-457",why:L("맥주 + 핫도그·소시지 세트. 맨 앞 폴더예요.","Beer plus hot dog or sausage deals. The first folder.")}
+ ],
+ st:{cur:[0,1],done:-1}},
+
+{a:"coolers",ph:"drink",ko:"Coolers & Cocktails",en:"Coolers & Cocktails",
+ screen:(lang,p)=>shell(p<.12?folders({hot:"Coolers & Cocktails"}):p<.82?inside("Coolers & Cocktails"):folders()),
+ log:[
+  {at:.12,tag:"key",name:"Coolers & Cocktails",ep:cnt("Coolers & Cocktails")+" items"},
+  {at:.4,tag:"rpc",name:"cider · seltzer · cocktail",ep:"LS-150 · LS-151 · LS-321 · LS-431 …"},
+  {at:.82,tag:"key",name:"← Food & Beverage",ep:"back to the folders"}
+ ],
+ st:{cur:[2],done:1}},
+
+{a:"soft",ph:"drink",ko:"Pop · Juice · Coffee",en:"Pop · Juice · Coffee",
+ screen:(lang,p)=>shell(p<.45?inside("Pop"):p<.8?inside("Juice & Water"):inside("Coffee & Tea")),
+ log:[
+  {at:.1,tag:"rpc",name:"Pop",ep:cnt("Pop")+" items",why:L("Ginger Ale은 SKU가 바코드 숫자(016600010240)로 들어와 있어요.","Ginger Ale's SKU is its barcode number (016600010240).")},
+  {at:.45,tag:"rpc",name:"Juice & Water",ep:cnt("Juice & Water")+" items"},
+  {at:.8,tag:"rpc",name:"Coffee & Tea",ep:cnt("Coffee & Tea")+" items"}
+ ],
+ st:{cur:[3,5,6],done:2}},
+
+{a:"sports",ph:"drink",ko:"Sports & Energy",en:"Sports & Energy",
+ screen:()=>shell(inside("Sports & Energy")),
+ log:[
+  {at:.15,tag:"rpc",name:"Sports & Energy",ep:cnt("Sports & Energy")+" items"},
+  {at:.45,tag:"rpc",name:"Gatorade flavours",ep:"LS-397 · LS-299 · LS-399 · LS-301 · LS-300",why:L("Cool Blue, Lemon-Lime, Orange Zero는 Gatorade 맛 이름으로 들어와 있어요.","Cool Blue, Lemon-Lime and Orange Zero came in under Gatorade flavour names.")},
+  {at:.75,tag:"rpc",name:"Celsius · Energy Drink",ep:"LS-394 · LS-395 · LS-359"}
+ ],
+ st:{cur:[4],done:6}},
+
+{a:"food",ph:"food",ko:"Grill · Noodles · Sides",en:"Grill · Noodles · Sides",
+ screen:(lang,p)=>shell(p<.42?inside("Grill"):p<.72?inside("Noodles & Dumplings"):inside("Sides & Extras")),
+ log:[
+  {at:.1,tag:"rpc",name:"Grill",ep:cnt("Grill")+" items",why:L("버거·핫도그·샌드위치·랩을 한 폴더에.","Burgers, hot dogs, sandwiches and wraps in one folder.")},
+  {at:.42,tag:"rpc",name:"Noodles & Dumplings",ep:cnt("Noodles & Dumplings")+" items"},
+  {at:.72,tag:"rpc",name:"Sides & Extras",ep:cnt("Sides & Extras")+" items",why:L("Bacon·Cheese는 따로 파는 추가 재료예요.","Bacon and Cheese are add-ons sold on their own.")}
+ ],
+ st:{cur:[7,8,9],done:6}},
+
+{a:"grab",ph:"food",ko:"Grab & Go",en:"Grab & Go",
+ screen:(lang,p)=>shell(p<.15?folders({hot:"Grab & Go"}):inside("Grab & Go")),
+ log:[
+  {at:.15,tag:"key",name:"Grab & Go",ep:cnt("Grab & Go")+" items"},
+  {at:.5,tag:"rpc",name:"snacks · bakery",ep:"LS-379 · LS-377 · CLIF-BAR · LS-376 …"}
+ ],
+ st:{cur:[10],done:9}},
+
+{a:"check",ph:"todo",ko:"확인 · 남은 일",en:"Check · to do",
+ screen:()=>shell(guesses()),
+ log:[
+  {at:.12,tag:"rpc",name:"placed by name",ep:"5 products",why:L("이름만 보고 짐작했어요. 틀리면 Products 탭에서 그룹 칸만 고치면 돼요.","Placed by name alone. If one is wrong, change its group on the Products tab.")},
+  {at:.4,tag:"rpc",name:"only where menu_group is null",ep:"safe to run again",why:L("직원이 이미 고친 그룹은 덮어쓰지 않아요.","Groups staff already changed are never overwritten.")},
+  {at:.6,tag:"ui",name:"Vercel",ep:"d124f47 · deployed ✓"},
+  {at:.8,tag:"key",name:"Supabase SQL Editor",ep:"paste 0031, run once",why:L("이걸 실행해야 실제 계산대에 폴더가 생겨요. 마지막 표로 바로 확인돼요.","Folders appear on the real register only after this. The last table confirms it.")}
+ ],
+ st:{cur:-1,done:10,todo:1}}
+];
+
+const PH={look:{ko:"보기",en:"Look"},drink:{ko:"음료",en:"Drinks"},food:{ko:"음식",en:"Food"},todo:{ko:"남은 일",en:"To do"}};
+const TAGS={ui:"SCREEN",rpc:"DATA",local:"DEVICE",stripe:"TERMINAL",key:"TAP"};
+
+function renderLedger(p){
+  const st=S[SC].st;const k=LANG;
+  const cur=Array.isArray(st.cur)?st.cur:[];
+  const card=(src,sub,pill,body)=>'<div class="lc"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const rows=a=>'<div class="lrows">'+a.map(r=>'<div class="'+(r[2]||"")+'"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>').join("")+'</div>';
+  let h=card(k==="ko"?"폴더 순서":"Folder order","SNACK_BAR_GROUPS",pill("vi",TOTAL+(k==="ko"?"개 상품":" products")),
+   '<div class="flist">'+F.map((f,i)=>{const c=cur.includes(i)?"cur":(i<=st.done||st.all?"done":"");return '<div class="'+c+'"><span class="ck">'+(cur.includes(i)?"▶":(i<=st.done?"✓":String(i+1)))+'</span><span>'+esc(f[0])+'</span><b>'+f[1].length+'</b></div>'}).join("")+'</div>');
+  h+=card(k==="ko"?"짐작한 상품":"Placed by name",k==="ko"?"이름만 보고 정함":"Name only",pill("wait",k==="ko"?"5개 확인":"Check 5"),
+   rows(F.flatMap(f=>f[1].filter(x=>x[2]).map(x=>[x[0],f[0]]))));
+  h+=card(k==="ko"?"반영 상태":"Status","d124f47",st.todo?pill("wait",k==="ko"?"1개 남음":"1 left"):pill("none",k==="ko"?"코드 배포됨":"Code deployed"),
+   rows([[k==="ko"?"화면 코드 (Vercel)":"Screen code (Vercel)",k==="ko"?"배포됨 ✓":"Deployed ✓"],[k==="ko"?"0031 SQL 실행":"Run 0031 SQL",k==="ko"?"직접 해야 함":"You run it",st.todo?"cur":""],[k==="ko"?"계산대에 폴더":"Folders on register",k==="ko"?"SQL 뒤에":"After SQL"]]));
+  $("ledger").innerHTML=h;
+}
+function ledgerAt(sc,p){return {st:S[sc].st,fl:new Set()}}
+
+const DUR={"ov": {"ko": 13.2, "en": 14.8}, "folders": {"ko": 18.2, "en": 17.6}, "beer": {"ko": 16.7, "en": 15.1}, "coolers": {"ko": 14.8, "en": 15.3}, "soft": {"ko": 12.4, "en": 13.2}, "sports": {"ko": 12.0, "en": 12.8}, "food": {"ko": 20.7, "en": 19.5}, "grab": {"ko": 10.5, "en": 10.6}, "check": {"ko": 18.7, "en": 19.3}};
+const NARR={"ko":{
+"ov":"이번엔 스낵바 메뉴예요. 매장 POS에서 옮겨 온 스낵바 상품이 아흔네 개인데, 지금까지는 계산대 한 화면에 전부 쏟아졌어요. 그래서 Lightspeed처럼 Beer, Grab and Go 같은 폴더 열한 개로 나눴어요.",
+"folders":"스낵바 계산대를 열면 상품 대신 검은 폴더 타일이 먼저 보여요. 순서는 Specials, Beer, 칵테일, 음료, 음식, 그리고 마지막이 Grab and Go예요. 타일마다 상품이 몇 개 들었는지 나와요. 검색창에 치면 폴더를 건너뛰고 바로 찾아요.",
+"beer":"Beer 폴더를 누르면 맥주 스물네 개가 나와요. Pelham Hills Lager, Bud Light, Corona, Blackburn, Silver Smith 같은 것들이요. 무알코올 Corona Zero도 여기 넣었어요. 맥주에 핫도그나 소시지가 붙은 세트 세 개는 맨 앞 Specials 폴더에 있어요.",
+"coolers":"사이다, 셀처, 칵테일은 Coolers and Cocktails 폴더예요. Strongbow, Niagara Cider, White Claw 두 가지, Caesar, Triple Bogey Transfusion까지 아홉 개예요. 위쪽 왼쪽 화살표를 누르면 폴더 목록으로 돌아가요.",
+"soft":"술이 아닌 음료는 셋으로 나눴어요. Pop은 Pepsi, 세븐업, Dr Pepper, Ginger Ale 같은 탄산 열 개, Juice and Water는 주스와 생수 여섯 개, Coffee and Tea는 커피와 차 두 개예요.",
+"sports":"Sports and Energy에는 열두 개가 있어요. Gatorade와 그 맛 이름으로 들어온 Cool Blue, Lemon-Lime, Orange Zero, Fruit Punch, 그리고 Celsius 두 가지와 Energy Drink예요.",
+"food":"음식은 세 폴더예요. Grill에는 햄버거, 치즈버거, 핫도그, 소시지, BLT, 클럽하우스 샌드위치, 랩까지 아홉 개. Noodles and Dumplings에는 불닭, 신라면, 우동, 만두 다섯 개. Sides and Extras에는 감자튀김, 어니언링, 그레이비, 베이컨, 치즈 추가가 있어요.",
+"grab":"마지막 Grab and Go는 손님이 바로 집어 가는 것들이에요. 칩, 초콜릿 바, Clif Bar, 쿠키, 브라우니, 머핀, 멘토스, 견과류, 와플까지 아홉 개예요.",
+"check":"이름만 보고 짐작한 상품이 다섯 개 있어요. Pure Drive, Golden Water Hazard, Raspberry Lemon Zested, Strawberry Kiwi, Fruit Punch예요. 다르면 Products 탭에서 그룹 칸만 고치면 돼요. 화면 코드는 배포됐고, 남은 일은 SQL editor에서 영 영 삼 일 파일을 한 번 실행하는 거예요."
+},"en":{
+"ov":"This time it's the snack bar menu. There are ninety-four snack bar products brought over from the old POS, and until now they all landed on one register screen. So, like Lightspeed, they're now split into eleven folders, such as Beer and Grab and Go.",
+"folders":"When you open the snack bar register, you see dark folder tiles first instead of products. The order is Specials, Beer, cocktails, drinks, food, and Grab and Go last. Each tile shows how many items are inside. Typing in the search box skips the folders and finds the item directly.",
+"beer":"Tap the Beer folder and you get twenty-four beers, like Pelham Hills Lager, Bud Light, Corona, Blackburn and Silver Smith. The non-alcoholic Corona Zero is in here too. The three beer-and-hot-dog or sausage deals sit in the Specials folder up front.",
+"coolers":"Ciders, seltzers and cocktails go in Coolers and Cocktails. That's nine items, from Strongbow, Niagara Cider and two White Claws to the Caesar and Triple Bogey Transfusion. The back arrow at the top left takes you back to the folders.",
+"soft":"Non-alcoholic drinks are split three ways. Pop has ten sodas like Pepsi, Seven Up, Dr Pepper and Ginger Ale. Juice and Water has six juices and bottled water. Coffee and Tea has coffee and tea.",
+"sports":"Sports and Energy holds twelve items: Gatorade and the flavors that came in under their own names, like Cool Blue, Lemon-Lime, Orange Zero and Fruit Punch, plus two Celsius flavors and Energy Drink.",
+"food":"Food is three folders. Grill has nine items, from hamburgers, cheeseburgers, hot dogs and sausages to the BLT, clubhouse sandwich and wrap. Noodles and Dumplings has five, including Buldak, Shin, udon and dumplings. Sides and Extras has fries, onion rings, gravy, and bacon or cheese add-ons.",
+"grab":"Last, Grab and Go is what guests pick up on the way out: chips, chocolate bars, Clif Bars, cookies, brownies, muffins, Mentos, nuts and waffles. Nine items.",
+"check":"Five products were placed by name alone: Pure Drive, Golden Water Hazard, Raspberry Lemon Zested, Strawberry Kiwi and Fruit Punch. If any is wrong, just change its group on the Products tab. The screen code is deployed. What's left is running the zero-zero-three-one file once in the SQL editor."
+}}
+;
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phsm-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phsm-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phsm-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phsm-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>
+
+</body></html>

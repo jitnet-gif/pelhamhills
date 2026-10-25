@@ -1,0 +1,297 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Pelham Hills 2026 요금표</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
+<style>
+/* Layout: 스코어카드처럼 — 오늘의 요금 → 시즌 달력 → 요일 매트릭스 → 요금표 8개(시간 막대) → 요금제·카트·실내 */
+:root{
+  --bg:#f4f6f1; --paper:#ffffff; --ink:#18231a; --muted:#5d6b5f; --line:#dbe2d7;
+  --green:#1f5a32; --green2:#2f7a47; --fair:#e3eedf; --sand:#e9dfc4; --flag:#c2412d;
+  --b1:#1f5a32; --b2:#4f8c5c; --b3:#a7c79a; --off:#eceee8;
+  --f-display:"Fraunces",Georgia,serif; --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1510; --paper:#162019; --ink:#e7eee5; --muted:#9aab9c; --line:#2a372c;
+  --green:#7fc794; --green2:#5fae77; --fair:#1d2d21; --sand:#3a3424; --flag:#f07a63;
+  --b1:#5fae77; --b2:#3f7d51; --b3:#2b5236; --off:#1c241d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1510; --paper:#162019; --ink:#e7eee5; --muted:#9aab9c; --line:#2a372c;
+  --green:#7fc794; --green2:#5fae77; --fair:#1d2d21; --sand:#3a3424; --flag:#f07a63;
+  --b1:#5fae77; --b2:#3f7d51; --b3:#2b5236; --off:#1c241d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:36px}
+h1,h2{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(28px,5vw,42px);line-height:1.1}
+h2{font-size:22px}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.sub{color:var(--muted);margin:6px 0 0;max-width:70ch}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+section{display:grid;gap:14px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px}
+
+/* hero */
+.hero{display:grid;gap:18px}
+.today{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.tcard{padding:18px 20px;display:grid;gap:12px}
+.tcard .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tcard .nm{font-weight:700;font-size:17px}
+.pill{font-size:12px;padding:2px 10px;border-radius:99px;background:var(--fair);color:var(--green);font-weight:600;white-space:nowrap}
+.pill.live{background:var(--green);color:var(--paper)}
+.prices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pr{display:grid;gap:2px}
+.pr .lb{font-size:12px;color:var(--muted)}
+.pr .v{font-family:var(--f-mono);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--green)}
+.pr .t{font-size:12px;color:var(--muted)}
+
+/* season timeline */
+.tl{padding:18px 20px;display:grid;gap:10px}
+.months{display:grid;grid-template-columns:repeat(12,1fr);font-size:11px;color:var(--muted)}
+.months span{border-left:1px solid var(--line);padding-left:4px}
+.bar{position:relative;height:44px;border-radius:6px;overflow:hidden;background:var(--off)}
+.seg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;overflow:hidden;white-space:nowrap}
+.seg.sh{background:var(--sand);color:var(--ink)}
+.seg.rg{background:var(--green2);color:#fff}
+.seg.of{color:var(--muted)}
+.now{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--flag)}
+.nowlb{position:absolute;top:-22px;transform:translateX(-50%);font-size:11px;color:var(--flag);font-weight:700;white-space:nowrap}
+.tlbox{position:relative;padding-top:20px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+
+/* day matrix */
+.mx-scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+.mx{min-width:620px}
+.mx th,.mx td{padding:10px 8px;text-align:center;border-bottom:1px solid var(--line);font-size:13px}
+.mx th{font-weight:600;color:var(--muted);font-size:12px}
+.mx td:first-child,.mx th:first-child{text-align:left;font-weight:600;color:var(--ink);white-space:nowrap}
+.chip{display:inline-block;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.c-wd{background:var(--fair);color:var(--green)}
+.c-fr{background:var(--green2);color:#fff}
+.c-we{background:var(--green);color:var(--paper)}
+.c-sh{background:var(--sand);color:var(--ink)}
+.c-sp{background:transparent;border:1px dashed var(--green2);color:var(--green)}
+
+/* rate cards */
+.scale{display:grid;grid-template-columns:150px 1fr;gap:0 14px;font-size:11px;color:var(--muted)}
+.ticks{position:relative;height:16px}
+.ticks span{position:absolute;transform:translateX(-50%)}
+.rc{display:grid;gap:10px}
+.row{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;align-items:center;padding:14px 16px}
+.row.live{outline:2px solid var(--green2);outline-offset:-1px}
+.row .meta{display:grid;gap:2px;min-width:0}
+.row .meta b{font-size:14px}
+.row .meta small{color:var(--muted);font-size:12px;line-height:1.35}
+.bands{position:relative;height:38px;border-radius:6px;overflow:hidden;background:var(--off)}
+.band{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;padding-left:8px;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px;font-weight:600;line-height:1.1;overflow:hidden;white-space:nowrap;border-right:2px solid var(--paper)}
+.band small{font-size:10px;font-weight:500;opacity:.85}
+.band.k0{background:var(--b1);color:#fff}.band.k1{background:var(--b2);color:#fff}.band.k2{background:var(--b3);color:var(--ink)}
+.nine{grid-column:2;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.nine .bar9{position:relative;flex:1;height:8px}
+.nine .bar9 i{position:absolute;top:0;bottom:0;right:0;border-radius:4px;background:var(--flag);opacity:.75}
+.nine b{font-family:var(--f-mono);color:var(--ink);font-weight:600;white-space:nowrap}
+
+/* plans */
+.plans{min-width:640px}
+.plans th,.plans td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}
+.plans th{font-size:12px;color:var(--muted);font-weight:600}
+.plans td:first-child{font-weight:600;width:28%}
+.plans tr.zero td:nth-child(2){color:var(--green);font-weight:700}
+.tbl{padding:4px 6px}
+
+.trio{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.box{padding:18px 20px;display:grid;gap:8px;align-content:start}
+.box h3{margin:0;font-size:15px}
+.kv{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed var(--line);padding-block:6px;font-size:14px}
+.kv:last-child{border-bottom:0}
+.kv .num{font-weight:600}
+.notes{display:grid;gap:8px;padding:18px 20px;font-size:14px}
+.notes p{margin:0}
+.notes b{color:var(--green)}
+.src{font-size:12px;color:var(--muted)}
+
+@media (max-width:620px){
+  .row,.scale{grid-template-columns:1fr}
+  .scale .sp{display:none}
+  .nine{grid-column:1}
+  .prices .pr .v{font-size:20px}
+}
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <div class="eyebrow">Pelham Hills Golf Club · 2026 · 세전 요금, HST 13% 별도</div>
+      <h1>지금 적용 중인 요금표</h1>
+      <p class="sub">티 시트·계산서·온라인 결제가 같은 값을 씁니다. Lightspeed(Chronogolf) 활성 요금표 그대로이며, 10월 19일에 클럽이 승인했습니다(0045).</p>
+    </div>
+    <div class="today" id="today"></div>
+  </header>
+
+  <section>
+    <div><div class="eyebrow">1 · 날짜로 요금표 고르기</div><h2>시즌 달력</h2></div>
+    <div class="card tl">
+      <div class="tlbox"><div class="bar" id="season"></div></div>
+      <div class="months" id="months"></div>
+      <div class="legend">
+        <span><i style="background:var(--green2)"></i>정규 시즌 5/8 – 9/30 · 요일마다 다른 표</span>
+        <span><i style="background:var(--sand)"></i>숄더 4/26 – 5/7, 10/1 – 12/15 · 평일/주말 두 표</span>
+        <span><i style="background:var(--off);border:1px solid var(--line)"></i>그 밖(비시즌)도 숄더 표로 계산</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div><div class="eyebrow">2 · 요일로 요금표 고르기</div><h2>요일 × 시즌</h2></div>
+    <div class="card mx-scroll">
+      <table class="mx">
+        <thead><tr><th></th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th></tr></thead>
+        <tbody>
+          <tr><td>정규 시즌</td><td colspan="4"><span class="chip c-wd">Weekday 2026</span></td><td><span class="chip c-fr">Friday</span></td><td colspan="2"><span class="chip c-we">Weekend 2026</span></td></tr>
+          <tr><td>6월 금요일</td><td colspan="4" class="src">—</td><td><span class="chip c-sp">June Friday</span></td><td colspan="2" class="src">—</td></tr>
+          <tr><td>6/25 – 6/30</td><td colspan="4"><span class="chip c-sp">60주년 스페셜</span></td><td colspan="3" class="src">평소대로</td></tr>
+          <tr><td>숄더·비시즌</td><td colspan="5"><span class="chip c-sh">Weekday Shoulder</span></td><td colspan="2"><span class="chip c-sh">Weekend Shoulder</span></td></tr>
+          <tr><td>공휴일</td><td colspan="7" style="text-align:left"><span class="chip c-sp">Victoria Day</span> 전용 표 · <span class="chip c-we">Canada Day</span> → Weekend · <span class="chip c-fr">Civic · Labour · Thanksgiving</span> → Friday 표</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div><div class="eyebrow">3 · 시각으로 가격 고르기</div><h2>요금표 8개, 18홀 시간대별 1인 그린피</h2>
+      <p class="sub">막대는 오전 6시~오후 8시입니다. 아래 빨간 선은 9홀을 파는 시각과 가격입니다. 테두리가 있는 표가 오늘 쓰는 표입니다.</p></div>
+    <div class="scale"><span class="sp"></span><div class="ticks" id="ticks"></div></div>
+    <div class="rc" id="cards"></div>
+  </section>
+
+  <section>
+    <div><div class="eyebrow">4 · 사람으로 가격 고르기</div><h2>요금제(회원 등급)별 그린피·카트</h2>
+      <p class="sub">요금제가 정한 값이 없으면 요금표 가격(퍼블릭가)을 받습니다. 이용 시간 밖에 치는 회원도 퍼블릭가입니다.</p></div>
+    <div class="card mx-scroll tbl">
+      <table class="plans">
+        <thead><tr><th>요금제</th><th>1인 그린피</th><th>카트(1인)</th></tr></thead>
+        <tbody>
+          <tr><td>Public · GolfNow</td><td>요금표 가격</td><td><span class="num">$19.47</span> (18) · <span class="num">$11.50</span> (9)</td></tr>
+          <tr><td>Public Senior</td><td><span class="num">$40.71</span> (18) · <span class="num">$30.97</span> (9), 요금표가 더 싸면 요금표 · 숄더 주말은 요금표</td><td>평일 <span class="num">$17.70</span> · <span class="num">$9.74</span> / 주말 <span class="num">$19.47</span> · <span class="num">$11.50</span></td></tr>
+          <tr><td>Public Junior</td><td>오후 2시 전 <span class="num">$35.40</span>(주말 <span class="num">$34.40</span>) · 2시부터 <span class="num">$32.75</span> · 9홀 <span class="num">$25.67</span></td><td><span class="num">$19.47</span> · <span class="num">$11.50</span></td></tr>
+          <tr><td>Friends &amp; Family</td><td><span class="num">$44.25</span> (18) · <span class="num">$22.12</span> (9)</td><td><span class="num">$19.47</span> · <span class="num">$11.50</span></td></tr>
+          <tr><td>LS League</td><td><span class="num">$45.00</span> (18) 하루 종일</td><td><span class="num">$19.47</span> · <span class="num">$11.50</span></td></tr>
+          <tr class="zero"><td>Full · Corporate · Intermediate · Restricted · Weekday · Junior Member</td><td><span class="num">$0</span></td><td>7 Day Cart <span class="num">$0</span> · Weekday Cart 평일 <span class="num">$0</span> · 그 외 <span class="num">$19.47</span> / <span class="num">$11.50</span></td></tr>
+          <tr class="zero"><td>9 Hole Member</td><td>평일 <span class="num">$0</span> · 주말은 오후 4시부터 9홀 <span class="num">$0</span>, 그 밖은 요금표</td><td>멤버십대로</td></tr>
+          <tr class="zero"><td>Twilight Member</td><td>오후 3시부터 <span class="num">$0</span>, 그 전은 요금표</td><td>멤버십대로</td></tr>
+          <tr class="zero"><td>Pelham Staff</td><td><span class="num">$0</span> · 주말·공휴일은 오후 4시부터, 그 전은 요금표</td><td>멤버십대로</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div><div class="eyebrow">5 · 그 밖의 요금</div><h2>카트 · 실내 연습장 · HST</h2></div>
+    <div class="trio">
+      <div class="card box">
+        <h3>하프 카트 (1인)</h3>
+        <div class="kv"><span>18홀</span><span class="num" data-hst="19.47"></span></div>
+        <div class="kv"><span>9홀</span><span class="num" data-hst="11.50"></span></div>
+        <div class="kv"><span>시니어 평일 18홀</span><span class="num" data-hst="17.70"></span></div>
+        <div class="kv"><span>시니어 평일 9홀</span><span class="num" data-hst="9.74"></span></div>
+      </div>
+      <div class="card box">
+        <h3>실내 시뮬레이터</h3>
+        <div class="kv"><span>베이 1시간</span><span class="num" data-hst="20.00"></span></div>
+        <div class="kv"><span>베이</span><span>Bay 1 · 2 · 3 (양손 겸용)</span></div>
+        <div class="kv"><span>2시간 예약</span><span class="num" data-hst="40.00"></span></div>
+      </div>
+      <div class="card box">
+        <h3>세금 계산</h3>
+        <div class="kv"><span>HST</span><span class="num">13%</span></div>
+        <div class="kv"><span>세전 $40.71</span><span class="num">→ $46.00</span></div>
+        <div class="kv"><span>세전 $58.41</span><span class="num">→ $66.00</span></div>
+        <p class="src" style="margin:0">세전 값은 HST를 붙였을 때 딱 떨어지는 금액에 맞춰져 있습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card notes">
+      <p><b>값이 그대로 남는 경우</b> · 직원이 손으로 적은 금액, 결제가 시작된 예약과 선수는 요금표를 바꿔도 다시 매기지 않습니다.</p>
+      <p><b>전화 예약</b> · 전화 예약 도우미는 18홀만 받습니다. 9홀은 프로숍에서 받습니다.</p>
+      <p><b>프로모 코드</b> · PROMO- 바코드는 그린피에서 할인됩니다(0078).</p>
+      <p class="src">출처: frontend/lib/rateCard.ts (DB 0045 `pelham_tee_rate_cards`·`rate_bands`·`plan_fee`·`cart_fee_on`의 사본), 실내 요금은 book/indoor 화면과 simulator_store.py. 2026-10-23 기준.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var CARDS=[
+    {code:"weekday_shoulder",name:"Weekday Shoulder",applies:"월–금 · 10/1–12/15, 4/26–5/7",bands:[["Open",40.71],["2:00 PM",35.40]],nine:[28.31,"10:00 AM"]},
+    {code:"weekend_shoulder",name:"Weekend Shoulder",applies:"토·일 · 10/1–12/15, 4/26–5/7",bands:[["Open",51.33],["2:00 PM",46.02]],nine:[38.94,"4:00 PM"]},
+    {code:"weekday",name:"Weekday 2026",applies:"월–목 · 5/8–9/30",bands:[["Open",47.79],["2:00 PM",38.94],["5:00 PM",34.52]],nine:[34.52,"10:00 AM"]},
+    {code:"friday",name:"Friday / Holiday",applies:"금 · 5/8–9/30, Civic·Labour·Thanksgiving",bands:[["Open",58.41],["2:00 PM",46.90],["5:00 PM",39.94]],nine:[35.40,"4:00 PM"]},
+    {code:"weekend",name:"Weekend 2026",applies:"토·일 · 5/8–9/30, Canada Day",bands:[["Open",58.41],["2:00 PM",46.90],["5:00 PM",38.94]],nine:[35.40,"4:00 PM"]},
+    {code:"june_friday",name:"June Friday",applies:"6월의 금요일",bands:[["Open",58.41],["12:00 PM",49.56],["5:00 PM",38.94]],nine:[35.40,"4:00 PM"]},
+    {code:"sixty",name:"60th Anniversary",applies:"월–목 · 2026-06-25 – 06-30",bands:[["Open",47.79],["1:00 PM",38.94],["5:00 PM",34.52]],nine:[34.52,"10:00 AM"]},
+    {code:"victoria",name:"Victoria Day",applies:"Victoria Day",bands:[["Open",47.79],["2:00 PM",38.94]],nine:[34.52,"10:00 AM"]}
+  ];
+  var START=6,END=20;
+  function hst(r){return Math.round(r*113)/100}
+  function $(r){return "$"+r.toFixed(2)}
+  function hour(s){if(s==="Open")return START;var m=s.match(/(\d+):(\d+) (AM|PM)/);var h=+m[1]%12+(m[3]==="PM"?12:0);return h+ +m[2]/60}
+  function pct(h){return (h-START)/(END-START)*100}
+  function ko(s){if(s==="Open")return "오픈";var h=hour(s);return (h<12?"오전 ":"오후 ")+((h%12)||12)+"시"}
+
+  // 오늘의 요금표: 날짜 규칙(0045)을 그대로
+  var now=new Date(), y=now.getFullYear(), md=(now.getMonth()+1)*100+now.getDate(), dow=now.getDay();
+  var regular=md>=508&&md<=930, weekend=dow===0||dow===6, live;
+  if(regular){live=weekend?["weekend"]:dow===5?[now.getMonth()===5?"june_friday":"friday"]:["weekday"];}
+  else live=[weekend?"weekend_shoulder":"weekday_shoulder"];
+  var showToday=regular?(live):["weekday_shoulder","weekend_shoulder"];
+  var byCode={};CARDS.forEach(function(c){byCode[c.code]=c});
+
+  var dn=["일","월","화","수","목","금","토"][dow];
+  var T=document.getElementById("today");
+  showToday.forEach(function(code){
+    var c=byCode[code], isLive=live.indexOf(code)>=0;
+    var h='<div class="card tcard"><div class="hd"><span class="nm">'+c.name+'</span><span class="pill'+(isLive?' live':'')+'">'+(isLive?'오늘 '+(now.getMonth()+1)+'/'+now.getDate()+' ('+dn+')':(regular?'':'이번 주말'))+'</span></div><div class="prices">';
+    c.bands.forEach(function(b){h+='<div class="pr"><span class="lb">18홀 · '+ko(b[0])+(b[0]==="Open"?'':'부터')+'</span><span class="v">'+$(b[1])+'</span><span class="t">HST 포함 '+$(hst(b[1]))+'</span></div>'});
+    h+='<div class="pr"><span class="lb">9홀 · '+ko(c.nine[1])+'부터</span><span class="v">'+$(c.nine[0])+'</span><span class="t">HST 포함 '+$(hst(c.nine[0]))+'</span></div>';
+    T.insertAdjacentHTML("beforeend",h+'</div><span class="src">'+c.applies+'</span></div>');
+  });
+
+  // 시즌 막대
+  function doy(m,d){return (Date.UTC(y,m-1,d)-Date.UTC(y,0,1))/864e5}
+  var Y=doy(12,31)+1, S=document.getElementById("season");
+  function seg(cls,a,b,label){S.insertAdjacentHTML("beforeend",'<div class="seg '+cls+'" style="left:'+(a/Y*100)+'%;width:'+((b-a)/Y*100)+'%">'+label+'</div>')}
+  seg("of",0,doy(4,26),"비시즌");
+  seg("sh",doy(4,26),doy(5,8),"");
+  seg("rg",doy(5,8),doy(10,1),"정규 시즌");
+  seg("sh",doy(10,1),doy(12,16),"가을 숄더");
+  seg("of",doy(12,16),Y,"");
+  var t=doy(now.getMonth()+1,now.getDate())/Y*100;
+  S.parentNode.insertAdjacentHTML("beforeend",'<div class="now" style="left:'+t+'%;top:16px"></div><div class="nowlb" style="left:'+t+'%;top:0">오늘</div>');
+  document.getElementById("months").innerHTML=["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"].map(function(m){return "<span>"+m+"</span>"}).join("");
+
+  // 눈금
+  var tk="";for(var h=START;h<=END;h+=2){tk+='<span style="left:'+pct(h)+'%">'+(h<12?h+"AM":h===12?"12PM":(h-12)+"PM")+'</span>'}
+  document.getElementById("ticks").innerHTML=tk;
+
+  // 요금표 행
+  var R=document.getElementById("cards");
+  CARDS.forEach(function(c){
+    var h='<div class="card row'+(live.indexOf(c.code)>=0?' live':'')+'"><div class="meta"><b>'+c.name+'</b><small>'+c.applies+'</small></div><div class="bands">';
+    c.bands.forEach(function(b,i){
+      var a=hour(b[0]), e=i+1<c.bands.length?hour(c.bands[i+1][0]):END;
+      h+='<div class="band k'+i+'" style="left:'+pct(a)+'%;width:'+(pct(e)-pct(a))+'%" title="'+ko(b[0])+' · HST 포함 '+$(hst(b[1]))+'">'+$(b[1])+'<small>'+(b[0]==="Open"?"오픈":b[0])+'</small></div>';
+    });
+    var n=pct(hour(c.nine[1]));
+    h+='</div><div class="nine"><span>9홀</span><span class="bar9"><i style="left:'+n+'%"></i></span><b>'+$(c.nine[0])+' · '+ko(c.nine[1])+'부터</b></div></div>';
+    R.insertAdjacentHTML("beforeend",h);
+  });
+
+  document.querySelectorAll("[data-hst]").forEach(function(el){var r=+el.dataset.hst;el.innerHTML=$(r)+' <span class="src">(HST 포함 '+$(hst(r))+')</span>'});
+})();
+</script>
+
+</body></html>

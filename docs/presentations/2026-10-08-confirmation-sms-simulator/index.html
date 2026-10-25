@@ -1,0 +1,573 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>펠햄힐스 확정 문자 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: change board (3 infographic cards) + presenter bar + narration, over a three-lane stage — conversation · system · golfer's phone. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --blue:#2D5E8C; --blue-soft:#E2ECF5; --violet:#5B3FD0; --violet-soft:#ECE7FF;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-line:#2E3F35;
+  --bc-ink:#000000; --bc-bg:#FFFFFF;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --blue:#7AAEDB; --blue-soft:#182A3A; --violet:#AE9BFF; --violet-soft:#261F3D;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-line:#24342B;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mono{font-family:var(--mono)}
+
+.top{display:grid;gap:4px}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--green)}
+.top .lede{color:var(--muted);max-width:76ch;font-size:13.5px}
+
+/* change board */
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.chg{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px;align-content:start;opacity:.55;transition:opacity .3s,border-color .3s,box-shadow .3s}
+.chg.on{opacity:1}
+.chg.pulse{border-color:var(--flag);box-shadow:0 0 0 3px var(--flag-soft)}
+.chg .hd{display:flex;align-items:center;gap:8px}
+.chg .num{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--paper);background:var(--green);border-radius:5px;padding:1px 6px}
+.chg h3{font-size:14.5px;font-weight:700}
+.ba{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center}
+.ba .was,.ba .now{border-radius:8px;padding:6px 9px;font-size:12.5px;min-width:0}
+.ba .was{background:var(--sunk);color:var(--muted);text-decoration:line-through;text-decoration-color:var(--flag)}
+.ba .now{background:var(--green-soft);color:var(--ink);font-weight:600}
+.ba .arr{color:var(--flag);font-weight:700}
+.ba .big{font-family:var(--mono);font-size:17px;letter-spacing:.06em;text-decoration:none;display:block}
+.ba .was .big{text-decoration:line-through;text-decoration-color:var(--flag)}
+.chg small{font-size:11.5px;color:var(--muted)}
+.mini-bc{display:block;height:26px;width:100%;max-width:150px;background:var(--bc-bg);border-radius:3px;padding:3px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip small{font-weight:400;color:var(--muted);font-size:11.5px}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no,.chip[aria-pressed="true"] small{color:var(--paper);opacity:.85}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:118px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--mono);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.elb{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--sand-soft);color:var(--sand);font-family:var(--mono);white-space:nowrap}
+.elb.on{background:var(--violet-soft);color:var(--violet)}
+details.voices{font-size:13px;position:relative}
+details.voices summary{cursor:pointer;list-style:none;color:var(--muted);font-weight:600;padding:6px 8px;border-radius:6px}
+details.voices summary::-webkit-details-marker{display:none}
+details.voices[open] summary{color:var(--ink)}
+.vbox{position:absolute;right:0;z-index:5;width:min(360px,calc(100vw - 32px));display:grid;gap:8px;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.cm{display:grid;grid-template-columns:10px minmax(0,1fr);gap:8px;align-items:start}
+.cm b{font-size:12.5px;display:block}.cm small{font-size:11.5px;color:var(--muted)}
+.cdot{width:10px;height:10px;border-radius:50%;margin-top:4px}
+.up{font-size:12.5px;font-weight:700;color:var(--violet)}
+#fAudio{font-size:12px;max-width:100%}
+.note{font-size:11.5px;color:var(--muted)}
+
+/* narration */
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.cap .stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.55;min-height:1.55em}
+.cap .who{display:block;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+.timer{display:grid;gap:3px;min-width:190px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600;color:var(--term-ink)}
+#tmScen{color:var(--term-key)}
+.prog{height:4px;border-radius:2px;background:var(--term-line);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:18px;height:6px;border-radius:3px;border:0;background:var(--term-line);cursor:pointer;padding:0}
+.dot.k-tool,.dot.k-note{background:#27405A}
+.dot.k-sms,.dot.k-scan{background:#5A3A24}
+.dot.done{background:var(--term-dim)}
+.dot.k-tool.done,.dot.k-note.done{background:#5E8FC0}
+.dot.k-sms.done,.dot.k-scan.done{background:#D08A5A}
+.dot.now{background:var(--term-key)!important;transform:scaleY(1.5)}
+
+/* stage */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.95fr);gap:12px;height:clamp(560px,72vh,760px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.callhead{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border-bottom:1px solid var(--line)}
+.orb{width:54px;height:54px;border-radius:50%;background:var(--sunk);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;gap:3px}
+.orb i{width:3px;height:8px;border-radius:2px;background:var(--muted);display:block}
+.orb[data-who="ai"],.orb[data-who="nr"]{border-color:var(--violet);background:var(--violet-soft)}
+.orb[data-who="ai"] i,.orb[data-who="nr"] i{background:var(--violet);animation:eq .7s ease-in-out infinite}
+.orb[data-who="cu"]{border-color:var(--green);background:var(--green-soft)}
+.orb[data-who="cu"] i{background:var(--green);animation:eq .7s ease-in-out infinite}
+.orb i:nth-child(2){animation-delay:.12s}.orb i:nth-child(3){animation-delay:.24s}.orb i:nth-child(4){animation-delay:.36s}.orb i:nth-child(5){animation-delay:.18s}
+@keyframes eq{0%,100%{height:6px}50%{height:24px}}
+.caller b{display:block;font-size:15px}
+.caller span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cstat{display:grid;justify-items:end;gap:3px}
+.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.live{background:var(--ok-soft);color:var(--ok)}
+.pill.ended{background:var(--flag-soft);color:var(--flag)}
+.pill.text{background:var(--blue-soft);color:var(--blue)}
+.chat{display:grid;gap:8px;padding:14px;align-content:start}
+.msg{max-width:88%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
+.msg small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;margin-bottom:2px;opacity:.8}
+.msg.ai{background:var(--violet-soft);border-top-left-radius:3px}
+.msg.ai small{color:var(--violet)}
+.msg.cu{background:var(--green-soft);justify-self:end;border-top-right-radius:3px}
+.msg.cu small{color:var(--green);text-align:right}
+.msg.sysline{justify-self:center;background:transparent;color:var(--muted);font-size:11.5px;padding:2px 10px;border:1px dashed var(--line);border-radius:999px}
+.msg.speaking{box-shadow:0 0 0 2px var(--violet)}
+.msg.cu.speaking{box-shadow:0 0 0 2px var(--green)}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent.cur{border-color:var(--blue)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.ent .lat{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ok);font-variant-numeric:tabular-nums}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em}
+.tag.tool{background:var(--blue-soft);color:var(--blue)}
+.tag.sms{background:var(--flag-soft);color:var(--flag)}
+.tag.hook{background:var(--violet-soft);color:var(--violet)}
+.tag.note{background:var(--sand-soft);color:var(--sand)}
+.ent .body{padding:6px 10px 9px;font-size:12.5px;color:var(--ink)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.json.req{border-bottom:1px dashed var(--term-line)}
+.json .hl{background:rgba(242,196,139,.18);border-radius:3px;outline:1px solid var(--term-str)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* phone */
+.phone{display:grid;gap:10px;padding:14px;align-content:start}
+.bub{background:var(--sunk);border:1px solid var(--line);border-radius:16px;border-bottom-left-radius:4px;padding:9px 12px;font-size:12.5px;max-width:96%;overflow-wrap:anywhere;display:grid;gap:7px}
+.bub.mine{justify-self:end;background:var(--green-soft);border-color:transparent;border-bottom-left-radius:16px;border-bottom-right-radius:4px}
+.bub .to{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+.bub mark{background:var(--flag-soft);color:var(--ink);border-radius:3px;padding:0 2px;font-weight:700}
+.bub mark.cx{background:var(--blue-soft)}
+.bub.cur{box-shadow:0 0 0 2px var(--flag)}
+.bc{background:var(--bc-bg);border-radius:10px;padding:10px 12px 6px;display:grid;justify-items:center;gap:2px;border:1px solid var(--line)}
+.bc svg{width:100%;max-width:260px;height:70px;display:block}
+.bc span{font-family:var(--mono);font-size:13px;letter-spacing:.3em;color:var(--bc-ink)}
+.mms{font-size:10px;font-weight:800;color:var(--flag);letter-spacing:.06em}
+.scan{border:2px dashed var(--ok);border-radius:12px;padding:12px;display:grid;gap:6px;background:var(--ok-soft)}
+.scan b{font-family:var(--mono);font-size:22px;letter-spacing:.12em;color:var(--ink)}
+.scan small{font-size:11.5px;color:var(--muted)}
+.beam{height:2px;background:var(--flag);border-radius:1px;animation:beam 1.2s ease-in-out 2}
+@keyframes beam{0%,100%{transform:translateY(-30px);opacity:.2}50%{transform:translateY(0);opacity:1}}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:540px}
+  .col.ph{grid-column:1 / -1;height:520px}
+}
+@media (max-width:860px){
+  .board{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:470px}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow">Pelham Hills Golf Club · 예약 확정 문자 업데이트 · 2026-10-08</div>
+    <h1>확정 문자 <b>시뮬레이터</b></h1>
+    <p class="lede">전화로 하든 문자로 하든, 예약이 확정되면 손님은 숫자 확인 번호, 취소 방법, 체크인용 바코드를 문자 하나로 받아요. 여섯 가지 장면을 한 단계씩 틀어 볼게요.</p>
+  </header>
+
+  <section class="board" aria-label="바뀐 점">
+    <article class="chg" id="c1">
+      <div class="hd"><span class="num">1</span><h3>확인 번호는 숫자로</h3></div>
+      <div class="ba"><div class="was"><span class="big">4F2K9Q</span>영문+숫자</div><span class="arr">→</span><div class="now"><span class="big">482915</span>숫자 6자리</div></div>
+      <small>실내 골프는 숫자 10자리. 숫자 자판으로 바로 치고, 전화로 불러 줘도 O/0·I/1이 헷갈리지 않아요.</small>
+    </article>
+    <article class="chg" id="c2">
+      <div class="hd"><span class="num">2</span><h3>취소 방법도 함께</h3></div>
+      <div class="ba"><div class="was">Reply C 4F2K9Q to cancel.</div><span class="arr">→</span><div class="now">reply C 482915 (2시간 전까지) 또는 프로샵 전화</div></div>
+      <small>실내 골프는 24시간 전까지. 예전 코드로 답장해도 그대로 취소돼요.</small>
+    </article>
+    <article class="chg" id="c3">
+      <div class="hd"><span class="num">3</span><h3>확정되면 바코드</h3></div>
+      <div class="ba"><div class="was">글자만 있는 SMS</div><span class="arr">→</span><div class="now"><svg class="mini-bc" id="miniBc" viewBox="0 0 92 20" preserveAspectRatio="none" aria-hidden="true"></svg>바코드 붙은 MMS</div></div>
+      <small>전화 예약, 문자 예약, 대기자 YES, 실내 골프 모두. 바코드에는 확인 번호만 들어 있어요.</small>
+    </article>
+  </section>
+
+  <nav class="scen" id="scen" aria-label="장면"></nav>
+
+  <div class="bar" role="toolbar" aria-label="재생 제어">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" title="이전 단계 (←)" aria-label="이전 단계"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" title="다음 단계 (→)" aria-label="다음 단계"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button">처음부터</button>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl">속도</span>
+    <div class="seg" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.1">1.1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.2">1.2×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tTalk" checked> 대화 음성</label>
+    <label class="tog"><input type="checkbox" id="tNarr" checked> 한국어 해설 음성</label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> 6개 연속 재생</label>
+    <span class="spacer"></span>
+    <span class="elb" id="elBadge">음성 파일 0 / 0</span>
+    <details class="voices">
+      <summary>캐스팅 · 음성 ▾</summary>
+      <div class="vbox">
+        <div class="cm"><span class="cdot" style="background:var(--violet)"></span><div><b>해설 · 직원 · Hope</b><small>ElevenLabs 경쾌한 여성 목소리. 한국어 해설과 상담원 대사를 같은 목소리로 읽어요.</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--green)"></span><div><b>Daniel Kim · Chris</b><small>단골 퍼블릭 골퍼 · 전화 예약·문자 취소·체크인</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--flag)"></span><div><b>Megan Lee · Matilda</b><small>문자로 처음 예약하는 손님</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--sand)"></span><div><b>Connor Walton · Will</b><small>대기 명단 회원 · YES 답장</small></div></div>
+        <div class="cm"><span class="cdot" style="background:var(--flag)"></span><div><b>Olivia Park · Sarah</b><small>실내 골프 예약</small></div></div>
+        <label class="up" for="fAudio">ElevenLabs 음성 파일 불러오기 (audio 폴더 전체 선택)</label>
+        <input type="file" id="fAudio" accept="audio/*,.mp3,.json" multiple>
+        <p class="note" id="elNote">ElevenLabs로 만든 mp3가 있으면 그 목소리로, 없는 문장은 브라우저의 여성 음성으로 밝게 읽어요.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="cap">
+    <span class="stepno" id="stepno">1 / 1</span>
+    <p id="capText" aria-live="polite"></p>
+    <div class="timer" aria-label="진행 시간">
+      <div class="tline"><span class="tl">이 장면</span><span class="tv" id="tmScen">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl">전체 6개</span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-label="대화">
+      <div class="callhead">
+        <div class="orb" id="orb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="caller"><b id="cName"></b><span id="cNum"></span></div>
+        <div class="cstat"><span class="pill" id="cStat">대기</span><span class="lbl" id="cMode"></span></div>
+      </div>
+      <div class="scroll" id="chatWrap"><div class="chat" id="chat"></div></div>
+    </section>
+    <section class="col" aria-label="시스템">
+      <div class="head"><h2>뒤에서 일어나는 일</h2><span class="mono" style="color:var(--muted);font-size:11px">FastAPI · Twilio MMS</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ph" aria-label="손님 휴대폰">
+      <div class="head"><h2>손님 휴대폰</h2><span class="mono" style="color:var(--muted);font-size:11px" id="phNum"></span></div>
+      <div class="scroll" id="phWrap"><div class="phone" id="phone"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>문자 문구와 도구 이름은 실제 코드(voice.py, voice_sim.py, sms.py, waitlist_offers.py)와 같습니다. 이름, 전화번호, 날짜, 확인 번호는 예시이고, 바코드는 각 예시 번호를 실제 Code 128로 그린 것입니다.</p>
+    <p>실내 골프의 10자리 숫자 번호는 Supabase에 0018 마이그레이션을 적용한 뒤부터 나갑니다. 단축키: Space 재생·일시정지, ← → 단계 이동, 1–5 속도.</p>
+  </footer>
+</div>
+
+<script type="application/json" id="deck">
+{
+"phone":"+12498050556",
+"bars":{"482915":"11010011100111011101101110011001010111001100110001011101100011101011","691716":"11010011100101100100001001110011010011101100110001011101100011101011","3817264950":"110100111001000110001010011100110111001001101101000111011000101110101111001001100011101011","275043":"11010011100111011001001100010111010110001110110111000101100011101011"},
+"scenarios":[
+{"ko":"전화 예약","en":"Phone","mode":"call","hl":[1,2,3],"who":{"name":"Daniel Kim","num":"+1 905-562-7189","short":"Daniel"},"steps":[
+ {"k":"ring","n":"자, 전화 예약부터 볼게요! 단골 다니엘 님이 이번 토요일 티타임을 잡으려고 전화했어요."},
+ {"k":"tool","name":"identify_caller","ep":"POST /voice/tools/identify-caller","ms":340,"req":{"caller_number":"+19055627189"},"res":{"known":true,"first_name":"Daniel"}},
+ {"k":"ai","t":"Good morning, Pelham Hills Golf Club! Hi Daniel, what can I do for you today?"},
+ {"k":"cu","t":"Hey! Can I get a tee time this Saturday morning? Two of us, eighteen holes."},
+ {"k":"tool","name":"find_tee_times","ep":"POST /voice/tools/find-tee-times","ms":610,"req":{"date":"2026-10-10","party_size":2,"earliest":"7:30 AM","latest":"9:30 AM"},"res":{"options":["8:01 AM","8:19 AM","9:04 AM"]}},
+ {"k":"ai","t":"Sure thing! I have eight oh one, eight nineteen, or nine oh four. Which one works for you?"},
+ {"k":"cu","t":"Eight oh one sounds great."},
+ {"k":"tool","name":"hold_tee_time","ep":"POST /voice/tools/hold-tee-time","ms":420,"req":{"date":"2026-10-10","time":"8:01 AM","party_size":2},"res":{"hold_id":"hold_7c2e","expires_in":"3:00"}},
+ {"k":"ai","t":"Perfect, I'm holding it for you. Shall I book it under Daniel Kim?"},
+ {"k":"cu","t":"Yes, please."},
+ {"k":"tool","name":"confirm_booking","ep":"POST /voice/tools/confirm-booking","ms":580,"req":{"hold_id":"hold_7c2e","first_name":"Daniel","last_name":"Kim"},"res":{"confirmation_code":"482915","status":"reserved"},"mark":"482915","pulse":1,"n":"확정되는 순간 확인 번호가 나와요. 예전엔 영어랑 숫자가 섞인 코드였는데, 이제는 여섯 자리 숫자예요!"},
+ {"k":"ai","t":"You're all set! Your confirmation number is four, eight, two, nine, one, five. I'm texting it to you now, with how to cancel and a barcode for check-in.","pulse":1,"n":"전화로 불러 줄 때도 숫자만 한 자리씩 읽으니까, 영이랑 오, 일이랑 아이를 헷갈릴 일이 없어요."},
+ {"k":"tool","name":"send_sms","tag":"sms","ep":"Twilio · Messages.json","ms":300,"req":{"To":"+19055627189","MediaUrl":".../sms/barcode/482915.png"},"res":{"status":"queued","num_media":"1"},"mark":"MediaUrl","pulse":3,"n":"확정 문자는 이제 MMS로 나가요. 바코드 그림이 한 장 같이 붙어 있어요."},
+ {"k":"sms","code":"482915","t":"Pelham Hills Golf Club: booked 2 players, Saturday, October 10 at 8:01 AM. Confirmation #482915. To cancel, reply C 482915 (up to 2 hours before your tee time) or call +12498050556. Show this barcode at the pro shop when you check in.","pulse":2,"n":"문자 하나에 확인 번호, 취소하는 방법, 체크인 때 보여 줄 바코드까지 다 들어 있어요. 깔끔하죠?"},
+ {"k":"end","name":"post_call","res":{"outcome":"booked","confirmation":"482915","texted":"MMS + barcode"}}
+]},
+{"ko":"문자 예약","en":"Text","mode":"text","hl":[1,2,3],"who":{"name":"Megan Lee","num":"+1 289-555-3350","short":"Megan"},"steps":[
+ {"k":"ring","n":"이번엔 문자로 예약해요. 메건 님이 클럽 번호로 바로 문자를 보냈어요."},
+ {"k":"cu","t":"Hi! Can I book Sunday around 9 for 3 people?"},
+ {"k":"tool","name":"find_tee_times","ep":"sms_agent → find_tee_times","ms":560,"req":{"date":"2026-10-11","party_size":3,"earliest":"8:30 AM","latest":"9:30 AM"},"res":{"options":["9:04 AM","9:13 AM"]}},
+ {"k":"ai","t":"Hi! Sunday, October 11, I have 9:04 AM or 9:13 AM. Which one would you like, and what's your first and last name?"},
+ {"k":"cu","t":"9:04 please! Megan Lee"},
+ {"k":"tool","name":"book_tee_time","ep":"sms_agent → confirm_booking","ms":650,"req":{"time":"9:04 AM","party_size":3,"first_name":"Megan","last_name":"Lee"},"res":{"confirmation_code":"691716","status":"reserved"},"mark":"691716","pulse":1,"n":"문자 비서도 전화 상담원이랑 똑같은 확정 단계를 거쳐요. 그래서 번호도 똑같이 여섯 자리 숫자예요."},
+ {"k":"ai","t":"Done! You're booked Sunday, October 11 at 9:04 AM for 3 players. Your confirmation text with the barcode is on its way.","n":"비서는 번호를 따로 반복하지 않아요. 확정 문자에 다 들어 있으니까요!"},
+ {"k":"tool","name":"send_sms","tag":"sms","ep":"Twilio · Messages.json","ms":300,"req":{"To":"+12895553350","MediaUrl":".../sms/barcode/691716.png"},"res":{"status":"queued","num_media":"1"},"mark":"MediaUrl","pulse":3},
+ {"k":"sms","code":"691716","t":"Pelham Hills Golf Club: booked 3 players, Sunday, October 11 at 9:04 AM. Confirmation #691716. To cancel, reply C 691716 (up to 2 hours before your tee time) or call +12498050556. Show this barcode at the pro shop when you check in.","pulse":3,"n":"전화로 하든 문자로 하든, 손님이 받는 확정 문자는 똑같은 모양이에요."}
+]},
+{"ko":"문자로 취소","en":"Cancel","mode":"text","hl":[1,2],"who":{"name":"Daniel Kim","num":"+1 905-562-7189","short":"Daniel"},"steps":[
+ {"k":"ring","n":"토요일에 일이 생겼대요. 다니엘 님은 확정 문자에 적힌 대로 답장만 하면 돼요."},
+ {"k":"cu","t":"C 482915","pulse":2},
+ {"k":"tool","name":"cancel_by_reply","ep":"POST /sms/inbound","ms":380,"req":{"From":"+19055627189","Body":"C 482915"},"res":{"phone_match":true,"code_match":true,"status":"cancelled"},"mark":"phone_match","n":"번호만 맞아서는 안 되고, 보낸 사람 전화번호까지 맞아야 취소돼요. 다른 사람이 번호를 알아도 남의 예약은 못 지워요."},
+ {"k":"sms","t":"Pelham Hills: cancelled your tee time, Saturday, October 10 at 8:01 AM. Hope to see you soon."},
+ {"k":"tool","name":"waitlist_offers.run","tag":"hook","ep":"취소 직후","ms":260,"req":{"slot":"Sat 8:01 AM","players":2},"res":{"offered_to":"+1 905-***-2214","held_for":"15 min"},"n":"비워진 자리는 바로 대기 명단 첫 번째 손님한테 제안이 가요."},
+ {"k":"note","name":"옛 코드도 그대로","res":{"Body":"C 4F2K9Q","result":"cancelled (legacy code)"},"pulse":2,"n":"참, 예전 영문 코드를 받은 손님도 걱정 없어요. 그 코드로 답장해도 그대로 취소돼요."},
+ {"k":"note","name":"티오프 2시간 전부터","res":{"rule":"no cancel by text within 2 hours","reply":"the pro shop has to cancel it"},"n":"티오프 두 시간 전부터는 문자로는 취소가 안 되고, 프로샵으로 안내해 드려요."}
+]},
+{"ko":"대기자 YES","en":"Waitlist","mode":"text","hl":[1,2,3],"who":{"name":"Connor Walton","num":"+1 905-***-2214","short":"Connor"},"steps":[
+ {"k":"ring","n":"토요일 여덟 시 일 분이 비었어요! 대기 명단에 있던 코너 님에게 제안 문자가 가요."},
+ {"k":"sms","t":"Pelham Hills Golf Club: a tee time opened on Saturday, October 10 at 8:01 AM for 2 players. We're holding it for you for 15 minutes. Reply YES to book it, or NO to pass."},
+ {"k":"cu","t":"YES"},
+ {"k":"tool","name":"waitlist_offers.handle_reply","ep":"POST /sms/inbound","ms":520,"req":{"From":"+1905•••2214","Body":"YES"},"res":{"status":"booked","confirmation_code":"275043"},"mark":"275043","pulse":1},
+ {"k":"tool","name":"TwiML reply","tag":"sms","ep":"<Message><Body>…</Body><Media>…</Media>","ms":120,"req":{"Body":"Pelham Hills Golf Club: booked 2 players…"},"res":{"Media":".../sms/barcode/275043.png"},"mark":"Media","pulse":3,"n":"예스 한 마디면 끝! 답장으로 돌려주는 문자가 바로 확정 문자고, 여기에도 바코드가 붙어요."},
+ {"k":"sms","code":"275043","t":"Pelham Hills Golf Club: booked 2 players, Saturday, October 10 at 8:01 AM. Confirmation #275043. To cancel, reply C 275043 (up to 2 hours before your tee time) or call +12498050556. Show this barcode at the pro shop when you check in.","pulse":3}
+]},
+{"ko":"실내 골프","en":"Simulator","mode":"call","hl":[1,2,3],"who":{"name":"Olivia Park","num":"+1 905-***-6632","short":"Olivia"},"steps":[
+ {"k":"ring","n":"실내 골프 시뮬레이터 예약도 똑같이 바뀌었어요. 다만 번호가 열 자리예요."},
+ {"k":"ai","t":"Good evening, Pelham Hills Golf Club! How can I help you?"},
+ {"k":"cu","t":"Hi, can I book a simulator bay Wednesday at six PM for two hours? Two players."},
+ {"k":"tool","name":"find_sim_times","ep":"POST /voice/tools/find-sim-times","ms":540,"req":{"date":"2026-10-14","duration_hours":2},"res":{"available":["6:00 PM","6:15 PM","6:30 PM"]}},
+ {"k":"ai","t":"Six PM is open! Can I get your first and last name?"},
+ {"k":"cu","t":"Olivia Park."},
+ {"k":"tool","name":"book_sim_bay","ep":"POST /voice/tools/book-sim-bay","ms":620,"req":{"date":"2026-10-14","time":"6:00 PM","duration_hours":2,"players":2},"res":{"bay_number":2,"confirmation_code":"3817264950"},"mark":"3817264950","pulse":1,"n":"실내 골프 번호는 열 자리 숫자예요. 티타임 여섯 자리랑 길이로 구분돼요."},
+ {"k":"ai","t":"You're booked in Bay 2, Wednesday at six PM for two hours. Your confirmation number is three eight one, seven two six, four nine five zero."},
+ {"k":"tool","name":"send_sms","tag":"sms","ep":"Twilio · Messages.json","ms":300,"req":{"MediaUrl":".../sms/barcode/3817264950.png"},"res":{"status":"queued","num_media":"1"},"mark":"MediaUrl","pulse":3},
+ {"k":"sms","code":"3817264950","t":"Pelham Hills Golf Club: simulator bay booked, Wednesday, October 14 at 6:00 PM for 2 hours. Confirmation #3817264950. To cancel, reply C 3817264950 (up to 24 hours before) or call +12498050556. Show this barcode at the front desk when you check in.","pulse":2,"n":"실내 골프는 스물네 시간 전까지 취소할 수 있다고 문자에 같이 적혀요."},
+ {"k":"note","name":"Supabase 0018 적용 후","res":{"before":"hex code, no barcode","after":"10-digit number + barcode"},"n":"이 열 자리 숫자 번호는 수파베이스에 공공일팔 마이그레이션을 적용하면 시작돼요. 그 전에는 예전 코드로 나가고, 바코드는 붙지 않아요."}
+]},
+{"ko":"체크인","en":"Check-in","mode":"desk","hl":[3],"who":{"name":"Daniel Kim","num":"프로샵 카운터","short":"Daniel"},"steps":[
+ {"k":"ring","n":"마지막은 체크인이에요! 다니엘 님이 프로샵에서 휴대폰 바코드를 내밀어요."},
+ {"k":"sms","code":"482915","t":"Pelham Hills Golf Club: booked 2 players, Saturday, October 10 at 8:01 AM. Confirmation #482915. To cancel, reply C 482915 (up to 2 hours before your tee time) or call +12498050556. Show this barcode at the pro shop when you check in.","n":"확정 문자에 붙어 온 바로 그 바코드예요."},
+ {"k":"scan","code":"482915","pulse":3,"n":"스캐너로 찍으면 확인 번호 여섯 자리가 그대로 입력돼요. 불러 주고 받아 적을 필요가 없어요."},
+ {"k":"tool","name":"barcode_png","ep":"GET /sms/barcode/482915.png","ms":40,"req":{"code":"482915"},"res":{"content_type":"image/png","encodes":"482915","personal_info":"none"},"mark":"personal_info","n":"바코드에는 확인 번호만 들어 있어요. 이름도 전화번호도 없어서 안심이에요."},
+ {"k":"end","name":"정리","res":{"1":"숫자 확인 번호","2":"취소 방법 안내","3":"바코드 MMS"},"n":"정리하면, 숫자 확인 번호, 친절한 취소 안내, 그리고 바코드! 전화든 문자든 예약이 확정되면 모두 한 번에 받아요."}
+]}
+]
+}
+</script>
+
+<script>
+(function(){
+"use strict";
+const D=JSON.parse(document.getElementById("deck").textContent);
+const S=D.scenarios;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const clipId=(si,j,narr)=>"s"+pad(si+1)+"-"+pad(j+1)+(narr?"-n":"");
+
+/* ---------- barcode ---------- */
+function barSvg(code,h){
+  const m=D.bars[code]; if(!m) return "";
+  const q=10, w=m.length+q*2; let r="";
+  for(let i=0;i<m.length;){ if(m[i]==="1"){let j=i;while(m[j]==="1")j++; r+='<rect x="'+(i+q)+'" y="0" width="'+(j-i)+'" height="'+h+'"/>'; i=j;} else i++; }
+  return '<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" role="img" aria-label="바코드 '+code+'"><rect width="'+w+'" height="'+h+'" style="fill:var(--bc-bg)"/><g style="fill:var(--bc-ink)">'+r+'</g></svg>';
+}
+(function(){ const m=D.bars["482915"]; let r=""; for(let i=0;i<m.length;i++) if(m[i]==="1") r+='<rect x="'+(i+12)+'" y="0" width="1" height="20"/>'; $("miniBc").setAttribute("viewBox","0 0 "+(m.length+24)+" 20"); $("miniBc").innerHTML='<g style="fill:var(--bc-ink)">'+r+'</g>'; })();
+
+/* ---------- audio ---------- */
+const CLIPS=new Map(), DUR=new Map();
+let total=0; S.forEach((s,si)=>s.steps.forEach((st,j)=>{ if(st.k==="ai"||st.k==="cu") total++; if(st.n) total++; }));
+function badge(){ const b=$("elBadge"); b.textContent="음성 파일 "+CLIPS.size+" / "+total; b.classList.toggle("on",CLIPS.size>0); }
+function probe(id,url){ const a=new Audio(); a.preload="metadata"; a.src=url; a.addEventListener("loadedmetadata",()=>{ if(isFinite(a.duration)){DUR.set(id,a.duration); timers();} }); }
+(async function(){ try{ const r=await fetch("audio/manifest.json"); if(r.ok){ const m=await r.json(); (m.clips||[]).forEach(c=>{CLIPS.set(c.id,"audio/"+c.file); probe(c.id,"audio/"+c.file);}); } }catch(e){} badge(); timers(); })();
+$("fAudio").addEventListener("change",e=>{ [...e.target.files].forEach(f=>{ const id=f.name.replace(/\.mp3$/i,""); if(/^s\d\d-\d\d(-n)?$/.test(id)){ const u=URL.createObjectURL(f); CLIPS.set(id,u); probe(id,u);} }); badge(); timers(); $("elNote").textContent="불러온 음성 파일 "+CLIPS.size+"개로 재생해요."; });
+
+let VOICES=[];
+function loadVoices(){ try{ VOICES=speechSynthesis.getVoices()||[]; }catch(e){ VOICES=[]; } }
+if("speechSynthesis" in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+const FEMALE=/female|samantha|yuna|sora|ava|allison|susan|victoria|karen|moira|tessa|serena|zira|jenny|aria|google us english|google 한국의|sunhi|heami|seoyeon|nara|joanna|salli|kendra|kimberly|ivy/i;
+const MALE=/male|daniel|alex|fred|tom|aaron|arthur|guy|david|mark|james|oliver|google uk english male|injoon|minsang/i;
+function pick(lang,female){
+  const pool=VOICES.filter(v=>v.lang&&v.lang.toLowerCase().startsWith(lang));
+  if(!pool.length) return null;
+  const want=pool.filter(v=>female?FEMALE.test(v.name)&&!/\bmale\b/i.test(v.name):MALE.test(v.name)&&!/female/i.test(v.name));
+  return (want[0]||pool[0]);
+}
+
+let speed=1, token=0, curAudio=null;
+function stopAudio(){ if(curAudio){ curAudio.pause(); curAudio=null; } try{ speechSynthesis.cancel(); }catch(e){} }
+function say(id,text,role,my){
+  return new Promise(res=>{
+    if(my!==token) return res();
+    const url=CLIPS.get(id);
+    if(url){ const a=new Audio(url); a.playbackRate=speed; curAudio=a; a.onended=a.onerror=()=>res(); a.play().catch(()=>res()); return; }
+    if(!("speechSynthesis" in window)) return setTimeout(res,est(text,role)*1000/speed);
+    const u=new SpeechSynthesisUtterance(text);
+    const ko=role==="nr"; u.lang=ko?"ko-KR":"en-US";
+    const v=pick(ko?"ko":"en",role!=="cu"); if(v) u.voice=v;
+    u.rate=Math.min(2,(ko?1.08:1.04)*speed); u.pitch=role==="cu"?0.9:1.2;
+    let done=false; const fin=()=>{ if(!done){done=true;res();} };
+    u.onend=fin; u.onerror=fin; setTimeout(fin,(est(text,role)*1.8+3)*1000/speed);
+    speechSynthesis.speak(u);
+  });
+}
+const wait=(ms,my)=>new Promise(r=>setTimeout(r,ms/speed));
+function est(t,role){ return role==="nr"? t.length/7.5+.4 : t.length/15+.4; }
+
+/* ---------- durations ---------- */
+function stepDur(si,j){
+  const st=S[si].steps[j]; let d=0;
+  if((st.k==="ai"||st.k==="cu")&&$("tTalk").checked) d+=DUR.get(clipId(si,j))||est(st.t,"en");
+  if(st.n&&$("tNarr").checked) d+=DUR.get(clipId(si,j,1))||est(st.n,"nr");
+  d+=base(st)/1000; return d/speed;
+}
+function base(st){ return st.k==="tool"?Math.max(700,st.ms+400):st.k==="sms"?1300:st.k==="ring"?900:st.k==="scan"?1600:st.k==="note"?1100:st.k==="end"?900:350; }
+const scenDur=si=>S[si].steps.reduce((a,_,j)=>a+stepDur(si,j),0);
+const fmt=s=>{ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+":"+pad(s%60); };
+function timers(){
+  const all=S.reduce((a,_,i)=>a+scenDur(i),0);
+  let doneScen=0; for(let j=0;j<step;j++) doneScen+=stepDur(SC,j);
+  let before=0; for(let i=0;i<SC;i++) before+=scenDur(i);
+  $("tmScen").textContent=fmt(doneScen)+" / "+fmt(scenDur(SC));
+  $("tmAll").textContent=fmt(before+doneScen)+" / "+fmt(all);
+  $("tmBar").style.width=(all?((before+doneScen)/all*100):0)+"%";
+}
+
+/* ---------- rendering ---------- */
+let SC=0, step=0, playing=false;
+function json(o,mark){
+  return esc(JSON.stringify(o,null,1)).replace(/&quot;([^&]+?)&quot;:/g,(m,k)=>'<span class="k'+(mark&&k===mark?' hl':'')+'">"'+k+'"</span>:')
+    .replace(/: &quot;(.*?)&quot;/g,(m,v)=>': <span class="s'+(mark&&v.indexOf(mark)>=0?' hl':'')+'">"'+v+'"</span>')
+    .replace(/[{}\[\]]/g,c=>'<span class="d">'+c+'</span>');
+}
+function markSms(t){
+  return esc(t).replace(/Confirmation #(\d+)/,'Confirmation #<mark>$1</mark>').replace(/To cancel, reply C \w+ \([^)]*\)/,'<mark class="cx">$&</mark>');
+}
+function render(){
+  const sc=S[SC], who=sc.who;
+  [...$("scen").children].forEach((c,i)=>c.setAttribute("aria-pressed",i===SC));
+  [1,2,3].forEach(n=>$("c"+n).classList.toggle("on",sc.hl.includes(n)));
+  const cur=sc.steps[step];
+  [1,2,3].forEach(n=>$("c"+n).classList.toggle("pulse",!!(cur&&cur.pulse===n)));
+  $("cName").textContent=who.name; $("cNum").textContent=who.num;
+  $("phNum").textContent=sc.mode==="desk"?"Daniel Kim":who.num;
+  $("cMode").textContent=sc.mode==="call"?"음성 통화":sc.mode==="text"?"문자":"체크인";
+  const ended=sc.steps.slice(0,step+1).some(s=>s.k==="end");
+  const st=$("cStat");
+  st.className="pill "+(ended?"ended":sc.mode==="text"?"text":"live");
+  st.textContent=ended?"종료":sc.mode==="call"?"통화 중":sc.mode==="text"?"문자 대화":"카운터";
+
+  let chat="",log="",ph="";
+  sc.steps.slice(0,step+1).forEach((s,j)=>{
+    const isCur=j===step, nw=isCur?" new":"";
+    if(s.k==="ring") chat+='<div class="msg sysline'+nw+'">'+(sc.mode==="call"?"전화 연결 · Twilio → AI 상담원":sc.mode==="text"?"문자 스레드 · 클럽 번호":"프로샵 카운터")+'</div>';
+    if(s.k==="ai"||s.k==="cu") chat+='<div class="msg '+s.k+nw+(isCur&&playing?' speaking':'')+'"><small>'+(s.k==="ai"?(sc.mode==="text"?"문자 비서":"직원 · Hope"):esc(who.short)+" · 손님")+'</small>'+esc(s.t)+'</div>';
+    if(s.k==="end") chat+='<div class="msg sysline'+nw+'">'+(sc.mode==="desk"?"체크인 완료":"대화 종료")+'</div>';
+    if(s.k==="tool"||s.k==="end"||s.k==="note"){
+      const tg=s.k==="note"?"note":s.k==="end"?"hook":(s.tag||"tool");
+      const tl={tool:"TOOL",sms:"SMS",hook:s.k==="end"?"END":"HOOK",note:"참고"}[tg];
+      log+='<div class="ent'+nw+(isCur?' cur':'')+'"><div class="eh"><span class="tag '+tg+'">'+tl+'</span><span class="tn">'+esc(s.name)+'</span>'+(s.ep?'<span class="ep">'+esc(s.ep)+'</span>':'')+(s.ms?'<span class="lat">'+s.ms+' ms</span>':'')+'</div>'+
+        (s.req?'<div class="json req">'+json(s.req,s.mark)+'</div>':'')+(s.res?'<div class="json">'+json(s.res,s.mark)+'</div>':'')+'</div>';
+    }
+    if(s.k==="sms"){
+      ph+='<div class="bub'+nw+(isCur?' cur':'')+'"><div class="to"><span>Pelham Hills</span>'+(s.code?'<span class="mms">MMS</span>':'<span>SMS</span>')+'</div><div>'+markSms(s.t)+'</div>'+(s.code?'<div class="bc">'+barSvg(s.code,60)+'<span>'+s.code+'</span></div>':'')+'</div>';
+    }
+    if(s.k==="cu"&&sc.mode==="text") ph+='<div class="bub mine'+nw+'"><div>'+esc(s.t)+'</div></div>';
+    if(s.k==="scan") ph+='<div class="scan'+nw+'"><div class="beam"></div><small>스캐너 입력</small><b>'+s.code+'</b><small>확인 번호가 그대로 입력됐어요</small></div>';
+  });
+  $("chat").innerHTML=chat||'<div class="empty">재생을 누르면 시작해요</div>';
+  $("log").innerHTML=log||'<div class="empty">아직 호출이 없어요</div>';
+  $("phone").innerHTML=ph||'<div class="empty">아직 받은 문자가 없어요</div>';
+  ["chatWrap","logWrap","phWrap"].forEach(id=>{ const el=$(id); el.scrollTop=el.scrollHeight; });
+
+  $("stepno").textContent=(step+1)+" / "+sc.steps.length;
+  const cap=cur.n?cur.n:(cur.k==="ai"||cur.k==="cu")?cur.t:cur.k==="tool"?cur.name+" 호출":cur.k==="sms"?"손님 휴대폰에 문자가 도착했어요":"";
+  const whoLbl=cur.n?"해설":(cur.k==="ai"?(sc.mode==="text"?"문자 비서":"직원"):cur.k==="cu"?"손님":"시스템");
+  $("capText").innerHTML='<span class="who">'+whoLbl+'</span>'+esc(cap);
+  $("dots").innerHTML=sc.steps.map((s,j)=>'<button type="button" class="dot k-'+s.k+(j<step?' done':'')+(j===step?' now':'')+'" data-j="'+j+'" aria-label="'+(j+1)+'단계"></button>').join("");
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>일시정지':'<svg viewBox="0 0 16 16"><path d="M3 2v12l11-6z"/></svg>재생';
+  timers();
+}
+function orb(who){ const o=$("orb"); if(who) o.dataset.who=who; else delete o.dataset.who; }
+
+/* ---------- playback ---------- */
+async function runStep(my){
+  const sc=S[SC], st=sc.steps[step];
+  render();
+  if((st.k==="ai"||st.k==="cu")&&$("tTalk").checked){ orb(st.k); await say(clipId(SC,step),st.t,st.k,my); }
+  if(my!==token) return;
+  if(st.n&&$("tNarr").checked){ orb("nr"); $("capText").innerHTML='<span class="who">해설</span>'+esc(st.n); await say(clipId(SC,step,1),st.ns||st.n,"nr",my); }
+  orb(null);
+  if(my!==token) return;
+  await wait(base(st),my);
+}
+async function loop(){
+  const my=++token; playing=true; render();
+  while(my===token){
+    await runStep(my);
+    if(my!==token) return;
+    if(step<S[SC].steps.length-1) step++;
+    else if($("tAll").checked&&SC<S.length-1){ SC++; step=0; }
+    else { playing=false; token++; render(); return; }
+  }
+}
+function pause(){ token++; playing=false; stopAudio(); orb(null); render(); }
+function go(si,j){ const was=playing; token++; stopAudio(); SC=si; step=Math.max(0,Math.min(j,S[si].steps.length-1)); playing=false; render(); if(was) loop(); }
+
+$("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" data-i="'+i+'"><span class="no">'+pad(i+1)+'</span>'+esc(s.ko)+'<small>'+esc(s.en)+'</small></button>').join("");
+$("scen").addEventListener("click",e=>{ const b=e.target.closest(".chip"); if(b) go(+b.dataset.i,0); });
+$("dots").addEventListener("click",e=>{ const b=e.target.closest(".dot"); if(b) go(SC,+b.dataset.j); });
+$("bPlay").addEventListener("click",()=>playing?pause():loop());
+$("bPrev").addEventListener("click",()=>{ if(step>0) go(SC,step-1); else if(SC>0) go(SC-1,S[SC-1].steps.length-1); });
+$("bNext").addEventListener("click",()=>{ if(step<S[SC].steps.length-1) go(SC,step+1); else if(SC<S.length-1) go(SC+1,0); });
+$("bRestart").addEventListener("click",()=>go(0,0));
+$("speed").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; speed=+b.dataset.v; [...$("speed").children].forEach(x=>x.setAttribute("aria-checked",x===b)); if(curAudio) curAudio.playbackRate=speed; timers(); });
+["tTalk","tNarr"].forEach(id=>$(id).addEventListener("change",timers));
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea,summary")) return;
+  if(e.key===" "){ e.preventDefault(); playing?pause():loop(); }
+  else if(e.key==="ArrowRight") $("bNext").click();
+  else if(e.key==="ArrowLeft") $("bPrev").click();
+  else if(/^[1-5]$/.test(e.key)) $("speed").children[+e.key-1].click();
+});
+render();
+})();
+</script>
+
+</body></html>

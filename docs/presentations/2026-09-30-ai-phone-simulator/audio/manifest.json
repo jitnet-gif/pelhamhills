@@ -1,0 +1,630 @@
+{
+ "cast": {
+  "agent": "elevenlabs:Hope",
+  "narrator": "elevenlabs:Hope",
+  "daniel": "elevenlabs:Chris",
+  "jason": "elevenlabs:Liam",
+  "connor": "elevenlabs:Will",
+  "ryan": "elevenlabs:Eric",
+  "megan": "elevenlabs:Matilda",
+  "olivia": "elevenlabs:Sarah"
+ },
+ "char_pitch": false,
+ "clips": [
+  {
+   "id": "s01-01-n",
+   "file": "s01-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-02-n",
+   "file": "s01-02-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-03",
+   "file": "s01-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-04",
+   "file": "s01-04.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s01-05",
+   "file": "s01-05.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-06",
+   "file": "s01-06.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s01-07",
+   "file": "s01-07.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-08",
+   "file": "s01-08.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s01-09",
+   "file": "s01-09.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-09-n",
+   "file": "s01-09-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-10-n",
+   "file": "s01-10-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-11",
+   "file": "s01-11.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-12",
+   "file": "s01-12.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s01-13-n",
+   "file": "s01-13-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-14",
+   "file": "s01-14.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-15",
+   "file": "s01-15.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s01-16",
+   "file": "s01-16.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-17",
+   "file": "s01-17.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s01-18-n",
+   "file": "s01-18-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-19-n",
+   "file": "s01-19-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-20-n",
+   "file": "s01-20-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s01-21",
+   "file": "s01-21.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-22",
+   "file": "s01-22.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s01-23",
+   "file": "s01-23.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s01-24-n",
+   "file": "s01-24-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s02-01-n",
+   "file": "s02-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s02-02-n",
+   "file": "s02-02-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s02-03",
+   "file": "s02-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s02-04",
+   "file": "s02-04.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s02-06",
+   "file": "s02-06.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s02-07",
+   "file": "s02-07.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s02-08-n",
+   "file": "s02-08-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s02-09",
+   "file": "s02-09.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s02-10",
+   "file": "s02-10.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s02-11-n",
+   "file": "s02-11-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s02-13-n",
+   "file": "s02-13-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s02-15",
+   "file": "s02-15.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s02-16",
+   "file": "s02-16.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s02-17",
+   "file": "s02-17.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s03-01-n",
+   "file": "s03-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s03-03",
+   "file": "s03-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s03-04",
+   "file": "s03-04.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s03-05-n",
+   "file": "s03-05-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s03-06",
+   "file": "s03-06.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s03-07",
+   "file": "s03-07.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s03-08-n",
+   "file": "s03-08-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s03-09",
+   "file": "s03-09.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s03-12",
+   "file": "s03-12.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s03-13",
+   "file": "s03-13.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s04-01-n",
+   "file": "s04-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s04-03",
+   "file": "s04-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s04-04",
+   "file": "s04-04.mp3",
+   "role": "megan"
+  },
+  {
+   "id": "s04-05-n",
+   "file": "s04-05-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s04-06",
+   "file": "s04-06.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s04-07",
+   "file": "s04-07.mp3",
+   "role": "megan"
+  },
+  {
+   "id": "s04-09",
+   "file": "s04-09.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s04-10",
+   "file": "s04-10.mp3",
+   "role": "megan"
+  },
+  {
+   "id": "s04-11",
+   "file": "s04-11.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s05-01-n",
+   "file": "s05-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s05-02-n",
+   "file": "s05-02-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s05-03",
+   "file": "s05-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s05-04",
+   "file": "s05-04.mp3",
+   "role": "connor"
+  },
+  {
+   "id": "s05-05",
+   "file": "s05-05.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s05-06",
+   "file": "s05-06.mp3",
+   "role": "connor"
+  },
+  {
+   "id": "s05-07",
+   "file": "s05-07.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s05-08",
+   "file": "s05-08.mp3",
+   "role": "connor"
+  },
+  {
+   "id": "s05-09-n",
+   "file": "s05-09-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s05-10",
+   "file": "s05-10.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s05-12",
+   "file": "s05-12.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s05-13",
+   "file": "s05-13.mp3",
+   "role": "connor"
+  },
+  {
+   "id": "s05-14",
+   "file": "s05-14.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s05-16-n",
+   "file": "s05-16-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s06-01-n",
+   "file": "s06-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s06-03",
+   "file": "s06-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s06-04",
+   "file": "s06-04.mp3",
+   "role": "jason"
+  },
+  {
+   "id": "s06-05-n",
+   "file": "s06-05-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s06-06",
+   "file": "s06-06.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s06-07",
+   "file": "s06-07.mp3",
+   "role": "jason"
+  },
+  {
+   "id": "s06-08-n",
+   "file": "s06-08-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s06-09",
+   "file": "s06-09.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s06-10",
+   "file": "s06-10.mp3",
+   "role": "jason"
+  },
+  {
+   "id": "s06-11",
+   "file": "s06-11.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s07-01-n",
+   "file": "s07-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s07-03",
+   "file": "s07-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s07-04",
+   "file": "s07-04.mp3",
+   "role": "olivia"
+  },
+  {
+   "id": "s07-06",
+   "file": "s07-06.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s07-07",
+   "file": "s07-07.mp3",
+   "role": "olivia"
+  },
+  {
+   "id": "s07-08-n",
+   "file": "s07-08-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s07-09",
+   "file": "s07-09.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s07-10",
+   "file": "s07-10.mp3",
+   "role": "olivia"
+  },
+  {
+   "id": "s07-11",
+   "file": "s07-11.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s07-12",
+   "file": "s07-12.mp3",
+   "role": "olivia"
+  },
+  {
+   "id": "s07-13",
+   "file": "s07-13.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s08-01-n",
+   "file": "s08-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s08-03",
+   "file": "s08-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s08-04",
+   "file": "s08-04.mp3",
+   "role": "ryan"
+  },
+  {
+   "id": "s08-05-n",
+   "file": "s08-05-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s08-06",
+   "file": "s08-06.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s08-07",
+   "file": "s08-07.mp3",
+   "role": "ryan"
+  },
+  {
+   "id": "s08-10",
+   "file": "s08-10.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s08-11",
+   "file": "s08-11.mp3",
+   "role": "ryan"
+  },
+  {
+   "id": "s08-12",
+   "file": "s08-12.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s08-13-n",
+   "file": "s08-13-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s09-01-n",
+   "file": "s09-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s09-03",
+   "file": "s09-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s09-04",
+   "file": "s09-04.mp3",
+   "role": "megan"
+  },
+  {
+   "id": "s09-06",
+   "file": "s09-06.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s09-07",
+   "file": "s09-07.mp3",
+   "role": "megan"
+  },
+  {
+   "id": "s09-08-n",
+   "file": "s09-08-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s09-10",
+   "file": "s09-10.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s10-01-n",
+   "file": "s10-01-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s10-02-n",
+   "file": "s10-02-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s10-03",
+   "file": "s10-03.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s10-04",
+   "file": "s10-04.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s10-05",
+   "file": "s10-05.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s10-06",
+   "file": "s10-06.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s10-07-n",
+   "file": "s10-07-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s10-08",
+   "file": "s10-08.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s10-09",
+   "file": "s10-09.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s10-10-n",
+   "file": "s10-10-n.mp3",
+   "role": "narrator"
+  },
+  {
+   "id": "s10-11",
+   "file": "s10-11.mp3",
+   "role": "agent"
+  },
+  {
+   "id": "s10-13",
+   "file": "s10-13.mp3",
+   "role": "daniel"
+  },
+  {
+   "id": "s10-15-n",
+   "file": "s10-15-n.mp3",
+   "role": "narrator"
+  }
+ ]
+}

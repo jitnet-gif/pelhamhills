@@ -1,0 +1,771 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone Booking Failures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* Pro shop admin mock — keeps a light look in both themes */
+.ad{--ai:#1F2328;--am:#6B7280;--al:#D4D4D8;--as:#F2F2F4;--av:#4533FF;background:#F2F2F4;color:var(--ai);border:1px solid var(--al);border-radius:10px;overflow:hidden;font-size:12px}
+.ad .urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#E4E4E8;border-bottom:1px solid var(--al);font-family:var(--mono);font-size:10.5px;color:var(--am);min-width:0}
+.ad .urlbar i{width:8px;height:8px;border-radius:50%;background:#C9CDD2;flex:none}
+.ad .urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#111315;color:#fff;padding:7px 12px;font-size:12px;font-weight:700}
+.adbar small{color:rgba(255,255,255,.6);font-weight:500;font-size:10.5px}
+.adbody{padding:10px;display:grid;gap:8px;min-width:0}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chips span{border:1px solid var(--al);background:#fff;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap}
+.chips span.on{background:#111315;color:#fff;border-color:#111315}
+.box{background:#fff;border:1px solid var(--al);padding:10px;display:grid;gap:6px;min-width:0}
+.box h5{margin:0;font-size:13px}
+.box p{margin:0;color:var(--am);font-size:11px;line-height:1.5}
+.eyeb{font-size:9.5px;font-weight:800;letter-spacing:.12em;color:var(--am);text-transform:uppercase}
+.pw{height:34px;border:1px solid var(--al);display:flex;align-items:center;padding:0 10px;font-family:var(--mono);letter-spacing:.2em;font-size:13px}
+.btnp{background:var(--av);color:#fff;text-align:center;font-weight:800;padding:8px}
+.errn{border:1px solid #F0B4B4;background:#FDF0F0;color:#8A1F1F;padding:6px 8px;font-size:11px}
+.cc{background:#fff;border:1px solid var(--al);min-width:0}
+.cch{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;border-bottom:1px solid #ECECF0;padding:6px 8px;font-size:11px}
+.cch .t{margin-left:auto;color:var(--am);font-variant-numeric:tabular-nums}
+.cch .by{width:100%;color:var(--am);font-size:10.5px}
+.op{font-size:10px;font-weight:800;padding:1px 6px}
+.op.ins{background:#E3F4E8;color:#1F6B3A}.op.upd{background:#FFF1CC;color:#8A5A00}.op.del{background:#FDE2E2;color:#8A1F1F}
+.ccb{padding:6px 8px;display:grid;gap:5px}
+.hist{margin:0;padding:0;list-style:none;font-size:11px}
+.dt{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}
+.dt th{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--am);text-align:left;padding:3px 4px;border-bottom:1px solid #ECECF0}
+.dt td{padding:3px 4px;border-bottom:1px solid #F2F2F4;vertical-align:top;word-break:break-all}
+.dt td.f{font-family:var(--mono);font-size:9.5px;color:#3F434A}
+.dt td.b{color:#8A1F1F}.dt td.b s{text-decoration-thickness:1px}.dt td.a{color:#1F6B3A}
+.dt tr.hot td{background:#FFF6DD}
+.hot{outline:2.5px solid #F2A33A;outline-offset:2px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(242,163,58,.25)}}
+.tee{background:#fff;border:1px solid var(--al);padding:8px;display:grid;gap:4px}
+.tee .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}
+.tee .pl{display:flex;gap:4px;flex-wrap:wrap}
+.tee .pl span{border:1px solid var(--al);padding:2px 6px;font-weight:700;font-size:11px}
+.tee .pl span.gone{opacity:.35;text-decoration:line-through}
+.tee .hl{border-top:1px dashed var(--al);padding-top:4px;font-size:10.5px;color:var(--am)}
+.vanish{opacity:.25;filter:grayscale(1)}
+.xmark{color:#B42318;font-weight:800;font-size:12px}
+.flow{display:grid;gap:6px}
+.fstep{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--al);padding:7px 9px;font-size:11.5px}
+.fstep b{font-family:var(--mono);font-size:10.5px}
+.fstep .n{flex:none;width:20px;height:20px;border-radius:50%;background:#111315;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800}
+.fstep.on{border-color:var(--av);box-shadow:0 0 0 2px rgba(69,51,255,.15)}
+.tbls{display:flex;flex-wrap:wrap;gap:4px}
+.tbls span{font-family:var(--mono);font-size:9.5px;background:#fff;border:1px solid var(--al);padding:2px 5px}
+.tbls span.on{background:#E3F4E8;border-color:#9BD2AE}
+.who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.who div{background:#fff;border:1px solid var(--al);padding:8px;text-align:center;font-size:11px}
+.who div b{display:block;font-size:13px}
+.who div.no{opacity:.45}
+.ad .plan{background:#fff;border:1px solid var(--al);padding:10px}
+.plan .done li{color:var(--ok)}
+.lc.lcdim{opacity:.5}.lc.lcon{border-color:var(--green)}
+.plan{display:grid;gap:4px;font-size:13px;color:#1F2328}
+.plan h3{margin:8px 0 2px;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.plan code{font-family:var(--mono);font-size:11.5px;background:#F2F2F4;padding:1px 4px;border-radius:4px}
+.plan .q li{color:#B5461F;font-weight:600}
+.plan .done li{color:#1F6B3A}
+/* phone call mock */
+.pc{background:#0F1A14;color:#E8F0EA;border-radius:14px;padding:10px;display:grid;gap:6px;font-size:11.5px;min-width:0}
+.pc .top{display:flex;justify-content:space-between;font-size:10.5px;color:#9FB8A8}
+.pc .b{max-width:88%;padding:6px 9px;border-radius:10px;line-height:1.45}
+.pc .b.ag{background:#1E3326;justify-self:start}
+.pc .b.us{background:#E8F0EA;color:#14231A;justify-self:end}
+.pc .tc{justify-self:center;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid #3A5A46;color:#BFD6C6}
+.pc .tc.x{border-color:#E06A5A;color:#FFB3A8;background:rgba(224,106,90,.12)}
+.pc .tc.ok{border-color:#5BC08A;color:#A9EBC5;background:rgba(91,192,138,.12)}
+.pc .dim{opacity:.35}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal div{background:#fff;border:1px solid var(--al);text-align:center;padding:4px 0;font-size:10.5px;font-variant-numeric:tabular-nums}
+.cal div.in{background:#E3F4E8;border-color:#9BD2AE}
+.cal div.td{background:#111315;color:#fff}
+.cal div.edge{outline:2px solid #1F6B3A}
+.cal div.ask{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F;font-weight:800}
+.cal div.hd{background:transparent;border:0;color:var(--am);font-size:9.5px}
+.js{font-family:var(--mono);font-size:10.5px;background:#fff;border:1px solid var(--al);padding:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.js .k{color:#6B7280}.js .bad{color:#B42318;font-weight:700}.js .good{color:#1F6B3A;font-weight:700}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.two h6{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--am)}
+.rows{display:grid;gap:3px}
+.rows div{display:flex;justify-content:space-between;gap:6px;background:#fff;border:1px solid var(--al);padding:4px 7px;font-size:10.5px}
+.rows div b{font-family:var(--mono);font-weight:600}
+.rows div.w{background:#FFF1CC;border-color:#F2C46A}
+.rows div.x{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F}
+.rows div.n{background:#E3F4E8;border-color:#9BD2AE}
+.big{font-size:20px;font-weight:800;font-family:var(--mono)}
+@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}}
+
+.bub{width:18px;height:15px;margin-right:4px;vertical-align:-3px}
+</style></head><body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Fly · ElevenLabs · Supabase</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const L=(ko,en)=>({ko,en});
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 전화 예약 비서(ElevenLabs) · 원인 분석",
+  h1:"전화 비서가 <b>티타임을 못 잡은</b> 이유",
+  lede:"10월 20일 통화 한 건에서 11월 7일 조회는 두 번, 10월 24일 12시 31분 잡기도 두 번 실패했어요. 문제는 ElevenLabs가 아니라 우리 서버였어요. 거절 이유를 에이전트가 읽을 수 없는 형식으로 보냈고, 자리를 잡을 때 그날 예약 전체를 다시 저장하다 걸렸어요. 왼쪽은 통화와 화면, 가운데는 서버 뒤에서 일어난 일, 오른쪽은 원인별 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"통화 · 화면",laneLog:"서버 뒤에서",laneLedger:"원인별 상태",
+  ledgerSub:"코드 분석 완료 · 아직 고치지 않음",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 기록이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"근거: 통화 녹취, backend/api/routes/voice.py · tee_sheet.py · tee_sheet_supabase.py, 마이그레이션 0012·0017·0048·0051, Fly 로그(2026-10-21 01:09Z PT422). ElevenLabs 키에 convai_read 권한이 없어 통화별 도구 호출 기록은 직접 못 봤어요. 10/24에 걸린 예약은 확인 쿼리로 찾았어요: 7:34 AM 직원 예약 2건(일출 7:40 전)."},
+ en:{eyebrow:"Pelham Hills Golf Club · Phone booking assistant (ElevenLabs) · Root cause",
+  h1:"Why the phone assistant <b>couldn't book</b> the tee time",
+  lede:"In one call on October 20, the November 7 search failed twice and the October 24, 12:31 PM hold failed twice. The fault is in our server, not ElevenLabs: rejections went back in a shape the agent can't read, and holding a seat rewrote the whole day's bookings and tripped a guard. Left: the call and screens. Middle: what happened behind the server. Right: status per cause.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Call · screen",laneLog:"Behind the server",laneLedger:"Status per cause",
+  ledgerSub:"Code analysed · not fixed yet",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Records appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Sources: the call transcript, backend/api/routes/voice.py · tee_sheet.py · tee_sheet_supabase.py, migrations 0012·0017·0048·0051, Fly log (2026-10-21 01:09Z PT422). The ElevenLabs key lacks convai_read, so per-call tool logs were not read. The October 24 rows were found with the check query: two staff bookings at 7:34 AM, before the 7:40 sunrise."}
+};
+
+function call(items,p){
+  return '<div class="pc"><div class="top"><span>📞 Pelham Hills · AI</span><span>Oct 20</span></div>'+
+   items.map(it=>{const on=p>=it[0];const cls=on?"":" dim";
+     if(it[1]==="tc")return '<div class="tc '+it[3]+cls+'">'+esc(it[2])+'</div>';
+     return '<div class="b '+it[1]+cls+'">'+esc(it[2])+'</div>'}).join("")+'</div>'}
+function box(h,inner,o){o=o||{};return '<div class="box'+(o.hot?" hot":"")+'">'+(o.eyeb?'<span class="eyeb">'+o.eyeb+'</span>':'')+(h?'<h5>'+h+'</h5>':'')+inner+'</div>'}
+function cal(p){
+  const hd=["S","M","T","W","T","F","S"];let h='<div class="cal">'+hd.map(d=>'<div class="hd">'+d+'</div>').join("");
+  // Oct 18 2026 is a Sunday; show Oct 18 → Nov 14
+  const days=[];for(let i=0;i<28;i++){const d=new Date(2026,9,18+i);days.push(d)}
+  days.forEach(d=>{const m=d.getMonth(),n=d.getDate();const off=Math.round((d-new Date(2026,9,20))/864e5);
+    let c="";if(off===0)c="td";else if(off>0&&off<=14)c=p>.25?"in":"";
+    if(off===14&&p>.25)c+=" edge";if(m===10&&n===7&&p>.5)c="ask";if(m===10&&n===8&&p>.75)c="ask";
+    h+='<div class="'+c+'">'+(n===1||off===0?(m===9?"10/":"11/"):"")+n+'</div>'});
+  return h+'</div>'}
+
+const S=[
+ {a:"ov",ph:"call",ko:"통화에서 무슨 일이",en:"What happened on the call",
+  screen:(l,p)=>call([
+    [0,"us","Book a tee time — four, 18 holes, November 7th."],
+    [.12,"tc","find_tee_times · 2026-11-07 ✕","x"],[.2,"tc","find_tee_times · 2026-11-07 ✕","x"],
+    [.28,"ag","I'm having trouble accessing the tee sheet for November 7th…"],
+    [.42,"us","What about October 24?"],
+    [.5,"tc","find_tee_times · 2026-10-24 ✓ 5 times","ok"],
+    [.58,"ag","7:40 AM · 10:34 AM · 12:31 PM · 2:19 PM · 4:16 PM"],
+    [.66,"us","12:31 PM, please."],
+    [.74,"tc","hold_tee_time · 12:31 PM ✕","x"],[.82,"tc","hold_tee_time · 12:31 PM ✕","x"],
+    [.9,"ag","This seems to be a system issue… let me transfer you."]],p),
+  log:[{at:.12,tag:"rpc",name:"find_tee_times 11/7",ep:"✕ twice",why:L("조회가 두 번 실패. 에이전트는 '시스템 문제'라고만 말했어요.","Search failed twice; the agent could only say 'system issue'.")},
+       {at:.5,tag:"rpc",name:"find_tee_times 10/24",ep:"✓ 59 open, 5 read"},
+       {at:.74,tag:"rpc",name:"hold_tee_time 12:31 PM",ep:"✕ twice",why:L("찾기는 되는데 잡기에서 막혔어요. 실패가 두 종류예요.","Searching works, holding doesn't — two different failures.")},
+       {at:.9,tag:"ui",name:"transfer_to_number",ep:"pro shop"}],
+  focus:["window","format","hold","rewrite"]},
+
+ {a:"nov7",ph:"c1",ko:"11월 7일은 창 밖",en:"Nov 7 is outside the window",
+  screen:(l,p)=>box(l==="ko"?"전화 예약은 오늘부터 14일까지":"Phone bookings: today to 14 days out",
+    cal(p)+'<div class="rows"><div><span>'+(l==="ko"?"오늘":"Today")+'</span><b>Tue, Oct 20</b></div><div class="n"><span>'+(l==="ko"?"마지막 날 (+14)":"Last day (+14)")+'</span><b>Tue, Nov 3</b></div>'+
+    (p>.5?'<div class="x"><span>'+(l==="ko"?"손님이 원한 날":"Caller asked")+'</span><b>Sat, Nov 7 (+18)</b></div>':'')+
+    (p>.75?'<div class="x"><span>'+(l==="ko"?"에이전트가 대신 권한 날":"Agent offered instead")+'</span><b>Nov 8 · 9 (+19)</b></div>':'')+'</div>',{eyeb:"BOOKING_WINDOW_DAYS = 14"}),
+  log:[{at:.15,tag:"local",name:"BOOKING_WINDOW_DAYS = 14",ep:"voice.py:59",why:L("웹(/book/tee-time)과 같은 값이에요. 일부러 정한 규칙이라 버그는 아니에요.","Same value as the website. It's a deliberate rule, not a bug.")},
+       {at:.4,tag:"rpc",name:"require_bookable_date",ep:"HTTP 422",body:{detail:"We only take bookings 14 days out. The furthest date available is Tuesday, November 3."}},
+       {at:.75,tag:"ui",name:"Nov 8 · Nov 9",ep:"also outside",why:L("에이전트는 규칙을 몰라서 더 먼 날을 권했어요. 그날도 똑같이 거절돼요.","Not knowing the rule, the agent offered later days — which fail the same way.")}],
+  focus:["window"]},
+
+ {a:"format",ph:"c1",ko:"답은 있었는데 못 읽음",en:"The answer was there, unread",
+  screen:(l,p)=>'<div class="ad"><div class="adbody"><div class="two"><div><h6>'+(l==="ko"?"지금 서버가 보내는 것":"What the server sends now")+'</h6><div class="js'+(p>.2&&p<.6?" hot":"")+'"><span class="bad">HTTP 422</span>\n{\n  <span class="bad">"detail"</span>: "We only take bookings 14 days out. The furthest date available is Tuesday, November 3."\n}</div></div>'+
+    '<div><h6>'+(l==="ko"?"프롬프트가 기대하는 것":"What the prompt expects")+'</h6><div class="js'+(p>=.6?" hot":"")+'"><span class="good">HTTP 200</span>\n{\n  "ok": false,\n  <span class="good">"message"</span>: "…14 days out… Tuesday, November 3."\n}</div></div></div>'+
+    box(l==="ko"?"에이전트 프롬프트":"Agent prompt",'<p>“Every tool result carries a <b>message</b> field… read its message and do exactly what it says.”</p><p>'+(l==="ko"?"14일 규칙은 프롬프트 어디에도 없어요.":"The 14-day rule appears nowhere in the prompt.")+'</p>')+'</div></div>',
+  log:[{at:.15,tag:"rpc",name:"HTTPException(422)",ep:"FastAPI → {detail}",why:L("거절이 '오류'로 가요. ElevenLabs는 이걸 도구 실패로 받아요.","The rejection goes out as an error; ElevenLabs treats it as a failed tool call.")},
+       {at:.45,tag:"ui",name:"message ≠ detail",ep:"field the prompt names is missing",why:L("프롬프트는 message를 읽으라는데, 문장은 detail에 들어 있어요.","The prompt says read message, but the sentence is in detail.")},
+       {at:.7,tag:"ui",name:"\"system issue\"",ep:"retry · guess",why:L("이유를 못 받은 모델은 다시 시도하고, 다른 날을 추측하고, 결국 연결해요. 통화가 길어지고 헷갈려요.","Without a reason the model retries, guesses another day, then transfers — a long, confusing call.")}],
+  focus:["window","format"]},
+
+ {a:"hold",ph:"c2",ko:"잡기가 저장에서 실패",en:"The hold fails on save",
+  screen:(l,p)=>{const st=p<.3?1:p<.55?2:p<.8?3:4;
+    const steps=[["1","find_tee_times 10/24","59 open · 12:31 PM ✓"],["2","hold_tee_time 12:31 PM",l==="ko"?"자리 검사 통과 · hold 줄 추가":"slot check passes · hold row added"],
+      ["3","bookings_tx → apply_diff","POST pelham_tee_bookings"],["4","Supabase","HTTP 422 · PT422 → API 500"]];
+    return '<div class="ad"><div class="adbody"><div class="flow">'+steps.map((s,i)=>'<div class="fstep'+(i+1===st?" on":"")+'"><span class="n">'+s[0]+'</span><span>'+s[1]+'<br><b>'+s[2]+'</b></span></div>').join("")+'</div>'+
+      (p>.7?'<div class="js hot">2026-10-21T01:09:16Z  pelham-hills-api\n<span class="bad">SupabaseStoreError: POST pelham_tee_bookings failed: HTTP 422 (code PT422)</span></div>':'')+'</div></div>'},
+  log:[{at:.1,tag:"rpc",name:"find_tee_times",ep:"read only · OK",why:L("찾기는 읽기만 해요. 그래서 성공했어요.","Search only reads, so it worked.")},
+       {at:.35,tag:"rpc",name:"hold_tee_time",ep:"writes",why:L("잡기는 쓰기를 해요. 실패는 쓰는 순간에 나요.","Holding writes, and the failure happens on write.")},
+       {at:.6,tag:"local",name:"PT422",ep:"Supabase trigger said no"},
+       {at:.8,tag:"ui",name:"500 Internal Server Error",ep:"no message at all",why:L("PT409만 문장으로 바꾸고 나머지는 그대로 터져서, 에이전트는 이유 없는 500을 받아요.","Only PT409 is turned into a sentence; anything else surfaces as a bare 500.")}],
+  focus:["hold"]},
+
+ {a:"rewrite",ph:"c2",ko:"한 자리 잡는데 하루 전체를 다시 씀",en:"One hold rewrites the whole day",
+  screen:(l,p)=>'<div class="ad"><div class="adbody"><div class="two"><div><h6>'+(l==="ko"?"DB에 있는 doc":"doc in the DB")+'</h6><div class="js">{ "time": "9:01 AM",\n  "players": [ { …, <span class="good">"greenFee"</span>: 40.71 } ],\n  <span class="good">"confirmationCode"</span>: "T8F2…" }</div></div>'+
+    '<div><h6>'+(l==="ko"?"Python 모델을 거친 뒤":"After the Python model")+'</h6><div class="js'+(p>.3?" hot":"")+'">{ "time": "9:01 AM",\n  "players": [ { … } ],\n  <span class="bad">— confirmationCode 없음</span> }</div></div></div>'+
+    (p>.55?'<div class="rows">'+["7:40 AM","9:01 AM","10:34 AM","12:31 PM hold","…"].map((t,i)=>'<div class="'+(i===3?"n":"w")+'"><span>'+t+'</span><b>'+(i===3?"new":"before ≠ after → upsert")+'</b></div>').join("")+'</div>':'')+'</div></div>',
+  log:[{at:.1,tag:"local",name:"pelham_tee_code_sync (0012)",ep:"doc.confirmationCode on every row"},
+       {at:.3,tag:"rpc",name:"TeeBooking(**doc).model_dump()",ep:"unknown keys dropped",why:L("Pydantic 모델에 confirmationCode·greenFee 같은 칸이 없어서 버려져요. 로컬에서 직접 돌려 확인했어요.","The Pydantic model has no confirmationCode or greenFee, so they are dropped — checked by running it locally.")},
+       {at:.55,tag:"local",name:"apply_diff: old != new",ep:"every row in scope",why:L("그래서 아무것도 안 바꾼 예약까지 전부 '바뀜'으로 보여, 그날 예약과 모든 hold를 통째로 다시 써요.","So untouched bookings all look changed, and the whole day plus every hold is written back.")},
+       {at:.8,tag:"rpc",name:"POST … on_conflict=id",ep:"INSERT … ON CONFLICT DO UPDATE"}],
+  focus:["rewrite"]},
+
+ {a:"guard",ph:"c2",ko:"오늘 붙인 트리거가 새 예약으로 봄",en:"Today's trigger sees them as new",
+  screen:(l,p)=>box(l==="ko"?"pelham_tee_daylight_guard (0048 → 0051, 10월 20일)":"pelham_tee_daylight_guard (0048 → 0051, Oct 20)",
+    '<div class="rows"><div class="n"><span>'+(l==="ko"?"10/24 열린 창":"Oct 24 window")+'</span><b>7:40 AM – 4:22 PM</b></div>'+
+    '<div class="'+(p>.3?"w":"")+'"><span>'+(l==="ko"?"예외: 시각 그대로인 수정":"Exempt: edit at same time")+'</span><b>tg_op = \'UPDATE\'</b></div>'+
+    '<div class="'+(p>.45?"x":"")+'"><span>'+(l==="ko"?"upsert가 먼저 부르는 것":"What upsert fires first")+'</span><b>BEFORE INSERT</b></div>'+
+    (p>.65?'<div class="x"><span>'+(l==="ko"?"7:34 AM 직원 예약 2건 (일출 7:40 전)":"Two staff bookings at 7:34 AM (before 7:40 sunrise)")+'</span><b>PT422</b></div>':'')+
+    (p>.8?'<div class="x"><span>'+(l==="ko"?"→ 묶음 전체 거절, hold 도 저장 안 됨":"→ whole batch rejected, hold not saved")+'</span><b>✕</b></div>':'')+'</div>',{eyeb:"BEFORE INSERT OR UPDATE"}),
+  log:[{at:.15,tag:"local",name:"0051 tee window",ep:"sunrise → sunset − 2h",why:L("어제까지 열려 있던 칸도 오늘부터 닫혔어요. 그 칸에 이미 있던 예약은 그대로 남아요.","Slots open until yesterday closed today; bookings already in them stayed.")},
+       {at:.45,tag:"rpc",name:"INSERT … ON CONFLICT",ep:"BEFORE INSERT runs, tg_op = INSERT",why:L("Postgres는 upsert 때 충돌이 나도 BEFORE INSERT 트리거를 먼저 돌려요. 그래서 'UPDATE면 통과' 예외가 안 먹혀요.","Postgres runs BEFORE INSERT on upsert even when it conflicts, so the 'UPDATE is exempt' rule never applies.")},
+       {at:.7,tag:"stripe",name:"PT422",ep:"before sunrise / too close to sunset / blocked"},
+       {at:.85,tag:"local",name:"7:34 AM × 2 · source staff",ep:"confirmed by SQL",why:L("확인 쿼리 결과, 10/24 7:34 AM에 직원이 넣은 예약 두 건이 일출(7:40) 전이라 걸렸어요. 오늘 0051로 닫힌 칸이에요.","The check query found two staff bookings at 7:34 AM on Oct 24 — before the 7:40 sunrise, a slot 0051 closed today.")}],
+  focus:["guard","rewrite"]},
+
+ {a:"other",ph:"more",ko:"그 밖에 보인 것",en:"Other things seen",
+  screen:(l,p)=>box(l==="ko"?"통화에서 같이 보인 문제":"Also visible in the call",
+    '<div class="flow">'+[
+      [l==="ko"?"회원 여부·카트를 묻지 않음, 홀 수를 물음":"Never asked member or cart; asked 9 vs 18","agent.json ≠ live?"],
+      [l==="ko"?"'세금 포함' 요금을 말함":"Quoted rates 'including tax'","find_tee_times = pre-tax"],
+      [l==="ko"?"'2명이면?' 에 다시 찾지 않음":"Ignored 'what about two people?'","no re-search"],
+      [l==="ko"?"[cheerfully] 같은 표정 태그":"Expression tags like [cheerfully]","v3 voice tags"]
+    ].map((s,i)=>'<div class="fstep'+(p>i*.2+.1?" on":"")+'"><span class="n">'+(i+1)+'</span><span>'+s[0]+'<br><b>'+s[1]+'</b></span></div>').join("")+'</div>'),
+  log:[{at:.12,tag:"ui",name:"ops/elevenlabs/agent.json",ep:"asks member first",why:L("저장소의 프롬프트와 실제 통화 흐름이 달라요. 대시보드에서 바뀌었을 수 있어요.","The repo prompt and the live call differ; it may have been changed in the dashboard.")},
+       {at:.4,tag:"stripe",name:"convai_read",ep:"missing on API key",why:L("키에 권한이 없어 실제 설정과 도구 호출 기록을 못 열었어요.","The key lacks the permission, so the live config and tool logs couldn't be opened.")},
+       {at:.7,tag:"ui",name:"party size changed",ep:"4 → 2",why:L("인원이 바뀌면 다시 찾아야 하는데 그대로 hold를 반복했어요.","A new party size needs a new search; it kept retrying the hold.")}],
+  focus:["agent"]},
+
+ {a:"todo",ph:"fix",ko:"고칠 것",en:"What to fix",
+  screen:(l,p)=>'<div class="ad"><div class="plan"><h3>'+(l==="ko"?"확인한 것":"Confirmed")+'</h3><ul class="done"><li>'+(l==="ko"?"11/7은 14일 창 밖 (마지막 날 11/3)":"Nov 7 is past the 14-day window (last day Nov 3)")+'</li><li>'+(l==="ko"?"거절이 422 + detail 로 나감 — 프롬프트는 message 를 찾음":"Rejections go out as 422 + detail — the prompt looks for message")+'</li><li>'+(l==="ko"?"모델이 confirmationCode 를 버려 하루 전체를 다시 씀 (로컬 실행 확인)":"The model drops confirmationCode, so the whole day is rewritten (checked locally)")+'</li><li>'+(l==="ko"?"Fly 로그: POST pelham_tee_bookings → PT422":"Fly log: POST pelham_tee_bookings → PT422")+'</li></ul>'+
+   '<h3>'+(l==="ko"?"제안하는 수정 (말씀 주시면 진행)":"Proposed fixes (on your go)")+'</h3><ul class="q"><li>'+(l==="ko"?"bookings_tx: 모르는 칸을 지우지 않게 — hold 는 자기 한 줄만 씀":"bookings_tx: keep unknown fields — a hold writes only its own row")+'</li><li>'+(l==="ko"?"전화 도구의 업무 거절은 200 + ok:false + message, DB 오류도 읽을 문장으로":"Phone tool rejections → 200 + ok:false + message; DB errors as a readable sentence")+'</li><li>'+(l==="ko"?"프롬프트: 14일 규칙, 인원 바뀌면 다시 찾기":"Prompt: the 14-day rule; re-search when party size changes")+'</li></ul>'+
+   '<h3>'+(l==="ko"?"해 주셔야 할 것":"For you")+'</h3><ul><li>'+(l==="ko"?"ElevenLabs 키에 convai_read 권한 추가 (통화 로그·실제 설정 확인용)":"Add convai_read to the ElevenLabs key (call logs, live config)")+'</li><li>'+(l==="ko"?"SQL editor 에서 확인 쿼리 한 번 (채팅에 드림)":"Run the check query in the SQL editor (in chat)")+'</li></ul></div></div>',
+  log:[{at:.15,tag:"local",name:"tee_sheet.py bookings_tx",ep:"fix 1 · root cause"},{at:.4,tag:"rpc",name:"voice.py tools",ep:"fix 2 · ok:false + message"},
+       {at:.65,tag:"ui",name:"agent.json prompt",ep:"fix 3 · sync script"},{at:.85,tag:"stripe",name:"convai_read",ep:"your key"}],
+  focus:["window","format","hold","rewrite","guard","agent"]}
+];
+
+S.forEach(s=>{s.ledger=s.ledger||[{at:0}]});
+const PH={call:{ko:"통화",en:"Call"},c1:{ko:"원인 1",en:"Cause 1"},c2:{ko:"원인 2",en:"Cause 2"},more:{ko:"기타",en:"Other"},fix:{ko:"수정",en:"Fix"}};
+const TAGS={ui:"AGENT",rpc:"SERVER",local:"CODE",stripe:"RULE",key:"INPUT"};
+
+const ITEMS=[
+ {id:"window",src:L("14일 예약 창","14-day window"),sub:"BOOKING_WINDOW_DAYS",st:["wait",L("정상 규칙","Rule, works")],rows:[[L("11/7 = +18일","Nov 7 = +18 days"),""],[L("프롬프트에 없음","not in the prompt"),""]]},
+ {id:"format",src:L("거절 응답 형식","Rejection format"),sub:"HTTPException → {detail}",st:["bad",L("고쳐야 함","Needs fix")],rows:[[L("422/409 + detail","422/409 + detail"),""],[L("message 없음","no message"),""]]},
+ {id:"hold",src:L("hold 저장","Hold save"),sub:"hold_tee_time",st:["bad",L("실패 · 500","Fails · 500")],rows:[["PT422 → 500",""]]},
+ {id:"rewrite",src:L("하루 전체 다시 쓰기","Whole-day rewrite"),sub:"bookings_tx · apply_diff",st:["bad",L("근본 원인","Root cause")],rows:[[L("confirmationCode 버려짐","confirmationCode dropped"),""]]},
+ {id:"guard",src:L("일출·일몰 트리거","Daylight trigger"),sub:"0048 · 0051",st:["bad",L("7:34 AM 2건 확인","7:34 AM × 2 found")],rows:[[L("upsert = BEFORE INSERT","upsert = BEFORE INSERT"),""],[L("일출 7:40 전","before 7:40 sunrise"),""]]},
+ {id:"agent",src:L("실제 에이전트 설정","Live agent config"),sub:"ElevenLabs",st:["wait",L("확인 불가","Can't check")],rows:[[L("convai_read 없음","no convai_read"),""]]}
+];
+function renderLedger(p){
+  const k=LANG;const f=new Set(S[SC].focus||[]);
+  $("ledger").innerHTML=ITEMS.map(it=>'<div class="lc'+(f.has(it.id)?" flash lcon":" lcdim")+'"><div class="r1"><span class="src">'+esc(it.src[k])+'<em>'+esc(it.sub)+'</em></span><span class="pill '+it.st[0]+'">'+esc(it.st[1][k])+'</span></div><div class="lrows">'+it.rows.map(r=>'<div><span>'+esc(typeof r[0]==="string"?r[0]:r[0][k])+'</span><span></span></div>').join("")+'</div></div>').join("");
+}
+
+const DUR={"ov": {"ko": 18.4, "en": 15.1}, "nov7": {"ko": 20.3, "en": 18.5}, "format": {"ko": 18.9, "en": 18.0}, "hold": {"ko": 22.3, "en": 17.4}, "rewrite": {"ko": 17.4, "en": 14.9}, "guard": {"ko": 26.3, "en": 21.3}, "other": {"ko": 18.0, "en": 16.6}, "todo": {"ko": 19.8, "en": 17.3}};
+const NARR={"ko": {"ov": "이 통화에서는 실패가 두 번 있었어요. 11월 7일 조회는 두 번 다 실패했고, 10월 24일은 빈 시간을 잘 찾았지만 12시 31분을 잡는 단계에서 또 두 번 실패했어요. 찾기와 잡기가 서로 다른 이유로 막혔어요. 그리고 둘 다 ElevenLabs가 아니라 우리 서버 문제였어요.", "nov7": "첫 번째 원인이에요. 전화 예약은 오늘부터 14일 뒤까지만 받아요. 오늘이 10월 20일이니 마지막 날은 11월 3일이에요. 11월 7일은 18일 뒤라 서버가 거절했어요. 이건 웹과 같은 규칙이라 정상이에요. 그런데 에이전트는 이 규칙을 몰라서 더 먼 8일과 9일을 권했어요.", "format": "서버는 거절할 때 이유를 문장으로 보냈어요. 그런데 그 문장을 422 오류 응답의 detail 칸에 넣었어요. 에이전트 프롬프트는 message 칸을 읽으라고 하고, 14일 규칙은 프롬프트 어디에도 없어요. 그래서 에이전트는 이유를 모른 채 시스템 문제라고 말하고 다시 시도했어요.", "hold": "두 번째 원인이에요. 10월 24일 찾기는 읽기만 해서 잘 됐어요. 12시 31분 잡기는 데이터베이스에 hold 줄을 써야 하는데, 그 저장을 Supabase가 PT422로 거절했어요. 서버는 이 오류를 문장으로 바꾸지 않아서 에이전트는 이유 없는 500 오류만 받았어요. Fly 로그에도 같은 오류가 남아 있어요.", "rewrite": "왜 거절됐을까요? 데이터베이스의 예약에는 확인 코드 같은 칸이 들어 있는데, 파이썬 모델은 그 칸을 몰라서 버려요. 그래서 아무것도 안 바꾼 예약도 모두 바뀐 것처럼 보여요. 결국 한 자리를 잡으려다 그날 예약 전체와 모든 hold를 다시 저장해요.", "guard": "다시 저장할 때 오늘 붙인 일출 일몰 트리거가 걸려요. upsert는 먼저 INSERT 트리거를 부르기 때문에, 시각을 그대로 둔 수정을 통과시키는 예외가 적용되지 않아요. 확인해 보니 10월 24일 아침 7시 34분에 직원이 넣은 예약 두 건이 있었어요. 그날 일출은 7시 40분이라, 오늘부터 닫힌 칸이에요. 이 두 줄이 PT422를 냈고, hold도 같이 저장되지 않았어요.", "other": "통화에서 같이 보인 것도 있어요. 회원 여부와 카트를 묻지 않았고, 세금 포함 요금을 말했고, 두 명이면 어떠냐는 말에 다시 찾지 않았어요. 저장소의 프롬프트와 다르게 움직여서, 실제 설정이 대시보드에서 바뀌었을 수 있어요. API 키에 권한이 없어 확인하지 못했어요.", "todo": "정리할게요. 근본 원인은 hold 하나 잡는데 하루 전체를 다시 쓰는 코드예요. 그 코드를 고치고, 전화 도구가 거절할 때 에이전트가 읽을 수 있는 message로 보내고, 프롬프트에 14일 규칙을 넣으면 돼요. 말씀 주시면 바로 고칠게요. ElevenLabs 키 권한과 확인 쿼리는 직접 해 주셔야 해요."}, "en": {"ov": "This call failed in two places. The November seventh search failed twice. October twenty-fourth found open times, but holding twelve thirty-one failed twice too. Search and hold broke for different reasons, and both were our server, not ElevenLabs.", "nov7": "Cause one. Phone bookings only go fourteen days out. Today is October twentieth, so the last day is November third. November seventh is eighteen days out, so the server said no. That's the same rule as the website, and it's working. But the agent didn't know the rule, so it offered the eighth and ninth, which are even further out.", "format": "The server did explain why, in a sentence. But it put that sentence in the detail field of a 422 error. The agent's prompt says to read the message field, and the fourteen-day rule isn't in the prompt at all. So the agent never got the reason, called it a system issue, and kept retrying.", "hold": "Cause two. Searching October twenty-fourth only reads, so it worked. Holding twelve thirty-one has to write a hold row, and Supabase rejected that write with PT422. The server doesn't turn that error into a sentence, so the agent got a bare 500. The same error is in the Fly log.", "rewrite": "Why was it rejected? Bookings in the database carry fields like the confirmation code, but the Python model doesn't know them and drops them. So every booking looks changed, even the untouched ones. Holding one seat ends up rewriting that whole day and every hold.", "guard": "That rewrite hits the daylight trigger added today. An upsert runs the INSERT trigger first, so the exception for edits at the same time never applies. The check query found two staff bookings at seven thirty-four in the morning on October twenty-fourth. Sunrise that day is seven forty, so that slot closed today. Those two rows raised PT422, and the hold went down with them.", "other": "A few other things showed up. The agent never asked about membership or a cart, quoted prices including tax, and didn't search again when the caller asked about two people. That doesn't match the prompt in the repo, so the live setup may have been changed in the dashboard. The API key lacks the permission to check.", "todo": "To sum up. The root cause is code that rewrites the whole day to hold one seat. Fix that, send phone rejections as a message the agent can read, and add the fourteen-day rule to the prompt. Say the word and I'll make the changes. The ElevenLabs key permission and the check query are for you to do."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phvb-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phvb-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phvb-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phvb-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script></body></html>
+</body></html>

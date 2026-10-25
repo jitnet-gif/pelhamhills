@@ -1,0 +1,788 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Membership Register Sale</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- membership sale mocks (prefixed ms-) ---- */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px}
+.seg.lang svg{width:20px;height:18px;flex:0 0 auto}
+.seg.lang svg path{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.seg.lang svg text{fill:currentColor;font-family:var(--sans);font-weight:700;font-size:8.5px}
+.ms-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:8px}
+.ms-file{border:1px solid var(--scr-line);background:var(--scr-paper);padding:9px;display:grid;gap:7px;align-content:start}
+.ms-file .hd{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
+.ms-file .hd small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-file .hd b{font-size:14px}
+.ms-file .btns{display:grid;gap:4px;justify-items:end}
+.ms-file dl{margin:0;display:grid;gap:5px;font-size:10.5px}
+.ms-file dt{font-weight:700;color:var(--scr-muted)}
+.ms-file dd{margin:0}
+.ms-tagm{font-size:9px;font-weight:700;padding:1px 6px;background:#ECECF0;color:#4E5560}
+.ms-tagm.on{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.ms-red{color:var(--scr-red);font-weight:700}
+.ms-okt{color:var(--scr-ok);font-weight:700}
+.ms-modal{background:var(--scr-paper);width:min(440px,100%);max-height:100%;overflow:hidden;display:grid;gap:7px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.ms-modal small.ey{font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-modal h4{margin:0;font-size:14px}
+.ms-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ms-dates div{display:grid;gap:2px;font-size:9px;font-weight:700;color:var(--scr-muted)}
+.ms-dates span{border:1px solid var(--scr-line);padding:4px 5px;font-weight:400;color:var(--scr-ink);font-size:10.5px;font-family:var(--mono)}
+.ms-dates span.off{background:#F7F7F8}
+.ms-dates span.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.2)}
+.ms-list{border:1px solid var(--scr-line);max-height:170px;overflow:hidden}
+.ms-list div{display:flex;justify-content:space-between;gap:6px;padding:4px 7px;border-bottom:1px solid #EEF0F2;font-size:10.5px}
+.ms-list div i{font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ms-list div.pick{background:var(--scr-accent);color:#fff;font-weight:700}
+.ms-foot{display:flex;justify-content:flex-end;gap:5px}
+.ms-note{font-size:9px;color:var(--scr-muted);text-align:right}
+.ms-map{display:grid;gap:6px;padding:4px}
+.ms-map .rw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center;font-size:10.5px}
+.ms-map .rw span{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 7px;min-width:0}
+.ms-map .rw span b{display:block;font-size:11px}
+.ms-map .rw span small{display:block;color:var(--scr-muted);font-size:9px}
+.ms-map .rw em{font-style:normal;text-align:center;color:var(--scr-accent);font-weight:700}
+.ms-map .hd{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.ms-map .rw.hot span:last-child{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-paid{background:var(--scr-ok-soft);color:var(--scr-ok);padding:8px;display:grid;gap:2px;font-size:11px}
+.ms-paid b{font-size:13px}
+.ms-rule{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px 8px;display:grid;gap:2px;font-size:10.5px}
+.ms-rule b{font-size:11px}
+.ms-rule.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-rule.warn{border-color:#E2A5A5;background:var(--scr-red-soft)}
+@media (max-width:560px){.ms-grid{grid-template-columns:minmax(0,1fr)}.ms-dates{grid-template-columns:minmax(0,1fr)}}
+.ph.pick{background:var(--violet-soft);color:var(--violet)}
+.ph.pay{background:var(--blue-soft);color:var(--blue)}
+.lnote{font-size:12px;color:var(--muted)}
+.ms-pay{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ms-pay span{border:1px solid var(--scr-line);padding:5px 6px;font-size:10.5px;font-weight:700;text-align:center}
+.ms-pay span.on{background:var(--scr-accent);border-color:var(--scr-accent);color:#fff}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Vercel · Supabase RPC · Stripe</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 회원권 판매 · 나레이터 프레젠테이션",
+  h1:"Lightspeed처럼 파는 <b>회원권 결제</b>",
+  lede:"Lightspeed에서 하던 Customer → Subscriptions → Sell → Register 순서를 우리 시스템에 그대로 옮겼어요. 고객 파일에서 회원권을 고르면 레지스터 계산서에 한 줄로 올라가고, 결제하면 회원권이 Active가 돼요. 왼쪽은 직원 화면, 가운데는 뒤에서 오가는 요청, 오른쪽은 회원권·계산서 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"직원 화면",laneLog:"뒤에서 일어나는 일",laneLedger:"회원권 · 계산서",
+  ledgerSub:"pelham_memberships · pelham_bills",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 요청이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"이름·금액·영수증 번호는 예시예요. 동작은 2026-10-22 작업본 기준이에요: 0072_membership_register.sql(카드 3%·시작일 포함, 아직 커밋 전), 고객 화면의 Sell membership 창, 레지스터의 회원권 줄. 0072는 로컬 Postgres에서 판매·카드 결제·환불·수단 확인을 돌려 봤어요. 쓰기 전에 Supabase SQL Editor에서 0072를 한 번 실행해야 하고, 실제 결제로 해 보는 확인은 아직 안 했어요."},
+ en:{eyebrow:"Pelham Hills Golf Club · Membership sales · narrated walkthrough",
+  h1:"<b>Membership payments</b>, sold like Lightspeed",
+  lede:"The Lightspeed order, Customer → Subscriptions → Sell → Register, now works the same way here. Pick a membership on the customer file, it lands on the register bill as one line, and paying it turns the membership Active. Left: the staff screen. Middle: the requests behind it. Right: the membership and bill state.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Staff screen",laneLog:"Behind the scenes",laneLedger:"Membership · bill",
+  ledgerSub:"pelham_memberships · pelham_bills",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Requests appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. The speech-bubble buttons (가 / Aa) restart the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Names, amounts and receipt numbers are examples. Behavior follows the 2026-10-22 working copy: 0072_membership_register.sql (with the 3% card fee and start date, not committed yet), the Sell membership window on Customers, and the membership line on the register. 0072 was run on a local Postgres through a sale, a card payment, a refund and the tender check. Run 0072 once in the Supabase SQL Editor before use. It has not been tried with a real payment yet."}
+};
+
+const L=(ko,en)=>({ko,en});
+const NAME="Alex Morgan";
+function frame(url,title,tab,body){return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app'+url+'</span></div><div class="posbar"><span><small>PELHAM HILLS STAFF</small><b>'+title+'</b></span><span class="st">'+tab+'</span></div><div class="posbody">'+body+'</div></div>'}
+
+/* 고객 화면 */
+function custScreen(o){o=o||{};
+ const st=o.st||"none";
+ const list='<div class="rlist">'+
+  '<div class="rrow hot"><span><b>'+NAME+'</b><small>PH00412 · (289) 555-0142</small></span><span class="amt">'+(st==="active"?'<span class="okpill">Member</span>':'Public')+'</span></div>'+
+  '<div class="rrow"><span><b>Jordan Lee</b><small>PH00388</small></span><span class="amt">Member</span></div>'+
+  '<div class="rrow"><span><b>Sam Patel</b><small>PH00301</small></span><span class="amt">Public</span></div></div>';
+ const mem=st==="none"?'<dd>No membership on file</dd>':
+  st==="pending"?'<dd>2026 Weekday · Pending</dd><dd>Starts Oct 22, 2026 · Expires Dec 15, 2026</dd>':
+  '<dd>2026 Weekday · <span class="ms-okt">Active</span></dd><dd>Starts Oct 22, 2026 · Expires Dec 15, 2026</dd><dd>Paid by Credit card</dd>';
+ const file='<div class="ms-file"><div class="hd"><span><small>Customer File · PH00412</small><b>'+NAME+'</b></span><span class="btns"><span class="ms-tagm'+(st==="none"?"":" on")+'">'+(st==="none"?"Public":"Member")+'</span><span class="sbtn">Edit</span><span class="sbtn pri'+(o.hot?" hot":"")+'">Sell membership</span></span></div>'+
+  '<dl><div><dt>Contact</dt><dd>(289) 555-0142</dd><dd>alex.morgan@example.com</dd></div><div><dt>Membership</dt>'+mem+'</div>'+(st==="active"?'<div><dt>Tee sheet</dt><dd>Weekday Member - Single</dd></div>':'')+'</dl></div>';
+ const body='<div class="sh">Customers</div><div class="ms-grid">'+list+file+'</div>';
+ return frame("/admin/customers","Customers",'Admin',body+(o.modal||""));
+}
+const PRODUCTS=[
+ ["Full Single Membership","$2,700.00"],
+ ["Full Spousal Membership","$4,560.00"],
+ ["Weekday Single Membership","$2,050.00"],
+ ["Weekday Single Membership with Unlimited 7-Day cart","$3,687.17"],
+ ["Weekday Spousal Membership","$3,500.00"],
+ ["9-Hole Single Membership","$1,450.00"],
+ ["Twilight Single Membership","$1,450.00"],
+ ["Junior Single Membership","$500.00"]
+];
+function sellModal(o){o=o||{};
+ const list='<div class="ms-list">'+PRODUCTS.map(p=>'<div class="'+(o.pick&&p[0]==="Weekday Single Membership"?"pick":"")+'"><span>'+p[0]+'</span><i>'+p[1]+'</i></div>').join("")+'</div>';
+ const sum=o.pick&&o.card?'<div class="sum"><div><span>Includes 3% credit card fee</span><span>$61.50</span></div><div><span>Subtotal</span><span>$2,111.50</span></div><div><span>HST</span><span>$274.50</span></div><div class="t"><span>Total</span><span>$2,386.00</span></div></div>':
+  o.pick?'<div class="sum"><div><span>Subtotal</span><span>$2,050.00</span></div><div><span>HST</span><span>$266.50</span></div><div class="t"><span>Total</span><span>$2,316.50</span></div></div>':
+  '<div class="sum"><div><span>Subtotal</span><span>$0.00</span></div><div><span>HST</span><span>$0.00</span></div><div class="t"><span>Total</span><span>$0.00</span></div></div>';
+ return '<div class="dim"><div class="ms-modal"><small class="ey">Sell membership</small><h4>'+NAME+'</h4>'+
+  '<div class="ms-dates"><div>Season<span>2026</span></div><div>Start<span class="'+(o.start?"on":"")+'">2026-10-22</span></div><div>End<span class="'+(o.end?"on":"")+'">2026-12-15</span></div></div>'+
+  '<div class="search'+(o.q?" on":"")+'">'+(o.q?"weekday":"Search")+'</div>'+list+
+  '<div class="mlbl">Paying by</div><div class="ms-pay"><span class="'+(o.card?"":"on")+'">Cash, debit or cheque</span><span class="'+(o.card?"on":"")+'">Credit card (+3%)</span></div>'+sum+
+  '<div class="ms-foot"><span class="sbtn">Cancel</span><span class="sbtn pri'+(o.send?" hot":"")+'">'+(o.sending?"Adding…":"Send to register")+'</span></div>'+
+  '<p class="ms-note">Paid at the register, the membership turns Active. You can still add or remove the card fee on the register line.</p></div></div>';
+}
+/* 레지스터 */
+function regScreen(o){o=o||{};
+ const cc=o.cc;
+ const line='<div class="ln"><span><b>2026 Weekday Single Membership · '+NAME+'</b><small>'+(cc?"Membership · incl. 3% credit card fee":"Membership · qty 1 (fixed)")+'</small><span class="sbtn'+(o.hotFee?" hot":"")+'" style="margin-top:4px">'+(cc?"Remove 3% card fee":"Add 3% card fee (credit card)")+'</span></span><span>'+(cc?"$2,111.50":"$2,050.00")+'</span></div>';
+ let right;
+ if(o.paid){right='<div class="ms-paid"><b>Paid · PH-20261022-0007</b><span>Credit card ····4242 · $2,386.00</span><span>Bill closed. Next sale is empty.</span></div>'}
+ else right='<div class="sum"><div><span>Subtotal</span><span>'+(cc?"$2,111.50":"$2,050.00")+'</span></div><div><span>HST 13%</span><span>'+(cc?"$274.50":"$266.50")+'</span></div><div class="t"><span>Total</span><span>'+(cc?"$2,386.00":"$2,316.50")+'</span></div></div>'+
+  '<div class="pays"><div><span class="sbtn">Cash</span><span class="sbtn'+(o.card?" hot":"")+'">Card</span><span class="sbtn">Debit</span><span class="sbtn">Credit Account</span></div>'+(o.warn?'<div class="refbox"><b>Card needs the fee</b>'+o.warn+'</div>':'')+'</div>';
+ const body='<div class="sh">Current sale</div><div class="salegrid"><div class="bill"><h4><span>Bill #318</span><span>Pro Shop</span></h4>'+line+'</div><div class="bill">'+right+'</div></div>';
+ return '<div class="pos"><div class="urlbar"><i></i><span>pelhamhills-golf.vercel.app/admin/retail?view=sale</span></div><div class="posbar"><span><small>PELHAM HILLS POS</small><b>Pro Shop</b></span><span class="st">Snack Bar <i>Pro Shop</i></span></div><div class="postabs"><span class="on">Register</span><span>Products</span></div><div class="posbody">'+body+'</div></div>';
+}
+function mapScreen(hot){
+ const rows=[
+  ["Customer → Subscriptions → Sell","Customer file → Sell membership"],
+  ["Add → Membership (product list)","Membership list · pre-tax price"],
+  ["Schedule: Start · End","Start date · End = expiry date"],
+  ["Summary: Subtotal · Tax · Total","Paying by · Subtotal · HST 13% · Total"],
+  ["Payment method: Register","Send to register"],
+  ["Retail Sales → Payment","Register bill → Cash / Card / Debit"]
+ ];
+ return frame("/admin/customers","Lightspeed → Pelham Hills","Map",'<div class="ms-map"><div class="hd"><span>Lightspeed</span><span></span><span>Pelham Hills</span></div>'+rows.map((r,i)=>'<div class="rw'+(hot===i?" hot":"")+'"><span><b>'+r[0]+'</b></span><em>→</em><span><b>'+r[1]+'</b></span></div>').join("")+'</div>');
+}
+function rulesScreen(n){
+ const R=[
+  ["Refund the bill","Paid amount comes back off. Active → Pending.",""],
+  ["Already paid in full","The register refuses to add the line again.","warn"],
+  ["Paid toward a different type","Change it on Memberships, not at the register.","warn"],
+  ["Part already paid","Only the balance goes on the bill.",""],
+  ["Card without the fee","Card is refused until the line has the 3% fee.","warn"]
+ ];
+ return frame("/admin/retail","Rules","Register",'<div class="sh">Edge cases</div><div style="display:grid;gap:6px">'+R.map((r,i)=>'<div class="ms-rule '+(i<n?(r[2]||"hot"):"")+'"><b>'+r[0]+'</b><span>'+r[1]+'</span></div>').join("")+'</div>');
+}
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"look",ko:"전체 구성",en:"Overview",
+ screen:(l,p)=>mapScreen(Math.min(5,Math.floor(p*6))),
+ log:[
+  {at:.15,tag:"ui",name:"Lightspeed Golf · Subscriptions",ep:"Sell → Register → Retail payment",why:L("사진에서 본 순서 그대로예요. 고객 → 회원권 고르기 → 기간 → 요약 → Register → 레지스터 결제.","The same order as the photos: customer → pick membership → dates → summary → Register → pay at the register.")},
+  {at:.45,tag:"ui",name:"customers/page.tsx",ep:"new · SellMembershipDialog",why:L("고객 파일에 Sell membership 버튼과 창을 더했어요.","Adds a Sell membership button and window to the customer file.")},
+  {at:.7,tag:"rpc",name:"0072_membership_register.sql",ep:"new line kind · RPC · trigger",why:L("계산서 줄 종류 membership, 담는 함수, 결제·환불 때 회원권을 고치는 트리거.","A membership line kind, the add function, and a trigger that updates the membership on pay and refund.")}
+ ],
+ ledger:[{at:0,m:"none",bill:"none",cust:"pub"}]},
+
+{a:"file",ph:"look",ko:"고객 파일",en:"Customer file",
+ screen:(l,p)=>custScreen({hot:p>.4}),
+ log:[
+  {at:.15,tag:"key",name:"Customers",ep:"/admin/customers · click a row"},
+  {at:.35,tag:"rpc",name:"pelham_staff_customers",ep:"staff token",why:L("명부와 가장 최근 시즌 회원권을 같이 읽어요(0070).","Reads the customer list with each latest-season membership (0070).")},
+  {at:.65,tag:"ui",name:"CustomerFile",ep:"Edit · Sell membership",why:L("Lightspeed의 Subscriptions 탭 Sell 버튼 자리예요. 매니저 PIN은 필요 없어요. 값은 요금표에서 정해지니까요.","This is where Lightspeed's Sell button sits. No manager PIN, because the price comes from the rate card.")}
+ ],
+ ledger:[{at:0,m:"none",bill:"none",cust:"pub"}]},
+
+{a:"pick",ph:"pick",ko:"회원권과 기간",en:"Membership and dates",
+ screen:(l,p)=>custScreen({modal:sellModal({q:p>.3,pick:p>.5,start:p>.68&&p<.82,end:p>.82})}),
+ log:[
+  {at:.12,tag:"ui",name:"MEMBERSHIP_PRODUCTS",ep:"type × plan × cart",why:L("Lightspeed 목록처럼 종류·플랜·카트를 한 줄씩 펼쳐요. 검색으로 좁혀요.","Like the Lightspeed list, every type, plan and cart is one row. Search narrows it.")},
+  {at:.4,tag:"key",name:"Search",ep:"\"weekday\""},
+  {at:.58,tag:"key",name:"Weekday Single Membership",ep:"$2,050.00 (pre-tax)"},
+  {at:.68,tag:"key",name:"Start",ep:"2026-10-22",why:L("시작일은 starts_on(0072)으로 따로 저장돼요. 기본은 오늘, 다음 시즌이면 4월 1일이에요.","The start date is saved on its own as starts_on (0072). It defaults to today, or April 1 for next season.")},
+  {at:.84,tag:"key",name:"End",ep:"2026-12-15",why:L("끝나는 날은 회원권 만료일(expires_on, 0069)이 돼요. 지나면 티시트가 회원 요금을 안 줘요.","The end date becomes the membership expiry (expires_on, 0069). After it, the tee sheet stops giving member rates.")}
+ ],
+ ledger:[{at:0,m:"none",bill:"none",cust:"pub"}]},
+
+{a:"tax",ph:"pick",ko:"결제 수단과 3%",en:"Paying by and 3%",
+ screen:(l,p)=>custScreen({modal:sellModal({q:true,pick:true,end:true,card:p>.55})}),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_membership_price",ep:"weekday · single → $2,316.50",why:L("우리 요금표는 HST가 들어간 금액이에요.","Our rate card prices include HST.")},
+  {at:.45,tag:"ui",name:"÷ 1.13",ep:"$2,316.50 → $2,050.00",why:L("그래서 세전 가격으로 줄을 올리고, 계산서가 원래대로 13%를 얹어요. Lightspeed 화면과 같은 숫자예요.","So the line goes on pre-tax and the bill adds its usual 13%. Same figures as the Lightspeed screen.")},
+  {at:.58,tag:"key",name:"Paying by",ep:"Credit card (+3%)",why:L("신청서 규칙대로 신용카드면 남은 금액에 3%를 먼저 얹어요. 단말기가 결제 기록보다 먼저 카드를 긁으니까, 수수료는 결제 전에 줄 가격에 들어 있어야 해요.","Per the application form, credit card adds 3% to the balance first. The terminal charges the card before the payment is recorded, so the fee has to be in the line price before paying.")},
+  {at:.8,tag:"ui",name:"$2,316.50 × 1.03 ÷ 1.13",ep:"$2,111.50 + HST $274.50 = $2,386.00"}
+ ],
+ ledger:[{at:0,m:"none",bill:"none",cust:"pub"}]},
+
+{a:"send",ph:"pay",ko:"레지스터로 보내기",en:"Send to register",
+ screen:(l,p)=>p<.45?custScreen({modal:sellModal({q:true,pick:true,end:true,card:true,send:true,sending:p>.25})}):regScreen({cc:true}),
+ log:[
+  {at:.12,tag:"key",name:"Send to register",ep:"button"},
+  {at:.28,tag:"rpc",name:"pelham_staff_bill_add_membership",ep:"staff token",body:{p_bill:318,customer_ref:"PH00412",season:2026,membership_type:"weekday",plan:"single",starts_on:"2026-10-22",expires_on:"2026-12-15",card_fee:true},why:L("열린 계산서가 없으면 Pro Shop 계산서를 새로 열어요.","Opens a Pro Shop bill if none is open.")},
+  {at:.42,tag:"rpc",name:"pelham_memberships",ep:"insert · status pending",why:L("그 시즌 회원권이 없으면 만들고, 있으면 종류·만료일을 맞춰요.","Creates that season's membership, or updates its type and expiry.")},
+  {at:.55,tag:"rpc",name:"pelham_bill_lines",ep:"kind membership · SKU MEMBERSHIP-CC · $2,111.50",why:L("수량은 1로 고정이에요. SKU가 MEMBERSHIP-CC면 3%가 들어간 줄이에요. 레지스터 줄의 버튼으로 수수료를 켜고 끌 수 있어요.","Quantity is fixed at 1. SKU MEMBERSHIP-CC means the 3% is in. The button on the register line turns the fee on or off.")},
+  {at:.75,tag:"local",name:"router.push",ep:"/admin/retail → sale view",why:L("레지스터 판매 화면이 바로 열려요. 지금 계산서 번호는 이 기기에 남아 있어요.","The register opens straight to the sale view. The current bill id is kept on this device.")}
+ ],
+ ledger:[{at:0,m:"none",bill:"none",cust:"pub"},{at:.42,m:"pending",bill:"open",cust:"member",flash:["m","bill"]}]},
+
+{a:"pay",ph:"pay",ko:"결제",en:"Take payment",
+ screen:(l,p)=>regScreen({cc:true,card:p<.55,paid:p>=.55}),
+ log:[
+  {at:.08,tag:"ui",name:"tender check",ep:"before the reader",why:L("단말기로 보내기 전에 화면이 수단과 수수료를 맞춰 봐요. 3% 없는 줄을 카드로, 3% 줄을 현금으로 받으려 하면 여기서 멈춰요.","Before anything goes to the reader, the screen checks the method against the fee. Card on a line without 3%, or cash on a 3% line, stops here.")},
+  {at:.18,tag:"key",name:"Card",ep:"Stripe S700 · $2,386.00"},
+  {at:.35,tag:"stripe",name:"terminal",ep:"approved ····4242"},
+  {at:.5,tag:"rpc",name:"pelham_staff_bill_pay",ep:"checkout_id · payments",why:L("다른 결제와 똑같이 영수증 번호가 붙고 계산서가 paid가 돼요.","Like any sale, it gets a receipt number and the bill turns paid.")},
+  {at:.65,tag:"rpc",name:"pelham_pos_membership_on_bill",ep:"trigger · open → paid",body:{amount_due:2386,amount_paid:2386,status:"active",paid_on:"2026-10-22",payment_method:"Credit card"},why:L("같은 트랜잭션 안에서 회원권에 낸 돈을 더하고, 카드 수수료 $69.50은 회원권 금액에 더해요. 수단이 안 맞거나 회원권이 취소됐으면 결제 전체를 되돌려요.","In the same transaction it adds the payment, and the $69.50 card fee goes onto the membership amount. If the method doesn't match or the membership was cancelled, the whole payment is rolled back.")},
+  {at:.85,tag:"rpc",name:"notes",ep:"Paid $2,386.00 at the register (incl. $69.50 card fee) · PH-20261022-0007 · card"}
+ ],
+ ledger:[{at:0,m:"pending",bill:"open",cust:"member"},{at:.5,bill:"paid",flash:["bill"]},{at:.65,m:"active",flash:["m"]}]},
+
+{a:"after",ph:"look",ko:"결제 뒤",en:"After payment",
+ screen:()=>custScreen({st:"active"}),
+ log:[
+  {at:.15,tag:"ui",name:"Customer file",ep:"2026 Weekday · Active · Paid by Credit card"},
+  {at:.4,tag:"rpc",name:"pelham_tee_sync_member",ep:"trigger (0069)",why:L("회원권이 바뀌면 그 사람의 앞으로 잡힌 티타임 요금도 회원 요금으로 다시 맞춰요.","When the membership changes, that person's upcoming tee times are repriced at member rates.")},
+  {at:.65,tag:"ui",name:"Memberships",ep:"Paid · balance $0.00",why:L("Memberships 화면에서도 완납으로 보여요. 손으로 적을 필요가 없어요.","Memberships shows it as paid in full too. Nothing to type in by hand.")},
+  {at:.85,tag:"ui",name:"Reports",ep:"division Memberships",why:L("매출 보고서와 회계 엑셀에 다섯 번째 사업부 칸 Memberships가 생겼어요. Pro Shop Retail에 섞이지 않아요.","Sales reports and the accounting workbook get a fifth division, Memberships. It no longer mixes into Pro Shop Retail.")}
+ ],
+ ledger:[{at:0,m:"active",bill:"paid",cust:"member"}]},
+
+{a:"rules",ph:"look",ko:"환불과 규칙",en:"Refunds and rules",
+ screen:(l,p)=>rulesScreen(Math.min(5,Math.ceil(p*5.5))),
+ log:[
+  {at:.12,tag:"rpc",name:"pelham_staff_bill_refund",ep:"manager PIN",why:L("환불하면 트리거가 낸 돈을 빼고 Active를 Pending으로 돌려요.","On refund the trigger takes the payment back off and turns Active back to Pending.")},
+  {at:.32,tag:"rpc",name:"409 · already paid in full",ep:"add_membership / bill_pay"},
+  {at:.5,tag:"rpc",name:"409 · paid toward a different type",ep:"change it on Memberships"},
+  {at:.66,tag:"ui",name:"balance only",ep:"amount_due − amount_paid"},
+  {at:.78,tag:"rpc",name:"422 · card needs the 3% fee",ep:"screen first, trigger again"},
+  {at:.9,tag:"rpc",name:"to do",ep:"run 0072 · test one real sale",why:L("SQL Editor에서 0072를 한 번 실행해야 써요(첫 버전을 이미 돌렸어도 다시 붙여 넣으면 돼요). 실제 결제로 한 번 해 봐야 해요.","Run 0072 once in the SQL Editor (pasting it again is fine if the first version already ran), then try one real sale.")}
+ ],
+ ledger:[{at:0,m:"active",bill:"paid",cust:"member"},{at:.15,m:"pending",bill:"refunded",flash:["m","bill"]}]}
+];
+
+const PH={look:{ko:"보기",en:"Read"},pick:{ko:"고르기",en:"Pick"},pay:{ko:"결제",en:"Pay"}};
+const TAGS={ui:"SCREEN",rpc:"SERVER",local:"DEVICE",stripe:"TERMINAL",key:"INPUT"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const rows=a=>'<div class="lrows">'+a.map(r=>'<div class="'+(r[2]||"")+'"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>').join("")+'</div>';
+  const m=st.m;
+  const mp={none:["none",k==="ko"?"아직 없음":"None yet"],pending:["wait","pending"],active:["ok","active"]}[m];
+  let h=card("m",k==="ko"?"회원권":"Membership","pelham_memberships · 2026",pill(mp[0],mp[1]),
+    m==="none"?'<p class="lnote">'+(k==="ko"?"Send to register를 누르면 생겨요.":"Created when you press Send to register.")+'</p>':
+    rows([["membership_type · plan","weekday · single"],["starts_on → expires_on","2026-10-22 → 2026-12-15"],["amount_due",m==="active"?"$2,386.00":"$2,316.50",m==="active"?"cur":""],["amount_paid",m==="active"?"$2,386.00":"$0.00",m==="active"?"cur":""],["payment_method",m==="active"?"Credit card":"—"]]));
+  const b=st.bill;
+  const bp={none:["none",k==="ko"?"없음":"None"],open:["wait","open"],paid:["ok","paid"],refunded:["bad","refunded"]}[b];
+  h+=card("bill",k==="ko"?"계산서":"Bill","pelham_bills #318 · pro_shop",pill(bp[0],bp[1]),
+    b==="none"?'<p class="lnote">'+(k==="ko"?"레지스터로 보내면 열려요.":"Opens when you send it to the register.")+'</p>':
+    rows([["line · SKU","MEMBERSHIP-CC"],["subtotal","$2,111.50"],["tax","$274.50"],["total","$2,386.00"],["receipt_no",b==="open"?"—":"PH-20261022-0007",b==="open"?"":"cur"]]));
+  h+=card("c",k==="ko"?"고객 명부":"Customer","pelham_customers · PH00412",st.cust==="member"?pill("vi","Member"):pill("none","Public"),
+    rows([["is_member",st.cust==="member"?"true":"false"],["player_type",st.cust==="member"?"Weekday Member - Single":"—"]]));
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"ov": {"ko": 16.0, "en": 14.7}, "file": {"ko": 15.2, "en": 13.9}, "pick": {"ko": 17.6, "en": 17.7}, "tax": {"ko": 18.4, "en": 15.8}, "send": {"ko": 16.3, "en": 15.3}, "pay": {"ko": 16.4, "en": 15.0}, "after": {"ko": 14.5, "en": 14.2}, "rules": {"ko": 17.4, "en": 16.8}};
+const NARR={"ko": {"ov": "이번엔 회원권 결제 흐름이에요. Lightspeed에서 하던 순서 그대로예요. 고객을 열고, 회원권을 고르고, 시작일과 끝나는 날을 정하고, 결제 수단과 요약을 보고, 레지스터로 보내서 돈을 받아요. 우리 시스템에서도 같은 여섯 단계예요.", "file": "먼저 Customers 화면에서 고객을 눌러 고객 파일을 열어요. Edit 버튼 아래에 새로 Sell membership 버튼이 생겼어요. Lightspeed의 Subscriptions, Sell 버튼 자리예요. 가격은 요금표에서 정해지니까 매니저 PIN은 필요 없어요.", "pick": "Sell membership을 누르면 창이 열려요. Lightspeed 목록처럼 종류, 플랜, 카트 조합이 한 줄씩 나오고, 검색으로 좁힐 수 있어요. Weekday Single을 고르고, 시작일과 끝나는 날을 정해요. 시작일은 따로 저장되고, 끝나는 날이 지나면 티시트가 회원 요금을 주지 않아요.", "tax": "요금표 금액은 HST가 들어간 값이라 일 점 일 삼으로 나눠 세전으로 올려요. 그리고 Paying by에서 결제 수단을 골라요. 신용카드를 고르면 신청서 규칙대로 3퍼센트가 먼저 붙어서, 이천백십일 달러 오십 센트에 HST를 더해 이천삼백팔십육 달러가 돼요.", "send": "Send to register를 누르면 서버가 그 시즌 회원권을 pending으로 만들고, 레지스터 계산서에 회원권 한 줄을 담아요. 수량은 1로 고정이고, 카드 수수료는 레지스터 줄의 버튼으로도 켜고 끌 수 있어요. 레지스터 판매 화면이 바로 열려요.", "pay": "이제 카드로 받아요. 단말기로 보내기 전에 화면이 결제 수단과 수수료를 맞춰 봐서, 3퍼센트 없는 줄을 카드로 받으려 하면 멈춰요. 결제가 끝나면 트리거가 회원권에 낸 돈을 더하고, 카드 수수료도 회원권 금액에 더한 뒤 Active로 바꿔요.", "after": "고객 파일로 돌아가면 2026 Weekday Active, 시작일과 만료일, Paid by Credit card가 보여요. 앞으로 잡힌 티타임은 회원 요금으로 다시 맞춰지고, 매출 보고서에는 다섯 번째 칸 Memberships로 따로 잡혀요.", "rules": "계산서를 환불하면 낸 돈과 카드 수수료를 다시 빼고 Pending으로 돌려요. 이미 완납했거나 다른 종류로 돈을 낸 회원권은 막고, 일부만 냈으면 남은 금액만 올라가요. 쓰기 전에 0072 SQL을 한 번 실행하고, 실제 결제로 한 번 시험해 주세요."}, "en": {"ov": "This is the membership payment flow, in the same order you used in Lightspeed. Open the customer, pick a membership, set the start and end dates, check how they're paying and the summary, then send it to the register and take the money there. The same six steps here.", "file": "First, click a customer on the Customers screen to open the customer file. Under Edit there's a new Sell membership button, right where Lightspeed has Subscriptions and Sell. The price comes from the rate card, so no manager PIN is needed.", "pick": "Sell membership opens a window. Like the Lightspeed list, every type, plan and cart combination is one row, and search narrows it down. Pick Weekday Single, then set the start and end dates. The start date is saved on its own, and after the end date the tee sheet stops giving member rates.", "tax": "Rate card prices include HST, so the line goes on before tax, divided by one point one three. Then choose Paying by. With credit card, the application form's three percent goes on first, so it's twenty-one eleven fifty plus HST, twenty-three eighty-six in total.", "send": "Press Send to register. The server creates that season's membership as pending and puts one membership line on the register bill, quantity fixed at one. The card fee can also be turned on or off with the button on the register line. The register sale screen opens right away.", "pay": "Now take the card. Before anything goes to the reader, the screen checks the method against the fee, so card on a line without the three percent stops right there. Once paid, a trigger adds the payment to the membership, adds the card fee to its amount, and turns it Active.", "after": "Back on the customer file, it shows 2026 Weekday, Active, with its start and end dates, paid by credit card. Upcoming tee times are repriced at member rates, and sales reports show it in a fifth division, Memberships.", "rules": "Refunding the bill takes the payment and the card fee back off and returns it to Pending. A membership already paid in full, or paid toward a different type, is blocked, and a part payment leaves only the balance. Before using it, run the 0072 SQL once and try one real sale."}};
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phms-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phms-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phms-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phms-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

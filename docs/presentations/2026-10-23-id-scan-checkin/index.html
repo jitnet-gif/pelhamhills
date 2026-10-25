@@ -1,0 +1,1089 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ID Scan Check-in</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- membership sale mocks (prefixed ms-) ---- */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px}
+.seg.lang svg{width:20px;height:18px;flex:0 0 auto}
+.seg.lang svg path{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.seg.lang svg text{fill:currentColor;font-family:var(--sans);font-weight:700;font-size:8.5px}
+.ms-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:8px}
+.ms-file{border:1px solid var(--scr-line);background:var(--scr-paper);padding:9px;display:grid;gap:7px;align-content:start}
+.ms-file .hd{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
+.ms-file .hd small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-file .hd b{font-size:14px}
+.ms-file .btns{display:grid;gap:4px;justify-items:end}
+.ms-file dl{margin:0;display:grid;gap:5px;font-size:10.5px}
+.ms-file dt{font-weight:700;color:var(--scr-muted)}
+.ms-file dd{margin:0}
+.ms-tagm{font-size:9px;font-weight:700;padding:1px 6px;background:#ECECF0;color:#4E5560}
+.ms-tagm.on{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.ms-red{color:var(--scr-red);font-weight:700}
+.ms-okt{color:var(--scr-ok);font-weight:700}
+.ms-modal{background:var(--scr-paper);width:min(440px,100%);max-height:100%;overflow:hidden;display:grid;gap:7px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.ms-modal small.ey{font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ms-modal h4{margin:0;font-size:14px}
+.ms-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ms-dates div{display:grid;gap:2px;font-size:9px;font-weight:700;color:var(--scr-muted)}
+.ms-dates span{border:1px solid var(--scr-line);padding:4px 5px;font-weight:400;color:var(--scr-ink);font-size:10.5px;font-family:var(--mono)}
+.ms-dates span.off{background:#F7F7F8}
+.ms-dates span.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.2)}
+.ms-list{border:1px solid var(--scr-line);max-height:170px;overflow:hidden}
+.ms-list div{display:flex;justify-content:space-between;gap:6px;padding:4px 7px;border-bottom:1px solid #EEF0F2;font-size:10.5px}
+.ms-list div i{font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ms-list div.pick{background:var(--scr-accent);color:#fff;font-weight:700}
+.ms-foot{display:flex;justify-content:flex-end;gap:5px}
+.ms-note{font-size:9px;color:var(--scr-muted);text-align:right}
+.ms-map{display:grid;gap:6px;padding:4px}
+.ms-map .rw{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center;font-size:10.5px}
+.ms-map .rw span{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 7px;min-width:0}
+.ms-map .rw span b{display:block;font-size:11px}
+.ms-map .rw span small{display:block;color:var(--scr-muted);font-size:9px}
+.ms-map .rw em{font-style:normal;text-align:center;color:var(--scr-accent);font-weight:700}
+.ms-map .hd{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:6px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.ms-map .rw.hot span:last-child{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-paid{background:var(--scr-ok-soft);color:var(--scr-ok);padding:8px;display:grid;gap:2px;font-size:11px}
+.ms-paid b{font-size:13px}
+.ms-rule{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px 8px;display:grid;gap:2px;font-size:10.5px}
+.ms-rule b{font-size:11px}
+.ms-rule.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ms-rule.warn{border-color:#E2A5A5;background:var(--scr-red-soft)}
+@media (max-width:560px){.ms-grid{grid-template-columns:minmax(0,1fr)}.ms-dates{grid-template-columns:minmax(0,1fr)}}
+.ph.pick{background:var(--violet-soft);color:var(--violet)}
+.ph.pay{background:var(--blue-soft);color:var(--blue)}
+.lnote{font-size:12px;color:var(--muted)}
+/* ---- tee capacity (ts-) ---- */
+.ph.rule{background:var(--green-soft);color:var(--green)}
+.ph.guest{background:var(--blue-soft);color:var(--blue)}
+.ph.desk{background:var(--violet-soft);color:var(--violet)}
+.ts-strip{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin:8px 0}
+.ts-seat{border:1px solid var(--scr-line);background:var(--scr-paper);min-height:46px;display:grid;align-content:space-between;padding:3px 4px}
+.ts-seat.x{border-style:dashed}
+.ts-seat small{font-size:9px;color:var(--scr-muted)}
+.ts-seat b{font-size:9px;font-family:var(--mono)}
+.ts-seat.on.w{background:#E2ECF5;color:#2D5E8C;border-color:#2D5E8C}
+.ts-seat.on.p{background:#E6F4EA;color:#1F6B3A;border-color:#1F6B3A}
+.ts-seat.on.c{background:var(--scr-accent-soft);color:var(--scr-accent);border-color:var(--scr-accent)}
+.ts-bands{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ts-band{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 7px;display:grid;gap:2px;font-size:10.5px;opacity:.45;transition:opacity .3s}
+.ts-band.on{opacity:1}
+.ts-band.std.on{border-color:#2D5E8C;background:#E2ECF5}
+.ts-band.ext.on{border-color:var(--scr-accent);background:var(--scr-accent-soft);border-style:dashed}
+.ts-band b{font-family:var(--mono);font-size:12px}
+.ts-who{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:8px}
+.ts-who div{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:1px;font-size:10.5px;opacity:.45}
+.ts-who div.on{opacity:1}
+.ts-who b{font-size:13px}
+.ts-pub{background:#FBF9F4;padding:10px;display:grid;gap:6px;color:#1F2328}
+.ts-pub .hd{display:flex;justify-content:space-between;gap:6px;align-items:baseline;flex-wrap:wrap}
+.ts-pub .hd span{font-size:10.5px;color:#6B7280}
+.ts-slot{display:flex;justify-content:space-between;align-items:center;gap:6px;border:1px solid #D8D1C3;background:#fff;padding:7px 9px;font-size:11px}
+.ts-slot small{display:block;font-size:9.5px;color:#6B7280}
+.ts-slot.hot{border-color:#2F5D3A;box-shadow:0 0 0 2px rgba(47,93,58,.25)}
+.ts-gone{font-size:10.5px;color:#8A1F1F;margin:0}
+.ts-call{display:grid;gap:6px}
+.ts-call div{max-width:85%;padding:6px 8px;font-size:11px;animation:rise .35s ease-out}
+.ts-call div small{display:block;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
+.ts-call .c{justify-self:start;background:var(--scr-paper);border:1px solid var(--scr-line)}
+.ts-call .a{justify-self:end;background:var(--scr-accent);color:#fff}
+.ts-code{font-family:var(--mono);font-size:10px;overflow-wrap:anywhere}
+.ts-mini{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+.ts-mini span{border:1px solid var(--line);text-align:center;font-family:var(--mono);font-size:11px;padding:4px 0;color:var(--muted)}
+.ts-mini span.x{border-style:dashed}
+.ts-mini span.on{font-weight:700;color:var(--fg,inherit)}
+.ts-mini span.on.w{background:var(--blue-soft);color:var(--blue)}
+.ts-mini span.on.p{background:var(--ok-soft);color:var(--ok)}
+.ts-mini span.on.c{background:var(--violet-soft);color:var(--violet)}
+@media (max-width:560px){.ts-bands,.ts-who{grid-template-columns:minmax(0,1fr)}}
+/* Calls & SMS mock */
+.cx{display:grid;grid-template-columns:62px 1fr;min-height:250px;font-size:10.5px}
+.cx-side{background:#141414;color:#e9e9ee;padding:8px 6px;display:grid;align-content:start;gap:5px;font-size:9.5px}
+.cx-side b{font-size:10px;margin-bottom:4px}
+.cx-side span{padding:3px 4px;opacity:.75}
+.cx-side span.on{background:#4533ff;opacity:1;color:#fff}
+.cx-main{padding:8px;display:grid;align-content:start;gap:7px;min-width:0}
+.cx-h{font-weight:700;font-size:12px}
+.cx-lede{color:var(--scr-muted);line-height:1.45;transition:background .3s}
+.cx-tabs{display:flex;gap:4px}
+.cx-tabs span{border:1px solid var(--scr-line);padding:3px 8px;font-weight:700}
+.cx-tabs span.on{background:#1f2430;color:#fff;border-color:#1f2430}
+.cx-met{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.cx-met div{border:1px solid var(--scr-line);padding:4px 5px;background:var(--scr-paper)}
+.cx-met small{display:block;color:var(--scr-muted);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-met b{font-size:14px}
+.cx-row{display:grid;grid-template-columns:62px 1fr auto auto;gap:6px;align-items:center;border:1px solid var(--scr-line);padding:5px 6px;background:var(--scr-paper)}
+.cx-row small{display:block;color:var(--scr-muted)}
+.cx-row .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-badge{padding:1px 5px;font-weight:700;font-size:9.5px;white-space:nowrap}
+.cx-badge.ok{background:#e3f4e8;color:#1d7a3e}.cx-badge.no{background:#fde8e8;color:#b42318}.cx-badge.inf{background:#eceef2;color:#4a5160}
+.cx-btn{border:1px solid var(--scr-line);padding:2px 6px;font-weight:700;white-space:nowrap}
+.cx-link{color:#4533ff;font-weight:700;white-space:nowrap}
+.cx-new{animation:cxflash 1.1s ease}
+@keyframes cxflash{0%{background:#fff3b0}100%{background:transparent}}
+.cx-dl{display:grid;grid-template-columns:70px 1fr;gap:3px 8px}
+.cx-dl dt{color:var(--scr-muted);font-weight:700}
+.cx-dl dd{margin:0}
+.cx-sec{font-size:9px;font-weight:700;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.04em}
+.cx-bub{max-width:85%;padding:4px 6px;background:#f0f1f3}
+.cx-bub.c{justify-self:end;background:#e6e3ff}
+.cx-tool{color:#4533ff;font-weight:700}
+.cx-sms{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;border:1px solid var(--scr-line);padding:5px 6px;background:var(--scr-paper)}
+.cx-sms small{display:block;color:var(--scr-muted)}
+.cx-st{font-weight:700;font-size:9.5px;white-space:nowrap}
+.cx-st.ok{color:#1d7a3e}.cx-st.bad{color:#b42318}.cx-st.mid{color:#8a6100}
+.cx-gl{display:grid;gap:3px;font-size:11px}
+.cx-gl div{display:grid;grid-template-columns:1fr 14px 1fr;gap:4px;align-items:baseline}
+.cx-gl s{color:var(--muted,#888);text-decoration-thickness:1px}
+.cx-gl i{font-style:normal;opacity:.5;text-align:center}
+.cx-gl b{font-weight:600}
+/* ---- promotions → marketing (pm-) ---- */
+.ph.promo{background:var(--violet-soft);color:var(--violet)}
+.ph.mkt{background:var(--blue-soft);color:var(--blue)}
+.ph.ship{background:var(--green-soft);color:var(--green)}
+.pm-flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:200px;align-content:center}
+.pm-step{flex:1 1 96px;border:1px solid var(--scr-line);background:var(--scr-paper);padding:8px;display:grid;gap:3px;font-size:10.5px;opacity:.4;transition:opacity .3s}
+.pm-step.on{opacity:1;border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.pm-step em{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--scr-muted)}
+.pm-step b{font-size:12px}
+.pm-arr{font-style:normal;color:var(--scr-line);font-weight:700}
+.pm-arr.on{color:var(--scr-accent)}
+.pm-two{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:6px;align-items:start}
+.pm-form{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:4px}
+.pm-form small.ey,.pm-sec small.ey{font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.pm-f{display:grid;gap:1px;font-size:9.5px;min-width:0}
+.pm-f small{font-weight:700;font-size:9px}
+.pm-f span{border:1px solid var(--scr-line);padding:3px 5px;min-height:20px;background:var(--scr-paper);overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.pm-f.hot span{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.2)}
+.pm-2{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.pm-btn{background:#4533ff;color:#fff;font-weight:700;text-align:center;padding:4px 8px;font-size:10px;white-space:nowrap}
+.pm-btn.ghost{background:var(--scr-paper);color:var(--scr-ink);border:1px solid var(--scr-line)}
+.pm-btn.hot{box-shadow:0 0 0 3px rgba(69,51,255,.35)}
+.pm-tbl{border:1px solid var(--scr-line);background:var(--scr-paper);min-width:0}
+.pm-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 48px auto;gap:5px;align-items:center;padding:5px 6px;border-bottom:1px solid #EEF0F2;font-size:10px}
+.pm-row.hd{font-size:8.5px;font-weight:700;color:var(--scr-muted);text-transform:uppercase;background:#F7F7F8}
+.pm-row b{display:block;font-size:10.5px}
+.pm-st{font-style:normal;font-size:8.5px;font-weight:700;padding:0 4px}
+.pm-st.a{background:#dff7e8;color:#087333}.pm-st.s{background:#ffd400;color:#1d232b}
+.pm-act{display:flex;gap:3px}
+.pm-act i{font-style:normal;font-size:9px;font-weight:700;border:1px solid var(--scr-line);padding:1px 4px}
+.pm-act i.pm-text{background:#4533ff;color:#fff;border-color:#4533ff}
+.pm-act i.pm-text.hot{box-shadow:0 0 0 3px rgba(69,51,255,.35)}
+.pm-newtab{border:1px dashed var(--scr-accent);background:var(--scr-accent-soft);padding:6px;display:grid;gap:3px;font-size:10px}
+.pm-newtab code{font-family:var(--mono);font-size:9px;word-break:break-all;color:var(--scr-muted)}
+.pm-mk{background:#f2f2f4;min-height:250px}
+.pm-top{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;background:#111315;color:#fff;padding:5px 8px;font-size:10px}
+.pm-top small{font-size:8px;opacity:.6;letter-spacing:.1em}
+.pm-top span{opacity:.7;font-size:9px}
+.pm-body{padding:7px;display:grid;gap:6px}
+.pm-sec{background:var(--scr-paper);padding:7px;display:grid;gap:5px;font-size:10.5px}
+.pm-ch{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.pm-ch span{border:1px solid var(--scr-line);padding:4px 6px;font-weight:700}
+.pm-ch span small{display:block;font-weight:400;color:var(--scr-muted);font-size:9px}
+.pm-ch span.on{border-color:#4533ff;background:#f0eeff}
+.pm-count{margin:0;text-align:right;font-size:9px;color:var(--scr-muted)}
+.pm-bub{margin:2px 0 0;max-width:92%;background:#e9e9eb;border-radius:12px;padding:6px 9px;font-size:10px;line-height:1.45}
+.pm-pills{display:flex;flex-wrap:wrap;gap:4px;font-size:9.5px}
+.pm-pills span{padding:2px 6px;font-weight:700}
+.pm-pills span.ok{background:#e3f5e8;color:#16723a}
+.pm-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;text-align:center}
+.pm-stats div{border:1px solid var(--scr-line);padding:4px 2px}
+.pm-stats div.strong{border-color:#4533ff;background:#f0eeff}
+.pm-stats b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.pm-stats small{font-size:8.5px;color:var(--scr-muted)}
+.pm-chk{font-size:9.5px}
+.pm-list{border:1px solid #ececf0}
+.pm-list div{display:grid;grid-template-columns:1fr 1fr auto;gap:4px;padding:3px 6px;border-bottom:1px solid #f0f1f3;font-size:9.5px}
+.pm-list div.x{color:var(--scr-muted);text-decoration:line-through}
+.pm-foot{display:flex;justify-content:flex-end;gap:5px}
+.pm-bar{height:6px;background:#ececf0}
+.pm-bar i{display:block;height:6px;background:#4533ff;transition:width .3s}
+.pm-login{background:#111315;min-height:250px;display:grid;place-content:center;gap:6px;padding:10px;color:#fff;font-size:10px}
+.pm-lcard{background:#fff;color:var(--scr-ink);padding:9px;display:grid;gap:5px;width:min(230px,70vw)}
+.pm-lcard p{margin:0;font-size:9px;color:var(--scr-muted);line-height:1.4}
+@media (max-width:560px){.pm-two{grid-template-columns:minmax(0,1fr)}}
+.pm-two .pm-row{grid-template-columns:minmax(0,1fr) 44px auto}
+.pm-two .pm-row>span:nth-child(2){display:none}
+.pm-row b{overflow-wrap:anywhere}
+/* ---- barcode version ---- */
+.ph.desk{background:var(--green-soft);color:var(--green)}
+.pm-bc{display:block;width:150px;height:42px;background:repeating-linear-gradient(90deg,#111 0 2px,#fff 2px 4px,#111 4px 5px,#fff 5px 8px,#111 8px 11px,#fff 11px 12px,#111 12px 13px,#fff 13px 16px);border:6px solid #fff;outline:1px solid var(--scr-line)}
+.pm-bc.sm{width:90px;height:26px;border-width:3px}
+.pm-row4{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px auto}
+.pm-use{font-variant-numeric:tabular-nums;font-weight:700}
+.pm-st.x{background:#ececf0;color:#4e5560}
+.pm-act i.hot{box-shadow:0 0 0 3px rgba(69,51,255,.35)}
+.pm-bcbox{display:flex;align-items:center;justify-content:flex-end;gap:8px;background:#f7f7f8;padding:6px;border-bottom:1px solid #EEF0F2}
+.pm-bcbox code{font-family:var(--mono);font-size:10px}
+.pm-bcbox .pm-btn,.pm-attach .pm-btn{font-style:normal}
+.pm-hint{font-size:8.5px;color:var(--scr-muted);margin-top:-2px}
+.pm-attach{display:flex;align-items:center;gap:7px;border:1px solid #d9d4ff;background:#f6f5ff;padding:6px;font-size:9.5px}
+.pm-attach span{flex:1;min-width:0}
+.pm-phone{background:#f2f2f4;min-height:250px;padding:12px;display:grid;align-content:start}
+.pm-msg{max-width:300px;background:#e9e9eb;border-radius:14px;padding:8px 10px;display:grid;gap:7px;font-size:10px;line-height:1.45}
+.pm-msg p{margin:0}
+.pm-mms{background:#fff;border-radius:8px;padding:8px;display:grid;justify-items:center;gap:3px}
+.pm-mms code{font-family:var(--mono);font-size:9.5px}
+.pm-two2{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:6px;align-items:start}
+.pm-tee{display:grid;gap:4px}
+.pm-slot{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 6px;display:grid;gap:1px;font-size:10px;border-left:4px solid #4533ff}
+.pm-slot.off{border-left-color:var(--scr-line);color:var(--scr-muted)}
+.pm-slot small{font-family:var(--mono);font-size:9px;color:var(--scr-muted)}
+.pm-slot i{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.pm-gun{display:grid;justify-items:center;gap:3px;border:1px dashed var(--scr-line);padding:6px;font-size:9px;color:var(--scr-muted);margin-top:6px;transition:all .3s}
+.pm-gun.on{border-color:#e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.25);color:#b42318;font-weight:700}
+.pm-bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:4px;font-size:10px}
+.pm-bl{display:flex;justify-content:space-between;gap:6px}
+.pm-bl span:last-child{font-variant-numeric:tabular-nums}
+.pm-bl.t{color:var(--scr-muted)}
+.pm-bl.tot{border-top:1px solid var(--scr-line);padding-top:4px;font-weight:700;font-size:12px}
+.pm-promo{display:flex;align-items:center;justify-content:space-between;gap:6px;background:#f0eeff;padding:5px 6px}
+.pm-promo b{color:#4533ff}
+.pm-promo small{display:block;color:var(--scr-muted);font-size:9px}
+.pm-promo .pm-btn{font-style:normal}
+@media (max-width:560px){.pm-two2{grid-template-columns:minmax(0,1fr)}}
+/* ---- ID scan check-in mocks (ic-) ---- */
+.ic-ways{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;min-height:220px;align-content:center}
+.ic-way{border:1px solid var(--scr-line);background:var(--scr-paper);padding:9px;display:grid;gap:5px;font-size:10.5px;opacity:.4;transition:opacity .3s}
+.ic-way.on{opacity:1;border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ic-way small{font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.ic-way b{font-size:13px}
+.ic-way span{display:flex;gap:6px;align-items:baseline}
+.ic-way em{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--scr-muted)}
+.ic-grid{display:grid;gap:4px;align-content:start}
+.ic-slot{position:relative;display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:2px 6px;align-items:center;border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 6px;font-size:10px}
+.ic-slot small{font-family:var(--mono);font-size:9px;color:var(--scr-muted);grid-row:span 2}
+.ic-slot span{grid-column:2;color:var(--scr-muted);font-size:9px}
+.ic-slot.hot{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.2)}
+.ic-slot.off{opacity:.5}
+.ic-timer{font-style:normal;grid-column:3;grid-row:1;border:1px solid var(--scr-line);padding:0 4px;font-size:11px}
+.ic-timer.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.35)}
+.ic-ok{font-style:normal;grid-column:3;grid-row:2;font-size:8.5px;font-weight:700;color:var(--scr-ok)}
+.ic-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:6px;align-items:start}
+.ic-det{display:grid;gap:5px;align-content:start;min-width:0;font-size:10.5px}
+.ic-det small.ey{font-size:8.5px;font-weight:700;letter-spacing:.08em;color:var(--scr-muted);text-transform:uppercase}
+.ic-pl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 6px;align-items:center;border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 6px}
+.ic-pl b{display:block;font-size:10.5px}
+.ic-pl small{display:block;font-size:9px;color:var(--scr-muted)}
+.ic-btns{display:flex;gap:3px}
+.ic-btns i{font-style:normal;font-size:9px;font-weight:700;border:1px solid var(--scr-line);padding:1px 5px;white-space:nowrap}
+.ic-btns i.on{background:var(--scr-ok-soft);color:var(--scr-ok);border-color:var(--scr-ok)}
+.ic-btns i.hot{box-shadow:0 0 0 3px rgba(69,51,255,.35);border-color:var(--scr-accent)}
+.ic-how{grid-column:1/-1;font-style:normal;font-size:9px;font-weight:700;color:var(--scr-accent)}
+.ic-scan{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:8px;align-items:start}
+.ic-col{display:grid;gap:6px;min-width:0}
+.ic-card{border:1px solid var(--scr-line);background:linear-gradient(135deg,#eef3f7,#dfe8ef);padding:8px;display:grid;gap:5px;justify-items:start;font-size:9px;opacity:.5;transition:opacity .3s}
+.ic-card.on{opacity:1}
+.ic-card small{font-size:8px;font-weight:700;letter-spacing:.06em;color:#3b4652}
+.ic-card span{font-family:var(--mono);font-size:8.5px;color:#3b4652}
+.pm-bc.ic-pdf{width:100%;max-width:170px;height:46px;background:repeating-linear-gradient(90deg,#111 0 1px,#fff 1px 3px,#111 3px 5px,#fff 5px 6px),repeating-linear-gradient(0deg,transparent 0 5px,rgba(255,255,255,.5) 5px 6px);background-blend-mode:screen}
+.ic-raw{border:1px solid var(--scr-line);background:#111315;color:#cfd6dd;font-family:var(--mono);font-size:8.5px;padding:6px;min-height:120px;display:grid;align-content:start;gap:1px;overflow:hidden}
+.ic-raw div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ic-raw div.keep{color:#7ee2a8;font-weight:600}
+.ic-raw div.drop{color:#ff8a8a;text-decoration:line-through}
+.ic-parsed{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.ic-parsed div{border:1px solid var(--scr-line);background:var(--scr-paper);padding:4px 5px;display:grid;gap:1px;font-size:10px}
+.ic-parsed small{font-size:8.5px;color:var(--scr-muted);font-weight:700}
+.ic-parsed div.x{background:var(--scr-red-soft);border-color:#E2A5A5}
+.ic-parsed div.x b{color:var(--scr-red)}
+.ic-toast{border:1px solid var(--scr-accent);background:var(--scr-paper);padding:7px;display:grid;gap:5px;font-size:10.5px}
+.ic-toast small{font-size:9px;font-weight:700;color:var(--scr-muted)}
+.ic-cand{display:flex;justify-content:space-between;align-items:center;gap:6px;border:1px solid var(--scr-line);padding:5px 6px}
+.ic-cand b{display:block;font-size:10.5px}
+.ic-cand small{display:block;font-weight:400}
+.ic-cand.on{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.ic-cand.dim2{opacity:.6}
+.ic-new{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ic-new div{display:grid;gap:1px}
+.ic-new span{border:1px solid var(--scr-line);padding:3px 5px;font-size:10px}
+.ic-new span.ic-blank{color:var(--scr-muted);font-style:italic}
+@media (max-width:560px){.ic-two,.ic-scan{grid-template-columns:1fr}}
+.ic-cand .pm-btn{font-style:normal}
+/* ---- ID sign-up + QR check-in (iq-) ---- */
+.iq-flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:200px;align-content:center}
+.iq-step{flex:1 1 92px;border:1px solid var(--scr-line);background:var(--scr-paper);padding:8px;display:grid;gap:3px;font-size:10.5px;opacity:.4;transition:opacity .3s}
+.iq-step.on{opacity:1;border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.iq-step.on.hot{background:#e9f7ee;border-color:#16723a}
+.iq-step em{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--scr-muted)}
+.iq-step b{font-size:12px}
+.iq-arr{font-style:normal;color:var(--scr-line);font-weight:700}
+.iq-arr.on{color:var(--scr-accent)}
+.iq-dim{position:relative;min-height:250px}
+.iq-dim>.ic-grid{opacity:.35}
+.iq-modal{position:absolute;inset:6px 6px auto auto;width:min(270px,92%);background:var(--scr-paper);box-shadow:0 10px 30px rgba(0,0,0,.35);display:grid;gap:6px;padding:8px;font-size:10.5px}
+.iq-mh{display:flex;justify-content:space-between;border-bottom:1px solid var(--scr-line);padding-bottom:4px}
+.iq-mh i{font-style:normal}
+.iq-id{display:flex;justify-content:space-between;gap:6px;border:1px solid var(--scr-line);background:#f7f7f8;padding:5px 7px}
+.iq-id span{font-variant-numeric:tabular-nums;color:var(--scr-muted)}
+.iq-lg{font-weight:700;font-size:9.5px}
+.iq-opt{display:flex;gap:6px;align-items:flex-start;border:1px solid var(--scr-line);padding:5px 6px}
+.iq-opt.on{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.iq-opt.off{opacity:.45}
+.iq-opt b{display:block;font-size:10.5px}
+.iq-opt b small{font-weight:400;color:var(--scr-muted)}
+.iq-opt>span>small{display:block;font-size:9px;color:var(--scr-muted)}
+.iq-radio{font-style:normal;color:var(--scr-accent)}
+.iq-foot{display:flex;justify-content:flex-end;gap:5px;align-items:center}
+.iq-foot.sp{justify-content:space-between}
+.iq-foot small{font-size:9px;color:var(--scr-muted)}
+.iq-ok{border:1px solid #9fd3b0;background:#e9f7ee;color:#16723a;font-weight:700;padding:5px 7px}
+.iq-qrbox{display:grid;justify-items:center;gap:3px}
+.iq-qrbox code,.iq-app code{font-family:var(--mono);font-size:9.5px}
+.iq-qrbox small{font-size:9px;color:var(--scr-muted);text-align:center}
+.iq-qr{display:block;max-width:100%;height:auto}
+.iq-hand{display:grid;gap:6px;justify-items:center;align-content:start}
+.iq-ph{border:2px solid #1f2328;border-radius:12px;padding:8px 8px 6px;background:#fff;display:grid;justify-items:center;gap:2px}
+.iq-ph small{font-family:var(--mono);font-size:8px}
+.iq-toast{border:1px solid;padding:6px 8px;font-weight:700;font-size:10.5px}
+.iq-toast.ok{border-color:#9fd3b0;background:#e9f7ee;color:#16723a}
+.iq-toast.warn{border-color:#e2c06a;background:#fff8e1;color:#6b4e00}
+.iq-center{justify-items:center}
+.iq-msg{max-width:280px;background:#e9e9eb;border-radius:14px;padding:8px 10px;display:grid;gap:7px;font-size:10px;line-height:1.45;word-break:break-all}
+.iq-msg p{margin:0}
+.iq-app{width:min(240px,100%);background:#fff;border:1px solid var(--scr-line);padding:10px;display:grid;gap:6px;justify-items:center;font-size:10.5px}
+.iq-app .pm-f{width:100%}
+.iq-app small{color:var(--scr-muted);font-size:9.5px;text-align:center}
+.iq-app .pm-btn{width:100%}
+.iq-dim{min-height:330px}.cx-main:has(.iq-dim){overflow:visible}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Tee sheet · Supabase · DS2208</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 신분증 등록 · 개인 QR 체크인 · 나레이터 프레젠테이션",
+  h1:"신분증 한 번, <b>그다음은 QR 한 번</b>으로 체크인",
+  lede:"처음 온 손님은 운전면허증 뒷면을 DS2208 로 찍어 이름·생년월일을 손님 기록에 넣고, 그 사람만의 QR 을 만들어요. 다음부터는 그 QR 을 찍으면 오늘 예약에서 바로 Arrived 가 돼요. 손님은 같은 QR 로 GPS 앱에 자기 계정을 이어요. 코드는 만들었고, 아직 배포 전이에요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"화면",laneLog:"뒤에서 일어나는 일",laneLedger:"체크리스트",
+  ledgerSub:"6단계",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 뒤에서 일어나는 일이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"서버: supabase/migrations/0084_customer_qr.sql. 어드민: frontend/lib/pos/idCard.ts, lib/pos/customerQr.ts, components/teesheet/IdCheckinDialog.tsx, app/teesheet/page.tsx, hooks/useBarcodeScanner.ts. 백엔드: backend/api/routes/customer_qr.py. GPS 앱: frontend/src/pages/MyQr.tsx, src/lib/customerQr.ts. 화면 속 이름·날짜·코드는 예시예요."},
+ en:{eyebrow:"Pelham Hills Golf Club · ID sign-up · personal QR check-in · narrated walkthrough",
+  h1:"Scan the ID once, <b>then just the QR</b> to check in",
+  lede:"A first-time customer's driver's licence is scanned with the DS2208. Name and date of birth go into the customer record, and they get their own QR code. After that, scanning the QR marks them Arrived on today's booking. The customer links the same QR to their GPS app account. The code is written; it is not deployed yet.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Screen",laneLog:"What happens behind",laneLedger:"Checklist",
+  ledgerSub:"6 steps",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Behind-the-scenes steps appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. The speech-bubble buttons (가 / Aa) restart the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Server: supabase/migrations/0084_customer_qr.sql. Admin: frontend/lib/pos/idCard.ts, lib/pos/customerQr.ts, components/teesheet/IdCheckinDialog.tsx, app/teesheet/page.tsx, hooks/useBarcodeScanner.ts. Backend: backend/api/routes/customer_qr.py. GPS app: frontend/src/pages/MyQr.tsx, src/lib/customerQr.ts. Names, dates and codes on screen are examples."}
+};
+
+const L=(ko,en)=>({ko,en});
+const T=(ko,en)=>LANG==="ko"?ko:en;
+const CODE="PHC-FSPESYMNAX";
+
+/* 그림용 QR(장식). 21칸 격자, 세 모서리 찾기 무늬 + 고정 난수. 실제로 읽히는 QR 은 아니다. */
+function qrSvg(px){
+ const n=21,c=[];let seed=7;
+ const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+ const finder=(x,y)=>{for(let i=0;i<7;i++)for(let j=0;j<7;j++){const e=i===0||i===6||j===0||j===6,inner=i>=2&&i<=4&&j>=2&&j<=4;if(e||inner)c.push([x+i,y+j])}};
+ finder(0,0);finder(14,0);finder(0,14);
+ for(let i=0;i<n;i++)for(let j=0;j<n;j++){const inF=(i<8&&j<8)||(i>12&&j<8)||(i<8&&j>12);if(!inF&&rnd()<.48)c.push([i,j])}
+ return '<svg class="iq-qr" viewBox="-2 -2 25 25" width="'+px+'" height="'+px+'" aria-hidden="true"><rect x="-2" y="-2" width="25" height="25" fill="#fff"/>'+c.map(p=>'<rect x="'+p[0]+'" y="'+p[1]+'" width="1" height="1" fill="#111"/>').join("")+'</svg>';
+}
+function adminFrame(url,body){return '<div class="pos"><div class="urlbar"><i></i><span>'+url+'</span></div><div class="cx"><div class="cx-side"><b>pelhamhills</b><span class="on">Tee Sheet</span><span>Customers</span><span>Promotions</span><span>Reports</span></div><div class="cx-main">'+body+'</div></div></div>'}
+function bars(cls){return '<i class="pm-bc '+(cls||"")+'"></i>'}
+
+/* 티 시트 줄 */
+function teeRows(o){
+ o=o||{};
+ const R=[["8:10 AM","Lee (4)","18 holes",o.lee||0],["8:19 AM","Jordan Park (2)","18 holes",o.park||0],["8:28 AM","Walk-in","—",-1]];
+ return '<div class="ic-grid">'+R.map((r,i)=>'<div class="ic-slot'+(i===1&&o.hot?" hot":"")+(r[3]<0?" off":"")+'"><small>'+r[0]+'</small><b>'+r[1]+'</b><span>'+r[2]+'</span>'+(r[3]>=0?'<i class="ic-timer'+(i===1&&o.timer?" hot":"")+'">⏱</i>':"")+(r[3]>0?'<em class="ic-ok">'+r[3]+' arrived</em>':"")+'</div>').join("")+'</div>';
+}
+function player(name,o){
+ o=o||{};
+ return '<div class="ic-pl'+(o.fresh?" cx-new":"")+'"><span><b>'+name+'</b><small>'+(o.sub||"Existing Customer")+'</small></span><span class="ic-btns"><i class="'+(o.arr?"on":"")+(o.hot?" hot":"")+'">'+(o.arr?"✓ Arrived":"Arrived")+'</i><i>No show</i></span>'+(o.how?'<em class="ic-how cx-new">'+o.how+'</em>':"")+'</div>';
+}
+
+const LIC=["@","ANSI 636012100002DL00410289ZO03300011","DLDCAJ","DCSPARK","DACJORDAN","DBB19850314","DAG12 MAPLE AVE","DAITORONTO","DAJON","DAQP1234-56789-01234"];
+function scanScreen(p){
+ const card='<div class="ic-card'+(p>.1?" on":"")+'"><small>ONTARIO · DRIVER\'S LICENCE · '+T("뒷면","back")+'</small>'+bars("ic-pdf")+'<span>PDF417</span></div>';
+ const gun='<div class="pm-gun'+(p>.2&&p<.5?" on":"")+'">'+bars("sm")+'<span>DS2208</span></div>';
+ const n=p<.35?0:Math.min(LIC.length,Math.ceil((p-.35)*LIC.length*3));
+ const raw='<div class="ic-raw">'+LIC.slice(0,n).map(l=>{const k=l.slice(0,3);const keep=["DCS","DAC","DBB"].includes(k);const drop=k==="DAQ";return '<div class="'+(keep?"keep":drop?"drop":"")+'">'+esc(l)+'</div>'}).join("")+'</div>';
+ const parsed=p>.75?'<div class="ic-parsed cx-new"><div><small>'+T("이름","Name")+'</small><b>Jordan Park</b></div><div><small>'+T("생년월일","Date of birth")+'</small><b>1985-03-14</b></div><div class="x"><small>'+T("면허 번호","Licence no.")+'</small><b>'+T("버림","dropped")+'</b></div></div>':"";
+ return '<div class="pos"><div class="urlbar"><i></i><span>'+T("프로 샵 카운터","Pro shop counter")+'</span></div><div class="posbody ic-scan"><div class="ic-col">'+card+gun+'</div><div class="ic-col">'+raw+parsed+'</div></div></div>';
+}
+
+function overviewScreen(p){
+ const n=Math.min(5,Math.ceil(p*6));
+ const st=LANG==="ko"?[["면허증 스캔","DS2208 · 뒷면 바코드"],["손님 기록","이름 · 생년월일"],["개인 QR","화면 · 문자"],["QR 스캔","자동 Arrived"],["GPS 앱","내 QR · 계정 연결"]]
+  :[["Scan licence","DS2208 · back barcode"],["Customer record","name · date of birth"],["Personal QR","screen · text"],["Scan QR","auto Arrived"],["GPS app","my QR · link account"]];
+ return '<div class="pos"><div class="urlbar"><i></i><span>'+T("처음 한 번 → 다음부터","First time → every time after")+'</span></div><div class="posbody iq-flow">'+st.map((s,i)=>'<div class="iq-step'+(i<n?" on":"")+(i===3?" hot":"")+'"><em>'+(i+1)+'</em><b>'+s[0]+'</b><span>'+s[1]+'</span></div>'+(i<4?'<i class="iq-arr'+(i<n-1?" on":"")+'">→</i>':"")).join("")+'</div></div>';
+}
+function dialogFrame(inner){
+ return adminFrame("pelhamhills.com/teesheet",'<div class="iq-dim">'+teeRows({})+'<div class="iq-modal"><div class="iq-mh"><b>ID check-in</b><i>×</i></div><div class="iq-id"><b>Jordan Park</b><span>Born 1985-03-14</span></div>'+inner+'</div></div>');
+}
+function pickScreen(p){
+ const pick=p<.35?-1:p<.6?1:0;
+ const rows=[["Jordan Park","PH00412","No date of birth on file — it will be added",""],["Jordan Park","PH00087","Different date of birth on file (1972-11-02) — another person","x"]];
+ const list=rows.map((r,i)=>'<div class="iq-opt'+(pick===0&&i===0?" on":"")+(r[3]?" off":"")+'"><i class="iq-radio">'+(pick===0&&i===0?"●":"○")+'</i><span><b>'+r[0]+' <small>#'+r[1]+'</small></b><small>'+r[2]+'</small></span></div>').join("")+
+  '<div class="iq-opt'+(pick===1?" on":"")+'"><i class="iq-radio">'+(pick===1?"●":"○")+'</i><span><b>New customer</b><small>Needs a Pelham Shift ID to approve.</small></span></div>';
+ return dialogFrame('<small class="iq-lg">Is this one of these customers?</small>'+list+'<div class="iq-foot"><span class="pm-btn ghost">Cancel</span><span class="pm-btn'+(p>.8?" hot":"")+'">Save and check in</span></div>');
+}
+function savedScreen(p){
+ const texted=p>.7;
+ return dialogFrame('<div class="iq-ok cx-new">Jordan Park checked in — 9:58 AM.</div><div class="iq-qrbox">'+qrSvg(96)+'<code>'+CODE+'</code><small>Next time, scan this code to check in.</small></div><div class="iq-foot sp"><small>'+(texted?"Texted to the number ending 0101.":"Mobile 4165550101")+'</small><span class="pm-btn ghost'+(p>.45&&!texted?" hot":"")+'">Text QR code</span></div>');
+}
+function qrScanScreen(p){
+ const s=p<.35?0:p<.7?1:2;
+ const toast=s===1?'<div class="iq-toast ok cx-new">✓ Jordan Park checked in — 9:58 AM.</div>':s===2?'<div class="iq-toast warn cx-new">Jordan Park is already checked in for 9:58 AM.</div>':"";
+ const phone='<div class="iq-hand"><div class="iq-ph">'+qrSvg(64)+'<small>'+CODE+'</small></div><div class="pm-gun'+(p>.15&&p<.4||p>.55&&p<.72?" on":"")+'">'+bars("sm")+'<span>DS2208</span></div></div>';
+ return adminFrame("pelhamhills.com/teesheet",'<div class="ic-two">'+phone+'<div class="ic-det">'+toast+player("Jordan Park",{arr:s>0,how:s>0?"QR code · 9:51":""})+player("Sam Rivera",{sub:"Guest"})+'</div></div>');
+}
+function gpsScreen(p){
+ const s=p<.3?0:p<.65?1:2;
+ let body;
+ if(s===0) body='<div class="iq-msg"><p>Pelham Hills Golf: Hi Jordan, here is your check-in QR code. Show it at the pro shop to check in. Open it to add it to the Pelham Hills GPS app: https://golf-gps-pelhamhills-seven.vercel.app/me?c='+CODE+'</p><div class="pm-mms">'+qrSvg(70)+'</div></div>';
+ else if(s===1) body='<div class="iq-app"><b>My QR</b><small>Confirm your date of birth</small><div class="pm-f"><small>Code</small><span>'+CODE+'</span></div><div class="pm-f hot"><small>Date of birth</small><span>1985-03-14</span></div><span class="pm-btn hot">Link</span></div>';
+ else body='<div class="iq-app cx-new"><b>Jordan Park</b>'+qrSvg(110)+'<code>'+CODE+'</code><small>Show this at the pro shop to check in.</small></div>';
+ return '<div class="pos"><div class="urlbar"><i></i><span>'+(s===0?T("손님 휴대폰 · 문자","Customer phone · Messages"):"golf-gps-pelhamhills-seven.vercel.app/me")+'</span></div><div class="pm-phone iq-center">'+body+'</div></div>';
+}
+function manualScreen(p){
+ const a=p>.4;
+ return adminFrame("pelhamhills.com/teesheet",'<div class="ic-two">'+teeRows({hot:1,park:a?2:1})+'<div class="ic-det"><small class="ey">9:58 AM · 2 players</small>'+player("Jordan Park",{arr:true,how:"QR code · 9:51"})+player("Sam Rivera",{sub:"Guest",arr:a,hot:p>.2&&!a})+'</div></div>');
+}
+function statusScreen(n){
+ const R=LANG==="ko"?[
+  ["만든 것 · 확인함","서버 SQL 은 로컬 DB 에서 등록·생년월일 충돌·QR 체크인·두 번 찍기·GPS 연결을 시험했어요. 백엔드 테스트 651개 통과, 화면 타입 검사·lint 통과, GPS 앱 빌드 통과.","hot"],
+  ["해 주실 일 1 · Supabase","SQL editor 에 0084_customer_qr.sql 전체를 붙여 한 번 실행해 주세요.","warn"],
+  ["해 주실 일 2 · Fly 배포","QR 문자 보내기는 백엔드라 Fly 배포가 필요해요. 등록과 체크인은 배포 없이도 돼요.","warn"],
+  ["해 주실 일 3 · 실제 면허증","티 시트를 연 채로 면허증 뒷면을 한 번 찍어 주세요. 예시 데이터로만 시험했어요.","warn"],
+  ["정해 주실 것 · 커밋","어드민은 제 파일만 골라 올릴 수 있어요. GPS 앱은 다른 작업(NFC·쿠폰 등)이 커밋 안 된 채 같은 파일에 섞여 있어요.",""]
+ ]:[
+  ["Built · checked","Server SQL tested on a local database: sign-up, date-of-birth conflict, QR check-in, double scan, GPS link. 651 backend tests pass; typecheck and lint pass; GPS app builds.","hot"],
+  ["Your step 1 · Supabase","Paste all of 0084_customer_qr.sql into the SQL editor and run it once.","warn"],
+  ["Your step 2 · Fly deploy","Texting the QR is a backend change and needs a Fly deploy. Sign-up and check-in work without it.","warn"],
+  ["Your step 3 · a real licence","With the tee sheet open, scan the back of a licence once. Only sample data has been tested.","warn"],
+  ["Decide · commit","Admin: I can commit just my files. GPS app: other uncommitted work (NFC, coupons, …) is mixed into the same files.",""]
+ ];
+ return '<div class="pos"><div class="urlbar"><i></i><span>github.com · supabase · fly.io · vercel.com</span></div><div class="posbody" style="display:grid;gap:6px">'+R.map((r,i)=>'<div class="ms-rule '+(i<n?(r[2]||"hot"):"")+'"><b>'+r[0]+'</b><span>'+r[1]+'</span></div>').join("")+'</div></div>';
+}
+
+/* 체크리스트 */
+const STEPS=[["면허증 뒷면 찍기","Scan the back of the licence"],["손님 고르기 / 새로 만들기","Pick or create the customer"],["Save and check in","Save and check in"],["QR 보여 주기·문자","Show or text the QR"],["다음부터 QR 찍기","Next time: scan the QR"],["GPS 앱에 연결","Link in the GPS app"]];
+const AT={ov:0,scan:1,pick:2,saved:4,qrscan:5,gps:6,manual:7,done:7};
+const NOTE={
+ ov:["처음 한 번만 신분증, 그다음부터는 QR 한 번이에요.","The ID is scanned once; after that, just the QR."],
+ scan:["면허 번호(DAQ)와 주소는 읽자마자 버려요. 남는 건 이름과 생년월일뿐이에요.","The licence number (DAQ) and address are dropped right away. Only name and date of birth are kept."],
+ pick:["생년월일이 다르게 적힌 같은 이름은 다른 사람이라 고를 수 없어요.","A same-name customer with a different date of birth is another person and can't be picked."],
+ saved:["QR 에는 GPS 앱 주소와 무작위 코드뿐이에요. 이름·번호는 없어요.","The QR holds only the GPS app address and a random code. No name or number."],
+ qrscan:["예약이 둘이면 지금 시각에 가장 가까운 티타임을 체크인해요.","With two bookings, the tee time nearest now is checked in."],
+ gps:["코드와 생년월일이 둘 다 맞아야 연결돼요. 사진만 찍어 가서는 연결 못 해요.","Linking needs both the code and the date of birth. A photo of the QR alone isn't enough."],
+ manual:["신분증·QR 이 없는 손님은 지금처럼 Arrived 버튼으로 해요.","Customers without an ID or QR use the Arrived button, as today."],
+ done:["Supabase 0084 실행, Fly 배포, 실제 면허증 시험이 남았어요.","Left to do: run 0084 on Supabase, deploy Fly, test a real licence."]
+};
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"plan",ko:"한눈에",en:"At a glance",
+ screen:(l,p)=>overviewScreen(p),
+ log:[
+  {at:.15,tag:"key",name:"DS2208",ep:"licence back · PDF417"},
+  {at:.4,tag:"rpc",name:"pelham_customers",ep:"date_of_birth · qr_token",why:L("손님 기록에 생년월일과 QR 토큰이 들어가요.","Date of birth and a QR token go into the customer record.")},
+  {at:.7,tag:"rpc",name:"pelham_staff_customer_checkin()",ep:"0084",why:L("QR 을 찍으면 오늘 예약에서 그 손님을 Arrived 로.","Scanning the QR marks that customer Arrived on today's booking.")}
+ ],
+ ledger:[{at:0,g:"ov"}]},
+
+{a:"scan",ph:"first",ko:"면허증 찍기",en:"Scan the licence",
+ screen:(l,p)=>scanScreen(p),
+ log:[
+  {at:.2,tag:"key",name:"DS2208",ep:"PDF417 → keyboard",why:L("면허 바코드는 여러 줄이라, 스캐너 코드가 줄바꿈에서 끊기지 않게 고쳤어요.","Licence barcodes have many lines; the scanner code now keeps reading past line breaks.")},
+  {at:.55,tag:"local",name:"parseIdCard()",ep:"lib/pos/idCard.ts",why:L("성(DCS)·이름(DAC)·생년월일(DBB)만 꺼내요.","Takes only last name (DCS), first name (DAC) and date of birth (DBB).")},
+  {at:.8,tag:"ui",name:"ID check-in",ep:"IdCheckinDialog.tsx"}
+ ],
+ ledger:[{at:0,g:"scan"}]},
+
+{a:"pick",ph:"first",ko:"손님 고르기",en:"Pick the customer",
+ screen:(l,p)=>pickScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_staff_id_find()",ep:"Jordan · Park · 1985-03-14",why:L("이름이 같거나, 성과 생년월일이 같은 손님을 보여 줘요.","Shows customers with the same name, or the same last name and date of birth.")},
+  {at:.45,tag:"local",name:"dobConflict",ep:"PH00087 · 1972-11-02",why:L("생년월일이 다르면 고를 수 없어요.","A different date of birth can't be picked.")},
+  {at:.8,tag:"rpc",name:"pelham_staff_id_register()",ep:"PH00412 + date_of_birth",why:L("새 손님이면 Shift ID 승인이 떠요 — 손님 추가와 같은 규칙.","A new customer asks for a Shift ID, the same rule as adding a customer.")}
+ ],
+ ledger:[{at:0,g:"pick"}]},
+
+{a:"saved",ph:"first",ko:"체크인 · 개인 QR",en:"Checked in · personal QR",
+ screen:(l,p)=>savedScreen(p),
+ log:[
+  {at:.12,tag:"rpc",name:"pelham_staff_customer_checkin()",ep:"id_scan → 9:58 AM",why:L("저장하자마자 오늘 예약에서 체크인해요.","Checks in on today's booking right after saving.")},
+  {at:.35,tag:"ui",name:"QR",ep:"…/me?c="+CODE},
+  {at:.6,tag:"stripe",name:"POST /pos/customer-qr/text",ep:"customer_qr.py → Twilio MMS",why:L("번호는 서버가 손님 기록에서 읽어요. STOP 한 번호에는 안 보내요.","The server reads the number from the record. Numbers that replied STOP are skipped.")}
+ ],
+ ledger:[{at:0,g:"saved"}]},
+
+{a:"qrscan",ph:"next",ko:"다음부터: QR 찍기",en:"Next time: scan the QR",
+ screen:(l,p)=>qrScanScreen(p),
+ log:[
+  {at:.18,tag:"key",name:"DS2208",ep:"…/me?c="+CODE,why:L("티 시트가 PHC- 를 알아봐요.","The tee sheet recognises PHC-.")},
+  {at:.38,tag:"rpc",name:"pelham_staff_customer_checkin()",ep:"qr",why:L("연결된 손님, 같은 이메일·전화, 또는 같은 이름의 자리를 찾아요.","Finds the seat by linked customer, same email or phone, or same name.")},
+  {at:.6,tag:"ui",name:"scan again",ep:"already",why:L("두 번 찍어도 오후 예약까지 체크인되지 않아요.","A second scan doesn't check in a later booking too.")}
+ ],
+ ledger:[{at:0,g:"qrscan"}]},
+
+{a:"gps",ph:"next",ko:"GPS 앱 연결",en:"Link the GPS app",
+ screen:(l,p)=>gpsScreen(p),
+ log:[
+  {at:.15,tag:"stripe",name:"MMS",ep:"QR picture + link"},
+  {at:.45,tag:"rpc",name:"pelham_gps_link()",ep:"code + date of birth",why:L("둘 다 맞아야 이 로그인 계정이 손님 기록에 이어져요.","Both must match before the login is linked to the record.")},
+  {at:.75,tag:"rpc",name:"pelham_gps_me()",ep:"MyQr.tsx",why:L("다음부터는 앱의 My QR 에서 바로 보여요.","From then on it shows under My QR in the app.")}
+ ],
+ ledger:[{at:0,g:"gps"}]},
+
+{a:"manual",ph:"next",ko:"캐셔 수동",en:"Cashier manual",
+ screen:(l,p)=>manualScreen(p),
+ log:[
+  {at:.4,tag:"ui",name:"Arrived",ep:"Sam Rivera",why:L("버튼은 지금 그대로예요.","Same button as today.")},
+  {at:.6,tag:"rpc",name:"pelham_staff_player_patch()",ep:"{arrived:true}"}
+ ],
+ ledger:[{at:0,g:"manual"}]},
+
+{a:"done",ph:"ship",ko:"상태 · 할 일",en:"Status · to do",
+ screen:(l,p)=>statusScreen(Math.min(5,Math.ceil(p*5.5))),
+ log:[
+  {at:.12,tag:"ui",name:"tests",ep:"651 passed · tsc · lint · GPS build"},
+  {at:.35,tag:"local",name:"Supabase",ep:"run 0084 — you"},
+  {at:.55,tag:"local",name:"Fly",ep:"deploy backend — you"},
+  {at:.75,tag:"key",name:"licence",ep:"real scan — you"}
+ ],
+ ledger:[{at:0,g:"done"}]}
+];
+
+const PH={plan:{ko:"한눈에",en:"Overview"},first:{ko:"처음 한 번",en:"First time"},next:{ko:"다음부터",en:"After that"},ship:{ko:"배포",en:"Ship"}};
+const TAGS={ui:"SCREEN",rpc:"CODE",local:"RULE",stripe:"TEXT",key:"INPUT"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;const g=st.g||"ov";const at=AT[g];
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const done=Math.min(6,Math.max(0,at-1));
+  const cur=i=>g==="saved"?(i===2||i===3):(i+1===at);
+  let h=card("c",k==="ko"?"단계":"Steps","",pill(done>=6?"ok":"wait",done+" / 6"),
+    '<div class="lrows">'+STEPS.map((s,i)=>{const c=cur(i)?(k==="ko"?"지금":"now"):(i+1<at?"✓":"—");return '<div class="'+(cur(i)?"cur":"")+'"><span>'+(i+1)+". "+esc(k==="ko"?s[0]:s[1])+'</span><span>'+c+'</span></div>'}).join("")+'</div>');
+  h+=card("n",k==="ko"?"알아 둘 것":"Good to know","",pill(g==="done"?"vi":"ok",k==="ko"?"메모":"note"),'<p class="lnote">'+esc(k==="ko"?NOTE[g][0]:NOTE[g][1])+'</p>');
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"ov": {"ko": 17.3, "en": 15.9}, "scan": {"ko": 16.6, "en": 18.2}, "pick": {"ko": 14.2, "en": 14.5}, "saved": {"ko": 13.0, "en": 12.4}, "qrscan": {"ko": 15.5, "en": 13.6}, "gps": {"ko": 16.5, "en": 15.5}, "manual": {"ko": 7.8, "en": 6.7}, "done": {"ko": 15.2, "en": 13.0}};
+const NARR={"ko": {"ov": "이번에 만든 체크인 흐름이에요. 처음 온 손님은 운전면허증을 한 번 찍어 손님 기록에 넣고, 그 사람만의 QR 코드를 만들어요. 다음부터는 그 QR을 찍기만 하면 오늘 예약에서 바로 체크인돼요. 손님은 같은 QR로 GPS 앱에 자기 계정을 이어요.", "scan": "티 시트를 연 채로 면허증 뒷면 바코드를 DS2208로 찍으면 ID 체크인 창이 떠요. 성, 이름, 생년월일만 꺼내고, 면허 번호와 주소는 읽자마자 버려요. 바코드가 여러 줄이라 스캐너 코드도 줄바꿈에서 끊기지 않게 고쳤어요.", "pick": "읽은 이름과 생년월일로 손님 기록을 찾아 보여 줘요. 이름이 같아도 생년월일이 다르게 적혀 있으면 다른 사람이라 고를 수 없어요. 기록이 없으면 새 손님으로 만들고, 이때는 손님 추가와 똑같이 Shift ID 승인이 떠요.", "saved": "Save and check in을 누르면 생년월일이 저장되고, 오늘 예약에서 바로 체크인돼요. 그리고 그 손님의 QR 코드가 나와요. Text QR code를 누르면 손님 휴대폰으로 QR 그림과 링크가 문자로 가요.", "qrscan": "다음에 오면 손님이 휴대폰의 QR을 내밀고, 캐셔가 스캐너로 찍기만 하면 돼요. 오늘 예약에서 그 손님이 바로 Arrived가 되고, 예약이 둘이면 지금 시각에 가장 가까운 티타임을 골라요. 실수로 두 번 찍어도 이미 체크인됐다고만 나와요.", "gps": "손님이 문자 속 링크나 QR을 휴대폰으로 열면 GPS 앱의 My QR 화면이 떠요. 로그인하고 생년월일을 확인하면 그 계정에 이어지고, 다음부터 앱에서 바로 자기 QR을 볼 수 있어요. 코드와 생년월일이 둘 다 맞아야 연결돼요.", "manual": "신분증이나 QR이 없는 동반자는 지금처럼 캐셔가 Arrived 버튼으로 체크인해요. 이 방식은 하나도 바뀌지 않았어요.", "done": "코드는 다 만들었고 테스트도 통과했어요. 남은 건 세 가지예요. Supabase에 0084 SQL 실행, 문자 보내기를 위한 Fly 배포, 그리고 실제 면허증으로 한 번 찍어 보기예요. 커밋은 정해 주시면 올릴게요."}, "en": {"ov": "Here is the check-in flow we built. A first-time customer's driver's licence is scanned once into the customer record, and they get their own QR code. After that, scanning the QR checks them in on today's booking right away. The customer links the same QR to their GPS app account.", "scan": "With the tee sheet open, scan the barcode on the back of the licence with the DS2208, and the ID check-in window opens. Only last name, first name and date of birth are taken; the licence number and address are dropped right away. The scanner code was also fixed so the multi-line barcode isn't cut off.", "pick": "It looks up customer records by the name and date of birth it read. A customer with the same name but a different date of birth is another person and can't be picked. If there's no record, it creates a new customer, which asks for a Shift ID, just like adding a customer.", "saved": "Press Save and check in, and the date of birth is saved and today's booking is checked in right away. Then the customer's QR code appears. Text QR code sends the QR picture and a link to the customer's phone.", "qrscan": "Next visit, the customer shows the QR on their phone and the cashier just scans it. They're marked Arrived on today's booking, and with two bookings it picks the tee time nearest now. A second scan by mistake only says they're already checked in.", "gps": "When the customer opens the link or QR on their phone, the GPS app's My QR page opens. After signing in and confirming their date of birth, it's linked to their account, and the QR shows in the app from then on. Both the code and date of birth must match.", "manual": "Guests without an ID or QR are checked in by the cashier with the Arrived button, as today. That hasn't changed at all.", "done": "The code is written and the tests pass. Three things are left: run the 0084 SQL on Supabase, deploy Fly for texting, and scan a real licence once. Tell me when to commit, and I'll push it."}};
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phid-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phid-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phid-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phid-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

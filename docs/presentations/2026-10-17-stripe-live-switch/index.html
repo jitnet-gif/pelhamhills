@@ -1,0 +1,761 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Stripe Live 전환</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ph.now{background:var(--blue-soft);color:var(--blue)}.ph.you{background:var(--flag-soft);color:var(--flag)}.ph.check{background:var(--green-soft);color:var(--green)}
+.posbar .st i.lv{background:#1F6B3A}.posbar .st i.tm{background:#B4690E}
+.mono{font-family:var(--mono)}
+.fl{display:grid;gap:3px}
+.fv{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;font-size:11.5px;overflow-wrap:anywhere}
+.fv.mono{font-family:var(--mono);font-size:11px}.fv.on{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.2)}
+.ck{display:flex;gap:8px;align-items:center;border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;font-size:11px;min-width:0}
+.ck span{min-width:0;overflow-wrap:anywhere}.ck code{font-family:var(--mono);font-size:10.5px}
+.ck i{flex:0 0 auto;width:15px;height:15px;border:1.5px solid #A1A1AA;display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:700;color:#fff}
+.ck.on i{background:var(--scr-ok);border-color:var(--scr-ok)}
+.ck.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.tw{margin:14px;display:grid;gap:12px;justify-items:center}
+.term{width:100%;background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.7;padding:12px 14px;border-radius:10px;min-height:260px;overflow-x:auto;white-space:pre}
+.term .dim{color:var(--term-dim)}.term .ok{color:var(--term-key);font-weight:600}.term .hide{visibility:hidden}
+.dev{width:min(230px,100%);background:#1A1C1F;border-radius:22px;padding:14px 14px 18px;display:grid;gap:10px;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+.dev .scrn{background:#F7F8FA;color:#1F2328;border-radius:10px;min-height:190px;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:10px}
+.dev .scrn small{font-size:8.5px;letter-spacing:.12em;color:#6B7280;font-weight:700}
+.dev .scrn b{font-size:22px}.dev .scrn span{font-size:11px;color:#6B7280}
+.dev .scrn.dim b{color:#A1A1AA}
+.dev .tap{text-align:center;color:#9CA3AF;font-family:var(--mono);letter-spacing:.2em;font-size:12px}
+.code{font-family:var(--mono);font-size:16px;font-weight:600;background:var(--violet-soft);color:var(--violet);padding:8px 14px;border-radius:8px;animation:rise .35s ease-out}
+.sms{justify-self:end;max-width:85%;background:#E9E9EB;color:#1F2328;border-radius:14px 14px 4px 14px;padding:8px 11px;font-size:11.5px;animation:rise .35s ease-out}
+.sms small{display:block;font-size:9px;color:#6B7280;margin-bottom:2px}
+.json.big{font-size:13px;border-radius:8px;padding:12px 14px}
+.json b.gtest{color:#F2C48B;background:rgba(242,196,139,.15);padding:0 3px}.json b.glive{color:#8FD3AE;background:rgba(143,211,174,.18);padding:0 3px}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko">한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en">English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Stripe · Fly · FastAPI</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · Stripe 결제 · 나레이터 프레젠테이션",
+  h1:"테스트에서 <b>실제 결제</b>로: Stripe live 전환",
+  lede:"지금 결제는 테스트 모드라 실제 돈이 들어오지 않아요. 아홉 장면으로 live로 바꾸는 순서를 따라가요. 왼쪽은 그 단계에서 보게 될 화면(예시), 가운데는 뒤에서 일어나는 일, 오른쪽은 실제 진행 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 9장면",laneScreen:"보게 될 화면 (예시)",laneLog:"뒤에서 일어나는 일",laneLedger:"실제 진행 상태",
+  ledgerSub:"2026-10-16 확인 기준",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"왼쪽 화면의 키 값·코드·금액은 모두 예시예요. 오른쪽 상태는 2026-10-16 운영 서버 확인 결과예요(온라인·단말기 모두 environment: test, 키·웹훅 정상). 1~6단계는 아직 아무것도 하지 않았어요. 코드 근거: backend/services/stripe_gateway.py (sk_live_ 로 시작하면 live)."},
+ en:{eyebrow:"Pelham Hills Golf Club · Stripe payments · narrated walkthrough",
+  h1:"From test to <b>real money</b>: switching Stripe to live",
+  lede:"Payments run in test mode today, so no real money comes in. Nine scenes walk through switching to live. Left: the screen you'll see at that step (example). Middle: what happens behind it. Right: where things actually stand.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 9 scenes",laneScreen:"What you'll see (example)",laneLog:"Behind the scenes",laneLedger:"Actual status",
+  ledgerSub:"As checked 2026-10-16",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Items appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Keys, codes and amounts on the left are examples. The status on the right is from the production server on 2026-10-16 (online and terminal both environment: test, keys and webhook OK). None of steps 1–6 has been done yet. Source: backend/services/stripe_gateway.py (a key starting with sk_live_ means live)."}
+};
+
+const L=(ko,en)=>({ko,en});
+const API="https://pelham-hills-api.fly.dev/api/v1/payments";
+
+/* ---------- screen pieces ---------- */
+function stripe(path,body,live){
+ return '<div class="pos"><div class="urlbar"><i></i><span>dashboard.stripe.com/'+path+'</span></div>'+
+  '<div class="posbar"><span><small>STRIPE</small><b>Pelham Hills Golf Club</b></span><span class="st">'+
+  (live?'<i class="lv">Live mode</i>':'<i class="tm">Test mode</i>')+'</span></div><div class="posbody">'+body+'</div></div>'}
+function pos(url,title,body){
+ return '<div class="pos"><div class="urlbar"><i></i><span>'+url+'</span></div><div class="posbar"><span><small>PELHAM HILLS POS</small><b>'+title+'</b></span><span class="st">Pro Shop <i>Register</i></span></div><div class="posbody">'+body+'</div></div>'}
+function fld(label,val,o){o=o||{};return '<div class="fl"><span class="mlbl">'+label+'</span><span class="fv'+(o.on?" on":"")+(o.mono?" mono":"")+(o.empty?" emp":"")+'">'+(val||"&nbsp;")+'</span></div>'}
+function chk(label,on,hot){return '<div class="ck'+(on?" on":"")+(hot?" hot":"")+'"><i>'+(on?"✓":"")+'</i><span>'+label+'</span></div>'}
+function term(lines){return '<div class="term">'+lines.map(l=>'<div class="'+(l[1]||"")+'">'+l[0]+'</div>').join("")+'</div>'}
+function cfgView(env,hot){
+ const j=(k,v,c)=>'  <span class="k">"'+k+'"</span>: '+(c?'<b class="'+c+'">':"")+v+(c?'</b>':"");
+ return '<div class="pos"><div class="urlbar"><i></i><span>pelham-hills-api.fly.dev/api/v1/payments/online/config</span></div><div class="posbody"><div class="json big">{\n'+
+  [j("enabled","true"),j("environment",'"'+env+'"',hot?(env==="live"?"glive":"gtest"):""),j("credentials",'"ok"'),j("webhook","true")].join(",\n")+'\n}</div>'+
+  '<p class="snote">'+(env==="live"?"environment: live → real cards are charged.":"environment: test → no real money moves.")+'</p></div></div>'}
+function s700(main,sub,cls){return '<div class="dev"><div class="scrn '+(cls||"")+'"><small>STRIPE READER S700</small><b>'+main+'</b><span>'+sub+'</span></div><div class="tap">)))</div></div>'}
+
+const EVENTS=["checkout.session.completed","checkout.session.async_payment_succeeded","charge.refunded","terminal.reader.action_succeeded","terminal.reader.action_failed"];
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"now",ko:"지금 상태",en:"Where we are",
+ screen:(lang,p)=>cfgView("test",p>.3),
+ log:[
+  {at:.15,tag:"rpc",name:"GET /payments/online/config",ep:"checked 2026-10-16",body:{enabled:true,environment:"test",credentials:"ok",webhook:true}},
+  {at:.45,tag:"rpc",name:"GET /payments/terminal/config",ep:"same day",body:{enabled:true,environment:"test"}},
+  {at:.7,tag:"rpc",name:"environment()",ep:"stripe_gateway.py:72",why:L("STRIPE_SECRET_KEY가 sk_live_ 로 시작하면 live, 아니면 test. 코드 수정은 필요 없어요.","A STRIPE_SECRET_KEY starting with sk_live_ means live, anything else test. No code change is needed.")}
+ ],
+ ledger:[{at:0}]},
+
+{a:"activate",ph:"you",ko:"1 · 계정 활성화",en:"1 · Activate account",
+ screen:(lang,p)=>p<.65?stripe("account/onboarding",
+   '<div class="sh">Activate payments</div>'+chk("Business details · Pelham Hills Golf Club",p>.15,p<=.15)+chk("Bank account for payouts · CAD",p>.3,p>.15&&p<=.3)+chk("Owner identity verification",p>.45,p>.3&&p<=.45)+
+   '<span class="sbtn pri'+(p>.45?" hot":"")+'">Activate account</span>',true):
+  stripe("apikeys",'<div class="sh">Developers › API keys</div>'+fld("Publishable key","pk_live_51Q••••••••••",{mono:true})+fld("Secret key","sk_live_51Q••••••••••",{mono:true,on:true})+'<span class="sbtn hot">Copy</span>',true),
+ log:[
+  {at:.1,tag:"ui",name:"Test mode → Live mode",ep:"toggle, top right"},
+  {at:.3,tag:"stripe",name:"account activation",ep:"business · bank · identity",why:L("이게 끝나야 live 키가 나와요. 정산은 캐나다 달러 계좌로.","Live keys appear only after this. Payouts go to a CAD account.")},
+  {at:.7,tag:"key",name:"copy secret key",ep:"sk_live_… (or rk_live_…)",why:L("비밀 키는 채팅·메일에 붙이지 말고 바로 Fly 시크릿으로만 넣어요.","Don't paste the secret key into chat or email. It goes straight into Fly secrets.")}
+ ],
+ ledger:[{at:0},{at:.7,got:["sk"],flash:["vals"]}]},
+
+{a:"webhook",ph:"you",ko:"2 · 웹훅 등록",en:"2 · Add webhook",
+ screen:(lang,p)=>p<.75?stripe("webhooks/create",
+   fld("Endpoint URL",API.replace("https://","")+"/stripe/webhook",{mono:true,on:p<.2})+'<span class="mlbl">Events to send</span>'+
+   EVENTS.map((e,i)=>chk('<code>'+e+'</code>',p>.2+i*.1,p>.2+(i-1)*.1&&p<=.2+i*.1)).join("")+
+   '<span class="sbtn pri'+(p>.65?" hot":"")+'">Add endpoint</span>',true):
+  stripe("webhooks/we_••••",'<div class="sh">Endpoint · Enabled</div>'+fld("Signing secret","whsec_••••••••••••",{mono:true,on:true})+'<span class="sbtn hot">Reveal · Copy</span>',true),
+ log:[
+  {at:.1,tag:"ui",name:"Developers › Webhooks › Add endpoint",ep:"in live mode",why:L("테스트 모드 웹훅은 live로 넘어오지 않아요.","Test-mode webhooks don't carry over to live.")},
+  {at:.25,tag:"rpc",name:"POST /payments/stripe/webhook",ep:"our endpoint",why:L("서명이 없거나 틀리면 400으로 거절해요(2026-10-16 확인).","Rejects unsigned or wrongly signed calls with 400 (checked 2026-10-16).")},
+  {at:.5,tag:"stripe",name:"5 events",ep:"checkout · refund · reader",why:L("온라인 결제 완료, 환불, 단말기 결과를 서버가 받아요.","The server hears about online payments, refunds and reader results.")},
+  {at:.8,tag:"key",name:"copy signing secret",ep:"whsec_…"}
+ ],
+ ledger:[{at:0,got:["sk"]},{at:.8,got:["sk","wh"],flash:["vals"]}]},
+
+{a:"location",ph:"you",ko:"3 · 단말기 Location",en:"3 · Terminal location",
+ screen:(lang,p)=>p<.6?stripe("terminal/locations",
+   fld("Display name","Pelham Hills Golf Club",{on:p<.25})+fld("Address","Fonthill, ON · Canada",{on:p>=.25&&p<.45})+'<span class="sbtn pri'+(p>.45?" hot":"")+'">Create location</span>',true):
+  stripe("terminal/locations",'<div class="sh">Locations</div><div class="rlist"><div class="rrow hot"><span><b>Pelham Hills Golf Club</b><small>Fonthill, ON</small></span><span class="amt mono">tml_••••••</span></div></div><span class="sbtn hot">Copy ID</span>',true),
+ log:[
+  {at:.15,tag:"ui",name:"Terminal › Locations › New",ep:"club address"},
+  {at:.4,tag:"rpc",name:"terminal_location()",ep:"stripe_gateway.py:372",why:L("설정값 → 첫 Location 순서로 찾아요. 테스트에서만 없으면 새로 만들어요.","Uses the setting, then the first location. Only test mode creates one when none exists.")},
+  {at:.6,tag:"stripe",name:"live: no auto-create",ep:"\"Create a Terminal location…\"",why:L("이걸 빼먹으면 단말기 등록이 이 오류로 실패해요.","Skip this and reader registration fails with this error.")},
+  {at:.8,tag:"key",name:"copy location ID",ep:"tml_…"}
+ ],
+ ledger:[{at:0,got:["sk","wh"]},{at:.8,got:["sk","wh","tml"],flash:["vals"]}]},
+
+{a:"secrets",ph:"you",ko:"4 · Fly 시크릿",en:"4 · Fly secrets",
+ screen:(lang,p)=>'<div class="tw">'+term([
+   ["# 1) keep today's test keys somewhere safe first","dim"],
+   ["$ fly secrets set -a pelham-hills-api \\",p>.25?"":"hide"],
+   ["    STRIPE_SECRET_KEY=sk_live_••••••• \\",p>.32?"":"hide"],
+   ["    STRIPE_WEBHOOK_SECRET=whsec_••••••• \\",p>.39?"":"hide"],
+   ["    STRIPE_TERMINAL_LOCATION=tml_•••••••",p>.46?"":"hide"],
+   ["Updating existing machines in 'pelham-hills-api'",p>.6?"dim":"hide"],
+   ["✓ Machine restarted (one restart for all three)",p>.75?"ok":"hide"]
+ ])+'</div>',
+ log:[
+  {at:.1,tag:"key",name:"save test keys",ep:"sk_test_… · whsec_… (test)",why:L("되돌릴 때 필요해요. fly secrets list는 값을 보여 주지 않아요.","Needed to switch back. fly secrets list does not show values.")},
+  {at:.4,tag:"local",name:"fly secrets set",ep:"3 values, one command",why:L("한 번에 넣어야 재시작이 한 번만 일어나요.","Setting them together restarts the server once.")},
+  {at:.75,tag:"rpc",name:"settings read per call",ep:"no deploy needed",why:L("서버는 호출할 때마다 환경변수를 읽어요. 재시작만 되면 바로 live예요.","The server reads these on every call. After the restart it's live.")}
+ ],
+ ledger:[{at:0,got:["sk","wh","tml"]},{at:.75,set:true,flash:["srv"]}]},
+
+{a:"reader",ph:"you",ko:"5 · S700 등록",en:"5 · Register S700",
+ screen:(lang,p)=>p<.45?'<div class="tw">'+s700("Wi-Fi connected","Registration code",p>.2?"":"dim")+(p>.2?'<div class="code">apple-river-stone</div>':"")+'</div>':
+  pos("pelhamhills-golf.vercel.app/pos/pro-shop","Card reader settings",
+   fld("Registration code","apple-river-stone",{mono:true,on:p<.7})+fld("Label","Pro shop")+'<span class="sbtn pri'+(p<.7?" hot":"")+'">Register reader</span>'+
+   (p>=.7?'<div class="rlist"><div class="rrow"><span><b>Pro shop</b><small>stripe_s700 · tmr_••••</small></span><span class="okpill">online</span></div></div>':"")),
+ log:[
+  {at:.1,tag:"stripe",name:"S700 · Wi-Fi",ep:"shows 3-word code"},
+  {at:.5,tag:"rpc",name:"POST /payments/terminal/readers",ep:"staff token",body:{registration_code:"apple-river-stone",label:"Pro shop"}},
+  {at:.7,tag:"stripe",name:"device_type: stripe_s700",ep:"not simulated-s700",why:L("테스트의 가상 리더는 live 계정에 없어서 지울 필요 없어요.","The simulated test reader isn't in the live account, so nothing to delete.")}
+ ],
+ ledger:[{at:0,got:["sk","wh","tml"],set:true},{at:.7,rdr:true,flash:["srv"]}]},
+
+{a:"verify",ph:"check",ko:"6 · 소액 실결제",en:"6 · Small real payments",
+ screen:(lang,p)=>p<.3?cfgView("live",true):p<.65?
+  pos("pelhamhills-golf.vercel.app/book/pay","Online payment",'<div class="bill"><h4><span>Tee time · 9 holes</span><span>$1.00</span></h4><div class="tot"><span>Status</span><span>'+(p>.45?'<span class="okpill">PAID</span>':'<span class="waitpill">Checkout…</span>')+'</span></div></div>'+
+   (p>.5?'<div class="sms"><small>Text · Pelham Hills</small>Payment approved: $1.00 for your tee time. Thank you!</div>':"")):
+  '<div class="tw">'+s700(p<.8?"$1.00":"Approved",p<.8?"Tap, insert or swipe":"Visa •••• 4242 · then Interac","")+'</div>',
+ log:[
+  {at:.1,tag:"rpc",name:"GET /payments/online/config",ep:"expect environment: live",why:L("이 확인은 Claude가 바로 해 드릴 수 있어요.","Claude can run this check for you right away.")},
+  {at:.35,tag:"stripe",name:"Checkout · your own card",ep:"smallest item"},
+  {at:.5,tag:"rpc",name:"checkout.session.completed",ep:"→ booking paid + approval text"},
+  {at:.7,tag:"stripe",name:"S700 · credit + Interac",ep:"card_present · interac_present",why:L("캐나다라 두 가지를 같이 받아요. 각각 한 번씩.","In Canada both are accepted. Try each once.")}
+ ],
+ ledger:[{at:0,got:["sk","wh","tml"],set:true,rdr:true},{at:.3,live:true,flash:["srv"]}]},
+
+{a:"refund",ph:"check",ko:"7 · 환불 · 대사",en:"7 · Refund · reconcile",
+ screen:(lang,p)=>p<.55?pos("pelhamhills-golf.vercel.app/pos/pro-shop","Refund",
+   '<div class="rlist"><div class="rrow'+(p>.15?" ref":" hot")+'"><span><b>Online · tee time</b><small>Visa · card not needed</small></span><span class="amt">$1.00</span></div>'+
+   '<div class="rrow'+(p>.3?" ref":"")+'"><span><b>Register · credit</b><small>API refund</small></span><span class="amt">$1.00</span></div>'+
+   '<div class="rrow'+(p>.45?" ref":p>.3?" hot":"")+'"><span><b>Register · Interac</b><small>tap the card on the reader again</small></span><span class="amt">$1.00</span></div></div>'):
+  pos("pelhamhills-golf.vercel.app/admin/reports","Reports › Stripe check",
+   '<table class="ctable"><thead><tr><th>Stripe</th><th class="r">Amount</th><th>Ours</th><th></th></tr></thead><tbody>'+
+   ['Online','Credit','Interac'].map(n=>'<tr><td>'+n+'</td><td class="r">$1.00 / −$1.00</td><td>'+n.toLowerCase()+'</td><td><span class="okpill">Matched</span></td></tr>').join("")+'</tbody></table>'),
+ log:[
+  {at:.15,tag:"rpc",name:"POST /payments/terminal/refund",ep:"credit: API · Interac: reader",why:L("Interac 환불은 카드가 있어야 해서 단말기의 refund_payment로 해요.","Interac refunds need the card, so they go through the reader's refund_payment.")},
+  {at:.35,tag:"stripe",name:"charge.refunded",ep:"webhook → bill updated"},
+  {at:.65,tag:"rpc",name:"GET /payments/reconcile",ep:"Reports › Stripe check",why:L("Stripe에 들어온 돈과 계산대·온라인 기록을 한 줄씩 맞춰 봐요.","Matches Stripe's money against register and online records line by line.")}
+ ],
+ ledger:[{at:0,got:["sk","wh","tml"],set:true,rdr:true,live:true},{at:.7,done:true,flash:["srv"]}]},
+
+{a:"rollback",ph:"check",ko:"되돌리기",en:"Switching back",
+ screen:(lang,p)=>p<.55?'<div class="tw">'+term([
+   ["# only if something goes wrong","dim"],
+   ["$ fly secrets set -a pelham-hills-api \\",""],
+   ["    STRIPE_SECRET_KEY=sk_test_••••••• \\",""],
+   ["    STRIPE_WEBHOOK_SECRET=whsec_(test)••• \\",""],
+   ["    STRIPE_TERMINAL_LOCATION=tml_(test)•••",""],
+   ["✓ Machine restarted",p>.3?"ok":"hide"]])+'</div>':cfgView("test",true),
+ log:[
+  {at:.15,tag:"local",name:"put the test keys back",ep:"same command",why:L("서버는 키만 보고 환경을 정해서, 되돌리면 바로 테스트 모드예요.","The server picks the mode from the key alone, so switching back is immediate.")},
+  {at:.55,tag:"key",name:"steps 1–5",ep:"needs Stripe + Fly access → you"},
+  {at:.75,tag:"rpc",name:"step 6 check",ep:"tell Claude → config read",why:L("시크릿을 넣고 알려 주시면 live로 바뀌었는지 Claude가 확인해요.","Once the secrets are in, tell Claude and it checks the server is live.")}
+ ],
+ ledger:[{at:0}]}
+];
+
+const PH={now:{ko:"현재",en:"Now"},you:{ko:"직접",en:"You"},check:{ko:"확인",en:"Check"}};
+const TAGS={ui:"DASHBOARD",rpc:"OUR SERVER",local:"FLY",stripe:"STRIPE",key:"YOU"};
+
+/* 오른쪽 칸: 실제 상태(고정) + 장면별로 '이 단계에서 생기는 값'을 보여 준다 */
+const STEPS=[
+ {n:"1",ko:"Stripe 계정 활성화 · live 키",en:"Activate Stripe · live key",sc:1},
+ {n:"2",ko:"live 웹훅 등록",en:"Live webhook",sc:2},
+ {n:"3",ko:"Terminal Location",en:"Terminal location",sc:3},
+ {n:"4",ko:"Fly 시크릿 교체",en:"Replace Fly secrets",sc:4},
+ {n:"5",ko:"S700 등록",en:"Register S700",sc:5},
+ {n:"6",ko:"live 확인 · 소액 실결제",en:"Live check · small payments",sc:6},
+ {n:"7",ko:"환불 · Stripe check",en:"Refund · Stripe check",sc:7}
+];
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;const ko=k==="ko";
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const rows=a=>'<div class="lrows">'+a.map(r=>'<div class="'+(r[2]||"")+'"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>').join("")+'</div>';
+  // 1) 운영 서버 — 실제 확인값
+  let h=card("now",ko?"운영 서버 지금":"Production now","GET /payments/*/config · 2026-10-16",pill("wait",ko?"테스트 모드":"Test mode"),
+    rows([["online.environment","test","cur"],["terminal.environment","test","cur"],["credentials","ok"],["webhook","true"],[ko?"웹훅 서명 없는 요청":"Unsigned webhook","400"]]));
+  // 2) 할 일 목록 — 모두 아직 안 함
+  h+=card("todo",ko?"할 일":"To do",ko?"아무것도 아직 하지 않음":"Nothing done yet",pill("bad",ko?"7개 남음":"7 left"),
+    '<div class="lrows">'+STEPS.map(s=>'<div class="'+(s.sc===SC?"cur":"")+'"><span>'+s.n+' · '+esc(s[k])+'</span><span>'+(s.n==="6"?(ko?"Claude 확인 가능":"Claude can check"):(ko?"직접":"you"))+'</span></div>').join("")+'</div>');
+  // 3) 이 순서대로 하면 생기는 값 (장면 따라가기, 예시)
+  const got=new Set(st.got||[]);
+  const v=(id,name,val)=>[name,got.has(id)?val:"—",got.has(id)?"cur":""];
+  h+=card("vals",ko?"모을 값 3개":"3 values to collect",ko?"장면을 따라가면 채워짐 · 예시":"Fills as the scenes play · example",
+    pill(got.size===3?"ok":got.size?"vi":"none",got.size+" / 3"),
+    rows([v("sk","STRIPE_SECRET_KEY","sk_live_…"),v("wh","STRIPE_WEBHOOK_SECRET","whsec_…"),v("tml","STRIPE_TERMINAL_LOCATION","tml_…")]));
+  // 4) 따라가면 바뀌는 서버 모습 (예시)
+  const ex=st.done?["ok",ko?"전환 완료(예시)":"Switched (example)"]:st.live?["ok","live"]:st.set?["vi",ko?"재시작됨(예시)":"Restarted (example)"]:["none",ko?"아직":"Not yet"];
+  h+=card("srv",ko?"전환 후 모습":"After the switch",ko?"장면 속 예시 · 실제 아님":"Example in the scenes · not real",pill(ex[0],ex[1]),
+    rows([["environment",st.live?"live":"test",st.live?"cur":""],["reader",st.rdr?"stripe_s700":"simulated-s700",st.rdr?"cur":""],[ko?"실결제 테스트":"Real payment test",st.done?(ko?"환불·대사 끝":"refunded · matched"):st.live?(ko?"진행":"running"):"—"]]));
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"activate": {"en": 14.6, "ko": 15.5}, "location": {"en": 14.8, "ko": 17.5}, "ov": {"en": 15.5, "ko": 17.0}, "reader": {"en": 17.0, "ko": 17.2}, "refund": {"en": 13.2, "ko": 14.4}, "rollback": {"en": 15.6, "ko": 17.3}, "secrets": {"en": 12.8, "ko": 13.5}, "verify": {"en": 15.8, "ko": 17.4}, "webhook": {"en": 15.4, "ko": 15.2}};
+const NARR={"ko": {"ov": "지금 Stripe 결제는 테스트 모드예요. 온라인 결제도, 계산대 단말기도 설정은 정상이지만, 진짜 카드를 넣어도 돈은 들어오지 않아요. 실제 돈을 받으려면 live 모드로 바꿔야 해요. 코드는 고칠 게 없어요. 키만 바꾸면 서버가 알아서 live로 움직여요.", "activate": "먼저 Stripe 대시보드를 live 모드로 바꾸고 계정을 활성화해요. 사업자 정보, 정산받을 캐나다 은행 계좌, 대표자 신원 확인을 마치면 돼요. 그다음 Developers, API keys에서 sk underscore live로 시작하는 비밀 키를 복사해요.", "webhook": "웹훅은 live 모드에서 새로 만들어야 해요. 테스트 때 만든 건 넘어오지 않아요. 우리 서버 주소를 넣고, 결제 완료, 환불, 단말기 결과 이벤트 다섯 개를 골라요. 만들고 나면 whsec로 시작하는 서명 비밀값을 복사해요.", "location": "단말기를 쓰려면 Location이 하나 있어야 해요. Terminal, Locations에서 클럽 주소로 만들고 tml로 시작하는 아이디를 복사해요. 테스트 모드에선 서버가 알아서 만들었지만, live에서는 만들지 않아요. 이걸 빼먹으면 단말기 등록이 실패해요.", "secrets": "이제 복사한 세 값을 Fly 시크릿에 넣어요. 한 번의 명령으로 같이 넣으면 서버가 딱 한 번만 다시 시작해요. 그 전에 지금 쓰는 테스트 키 세 개를 따로 적어 두세요. 문제가 생기면 되돌릴 때 필요해요.", "reader": "이제 진짜 S700 단말기를 등록해요. 켜고 와이파이에 연결하면 화면에 단어 세 개로 된 등록 코드가 나와요. 계산대의 단말기 설정에서 그 코드를 넣으면 끝이에요. 테스트 때 쓰던 가상 리더는 live 계정에 없으니 지울 필요 없어요.", "verify": "바꾼 다음엔 소액으로 실제 결제를 해 봐요. 먼저 결제 설정이 live로 나오는지 확인하고, 본인 카드로 온라인 결제를 하나 해요. 예약이 결제됨으로 바뀌고 승인 문자가 오면 성공이에요. 계산대에서도 신용카드 한 번, Interac 체크카드 한 번 결제해요.", "refund": "테스트한 결제는 모두 환불해요. Interac 환불은 카드를 단말기에 다시 대야 해요. 마지막으로 Reports의 Stripe check에서 Stripe로 들어온 돈과 우리 기록이 맞는지 확인해요. 여기까지 맞으면 live 전환 완료예요.", "rollback": "혹시 문제가 생기면 Fly 시크릿을 아까 적어 둔 테스트 키로 되돌리면 바로 테스트 모드로 돌아가요. 1번부터 5번까지는 Stripe와 Fly 권한이 있어야 해서 직접 하셔야 해요. 시크릿을 넣고 알려 주시면, live로 바뀌었는지는 제가 바로 확인해 드릴게요."}, "en": {"ov": "Right now, Stripe payments are in test mode. Online payments and the card terminal are both set up correctly, but a real card won't move any money. To take real payments, we switch to live mode. No code changes are needed. Change the keys, and the server runs in live mode on its own.", "activate": "First, switch the Stripe Dashboard to live mode and activate the account. Fill in the business details, the Canadian bank account for payouts, and the owner's identity check. Then, under Developers and API keys, copy the secret key that starts with s k underscore live.", "webhook": "The webhook has to be created again in live mode. The test one doesn't carry over. Enter our server's address and pick five events: checkout completed, refunds, and the terminal results. Once it's created, copy the signing secret that starts with w h s e c.", "location": "The card terminal needs a Location. Under Terminal and Locations, create one with the club's address and copy its ID, starting with t m l. In test mode the server made one for us, but it won't in live mode. Skip this and registering the reader will fail.", "secrets": "Now put the three values into the Fly secrets. Set them together in one command, so the server restarts only once. Before that, write down the three test keys you use today. You'll need them if you ever have to switch back.", "reader": "Next, register the real S700 reader. Turn it on and connect it to Wi-Fi, and it shows a registration code made of three words. Enter that code in the register's card reader settings, and you're done. The simulated test reader doesn't exist in the live account, so there's nothing to delete.", "verify": "After the switch, run a few small real payments. First, check that the payment settings say live. Then pay online with your own card. If the booking turns paid and the approval text arrives, it worked. At the register, run one credit card and one Interac debit card.", "refund": "Refund every test payment. An Interac refund needs the card tapped on the reader again. Finally, open Reports, then Stripe check, and confirm Stripe's money matches our records. If it all matches, the switch to live is complete.", "rollback": "If anything goes wrong, set the Fly secrets back to the test keys you wrote down, and payments return to test mode right away. Steps one to five need Stripe and Fly access, so you'll do those yourself. Tell me once the secrets are in, and I'll check right away that it's running live."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phlive-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phlive-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phlive-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phlive-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>

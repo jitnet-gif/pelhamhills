@@ -1,0 +1,758 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nine Holes and Hang-up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-inline:16px;padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* Pro shop admin mock — keeps a light look in both themes */
+.ad{--ai:#1F2328;--am:#6B7280;--al:#D4D4D8;--as:#F2F2F4;--av:#4533FF;background:#F2F2F4;color:var(--ai);border:1px solid var(--al);border-radius:10px;overflow:hidden;font-size:12px}
+.ad .urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#E4E4E8;border-bottom:1px solid var(--al);font-family:var(--mono);font-size:10.5px;color:var(--am);min-width:0}
+.ad .urlbar i{width:8px;height:8px;border-radius:50%;background:#C9CDD2;flex:none}
+.ad .urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#111315;color:#fff;padding:7px 12px;font-size:12px;font-weight:700}
+.adbar small{color:rgba(255,255,255,.6);font-weight:500;font-size:10.5px}
+.adbody{padding:10px;display:grid;gap:8px;min-width:0}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chips span{border:1px solid var(--al);background:#fff;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap}
+.chips span.on{background:#111315;color:#fff;border-color:#111315}
+.box{background:#fff;border:1px solid var(--al);padding:10px;display:grid;gap:6px;min-width:0}
+.box h5{margin:0;font-size:13px}
+.box p{margin:0;color:var(--am);font-size:11px;line-height:1.5}
+.eyeb{font-size:9.5px;font-weight:800;letter-spacing:.12em;color:var(--am);text-transform:uppercase}
+.pw{height:34px;border:1px solid var(--al);display:flex;align-items:center;padding:0 10px;font-family:var(--mono);letter-spacing:.2em;font-size:13px}
+.btnp{background:var(--av);color:#fff;text-align:center;font-weight:800;padding:8px}
+.errn{border:1px solid #F0B4B4;background:#FDF0F0;color:#8A1F1F;padding:6px 8px;font-size:11px}
+.cc{background:#fff;border:1px solid var(--al);min-width:0}
+.cch{display:flex;flex-wrap:wrap;align-items:center;gap:4px 7px;border-bottom:1px solid #ECECF0;padding:6px 8px;font-size:11px}
+.cch .t{margin-left:auto;color:var(--am);font-variant-numeric:tabular-nums}
+.cch .by{width:100%;color:var(--am);font-size:10.5px}
+.op{font-size:10px;font-weight:800;padding:1px 6px}
+.op.ins{background:#E3F4E8;color:#1F6B3A}.op.upd{background:#FFF1CC;color:#8A5A00}.op.del{background:#FDE2E2;color:#8A1F1F}
+.ccb{padding:6px 8px;display:grid;gap:5px}
+.hist{margin:0;padding:0;list-style:none;font-size:11px}
+.dt{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}
+.dt th{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--am);text-align:left;padding:3px 4px;border-bottom:1px solid #ECECF0}
+.dt td{padding:3px 4px;border-bottom:1px solid #F2F2F4;vertical-align:top;word-break:break-all}
+.dt td.f{font-family:var(--mono);font-size:9.5px;color:#3F434A}
+.dt td.b{color:#8A1F1F}.dt td.b s{text-decoration-thickness:1px}.dt td.a{color:#1F6B3A}
+.dt tr.hot td{background:#FFF6DD}
+.hot{outline:2.5px solid #F2A33A;outline-offset:2px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(242,163,58,.25)}}
+.tee{background:#fff;border:1px solid var(--al);padding:8px;display:grid;gap:4px}
+.tee .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}
+.tee .pl{display:flex;gap:4px;flex-wrap:wrap}
+.tee .pl span{border:1px solid var(--al);padding:2px 6px;font-weight:700;font-size:11px}
+.tee .pl span.gone{opacity:.35;text-decoration:line-through}
+.tee .hl{border-top:1px dashed var(--al);padding-top:4px;font-size:10.5px;color:var(--am)}
+.vanish{opacity:.25;filter:grayscale(1)}
+.xmark{color:#B42318;font-weight:800;font-size:12px}
+.flow{display:grid;gap:6px}
+.fstep{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--al);padding:7px 9px;font-size:11.5px}
+.fstep b{font-family:var(--mono);font-size:10.5px}
+.fstep .n{flex:none;width:20px;height:20px;border-radius:50%;background:#111315;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800}
+.fstep.on{border-color:var(--av);box-shadow:0 0 0 2px rgba(69,51,255,.15)}
+.tbls{display:flex;flex-wrap:wrap;gap:4px}
+.tbls span{font-family:var(--mono);font-size:9.5px;background:#fff;border:1px solid var(--al);padding:2px 5px}
+.tbls span.on{background:#E3F4E8;border-color:#9BD2AE}
+.who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.who div{background:#fff;border:1px solid var(--al);padding:8px;text-align:center;font-size:11px}
+.who div b{display:block;font-size:13px}
+.who div.no{opacity:.45}
+.ad .plan{background:#fff;border:1px solid var(--al);padding:10px}
+.plan .done li{color:var(--ok)}
+.lc.lcdim{opacity:.5}.lc.lcon{border-color:var(--green)}
+.plan{display:grid;gap:4px;font-size:13px;color:#1F2328}
+.plan h3{margin:8px 0 2px;font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.plan code{font-family:var(--mono);font-size:11.5px;background:#F2F2F4;padding:1px 4px;border-radius:4px}
+.plan .q li{color:#B5461F;font-weight:600}
+.plan .done li{color:#1F6B3A}
+/* phone call mock */
+.pc{background:#0F1A14;color:#E8F0EA;border-radius:14px;padding:10px;display:grid;gap:6px;font-size:11.5px;min-width:0}
+.pc .top{display:flex;justify-content:space-between;font-size:10.5px;color:#9FB8A8}
+.pc .b{max-width:88%;padding:6px 9px;border-radius:10px;line-height:1.45}
+.pc .b.ag{background:#1E3326;justify-self:start}
+.pc .b.us{background:#E8F0EA;color:#14231A;justify-self:end}
+.pc .tc{justify-self:center;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid #3A5A46;color:#BFD6C6}
+.pc .tc.x{border-color:#E06A5A;color:#FFB3A8;background:rgba(224,106,90,.12)}
+.pc .tc.ok{border-color:#5BC08A;color:#A9EBC5;background:rgba(91,192,138,.12)}
+.pc .dim{opacity:.35}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal div{background:#fff;border:1px solid var(--al);text-align:center;padding:4px 0;font-size:10.5px;font-variant-numeric:tabular-nums}
+.cal div.in{background:#E3F4E8;border-color:#9BD2AE}
+.cal div.td{background:#111315;color:#fff}
+.cal div.edge{outline:2px solid #1F6B3A}
+.cal div.ask{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F;font-weight:800}
+.cal div.hd{background:transparent;border:0;color:var(--am);font-size:9.5px}
+.js{font-family:var(--mono);font-size:10.5px;background:#fff;border:1px solid var(--al);padding:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.js .k{color:#6B7280}.js .bad{color:#B42318;font-weight:700}.js .good{color:#1F6B3A;font-weight:700}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.two h6{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--am)}
+.rows{display:grid;gap:3px}
+.rows div{display:flex;justify-content:space-between;gap:6px;background:#fff;border:1px solid var(--al);padding:4px 7px;font-size:10.5px}
+.rows div b{font-family:var(--mono);font-weight:600}
+.rows div.w{background:#FFF1CC;border-color:#F2C46A}
+.rows div.x{background:#FDE2E2;border-color:#E9A3A3;color:#8A1F1F}
+.rows div.n{background:#E3F4E8;border-color:#9BD2AE}
+.big{font-size:20px;font-weight:800;font-family:var(--mono)}
+@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}}
+.h6d{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6B7280)}
+.fstep.bad{border-color:#E06A5A;box-shadow:0 0 0 2px rgba(224,106,90,.18)}
+
+.bub{width:18px;height:15px;margin-right:4px;vertical-align:-3px}
+</style></head><body>
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en"><svg class="bub" viewBox="0 0 24 20" aria-hidden="true"><path d="M3 1h18a2 2 0 012 2v10a2 2 0 01-2 2H10l-5 4v-4H3a2 2 0 01-2-2V3a2 2 0 012-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="11.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Fly · ElevenLabs · Supabase</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const L=(ko,en)=>({ko,en});
+
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · 전화 예약 비서(ElevenLabs) · 원인 분석",
+  h1:"<b>9홀 예약</b>이 안 되고, 확정 뒤 <b>전화를 안 끊는</b> 이유",
+  lede:"두 문제 모두 ElevenLabs 자체의 고장은 아니에요. 9홀은 찾기 도구가 홀 수를 모르고, 9홀 시작 시각 안내가 틀렸고, 에이전트 규칙이 9홀을 프로 샵으로 보내라고 해서 막혀요. 전화 끊기는 고친 규칙이 아직 ElevenLabs에 올라가지 않았고, 올라갈 규칙 안에서도 두 문단이 서로 반대로 말해요. 왼쪽은 통화와 화면, 가운데는 뒤에서 일어난 일, 오른쪽은 원인별 상태예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"통화 · 화면",laneLog:"뒤에서",laneLedger:"원인별 상태",
+  ledgerSub:"코드·설정 분석 완료 · 아직 고치지 않음",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 기록이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 언어 버튼을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"근거: ops/elevenlabs/agent.json, scripts/attach_voice_tools.py, backend/api/routes/voice.py · tee_sheet.py(RATE_CARDS), 커밋 8e14e6b·de84f4d, Fly 릴리스 v33(2026-10-21 03:01Z), 이전 세션의 --apply 401 기록. 첫 장면의 통화는 예시예요. .env 의 ElevenLabs 키에 convai_read 가 없어 실제 에이전트 설정과 통화 기록은 직접 열지 못했어요(오늘 다시 시도해도 401)."},
+ en:{eyebrow:"Pelham Hills Golf Club · Phone booking assistant (ElevenLabs) · Root cause",
+  h1:"Why <b>nine holes</b> won't book, and the call <b>doesn't hang up</b>",
+  lede:"Neither problem is ElevenLabs breaking. Nine holes fail because the search tool has no hole count, the nine-hole start time in the prompt is wrong, and the live rules send nine holes to the pro shop. The hang-up fix never reached ElevenLabs, and the rules it would upload contradict each other. Left: the call and screens. Middle: what happens behind. Right: status per cause.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Call · screen",laneLog:"Behind the scenes",laneLedger:"Status per cause",
+  ledgerSub:"Code and config analysed · not fixed yet",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Records appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. Switching language restarts the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Sources: ops/elevenlabs/agent.json, scripts/attach_voice_tools.py, backend/api/routes/voice.py · tee_sheet.py (RATE_CARDS), commits 8e14e6b and de84f4d, Fly release v33 (2026-10-21 03:01Z), the earlier session's --apply 401. The first scene's call is an example. The ElevenLabs key in .env lacks convai_read, so the live agent config and call logs could not be opened (401 again today)."}
+};
+
+function call(items,p,hd){
+  return '<div class="pc"><div class="top"><span>📞 Pelham Hills · AI</span><span>'+(hd||"")+'</span></div>'+
+   items.map(it=>{const on=p>=it[0];const cls=on?"":" dim";
+     if(it[1]==="tc")return '<div class="tc '+it[3]+cls+'">'+esc(it[2])+'</div>';
+     return '<div class="b '+it[1]+cls+'">'+esc(it[2])+'</div>'}).join("")+'</div>'}
+function box(h,inner,o){o=o||{};return '<div class="box'+(o.hot?" hot":"")+'">'+(o.eyeb?'<span class="eyeb">'+o.eyeb+'</span>':'')+(h?'<h5>'+h+'</h5>':'')+inner+'</div>'}
+function rows(list){return '<div class="rows">'+list.map(r=>'<div class="'+(r[2]||"")+'"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join("")+'</div>'}
+
+const S=[
+ {a:"ov",ph:"nine",ko:"9홀 통화에서 생기는 일",en:"A nine-hole call",
+  screen:(l,p)=>call([
+    [0,"us","Nine holes this Saturday, two of us."],
+    [.1,"tc","find_tee_times · date, party_size, day_part","ok"],
+    [.2,"ag","I have 7:40, 10:34 and 12:31 in the morning…"],
+    [.32,"us","10:34 is great."],
+    [.4,"tc","hold_tee_time · 10:34 AM ✓","ok"],
+    [.52,"tc","confirm_booking · holes 9 → ok:false","x"],
+    [.62,"ag","Nine holes start from 4 PM that day…"],
+    [.74,"us","Oh. What's open at 4?"],
+    [.82,"ag","Nine-hole pricing isn't in my system — let me put you through to the pro shop."]],p,l==="ko"?"예시 통화":"Example call"),
+  log:[{at:.1,tag:"rpc",name:"find_tee_times",ep:"no holes field",why:L("찾기 도구에 홀 수 칸이 없어서 18홀 기준 시간을 전부 줘요.","The search tool has no hole count, so it returns every 18-hole time.")},
+       {at:.52,tag:"rpc",name:"confirm_booking holes=9",ep:"refused at the last step",why:L("9홀이 안 되는 시각이라는 걸 맨 마지막에야 알아요. 이름·전화번호까지 다 받은 뒤예요.","Only the final step knows the time can't be nine holes, after the name and number are taken.")},
+       {at:.82,tag:"ui",name:"live rules block",ep:"\"offer the pro shop\"",why:L("ElevenLabs 규칙 블록이 9홀은 프로 샵으로 넘기라고 해요.","The rules block on ElevenLabs says to hand nine holes to the pro shop.")}],
+  focus:["find","window","rules","ask"]},
+
+ {a:"find",ph:"nine",ko:"찾기 도구는 홀 수를 모른다",en:"The search tool can't see holes",
+  screen:(l,p)=>'<div class="ad"><div class="adbody"><div class="two"><div><h6>find_tee_times</h6><div class="js'+(p>.15&&p<.6?" hot":"")+'">{\n  "date": …,\n  "party_size": …,\n  "day_part": …\n  <span class="bad">— holes 없음</span>\n}</div></div>'+
+    '<div><h6>confirm_booking</h6><div class="js'+(p>=.4?" hot":"")+'">{\n  "hold_id": …, "riders": …,\n  <span class="good">"holes"</span>: 9 | 18\n}</div></div></div>'+
+    (p>.6?rows([[l==="ko"?"찾기가 주는 시간":"Times search returns","7:40 · 10:34 · 12:31 …","w"],[l==="ko"?"토요일 9홀 가능":"Saturday nine-hole OK","4:07 · 4:16 PM","n"],[l==="ko"?"확정에서 거절":"Refused at confirm","10:34 + holes 9","x"]]):'')+'</div></div>',
+  log:[{at:.15,tag:"local",name:"agent.json tools[0]",ep:"date · party_size · day_part"},
+       {at:.4,tag:"local",name:"voice.py:1017",ep:"holes 9 before nine_holes_from → refuse",why:L("9홀 시각 검사는 확정 단계에만 있어요. 찾기·잡기는 9홀인지 모른 채 지나가요.","The nine-hole time check lives only in confirm; search and hold pass without knowing.")},
+       {at:.7,tag:"ui",name:"agent",ep:"has no nine-hole list to offer",why:L("거절된 뒤 권할 9홀 시간이 결과에 없어서 에이전트가 다시 고르기 어려워요.","After the refusal there's no nine-hole list to offer, so the agent struggles to recover.")}],
+  focus:["find"]},
+
+ {a:"window",ph:"nine",ko:"9홀 시작 시각: 3시가 아니라 4시",en:"Nine holes start at 4, not 3",
+  screen:(l,p)=>box(l==="ko"?"9홀을 칠 수 있는 첫 티타임 (서버의 RATE_CARDS)":"First nine-hole tee time (server RATE_CARDS)",
+    rows([[l==="ko"?"평일 (월–금, 숄더 시즌)":"Weekdays (Mon–Fri, shoulder)","10:00 AM","n"],
+      [l==="ko"?"주말·공휴일":"Weekends · holidays","4:00 PM",p>.2?"w":""],
+      [l==="ko"?"프롬프트가 말하는 주말":"What the prompt says","3 PM",p>.35?"x":""]])+
+    (p>.5?rows([["Wed 10/21","43 "+(l==="ko"?"칸":"slots"),"n"],["Sat 10/24","4:07 · 4:16 PM "+(l==="ko"?"(2칸)":"(2)"),"w"],["Sun 11/1 ("+(l==="ko"?"서머타임 끝":"DST ends")+")",l==="ko"?"0칸 · 마지막 티 3:04 PM":"0 · last tee 3:04 PM","x"]]):''),{eyeb:"nine_holes_from() · daylight_slots()"}),
+  log:[{at:.15,tag:"local",name:"weekend_shoulder",ep:"nine from 960 min = 4:00 PM",why:L("서버는 주말 9홀을 오후 4시부터 받아요. 프롬프트는 3시라고 해요.","The server takes weekend nine holes from 4 PM; the prompt says 3 PM.")},
+       {at:.5,tag:"rpc",name:"10/24 open slots",ep:"last 4:16 PM",why:L("해가 짧아져 토요일 9홀은 두 칸뿐이에요.","With shorter days, Saturday has only two nine-hole slots.")},
+       {at:.8,tag:"stripe",name:"11/1 onward",ep:"no weekend nine",why:L("11월 1일 서머타임이 끝나면 마지막 티가 3시 4분이라 주말 9홀은 하나도 없어요. 이건 정책 결정이 필요해요.","From Nov 1 the last tee is 3:04 PM, so weekends have no nine-hole times at all — a policy call for the club.")}],
+  focus:["window"]},
+
+ {a:"rules",ph:"nine",ko:"규칙 블록이 9홀을 프로 샵으로",en:"The rules send nine holes away",
+  screen:(l,p)=>'<div class="ad"><div class="adbody">'+box(l==="ko"?"ElevenLabs에 붙는 규칙 블록 (attach_voice_tools.py)":"Rules block pushed to ElevenLabs (attach_voice_tools.py)",
+    '<p>“These are the tools you actually have, and this section <b>wins over anything earlier</b> that contradicts it.”</p><div class="js'+(p>.25?" hot":"")+'">'+'Prices: … <span class="bad">Nine-hole pricing is not in the rate table either; offer the pro shop for both.</span></div>')+
+    (p>.55?box(l==="ko"?"예약 질문 순서":"Booking question order",rows([["1",l==="ko"?"회원인가요?":"Member?"],["2",l==="ko"?"어느 날?":"Which day?"],["3",l==="ko"?"몇 명?":"How many?"],["4",l==="ko"?"카트?":"Cart?"],["5",l==="ko"?"오전·오후?":"Morning / afternoon?"],["—",l==="ko"?"9홀·18홀? 없음":"9 or 18? missing","x"]])):'')+'</div></div>',
+  log:[{at:.25,tag:"local",name:"RULES · Prices",ep:"old line, still there",why:L("9홀 요금표가 생기기 전에 쓴 문장이에요. 지금은 get_rates가 9홀 요금을 주는데도 남아 있어요.","Written before nine-hole rates existed. get_rates quotes them now, but the line stayed.")},
+       {at:.45,tag:"ui",name:"\"wins over anything earlier\"",ep:"beats the nine-hole section",why:L("이 블록이 우선이라, 앞쪽의 9홀 안내보다 이 문장을 따라요.","This block takes priority, so the agent follows it over the nine-hole guidance.")},
+       {at:.7,tag:"ui",name:"booking order",ep:"never asks 9 or 18",why:L("손님이 먼저 말하지 않으면 holes가 빠지고 18홀로 들어가요.","Unless the caller says it, holes is left out and the booking goes in as 18.")}],
+  focus:["rules","ask"]},
+
+ {a:"hang",ph:"hang",ko:"확정 뒤 기대한 흐름과 실제",en:"After confirm: expected vs actual",
+  screen:(l,p)=>'<div class="two"><div><h6 class="h6d">'+(l==="ko"?"de84f4d가 의도한 것":"What de84f4d intended")+'</h6>'+call([
+     [0,"tc","confirm_booking ✓","ok"],[.1,"ag","Your code is T-8-F-2. You're all set. Is it okay if I hang up now?"],[.25,"us","Yes."],[.35,"ag","Thanks for calling Pelham Hills. Goodbye!"],[.42,"tc","end_call","ok"]],p)+'</div>'+
+    '<div><h6 class="h6d">'+(l==="ko"?"지금 일어나는 것":"What happens now")+'</h6>'+call([
+     [.5,"tc","confirm_booking ✓","ok"],[.58,"ag","You're all set. Is there anything else I can help with?"],[.68,"us","No, that's it."],[.76,"ag","Great! Enjoy your round. Have a wonderful day!"],[.86,"tc","… no end_call","x"]],p)+'</div></div>',
+  log:[{at:.1,tag:"local",name:"commit de84f4d",ep:"agent.json + RULES",why:L("확정 뒤 '끊어도 될까요?'를 묻고 '네'면 end_call 하도록 글만 바꿨어요.","It only changed text: ask 'okay to hang up?' after confirming, end_call on yes.")},
+       {at:.58,tag:"ui",name:"live agent",ep:"still asks \"anything else\"",why:L("ElevenLabs에는 예전 규칙이 남아 있어서 예전처럼 말해요.","ElevenLabs still holds the old rules, so it talks the old way.")},
+       {at:.86,tag:"ui",name:"end_call",ep:"not called",why:L("작별 인사만 하고 도구를 부르지 않으면 손님이 끊을 때까지 통화가 열려 있어요.","If it says goodbye without calling the tool, the line stays open until the caller hangs up.")}],
+  focus:["apply","conflict","endcall"]},
+
+ {a:"apply",ph:"hang",ko:"고친 규칙이 ElevenLabs에 안 올라감",en:"The fix never reached ElevenLabs",
+  screen:(l,p)=>{const st=p<.25?1:p<.5?2:p<.75?3:4;
+    const steps=[["1","git commit de84f4d",l==="ko"?"저장소만 바뀜 ✓":"repo only ✓"],["2","Fly v33 · 03:01Z",l==="ko"?"서버 배포됨 ✓":"server deployed ✓"],
+      ["3","attach_voice_tools.py --apply","GET /convai/agents/… "],["4","ElevenLabs","401 · missing convai_read"]];
+    return '<div class="ad"><div class="adbody"><div class="flow">'+steps.map((s,i)=>'<div class="fstep'+(i+1===st?" on":"")+(i===3&&p>.75?" bad":"")+'"><span class="n">'+s[0]+'</span><span>'+s[1]+'<br><b>'+s[2]+'</b></span></div>').join("")+'</div>'+
+      (p>.7?'<div class="js hot"><span class="bad">401 authentication_error: The API key you used is missing the permission convai_read</span></div>':'')+'</div></div>'},
+  log:[{at:.1,tag:"local",name:"agent.json · RULES",ep:"text in git"},
+       {at:.3,tag:"rpc",name:"Fly backend",ep:"v33 live",why:L("서버 쪽 고침(거절을 읽을 수 있는 문장으로)은 배포됐어요. 03:05Z 통화가 find→hold→confirm까지 갔어요.","The server fix (readable refusals) is live; a 03:05Z call went find → hold → confirm.")},
+       {at:.55,tag:"rpc",name:"--apply",ep:"401 × 9 (last session)",why:L("프롬프트를 바꾸려면 키에 convai_read·convai_write가 있어야 해요. 지난 세션에서도, 오늘도 401이에요.","Changing the prompt needs convai_read and convai_write on the key. 401 last session and again today.")},
+       {at:.8,tag:"stripe",name:"ElevenLabs agent",ep:"old rules still live",why:L("그래서 8e14e6b·de84f4d의 프롬프트 변경은 전화에 하나도 반영되지 않았을 가능성이 커요.","So the prompt changes in 8e14e6b and de84f4d most likely never reached the phone.")}],
+  focus:["apply"]},
+
+ {a:"conflict",ph:"hang",ko:"올라가도 두 문단이 싸운다",en:"Even uploaded, two rules clash",
+  screen:(l,p)=>'<div class="ad"><div class="adbody"><div class="two"><div><h6>RULES · '+(l==="ko"?"확정 뒤":"after booking")+'</h6><div class="js'+(p>.1&&p<.5?" hot":"")+'">"You\'re all set. <span class="good">Is it okay if I hang up now?</span>" <span class="good">Do not ask "anything else" first.</span></div></div>'+
+    '<div><h6>RULES · Ending the call</h6><div class="js'+(p>=.35?" hot":"")+'">When the caller has what they need, <span class="bad">ask once if there is anything else.</span></div></div></div>'+
+    (p>.6?box(l==="ko"?"그 밖에":"Also",rows([[l==="ko"?"대시보드 프롬프트 8천 자의 끝맺음":"8,000-char dashboard prompt's own ending",l==="ko"?"못 봄":"unseen","w"],["end_call "+(l==="ko"?"설명":"description"),l==="ko"?"agent.json 것은 안 올라감":"agent.json's never pushed","w"]])):'')+'</div></div>',
+  log:[{at:.1,tag:"local",name:"RULES ¶ after booking",ep:"hang-up question"},
+       {at:.35,tag:"local",name:"RULES ¶ Ending the call",ep:"\"anything else\"",why:L("같은 블록 안에서 '묻지 마라'와 '물어라'가 같이 있어요. 모델은 더 흔한 쪽인 '다른 건요?'로 가기 쉬워요.","The same block says both 'don't ask' and 'ask'. The model drifts to the familiar 'anything else?'.")},
+       {at:.65,tag:"ui",name:"attach_voice_tools.py",ep:"leaves end_call alone",why:L("스크립트는 transfer만 덮어쓰고 end_call 설명은 대시보드 것을 그대로 둬요.","The script overwrites transfer only; end_call keeps the dashboard's description.")}],
+  focus:["conflict","endcall"]},
+
+ {a:"todo",ph:"fix",ko:"고칠 것",en:"What to fix",
+  screen:(l,p)=>'<div class="ad"><div class="plan"><h3>'+(l==="ko"?"확인한 것":"Confirmed")+'</h3><ul class="done"><li>'+(l==="ko"?"find_tee_times 에 holes 없음 — 9홀 검사는 confirm 에만":"find_tee_times has no holes — the nine-hole check is only in confirm")+'</li><li>'+(l==="ko"?"주말 9홀은 4 PM부터(프롬프트 3 PM), 11/1부터 주말 9홀 0칸":"Weekend nine from 4 PM (prompt says 3), none on weekends from Nov 1")+'</li><li>'+(l==="ko"?"규칙 블록: '9홀은 프로 샵으로' + '끝낼 때 다른 건요?'":"Rules block: 'nine holes → pro shop' + 'ask anything else'")+'</li><li>'+(l==="ko"?"--apply 가 401 (convai_read 없음) — ElevenLabs 는 예전 규칙":"--apply gets 401 (no convai_read) — ElevenLabs runs the old rules")+'</li></ul>'+
+   '<h3>'+(l==="ko"?"제안하는 수정 (말씀 주시면 진행)":"Proposed fixes (on your go)")+'</h3><ul class="q"><li>'+(l==="ko"?"find_tee_times·hold 에 holes 추가 — 9홀이면 가능한 시각만 돌려줌":"Add holes to find_tee_times and hold — return only nine-hole-eligible times")+'</li><li>'+(l==="ko"?"질문 순서에 '9홀·18홀?' 추가, 3 PM → 서버가 준 시각을 읽게":"Ask '9 or 18?' in the booking order; read the start time the server gives instead of '3 PM'")+'</li><li>'+(l==="ko"?"규칙 블록: 프로 샵 문장 삭제, 끝맺음 문단 하나로 합치기, end_call 설명도 올리기":"Rules block: drop the pro-shop line, merge the two ending paragraphs, push the end_call description too")+'</li></ul>'+
+   '<h3>'+(l==="ko"?"해 주셔야 할 것":"For you")+'</h3><ul><li>'+(l==="ko"?"ElevenLabs 키에 convai_read · convai_write 권한 추가 → 그 뒤 제가 --apply":"Add convai_read and convai_write to the ElevenLabs key, then I run --apply")+'</li><li>'+(l==="ko"?"11월 주말 9홀을 어떻게 할지 (해가 짧아 4 PM 칸이 없음)":"Decide November weekend nine holes (no 4 PM slots left)")+'</li></ul></div></div>',
+  log:[{at:.15,tag:"local",name:"voice.py · agent.json",ep:"fix 1 · holes on search"},{at:.4,tag:"local",name:"RULES block",ep:"fix 2 · one ending, no pro-shop line"},
+       {at:.65,tag:"stripe",name:"convai_read · convai_write",ep:"your key"},{at:.85,tag:"rpc",name:"attach_voice_tools.py --apply",ep:"after the key"}],
+  focus:["find","window","rules","ask","apply","conflict","endcall"]}
+];
+
+S.forEach(s=>{s.ledger=s.ledger||[{at:0}]});
+const PH={nine:{ko:"9홀",en:"Nine holes"},hang:{ko:"전화 끊기",en:"Hang up"},fix:{ko:"수정",en:"Fix"}};
+const TAGS={ui:"AGENT",rpc:"SERVER",local:"CODE",stripe:"BLOCKED",key:"INPUT"};
+
+const ITEMS=[
+ {id:"find",src:L("찾기에 홀 수 없음","Search has no holes"),sub:"find_tee_times",st:["bad",L("고쳐야 함","Needs fix")],rows:[[L("9홀 검사는 확정 때만","nine check only at confirm"),""]]},
+ {id:"window",src:L("9홀 시작 시각","Nine-hole start"),sub:"nine_holes_from",st:["bad",L("프롬프트 틀림","Prompt wrong")],rows:[[L("주말 4 PM (프롬프트 3 PM)","weekend 4 PM (prompt 3 PM)"),""],[L("11/1부터 주말 0칸","none on weekends from Nov 1"),""]]},
+ {id:"rules",src:L("규칙 블록 9홀 문장","Rules block nine line"),sub:"attach_voice_tools.py",st:["bad",L("프로 샵으로 넘김","Sends to pro shop")],rows:[[L("이 블록이 우선","this block wins"),""]]},
+ {id:"ask",src:L("9홀·18홀 질문","'9 or 18?' question"),sub:"booking order",st:["bad",L("빠짐","Missing")],rows:[[L("말 안 하면 18홀","defaults to 18"),""]]},
+ {id:"apply",src:L("ElevenLabs 반영","Pushed to ElevenLabs"),sub:"--apply",st:["wait",L("키 권한 필요","Key needs access")],rows:[[L("401 convai_read","401 convai_read"),""],[L("Fly 서버는 배포됨","Fly server is live"),""]]},
+ {id:"conflict",src:L("끝맺음 두 문단","Two ending paragraphs"),sub:"RULES",st:["bad",L("서로 반대","Contradict")],rows:[[L("끊을까요? vs 다른 건요?","hang up? vs anything else?"),""]]},
+ {id:"endcall",src:L("end_call 설명","end_call description"),sub:"built_in_tools",st:["wait",L("대시보드 것","Dashboard's")],rows:[[L("agent.json 것 안 올라감","agent.json's not pushed"),""]]}
+];
+function renderLedger(p){
+  const k=LANG;const f=new Set(S[SC].focus||[]);
+  $("ledger").innerHTML=ITEMS.map(it=>'<div class="lc'+(f.has(it.id)?" flash lcon":" lcdim")+'"><div class="r1"><span class="src">'+esc(it.src[k])+'<em>'+esc(it.sub)+'</em></span><span class="pill '+it.st[0]+'">'+esc(it.st[1][k])+'</span></div><div class="lrows">'+it.rows.map(r=>'<div><span>'+esc(typeof r[0]==="string"?r[0]:r[0][k])+'</span><span></span></div>').join("")+'</div></div>').join("");
+}
+
+const DUR={"ov": {"ko": 19.2, "en": 18.4}, "find": {"ko": 17.4, "en": 16.1}, "window": {"ko": 21.1, "en": 21.8}, "rules": {"ko": 18.8, "en": 18.3}, "hang": {"ko": 17.9, "en": 15.1}, "apply": {"ko": 20.4, "en": 18.8}, "conflict": {"ko": 18.3, "en": 16.6}, "todo": {"ko": 23.8, "en": 19.3}};
+const NARR={"ko": {"ov": "두 가지를 볼게요. 먼저 9홀이에요. 손님이 토요일 9홀을 원해도, 찾기 도구는 홀 수를 몰라서 아침 시간까지 전부 읽어 줘요. 손님이 10시 34분을 고르면 이름과 번호를 다 받은 뒤 마지막 확정에서야 거절돼요. 그다음 에이전트는 9홀 요금이 없다며 프로 샵으로 넘겨요.", "find": "첫 번째 원인이에요. find_tee_times에는 날짜, 인원, 시간대만 있고 홀 수 칸이 없어요. 9홀이 되는 시각인지는 confirm_booking에서만 검사해요. 그래서 찾기와 잡기는 그냥 지나가고, 맨 끝에서 막혀요. 거절된 뒤에도 권할 9홀 시간 목록이 없어요.", "window": "두 번째 원인이에요. 서버는 평일 9홀을 오전 10시부터, 주말은 오후 4시부터 받아요. 그런데 프롬프트는 주말 3시라고 안내해요. 해도 짧아져서 이번 토요일 9홀은 4시 7분과 4시 16분 두 칸뿐이에요. 11월 1일 서머타임이 끝나면 주말 9홀은 한 칸도 없어요. 이건 클럽이 정할 일이에요.", "rules": "세 번째 원인이에요. ElevenLabs에 붙는 규칙 블록에 9홀 요금이 없으니 프로 샵으로 넘기라는 옛 문장이 남아 있어요. 그리고 이 블록이 앞의 어떤 안내보다 우선이라고 적혀 있어요. 또 예약 질문 순서에 9홀이냐 18홀이냐가 없어서, 손님이 먼저 말하지 않으면 18홀로 들어가요.", "hang": "이제 전화 끊기예요. 마지막 커밋은 확정 뒤에 끊어도 될까요를 묻고, 네 하면 바로 end_call을 부르도록 바꿨어요. 하지만 실제 전화는 여전히 다른 도와드릴 게 있나요를 묻고, 인사만 한 뒤 end_call을 부르지 않아요. 그러면 손님이 끊을 때까지 통화가 열려 있어요.", "apply": "가장 큰 이유예요. 그 커밋은 저장소의 글만 바꿨어요. 서버는 Fly에 배포됐지만, 프롬프트를 ElevenLabs에 올리는 스크립트는 API 키에 convai_read 권한이 없어서 401로 막혀요. 지난 세션에서도, 오늘도 같아요. 그래서 ElevenLabs에는 예전 규칙이 그대로 돌고 있을 가능성이 커요.", "conflict": "그리고 올라가더라도 문제가 남아요. 같은 규칙 블록 안에 다른 건 묻지 말고 끊을까요를 물으라는 문단과, 끝낼 때 다른 건 없는지 한 번 물으라는 문단이 같이 있어요. 서로 반대예요. 또 스크립트는 end_call 설명을 올리지 않아서 대시보드의 설명이 그대로 쓰여요.", "todo": "정리할게요. 찾기와 잡기에 홀 수를 넣어 9홀이면 가능한 시각만 돌려주고, 질문 순서에 9홀 18홀을 넣고, 규칙 블록의 프로 샵 문장을 지우고 끝맺음을 하나로 합칠게요. 해 주실 것은 두 가지예요. ElevenLabs 키에 convai_read와 convai_write 권한을 추가하는 것, 그리고 11월 주말 9홀을 어떻게 할지 정하는 거예요."}, "en": {"ov": "Two problems. First, nine holes. A caller wants nine holes on Saturday, but the search tool has no hole count, so it reads out morning times too. The caller picks 10:34, gives a name and number, and only the final confirm refuses it. Then the agent says nine-hole pricing isn't available and transfers to the pro shop.", "find": "Cause one. find_tee_times takes a date, a party size and a part of day, but no hole count. Only confirm_booking checks whether a time allows nine holes. So search and hold pass, and the call fails at the very end, with no list of nine-hole times to offer instead.", "window": "Cause two. The server takes nine holes from 10 AM on weekdays and from 4 PM on weekends, but the prompt says 3 PM. With shorter days, this Saturday has only two nine-hole slots, 4:07 and 4:16. After daylight saving ends on November 1st, weekends have none at all. That is a decision for the club.", "rules": "Cause three. The rules block pushed to ElevenLabs still has an old line saying nine-hole pricing isn't in the rate table, so offer the pro shop. And the block says it wins over anything earlier. The booking questions also never ask nine or eighteen, so unless the caller says it, the booking goes in as eighteen.", "hang": "Now the hang-up. The last commit made the agent ask if it's okay to hang up after a booking, and call end_call on yes. But the real calls still ask 'anything else?', say goodbye, and never call end_call. The line stays open until the caller hangs up.", "apply": "This is the main reason. That commit only changed text in the repository. The server is deployed on Fly, but the script that uploads the prompt to ElevenLabs is blocked with a 401, because the API key lacks convai_read. Same last session, same today. So ElevenLabs is most likely still running the old rules.", "conflict": "Even once uploaded, a problem remains. The same rules block has one paragraph saying don't ask 'anything else', ask to hang up, and another saying ask once if there's anything else. They contradict. And the script never uploads the end_call description, so the dashboard's version is used.", "todo": "To sum up. I'll add hole count to search and hold so nine holes return only valid times, add 'nine or eighteen' to the questions, remove the pro-shop line, and merge the ending into one rule. Two things for you: add convai_read and convai_write to the ElevenLabs key, and decide what to do about November weekend nine holes."}};
+
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phnh-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phnh-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phnh-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phnh-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script></body></html>
+</body></html>

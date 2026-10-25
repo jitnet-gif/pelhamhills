@@ -1,0 +1,827 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>GolfNow & Bill Amounts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: presenter bar (scenes + controls + language) over a dark narration band, then a three-lane stage — register screen · behind the scenes · register state. */
+:root{
+  --bg:#EEF2EC; --paper:#FFFFFF; --ink:#15211B; --muted:#5B6B62; --line:#D6DED5; --sunk:#F5F7F3;
+  --green:#1E5A3F; --green-soft:#E1EDE5; --flag:#D4572A; --flag-soft:#FBE5DB;
+  --violet:#4533FF; --violet-soft:#ECEAFF; --blue:#2D5E8C; --blue-soft:#E2ECF5;
+  --sand:#9C7424; --sand-soft:#F5EDDC; --ok:#2F7D4F; --ok-soft:#E0F1E6;
+  --term:#14201A; --term-ink:#DDE8E0; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#7F9489; --term-track:#2E3F35;
+  /* the depicted POS screen keeps its real light look in both themes */
+  --scr-bg:#F2F2F4; --scr-paper:#FFFFFF; --scr-ink:#1F2328; --scr-muted:#6B7280; --scr-line:#D4D4D8; --scr-bar:#111315; --scr-accent:#4533FF; --scr-accent-soft:#F4F3FF; --scr-red:#8A1F1F; --scr-red-soft:#FDF0F0; --scr-ok:#1F6B3A; --scr-ok-soft:#E6F4EA;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+    --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+    --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+    --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+    --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1511; --paper:#162019; --ink:#E6ECE7; --muted:#9AAA9F; --line:#2A3830; --sunk:#111A15;
+  --green:#6BC196; --green-soft:#1B3127; --flag:#F08A5D; --flag-soft:#3A2219;
+  --violet:#A99FFF; --violet-soft:#241F44; --blue:#7AAEDB; --blue-soft:#182A3A;
+  --sand:#D9B566; --sand-soft:#2E2715; --ok:#6BCB8E; --ok-soft:#173222;
+  --term:#0A110D; --term-ink:#D6E2DA; --term-key:#8FD3AE; --term-str:#F2C48B; --term-dim:#6E8277; --term-track:#22302A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.app{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{margin:0;line-height:1.25;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.eyebrow{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{display:grid;gap:4px;min-width:0}
+.top h1{font-size:clamp(22px,3vw,30px);font-weight:700}
+.top h1 b{color:var(--violet)}
+.top .lede{color:var(--muted);max-width:72ch;font-size:13.5px}
+
+.scen{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.chip .ph{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:4px}
+.ph.look{background:var(--green-soft);color:var(--green)}
+.ph.count{background:var(--violet-soft);color:var(--violet)}
+.ph.save{background:var(--blue-soft);color:var(--blue)}
+.ph.home{background:var(--green-soft);color:var(--green)}
+.ph.sale{background:var(--violet-soft);color:var(--violet)}
+.ph.refund{background:var(--flag-soft);color:var(--flag)}
+.ph.reg{background:var(--blue-soft);color:var(--blue)}
+.chip:hover{border-color:var(--green)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--paper)}
+.chip[aria-pressed="true"] .no{color:var(--paper);opacity:.8}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;height:36px;min-width:36px;padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.play{background:var(--flag);border-color:var(--flag);color:#fff;min-width:150px;font-size:14px}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.sep{width:1px;height:26px;background:var(--line)}
+.lbl{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;height:34px;padding:0 12px;font-weight:700;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg.lang button{padding:0 14px}
+.seg.lang button[aria-checked="true"]{background:var(--violet);color:#fff}
+.seg.speed button{font-family:var(--mono)}
+.tog{display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+.tog input{appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;margin:0;transition:background .15s}
+.tog input::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--paper);transition:left .15s}
+.tog input:checked{background:var(--green)}
+.tog input:checked::after{left:16px}
+.spacer{flex:1}
+.voice{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-family:var(--mono);white-space:nowrap}
+
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--term);color:var(--term-ink);border-radius:12px;padding:14px 18px}
+.stepno{font-family:var(--mono);font-size:12px;color:var(--term-key);border:1px solid var(--term-dim);border-radius:6px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cap p{font-size:clamp(15px,1.6vw,18px);font-weight:500;line-height:1.6;min-height:3.2em}
+.cap .who{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--term-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.eq{display:inline-flex;gap:2px;align-items:center;height:12px}
+.eq i{width:3px;height:4px;border-radius:2px;background:var(--term-key)}
+.speaking .eq i{animation:eq .7s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.12s}.eq i:nth-child(3){animation-delay:.24s}.eq i:nth-child(4){animation-delay:.36s}
+@keyframes eq{0%,100%{height:3px}50%{height:12px}}
+.timer{display:grid;gap:3px;min-width:180px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tline{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tl{font-family:var(--sans);font-size:11px;color:var(--term-dim)}
+.tv{font-size:15px;font-weight:600}
+.prog{height:4px;border-radius:2px;background:var(--term-track);overflow:hidden;margin-top:2px}
+.prog i{display:block;height:100%;width:0;background:var(--term-str);transition:width .25s linear}
+.dots{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px}
+.dot{width:26px;height:6px;border-radius:3px;border:0;background:var(--term-track);cursor:pointer;padding:0}
+.dot.done{background:var(--term-dim)}
+.dot.now{background:var(--term-key);transform:scaleY(1.5)}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);gap:12px;height:clamp(600px,74vh,780px)}
+.col{background:var(--paper);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.head h2{font-size:13.5px;font-weight:700}
+.head .sub{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth}
+.new{animation:rise .35s ease-out}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+
+/* ---- depicted POS screen ---- */
+.pos{margin:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--scr-bg);color:var(--scr-ink);font-size:12px;position:relative}
+.posbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:8px 10px}
+.posbar small{display:block;font-size:8.5px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.posbar b{font-size:12.5px}
+.posbar .st{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700}
+.posbar .st i{font-style:normal;background:var(--scr-accent);padding:4px 8px}
+.postabs{display:flex;gap:5px;padding:7px 10px;background:var(--scr-paper);border-bottom:1px solid var(--scr-line)}
+.postabs span{border:1px solid var(--scr-line);padding:4px 9px;font-weight:700;font-size:11px}
+.postabs span.on{background:var(--scr-bar);color:#fff;border-color:var(--scr-bar)}
+.posbody{padding:10px;display:grid;gap:10px;min-height:440px;align-content:start;position:relative}
+.sh{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3f434a;border-bottom:1px solid var(--scr-line);padding-bottom:5px}
+.snote{font-size:11px;color:#3f434a}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+.tile{position:relative;aspect-ratio:1;max-width:100%;background:var(--scr-paper);border:1px solid var(--scr-line);display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:6px;transition:transform .2s,box-shadow .2s}
+.tile svg{width:26px;height:26px;fill:#2b2f36}
+.tile b{font-size:11.5px;line-height:1.15}
+.tile em{font-style:normal;font-size:9px;color:var(--scr-muted)}
+.tile .k{position:absolute;top:3px;right:5px;font-size:8.5px;color:var(--scr-muted)}
+.tile.primary{border-color:var(--scr-accent)}
+.tile.primary svg{fill:var(--scr-accent)}
+.tile.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.tile.off{background:#F7F7F8;color:#A1A1AA;border-style:dashed}
+.tile.off svg{fill:#C4C4CC}
+@keyframes press{50%{transform:scale(.97)}}
+.rlist{border:1px solid var(--scr-line);background:var(--scr-paper)}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #E4E4E8}
+.rrow:last-child{border-bottom:0}
+.rrow b{font-size:11.5px;display:block}
+.rrow small{font-size:9.5px;color:var(--scr-muted);display:block}
+.rrow .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow.ref b,.rrow.ref .amt{text-decoration:line-through;color:var(--scr-muted)}
+.rrow.hot{background:var(--scr-accent-soft);outline:2px solid var(--scr-accent);outline-offset:-2px}
+.badge{font-size:8.5px;font-weight:700;background:var(--scr-red-soft);color:var(--scr-red);padding:1px 5px;margin-right:6px;text-transform:uppercase}
+.salegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.backrow{display:flex;gap:6px;align-items:center}
+.sbtn{border:1px solid var(--scr-line);background:var(--scr-paper);padding:5px 9px;font-weight:700;font-size:11px;display:inline-block}
+.sbtn.hot{border-color:var(--scr-accent);box-shadow:0 0 0 3px rgba(69,51,255,.25);animation:press 1.2s ease-in-out infinite}
+.sbtn.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.sbtn.dan{background:var(--scr-red);color:#fff;border-color:var(--scr-red)}
+.search{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px 8px;color:var(--scr-muted);font-size:11px}
+.search.on{border-color:var(--scr-accent);color:var(--scr-ink);font-family:var(--mono)}
+.prods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.prod{border:1px solid var(--scr-line);background:var(--scr-paper);padding:6px;display:grid;gap:3px;min-height:58px;align-content:space-between}
+.prod b{font-size:10.5px;line-height:1.2}
+.prod span{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700}
+.prod span i{font-style:normal;font-weight:400;color:var(--scr-muted);font-size:9px}
+.prod.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.bill{border:1px solid var(--scr-line);background:var(--scr-paper);padding:7px;display:grid;gap:6px;align-content:start}
+.bill h4{margin:0;font-size:11.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln{border:1px solid #E4E4E8;padding:5px;font-size:10.5px;display:flex;justify-content:space-between;gap:6px}
+.bill .ln small{display:block;color:var(--scr-muted);font-size:9px}
+.bill .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--scr-line);padding-top:5px;font-size:12px}
+.bill .pays{border:2px solid var(--scr-accent);padding:5px;display:grid;gap:4px;font-size:10px}
+.bill .pays div{display:flex;gap:4px;flex-wrap:wrap}
+.empty-bill{color:var(--scr-muted);font-size:10.5px;text-align:center;padding:14px 4px}
+.sel{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;background:var(--scr-paper)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:12px;z-index:2}
+.modal{background:var(--scr-paper);width:min(320px,100%);max-height:100%;overflow:hidden;display:grid;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.modal header{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.modal .mb{padding:9px 10px;display:grid;gap:7px}
+.mlbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+.obtn{border:1px solid var(--scr-line);padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.obtn b{display:block;font-size:11px}.obtn small{display:block;font-size:9.5px;color:var(--scr-muted)}
+.obtn.hot{border-color:var(--scr-accent);background:var(--scr-accent-soft)}
+.sum{display:grid;gap:2px;font-size:10.5px}
+.sum div{display:flex;justify-content:space-between}
+.sum .t{font-weight:700;font-size:12px;border-top:1px solid var(--scr-line);padding-top:3px}
+.warnbox{background:#FFF8E1;color:#5B4708;font-size:10px;padding:5px 6px}
+.refbox{background:var(--scr-red-soft);border:1px solid #E2A5A5;color:var(--scr-red);padding:6px;font-size:11px}
+.refbox b{display:block}
+.ta{border:1px solid var(--scr-line);padding:5px;font-size:10.5px;min-height:34px}
+.ta.on{border-color:var(--scr-accent)}
+.scanbeam{display:flex;align-items:center;gap:8px;background:var(--scr-bar);color:#fff;padding:7px 9px;font-family:var(--mono);font-size:10.5px}
+.scanbeam i{width:8px;height:8px;border-radius:50%;background:#E5484D;box-shadow:0 0 8px #E5484D;animation:blink .6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.picker{background:var(--scr-bar);color:#fff;min-height:440px;display:grid;place-content:center;gap:10px;padding:20px}
+.picker small{font-size:9px;letter-spacing:.1em;opacity:.55;font-weight:700}
+.picker h4{margin:0;font-size:17px}
+.picker p{font-size:11px;opacity:.7}
+.picker .stn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);padding:9px 11px;display:grid}
+.picker .stn b{font-size:12.5px}.picker .stn span{font-size:10px;opacity:.6}
+.picker .stn.hot{border-color:#8b80ff;background:rgba(255,255,255,.12)}
+.ctable{width:100%;border-collapse:collapse;font-size:10.5px}
+.ctable th,.ctable td{text-align:left;padding:4px 3px;border-bottom:1px solid #E4E4E8;font-variant-numeric:tabular-nums}
+.ctable th{font-size:9px;color:var(--scr-muted);text-transform:uppercase;letter-spacing:.06em}
+.ctable td.r,.ctable th.r{text-align:right}
+.okpill{background:var(--scr-ok-soft);color:var(--scr-ok);font-weight:700;font-size:9px;padding:1px 5px}
+.waitpill{background:#FFF4D6;color:#7A5A00;font-weight:700;font-size:9px;padding:1px 5px}
+.ghostlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.ghostlist span{border:1px dashed var(--scr-line);color:#A1A1AA;padding:6px;font-size:10.5px;text-align:center}
+.kbd{display:inline-flex;gap:4px;align-items:center;justify-self:start;background:var(--scr-bar);color:#fff;padding:5px 8px;font-family:var(--mono);font-size:11px;animation:rise .35s ease-out}
+.kbd kbd{border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 5px;font-family:inherit}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);background:var(--scr-paper);font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);min-width:0}
+.urlbar i{width:8px;height:8px;border-radius:50%;background:#2F7D4F;flex:0 0 auto}
+.urlbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- behind the scenes ---- */
+.log{display:grid;gap:8px;padding:12px;align-content:start}
+.ent{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--sunk)}
+.ent .eh{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;flex-wrap:wrap}
+.ent .tn{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow-wrap:anywhere}
+.ent .ep{font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.ent .why{padding:0 10px 8px;font-size:12px;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.04em;flex:0 0 auto}
+.tag.ui{background:var(--green-soft);color:var(--green)}
+.tag.rpc{background:var(--sand-soft);color:var(--sand)}
+.tag.local{background:var(--blue-soft);color:var(--blue)}
+.tag.stripe{background:var(--violet-soft);color:var(--violet)}
+.tag.key{background:var(--flag-soft);color:var(--flag)}
+.json{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:11.5px;line-height:1.55;padding:8px 10px;overflow-x:auto;white-space:pre}
+.json .k{color:var(--term-key)}.json .s{color:var(--term-str)}.json .d{color:var(--term-dim)}
+.empty{color:var(--muted);font-size:12.5px;padding:14px;text-align:center}
+
+/* ---- register state ---- */
+.ledger{display:grid;gap:10px;padding:12px;align-content:start}
+.lc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;background:var(--sunk)}
+.lc.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--violet)}100%{box-shadow:0 0 0 0 transparent}}
+.lc .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc .src{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lc .src em{display:block;font-style:normal;font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill.none{background:var(--line);color:var(--muted)}
+.pill.wait{background:var(--sand-soft);color:var(--sand)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--flag-soft);color:var(--flag)}
+.pill.vi{background:var(--violet-soft);color:var(--violet)}
+.lrows{display:grid;gap:3px;font-size:12px}
+.lrows div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lrows div span:first-child{min-width:0;overflow-wrap:anywhere}
+.lrows .cur{font-weight:700;color:var(--violet)}
+.lrows .gone{text-decoration:line-through;color:var(--muted)}
+/* ---- closing totals window ---- */
+.win{background:var(--scr-paper);border:1px solid var(--scr-line);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.win header{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--scr-line);font-weight:700;font-size:12px}
+.win .wb{padding:9px;display:grid;gap:8px}
+.wt{margin:0;font-size:13px;color:#2b2f36}
+.ctw{overflow-x:auto}
+.ct{width:100%;min-width:430px;border-collapse:collapse;border:1px solid var(--scr-line);font-size:10px;font-variant-numeric:tabular-nums}
+.ct th{background:#F2F2F4;font-weight:700;padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);font-size:9.5px;line-height:1.2}
+.ct th.l,.ct td.l{text-align:left;border-left:0}.ct th.c{text-align:center}
+.ct th.hc{background:var(--scr-accent-soft);color:var(--scr-accent);box-shadow:inset 0 -2px 0 var(--scr-accent)}
+.ct td{padding:5px 4px;text-align:right;border-left:1px solid var(--scr-line);border-top:1px solid var(--scr-line);vertical-align:top}
+.ct td.b{font-weight:700}
+.ct tr.hr td{background:var(--scr-accent-soft)}
+.ct tr.tt td{background:#F2F2F4;font-weight:700}
+.ct td.cc{width:118px}
+.den{display:grid;grid-template-columns:1fr 58px;gap:2px 5px;align-items:center}
+.den i,.mi{font-style:normal;white-space:nowrap;border:1px solid #A1A1AA;background:#fff;padding:1px 4px;text-align:right;display:block}
+.den i.w{grid-column:auto}
+.den i.on,.mi.on{border-color:var(--scr-accent);box-shadow:0 0 0 2px rgba(69,51,255,.25)}
+.den i.tot{background:#F7F7F8;border-color:var(--scr-line)}
+.ro{display:block}
+.df{display:block;margin-top:3px;font-size:9.5px;font-weight:700}.df.ok{color:var(--scr-ok)}.df.bad{color:var(--scr-red)}
+.nr{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border-top:1px solid var(--scr-line);padding-top:7px;font-size:11px}
+.nr .ta{min-height:24px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--scr-line);padding-top:7px}
+.btns .r{margin-left:auto}
+.sv{display:grid;gap:1px;padding:6px 8px;font-size:10.5px}
+.sv.warn{background:#FFF8E1;color:#5B4708}.sv.bad{background:var(--scr-red-soft);color:var(--scr-red)}
+
+.lnote{font-size:11.5px;color:var(--muted)}
+
+footer{font-size:12px;color:var(--muted);display:grid;gap:4px;max-width:120ch}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto}
+  .col{height:600px}
+  .col.ledgercol{grid-column:1 / -1;height:auto;max-height:640px}
+}
+@media (max-width:760px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .col{height:auto;max-height:640px}
+  .col.ledgercol{max-height:none}
+  .cap{grid-template-columns:minmax(0,1fr)}
+  .timer{min-width:0}
+  .sep{display:none}
+  .salegrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
+/* ---- membership sale mocks (prefixed ms-) ---- */
+.seg.lang button{display:inline-flex;align-items:center;gap:6px}
+.seg.lang svg{width:20px;height:18px;flex:0 0 auto}
+.seg.lang svg path{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.seg.lang svg text{fill:currentColor;font-family:var(--sans);font-weight:700;font-size:8.5px}
+/* ---- GolfNow + bill fix mocks (prefixed pf-) ---- */
+.ph.plan{background:var(--green-soft);color:var(--green)}
+.ph.gn{background:var(--flag-soft);color:var(--flag)}
+.ph.fix{background:var(--violet-soft);color:var(--violet)}
+.ph.ship{background:var(--sand-soft);color:var(--sand)}
+.cx-new{animation:cxflash 1.1s ease}
+@keyframes cxflash{0%{background:#fff3b0}100%{background:transparent}}
+@media (prefers-reduced-motion:reduce){.cx-new{animation:none}}
+.pf-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){.pf-two{grid-template-columns:1fr}}
+.pf-card{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:6px;min-width:0;transition:opacity .3s}
+.pf-card.off{opacity:.35}
+.pf-card small{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);font-weight:700}
+.pf-card>b{font-size:15px}
+.pf-card.bad{border-color:var(--scr-red);background:var(--scr-red-soft)}
+.pf-card.good{border-color:var(--scr-ok);background:var(--scr-ok-soft)}
+.pf-li{display:flex;gap:8px;align-items:baseline;font-size:12px}
+.pf-li em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);flex:0 0 auto}
+.pf-flow{display:grid;gap:8px}
+.pf-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pf-node{border:1px solid var(--scr-line);background:var(--scr-paper);border-radius:6px;padding:6px 9px;font-weight:700;font-size:12px;white-space:nowrap}
+.pf-node.gn{border-color:#1a7f4b;color:#1a7f4b}
+.pf-node.cg{border-color:#2d5e8c;color:#2d5e8c}
+.pf-node.us{border-color:var(--scr-accent);color:var(--scr-accent)}
+.pf-node.off{opacity:.35;text-decoration:line-through}
+.pf-arr{font-family:var(--mono);color:var(--scr-muted);font-size:12px}
+.pf-arr.cut{color:var(--scr-red);font-weight:700}
+.pf-cap{font-size:11px;color:var(--scr-muted)}
+.pf-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--scr-red-soft);color:var(--scr-red)}
+.pf-tag.ok{background:var(--scr-ok-soft);color:var(--scr-ok)}
+.pf-tag.ac{background:var(--scr-accent-soft);color:var(--scr-accent)}
+.pf-bill{background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:8px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.pf-bill h4{margin:0 0 4px;font-size:12px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.pf-l{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums;font-size:12px}
+.pf-l.gone{color:var(--scr-muted);text-decoration:line-through}
+.pf-l.disc{color:var(--scr-ok)}
+.pf-l.tot{border-top:1px solid var(--scr-line);padding-top:5px;margin-top:3px;font-weight:700;font-size:13.5px}
+.pf-l.tot.bad{color:var(--scr-red)}
+.pf-l.tot.ok{color:var(--scr-ok)}
+.pf-step{font-size:11.5px;font-weight:700;color:var(--scr-accent);background:var(--scr-accent-soft);border-radius:6px;padding:5px 8px}
+.pf-field{display:grid;gap:3px;font-size:11px;color:var(--scr-muted)}
+.pf-field span{border:1px solid var(--scr-line);border-radius:5px;padding:5px 8px;background:#fff;color:var(--scr-ink);font-family:var(--mono);font-size:12px}
+.pf-field span.hot{border-color:var(--scr-accent);box-shadow:0 0 0 2px var(--scr-accent-soft)}
+.pf-reader{display:grid;gap:6px;justify-items:center;background:var(--scr-bar);color:#fff;border-radius:10px;padding:14px 10px;text-align:center}
+.pf-reader b{font-size:20px;font-variant-numeric:tabular-nums}
+.pf-reader small{color:#b9c0c8;font-size:11px}
+.pf-err{border:1px solid var(--scr-red);background:var(--scr-red-soft);color:var(--scr-red);border-radius:6px;padding:7px 9px;font-size:11.5px;font-weight:600}
+.pf-dlg{border:1px solid var(--scr-line);background:#fff;border-radius:8px;padding:10px 12px;display:grid;gap:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:12px}
+.pf-dlg .bt{display:flex;gap:6px;justify-content:flex-end}
+.pf-dlg .bt i{font-style:normal;border:1px solid var(--scr-line);border-radius:5px;padding:4px 10px;font-weight:700}
+.pf-dlg .bt i.pri{background:var(--scr-accent);color:#fff;border-color:var(--scr-accent)}
+.pf-todo{display:grid;gap:6px}
+.pf-todo div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;background:var(--scr-paper);border:1px solid var(--scr-line);border-radius:7px;padding:7px 9px;font-size:12px}
+.pf-todo div.you{border-color:var(--scr-accent)}
+.pf-todo b{display:block}
+.pf-todo small{color:var(--scr-muted);font-size:11px}
+
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="eyebrow" data-i="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="lede" data-i="lede"></p>
+  </header>
+
+  <nav class="scen" id="scen" aria-label="Scenes"></nav>
+
+  <div class="bar" role="toolbar" aria-label="Player">
+    <button class="btn play" id="bPlay" type="button"></button>
+    <button class="btn" id="bPrev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+    <button class="btn" id="bNext" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+    <button class="btn" id="bRestart" type="button" data-i="restart"></button>
+    <span class="sep"></span>
+    <span class="lbl" id="langLbl" data-i="lang"></span>
+    <div class="seg lang" id="lang" role="radiogroup" aria-labelledby="langLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="ko" aria-label="한국어"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">가</text></svg>한국어</button>
+      <button type="button" role="radio" aria-checked="false" data-v="en" aria-label="English"><svg viewBox="0 0 22 20" aria-hidden="true"><path d="M3 2.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4.5 3.5V14.5H3A1.5 1.5 0 0 1 1.5 13V4A1.5 1.5 0 0 1 3 2.5z"/><text x="11" y="11.6" text-anchor="middle">Aa</text></svg>English</button>
+    </div>
+    <span class="sep"></span>
+    <span class="lbl" id="spLbl" data-i="speed"></span>
+    <div class="seg speed" id="speed" role="radiogroup" aria-labelledby="spLbl">
+      <button type="button" role="radio" aria-checked="true" data-v="1">1×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.25">1.25×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="1.5">1.5×</button>
+      <button type="button" role="radio" aria-checked="false" data-v="2">2×</button>
+    </div>
+    <span class="sep"></span>
+    <label class="tog"><input type="checkbox" id="tVoice" checked> <span data-i="voiceOn"></span></label>
+    <label class="tog"><input type="checkbox" id="tAll" checked> <span data-i="autoNext"></span></label>
+    <span class="spacer"></span>
+    <span class="voice">ElevenLabs · Hope</span>
+  </div>
+
+  <div class="cap" id="cap">
+    <span class="stepno" id="stepno">1 / 9</span>
+    <div style="min-width:0">
+      <span class="who"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="capWho"></span></span>
+      <p id="capText" aria-live="polite"></p>
+    </div>
+    <div class="timer">
+      <div class="tline"><span class="tl" data-i="tScene"></span><span class="tv" id="tmScene">0:00 / 0:00</span></div>
+      <div class="tline"><span class="tl" data-i="tAll"></span><span class="tv" id="tmAll">0:00 / 0:00</span></div>
+      <div class="prog"><i id="tmBar"></i></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <main class="stage">
+    <section class="col" aria-labelledby="gTitle">
+      <div class="head"><h2 id="gTitle" data-i="laneScreen"></h2><span class="sub" id="gSub"></span></div>
+      <div class="scroll" id="guest"></div>
+    </section>
+    <section class="col" aria-labelledby="lTitle">
+      <div class="head"><h2 id="lTitle" data-i="laneLog"></h2><span class="sub">Tee sheet · Supabase · Stripe S700</span></div>
+      <div class="scroll" id="logWrap"><div class="log" id="log"></div></div>
+    </section>
+    <section class="col ledgercol" aria-labelledby="rTitle">
+      <div class="head"><h2 id="rTitle" data-i="laneLedger"></h2><span class="sub" data-i="ledgerSub"></span></div>
+      <div class="scroll"><div class="ledger" id="ledger"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p data-i="foot1"></p>
+    <p data-i="foot2"></p>
+  </footer>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const UI={
+ ko:{eyebrow:"Pelham Hills Golf Club · GolfNow 예약 · 결제 금액 · 나레이터 프레젠테이션",
+  h1:"GolfNow 예약은 <b>연동이 없었고</b>, 금액은 <b>할인 계산</b>이 틀렸어요",
+  lede:"클럽이 말한 두 가지 문제를 장면별로 보여 드려요. 결제 금액 문제는 원인 6가지를 고쳤어요. 화면 수정은 배포됐고, SQL 0080 은 붙여 넣어 실행해야 해요. GolfNow 문제는 연동 방식을 정해 주셔야 만들 수 있어요. 왼쪽은 화면, 가운데는 뒤에서 일어나는 일, 오른쪽은 고친 것 체크리스트예요.",
+  restart:"처음부터",lang:"나레이션",speed:"속도",voiceOn:"나레이션 음성",autoNext:"다음 장면 자동",
+  tScene:"이 장면",tAll:"전체 8장면",laneScreen:"화면",laneLog:"뒤에서 일어나는 일",laneLedger:"체크리스트",
+  ledgerSub:"고친 것 6 · 정할 것",narr:"나레이터 · Hope",play:"프레젠테이션 시작",resume:"재생",pause:"일시정지",
+  waitLog:"장면이 진행되면 뒤에서 일어나는 일이 여기에 쌓여요.",
+  foot1:"나레이션은 ElevenLabs Hope 목소리로 한국어·영어 두 벌을 만들었어요. 말풍선 버튼(가 / Aa)을 누르면 지금 장면부터 그 언어로 다시 읽어요. 단축키: Space 재생·일시정지, ← → 장면 이동, L 언어 바꾸기.",
+  foot2:"커밋 527786f. 고친 곳: supabase/migrations/0080_bill_discount_fix.sql, components/pos/BillPanel.tsx, components/teesheet/ReservationDetail.tsx, lib/pos/api.ts. 금액 예시는 로컬 Postgres 에서 0001~0080 을 적용하고 돌린 시험과 같은 계산이에요(18홀 $51.33 × 4명, HST 13%). 이름은 예시예요."},
+ en:{eyebrow:"Pelham Hills Golf Club · GolfNow bookings · payment amounts · narrated walkthrough",
+  h1:"GolfNow had <b>no connection</b>, and amounts came from <b>discount math</b>",
+  lede:"The club's two reports, scene by scene. The payment problem had six causes, all fixed. The screen changes are live; SQL 0080 still has to be pasted and run. GolfNow needs your choice of connection before it can be built. Left: the screen. Middle: what happens behind it. Right: the fix checklist.",
+  restart:"Restart",lang:"Narration",speed:"Speed",voiceOn:"Narration voice",autoNext:"Auto-advance",
+  tScene:"This scene",tAll:"All 8 scenes",laneScreen:"Screen",laneLog:"What happens behind",laneLedger:"Checklist",
+  ledgerSub:"6 fixes · decisions",narr:"Narrator · Hope",play:"Start presentation",resume:"Play",pause:"Pause",
+  waitLog:"Behind-the-scenes steps appear here as the scene plays.",
+  foot1:"Narration uses the ElevenLabs Hope voice, recorded in Korean and English. The speech-bubble buttons (가 / Aa) restart the current scene in that language. Keys: Space play/pause, ← → change scene, L switch language.",
+  foot2:"Commit 527786f. Changed: supabase/migrations/0080_bill_discount_fix.sql, components/pos/BillPanel.tsx, components/teesheet/ReservationDetail.tsx, lib/pos/api.ts. The amounts match the test run on a local Postgres with 0001–0080 applied (18 holes $51.33 × 4 players, 13% HST). Names are examples."}
+};
+
+const L=(ko,en)=>({ko,en});
+const T=(ko,en)=>LANG==="ko"?ko:en;
+const $m=c=>(c<0?"−":"")+"$"+(Math.abs(c)/100).toFixed(2);
+const tax=c=>Math.round(c*0.13);
+
+function frame(url,body){return '<div class="pos"><div class="urlbar"><i></i><span>'+url+'</span></div><div class="posbody">'+body+'</div></div>'}
+function bill(title,tag,rows,disc,totCls){
+ const sub=rows.filter(r=>!r[2]).reduce((s,r)=>s+r[1],0);
+ const t=sub-disc;const tx=tax(t);
+ return '<div class="pf-bill"><h4><span>'+title+'</span>'+(tag||"")+'</h4>'+
+  rows.map(r=>'<div class="pf-l'+(r[2]?" gone":"")+'"><span>'+r[0]+'</span><span>'+$m(r[1])+'</span></div>').join("")+
+  '<div class="pf-l"><span>'+T("소계","Subtotal")+'</span><span>'+$m(sub)+'</span></div>'+
+  (disc?'<div class="pf-l disc"><span>'+T("할인","Discount")+'</span><span>−'+$m(disc)+'</span></div>':"")+
+  '<div class="pf-l"><span>HST (13%)</span><span>'+$m(tx)+'</span></div>'+
+  '<div class="pf-l tot '+(totCls||"")+'"><span>'+T("합계","Total")+'</span><span>'+$m(t+tx)+'</span></div></div>';
+}
+const G=5133;
+function players(n,gone){const out=[];for(let i=0;i<4;i++)out.push([["Lee","Park","Kim","Choi"][i]+" · 18h",G,i>=n||(gone&&i>=gone)]);return out}
+
+function overviewScreen(p){
+ const n=Math.min(2,Math.ceil(p*2.6));
+ const card=(on,cls,ey,h,lines,tag)=>'<div class="pf-card '+cls+(on?"":" off")+'"><small>'+ey+'</small><b>'+h+'</b>'+lines.map((s,i)=>'<span class="pf-li"><em>'+(i+1)+'</em>'+s+'</span>').join("")+tag+'</div>';
+ return frame(T("클럽이 말한 문제 두 가지","The club's two reports"),'<div class="pf-two">'+
+  card(n>=1,"bad",T("문제 1","Report 1"),"“GolfNow bookings not appearing”",
+   LANG==="ko"?["GolfNow 와 새 티 시트를 잇는 코드가 없어요","예전엔 Chronogolf CSV 를 손으로 가져올 때만 보였어요","방식을 정해 주셔야 만들 수 있어요"]:["Nothing connects GolfNow to the new tee sheet","They only showed up when someone imported the Chronogolf CSV by hand","Needs your choice before it can be built"],
+   '<span class="pf-tag">'+T("결정 필요","Needs a decision")+'</span>')+
+  card(n>=2,"good",T("문제 2","Report 2"),"“Payment amounts never correct”",
+   LANG==="ko"?["세금·센트 계산은 맞았어요","할인 저장 방식과 카드 승인 한도가 틀렸어요","원인 6가지를 고쳤어요"]:["Tax and cents math was right","Discount storage and the card approval limit were wrong","Six causes fixed"],
+   '<span class="pf-tag ok">'+T("고침 · SQL 실행 필요","Fixed · run the SQL")+'</span>')+
+  '</div>');
+}
+
+function gnScreen(p){
+ const after=p>.5;
+ const row=(nodes)=>'<div class="pf-row">'+nodes.join("")+'</div>';
+ const nd=(cls,t)=>'<span class="pf-node '+cls+'">'+t+'</span>';
+ const ar=(t,cut)=>'<span class="pf-arr'+(cut?" cut":"")+'">'+t+'</span>';
+ const before='<div class="pf-card"><small>'+T("예전 (9월 중순까지)","Before (until mid-September)")+'</small>'+
+  row([nd("gn","GolfNow"),ar("→"),nd("cg","Chronogolf"),ar(T("→ 손으로 CSV →","→ CSV by hand →")),nd("us",T("새 티 시트","New tee sheet"))])+
+  '<span class="pf-cap">'+T("누가 가져오기를 돌릴 때만 들어왔어요.","Only arrived when someone ran the import.")+'</span></div>';
+ const now='<div class="pf-card '+(after?"bad cx-new":"off")+'"><small>'+T("지금","Now")+'</small>'+
+  row([nd("gn","GolfNow"),ar("→"),nd("cg off","Chronogolf"),ar("✕",true),nd("us",T("새 티 시트","New tee sheet"))])+
+  '<span class="pf-cap">'+T("API · 웹훅 · 이메일 · 가져오기 화면 모두 없어요. 직원이 다시 치지 않으면 안 보여요.","No API, webhook, email reader or import screen. Staff must retype them.")+'</span></div>';
+ const doc='<div class="pf-step">'+T("2026-09-10 결정: “GolfNow 와는 직접 연동이 필요하다” · 만든 적은 없어요","2026-09-10 decision: “GolfNow needs a direct connection” · never built")+'</div>';
+ return frame("pelhamhills · tee sheet",before+now+(p>.75?doc:""));
+}
+
+function clampScreen(p){
+ const st=p<.3?0:p<.6?1:2;
+ const old=st===0?bill(T("계산서 #12 · 직원 할인 $60","Bill #12 · staff discount $60"),"",players(4),6000)
+  :st===1?bill(T("3명을 잠깐 뺌","3 players taken off"),"<span class='pf-tag'>"+T("할인이 $51.33 로 저장","Discount saved as $51.33")+"</span>",players(1),5133)
+  :bill(T("다시 넣음 · 예전","Put back · before"),"<span class='pf-tag'>"+T("$8.67 덜 깎임","$8.67 less off")+"</span>",players(4),5133,"bad");
+ const fixed=st<2?"":bill(T("다시 넣음 · 고친 뒤","Put back · after the fix"),"<span class='pf-tag ok'>"+T("할인 $60 그대로","Still $60 off")+"</span>",players(4),6000,"ok");
+ return frame("pelhamhills · tee sheet · bill",'<div class="pf-two">'+old+(fixed?'<div class="cx-new">'+fixed+'</div>':'<div class="pf-step">'+T("소계가 할인보다 작아지는 순간, 줄인 할인이 저장됐어요.","The moment the subtotal dropped below the discount, the cut discount was saved.")+'</div>')+'</div>');
+}
+
+function promoScreen(p){
+ const st=p<.35?0:1;
+ const t='<span class="pf-tag ac">TEN · $10 / '+T("인","player")+'</span>';
+ if(st===0) return frame("pelhamhills · tee sheet · bill",'<div class="pf-two">'+bill(T("4명 · 바코드 찍음","4 players · code scanned"),t,players(4),4000)+'<div class="pf-step">'+T("PROMO-TEN 을 찍는 순간 $40 으로 정해졌어요.","Scanning PROMO-TEN fixed the amount at $40.")+'</div></div>');
+ return frame("pelhamhills · tee sheet · bill",'<div class="pf-two">'+
+  bill(T("2명 뺌 · 예전","2 removed · before"),"<span class='pf-tag'>"+T("$40 그대로","Still $40")+"</span>",players(2,2),4000,"bad")+
+  (p>.65?'<div class="cx-new">'+bill(T("2명 뺌 · 고친 뒤","2 removed · after"),"<span class='pf-tag ok'>$20</span>",players(2,2),2000,"ok")+'</div>':"")+'</div>');
+}
+
+function manualScreen(p){
+ const st=p<.3?0:p<.65?1:2;
+ const fld=(lab,val,hot)=>'<div class="pf-field">'+lab+'<span class="'+(hot?"hot":"")+'">'+val+'</span></div>';
+ const left='<div class="pf-card"><small>'+T("예전","Before")+'</small>'+
+  fld("Bill discount","$40.00",st===0)+(st>=1?fld(T("직원이 $5 더 깎으려고 5 를 침","Staff types 5 to take $5 more off"),"$5.00",true):"")+
+  (st>=1?'<span class="pf-tag">'+T("할인 = $5 · 프로모션 $40 사라짐","Discount = $5 · the $40 promo is gone")+'</span>':"")+'</div>';
+ const right=st<2?'<div class="pf-step">'+T("칸에 프로모션까지 합친 금액이 보여서, 고치면 프로모션을 덮어썼어요.","The field showed the promo inside it, so editing it overwrote the promo.")+'</div>'
+  :'<div class="pf-card good cx-new"><small>'+T("고친 뒤","After")+'</small>'+fld(T("Bill discount (직원 할인만)","Bill discount (staff only)"),"$5.00",false)+
+   '<span class="pf-li"><em>+</em>'+T("프로모션 TEN","Promo TEN")+' $40.00</span><span class="pf-li"><em>=</em><b>'+T("할인","Discount")+' $45.00</b></span></div>';
+ return frame("pelhamhills · tee sheet · bill",'<div class="pf-two">'+left+right+'</div>');
+}
+
+function cardScreen(p){
+ const tot=20532+tax(20532);
+ const st=p<.3?0:p<.6?1:2;
+ const rd=(amt,sub)=>'<div class="pf-reader"><small>Stripe S700</small><b>'+$m(amt)+'</b><small>'+sub+'</small></div>';
+ if(st===0) return frame("pelhamhills · tee sheet · bill",'<div class="pf-two">'+rd(tot,T("승인됨 · 아직 Charge 전","Approved · not charged yet"))+'<div class="pf-step">'+T("화면이 멈춘 것 같아 직원이 다시 누름","The screen looked stuck, so staff pressed again")+'</div></div>');
+ if(st===1) return frame("pelhamhills · tee sheet · bill",'<div class="pf-two">'+rd(tot,T("또 승인됨","Approved again"))+'<div class="pf-card bad"><small>'+T("예전","Before")+'</small><b>'+$m(tot*2)+'</b><span class="pf-cap">'+T("합계만 봤어요. 이미 승인된 금액은 빼지 않았어요.","It only checked the total, not what was already approved.")+'</span></div></div>');
+ return frame("pelhamhills · tee sheet · bill",'<div class="pf-two"><div class="pf-err cx-new">'+T("The card reader already approved $232.01 on this bill. Only $0.00 is left — check the payments list before charging again.","The card reader already approved $232.01 on this bill. Only $0.00 is left — check the payments list before charging again.")+'</div><div class="pf-card good"><small>'+T("고친 뒤","After")+'</small><span class="pf-li"><em>1</em>'+T("이미 승인된 금액 + 새 금액 ≤ 합계","Approved so far + new amount ≤ total")+'</span><span class="pf-li"><em>2</em>'+T("금액을 안 쳤으면 방금 다시 읽은 남은 금액을 보냄","With no amount typed, send the balance just reloaded")+'</span></div></div>');
+}
+
+function screenScreen(p){
+ const st=p<.45?0:1;
+ if(st===0){
+  const tot=20532+tax(20532);
+  return frame("pelhamhills · tee sheet · Take Payment",'<div class="pf-two"><div class="pf-bill"><h4><span>'+T("예전","Before")+'</span></h4><div class="pf-l tot bad"><span>Subtotal Due</span><span>$205.32</span></div><span class="pf-cap">+ HST at checkout</span></div>'+
+   '<div class="pf-bill cx-new"><h4><span>'+T("고친 뒤","After")+'</span><span class="pf-tag ok">'+T("세금 포함","Tax included")+'</span></h4><div class="pf-l"><span>HST (13%)</span><span>'+$m(tax(20532))+'</span></div><div class="pf-l tot ok"><span>Total Due</span><span>'+$m(tot)+'</span></div></div></div>');
+ }
+ return frame("pelhamhills · tee sheet",'<div class="pf-dlg cx-new">'+T("Bill #12 already has Lee · 18h (8:10 AM) — $232.01 so far.<br><br>OK = add this group to the same bill (one person pays for both).<br>Cancel = start a new bill for this group.","Bill #12 already has Lee · 18h (8:10 AM) — $232.01 so far.<br><br>OK = add this group to the same bill (one person pays for both).<br>Cancel = start a new bill for this group.")+'<div class="bt"><i>Cancel</i><i class="pri">OK</i></div></div><div class="pf-step">'+T("앞 팀 계산서가 열린 채로 남아 있으면, 다음 팀을 담기 전에 물어요.","If the last group's bill is still open, it asks before adding the next group.")+'</div>');
+}
+
+function todoScreen(n){
+ const it=[
+  ["you",T("지금 할 일 · SQL 0080 실행","To do now · run SQL 0080"),T("Supabase SQL editor 에 파일 전체를 붙여 한 번. 다시 돌려도 안전해요.","Paste the whole file in the Supabase SQL editor once. Safe to re-run.")],
+  ["",T("GolfNow 연동 방식","GolfNow connection"),T("① GolfNow 공식 API(클럽이 요청) ② 예약 확인 메일 자동 읽기 ③ 리포트 CSV 올리기 화면","① Official GolfNow API (club requests it) ② Read booking emails ③ Upload report CSV")],
+  ["",T("GolfNow 선결제 손님","GolfNow prepaid players"),T("지금은 현장에서 그린피 전액이 다시 청구돼요. $0 로 할지 정해 주세요.","Today they're charged the full green fee again. Should it be $0?")],
+  ["",T("1~2센트 차이","1–2 cent drift"),T("4명 $320.00 이 $320.02 로 나와요. 세금 포함 금액을 맞출지 정해 주세요.","4 players come to $320.02, not $320.00. Match the all-in prices?")],
+  ["",T("금요일 5시 39.94 · 카트비","Friday 5 PM 39.94 · cart fees"),T("오타로 보여요. 카트 수를 나중에 바꾸면 카트비가 안 따라가요.","Looks like a typo. Cart fees don't follow a later cart-count change.")]
+ ];
+ return frame(T("정할 것 · 할 일","Decide · to do"),'<div class="pf-todo">'+it.slice(0,n).map((x,i)=>'<div class="'+x[0]+(i===n-1?" cx-new":"")+'"><span class="pf-tag '+(i===0?"ac":"")+'">'+(i===0?T("할 일","Do"):T("정할 것","Decide"))+'</span><span><b>'+x[1]+'</b><small>'+x[2]+'</small></span></div>').join("")+'</div>');
+}
+
+const FIX=[["할인이 사라지지 않게","Discounts don't shrink","sql"],["프로모션 금액 다시 계산","Promo re-priced","sql"],["직원 할인 · 프로모션 따로","Staff discount and promo kept apart","both"],["카드 중복 승인 막기","No double card approvals","sql"],["단말기 금액 새로 읽기","Reader gets the fresh balance","web"],["Total Due · 다른 팀 확인","Total Due · other-group check","web"]];
+const AT={ov:-1,gn:-1,clamp:0,promo:1,manual:2,card:3,screen:5,todo:-1};
+const NOTE={
+ ov:["화면 수정은 Vercel 배포까지 끝났어요. SQL 0080 은 아직 실행해야 해요.","Screen changes are live on Vercel. SQL 0080 still needs to be run."],
+ gn:["코드 버그가 아니라 아직 만들지 않은 기능이에요.","Not a bug in code: the feature was never built."],
+ clamp:["직원이 친 할인은 manual_discount 칸에 따로 두고, 다시 계산이 건드리지 않아요.","The staff discount now lives in manual_discount, which recalculation never touches."],
+ promo:["프로모션은 지금 담긴 그린피 줄로 매번 다시 매겨요. 사람을 더하면 할인도 늘어요.","The promo is re-priced from the current green-fee lines each time. Add a player and it grows."],
+ manual:["Bill discount 칸은 이제 직원 할인만 보여요. 코드를 지워도 직원 할인은 그대로예요.","The Bill discount field now shows only the staff part. Removing the code leaves it alone."],
+ card:["처음 승인된 금액은 Charge 하거나 결제 줄을 지워 환불하면 다시 쓸 수 있어요.","The first approval is used at Charge, or refunded when its payment line is removed."],
+ screen:["Cancel 을 누르면 새 계산서가 열리고, 앞 팀 계산서는 열린 채 목록에 남아요.","Cancel opens a new bill; the earlier bill stays open in the list."],
+ todo:["SQL 을 실행하신 뒤 알려 주시면, 실제 계산서로 한 번 확인할게요.","Tell me once the SQL has run and I'll check it on a real bill."]
+};
+
+/* ---------- scenes ---------- */
+const S=[
+{a:"ov",ph:"plan",ko:"한눈에",en:"At a glance",
+ screen:(l,p)=>overviewScreen(p),
+ log:[
+  {at:.2,tag:"local",name:"Report 1",ep:"GolfNow → tee sheet",why:L("연결이 아예 없었어요.","There was no connection at all.")},
+  {at:.55,tag:"local",name:"Report 2",ep:"bill → card reader",why:L("할인과 카드 승인 쪽에서 틀렸어요.","Discounts and card approvals were wrong.")},
+  {at:.8,tag:"ui",name:"Vercel",ep:"527786f · success"}
+ ],
+ ledger:[{at:0,g:"ov"}]},
+
+{a:"gn",ph:"gn",ko:"GolfNow 예약",en:"GolfNow bookings",
+ screen:(l,p)=>gnScreen(p),
+ log:[
+  {at:.15,tag:"stripe",name:"pelham_tee_bookings",ep:"source: staff · web · voice",why:L("예약이 들어오는 길은 직원·홈페이지·전화뿐이에요.","Bookings only come from staff, the website and the phone assistant.")},
+  {at:.35,tag:"rpc",name:"import_teesheet_csv.py",ep:"manual · last 2026-09-15",why:L("Chronogolf 가져오기는 손으로 돌리는 스크립트예요.","The Chronogolf import is a script someone runs by hand.")},
+  {at:.6,tag:"local",name:"GolfNow",ep:"API · webhook · email = none"},
+  {at:.85,tag:"ui",name:"tone.ts",ep:"ratePlan 'GolfNow' → blue",why:L("화면은 GolfNow 색만 칠할 수 있어요. 들여오는 기능은 없어요.","The screen can only colour GolfNow bookings; nothing brings them in.")}
+ ],
+ ledger:[{at:0,g:"gn"}]},
+
+{a:"clamp",ph:"fix",ko:"사라지던 할인",en:"Shrinking discount",
+ screen:(l,p)=>clampScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_pos_recalc()",ep:"0008",why:L("줄을 바꿀 때마다 합계를 다시 계산해요.","Runs every time a line changes.")},
+  {at:.4,tag:"local",name:"discount = least(discount, subtotal)",ep:"saved",why:L("줄인 값을 그대로 저장했어요.","It saved the reduced value.")},
+  {at:.7,tag:"rpc",name:"0080",ep:"discount = least(manual + promo, subtotal)",why:L("줄이는 건 그 순간 계산에만 쓰고, 직원 할인은 남겨요.","The cap applies to that calculation only; the staff discount is kept.")}
+ ],
+ ledger:[{at:0,g:"clamp"}]},
+
+{a:"promo",ph:"fix",ko:"굳어 있던 프로모션",en:"Frozen promo",
+ screen:(l,p)=>promoScreen(p),
+ log:[
+  {at:.15,tag:"rpc",name:"pelham_staff_bill_apply_promo()",ep:"0078",why:L("찍는 순간 금액을 정해 할인에 더했어요.","Fixed the amount at scan time and added it to the discount.")},
+  {at:.45,tag:"local",name:"2 players removed",ep:"promo $40 → $40",why:L("빼도 그대로라 덜 받았어요. 상품까지 깎일 수 있었어요.","It stayed, so the bill came out short, even cutting into products.")},
+  {at:.7,tag:"rpc",name:"pelham_promo_amount_for()",ep:"0080 · each recalc",why:L("$10 × 지금 그린피 인원 = $20.","$10 × players on the bill now = $20.")}
+ ],
+ ledger:[{at:0,g:"promo"}]},
+
+{a:"manual",ph:"fix",ko:"덮어쓰던 직원 할인",en:"Overwritten promo",
+ screen:(l,p)=>manualScreen(p),
+ log:[
+  {at:.2,tag:"ui",name:"Bill discount",ep:"showed $40 (promo inside)"},
+  {at:.45,tag:"rpc",name:"pelham_staff_bill_update()",ep:"{discount: 500}",why:L("할인 전체를 $5 로 바꿔 프로모션이 사라졌어요.","Replaced the whole discount with $5, wiping the promo.")},
+  {at:.75,tag:"stripe",name:"pelham_bills.manual_discount",ep:"500 + promo 4000",why:L("직원 할인과 프로모션을 따로 저장하고 더해요.","Staff discount and promo are stored apart and added.")}
+ ],
+ ledger:[{at:0,g:"manual"}]},
+
+{a:"card",ph:"fix",ko:"두 번 긁힐 뻔한 카드",en:"Double card approval",
+ screen:(l,p)=>cardScreen(p),
+ log:[
+  {at:.15,tag:"stripe",name:"terminal sale",ep:"$232.01 approved · unused"},
+  {at:.4,tag:"rpc",name:"pelham_staff_terminal_begin()",ep:"amount ≤ total only",why:L("이미 승인된 금액을 보지 않았어요.","It ignored what was already approved.")},
+  {at:.65,tag:"rpc",name:"0080",ep:"amount + approved ≤ total",why:L("넘으면 단말기로 보내기 전에 거절해요.","Over the total, it is refused before reaching the reader.")},
+  {at:.85,tag:"ui",name:"BillPanel.tsx",ep:"amount = fresh balance",why:L("다시 읽은 합계로 보내요.","Sends the freshly reloaded balance.")}
+ ],
+ ledger:[{at:0,g:"card"}]},
+
+{a:"screen",ph:"fix",ko:"화면 두 곳",en:"Two screen fixes",
+ screen:(l,p)=>screenScreen(p),
+ log:[
+  {at:.15,tag:"ui",name:"Take Payment",ep:"Subtotal Due → Total Due",why:L("세전 금액이 크게 보여 그 돈을 받을 수 있었어요.","The pre-tax number was the big one, so staff could collect it.")},
+  {at:.55,tag:"local",name:"current bill",ep:"saved in this browser",why:L("앞 팀 계산서가 열려 있으면 다음 팀이 같은 계산서에 담겼어요.","With the last group's bill open, the next group landed on it.")},
+  {at:.75,tag:"ui",name:"ReservationDetail.tsx",ep:"ask: same bill or new bill"}
+ ],
+ ledger:[{at:0,g:"screen"}]},
+
+{a:"todo",ph:"ship",ko:"정할 것 · 할 일",en:"Decide · to do",
+ screen:(l,p)=>todoScreen(Math.min(5,Math.ceil(p*5.5))),
+ log:[
+  {at:.1,tag:"key",name:"Supabase SQL editor",ep:"0080_bill_discount_fix.sql"},
+  {at:.3,tag:"key",name:"GolfNow",ep:"① API ② email ③ CSV"},
+  {at:.55,tag:"key",name:"Sample",ep:"one booking email or report CSV"},
+  {at:.8,tag:"local",name:"Test",ep:"local Postgres 0001–0080 · passed",why:L("단말기 실결제와 브라우저 화면은 아직 직접 확인하지 않았어요.","A live card charge and the browser screens are not checked yet.")}
+ ],
+ ledger:[{at:0,g:"todo"}]}
+];
+
+const PH={plan:{ko:"개요",en:"Overview"},gn:{ko:"GolfNow",en:"GolfNow"},fix:{ko:"금액",en:"Amounts"},ship:{ko:"정할 것",en:"Decide"}};
+const TAGS={ui:"SCREEN",rpc:"CODE",local:"RULE",stripe:"DATA",key:"INPUT"};
+
+function renderLedger(p){
+  const {st,fl}=ledgerAt(SC,p);const k=LANG;const g=st.g||"ov";const cur=AT[g];
+  const card=(id,src,sub,pill,body)=>'<div class="lc'+(fl.has(id)?" flash":"")+'"><div class="r1"><span class="src">'+src+'<em>'+sub+'</em></span>'+pill+'</div>'+body+'</div>';
+  const pill=(cls,t)=>'<span class="pill '+cls+'">'+esc(t)+'</span>';
+  const where=w=>w==="web"?(k==="ko"?"배포됨":"live"):w==="sql"?(k==="ko"?"SQL 대기":"SQL pending"):(k==="ko"?"화면 ✓ · SQL 대기":"web ✓ · SQL pending");
+  const isCur=i=>i===cur||(g==="card"&&i===4);
+  let h=card("f",k==="ko"?"결제 금액 · 고친 것":"Payment amounts · fixes","",pill("wait",k==="ko"?"SQL 0080 실행 필요":"Run SQL 0080"),
+    '<div class="lrows">'+FIX.map((f,i)=>'<div class="'+(isCur(i)?"cur":"")+'"><span>'+(i+1)+". "+esc(k==="ko"?f[0]:f[1])+'</span><span>'+esc(where(f[2]))+'</span></div>').join("")+'</div>');
+  h+=card("g","GolfNow","",pill(g==="gn"||g==="todo"?"bad":"none",k==="ko"?"결정 필요":"Needs a decision"),
+    '<div class="lrows"><div class="'+(g==="gn"?"cur":"")+'"><span>'+(k==="ko"?"연동 방식":"Connection")+'</span><span>① ② ③</span></div><div><span>'+(k==="ko"?"선결제 처리":"Prepaid players")+'</span><span>?</span></div></div>');
+  h+=card("n",k==="ko"?"알아 둘 것":"Good to know","",pill(g==="todo"?"vi":"ok",k==="ko"?"메모":"note"),'<p class="lnote">'+esc(k==="ko"?NOTE[g][0]:NOTE[g][1])+'</p>');
+  $("ledger").innerHTML=h;
+}
+
+const DUR={"ov": {"ko": 14.1, "en": 13.3}, "gn": {"ko": 14.3, "en": 12.6}, "clamp": {"ko": 16.0, "en": 19.0}, "promo": {"ko": 14.5, "en": 15.6}, "manual": {"ko": 14.2, "en": 14.9}, "card": {"ko": 17.0, "en": 15.5}, "screen": {"ko": 13.2, "en": 14.6}, "todo": {"ko": 16.6, "en": 15.5}};
+const NARR={"ko": {"ov": "클럽이 말한 문제는 두 가지예요. GolfNow 예약이 새 티 시트에 안 보인다는 것과, 결제 금액이 늘 맞지 않는다는 것이에요. 금액 문제는 원인 여섯 가지를 찾아 고쳤고, GolfNow 는 연동 방식을 정해 주셔야 만들 수 있어요.", "gn": "예전에는 GolfNow 예약이 Chronogolf 로 들어갔고, 누군가 CSV 가져오기를 손으로 돌릴 때만 티 시트에 보였어요. 새 티 시트에는 GolfNow 와 잇는 코드가 전혀 없어요. 버그가 아니라 아직 만들지 않은 기능이에요.", "clamp": "첫 번째 원인이에요. 직원 할인 60달러를 건 뒤 세 명을 잠깐 빼면, 소계가 51달러 33센트로 줄면서 할인도 그 금액으로 저장됐어요. 다시 넣어도 할인이 돌아오지 않아 더 받았어요. 이제 직원 할인은 따로 두고 줄어들지 않아요.", "promo": "두 번째는 프로모션이에요. 일인당 10달러 코드를 네 명에게 찍으면 40달러로 굳었어요. 두 명을 빼도 40달러가 그대로라 덜 받았어요. 이제는 계산할 때마다 지금 인원으로 다시 매겨서, 두 명이면 20달러예요.", "manual": "세 번째는 할인 칸이에요. 칸에 프로모션까지 합친 금액이 보여서, 직원이 5달러를 치면 프로모션 40달러가 사라졌어요. 이제 칸에는 직원 할인만 보이고, 프로모션과 더해서 45달러가 깎여요.", "card": "네 번째는 카드 단말기예요. 이미 승인된 금액을 보지 않아서, 다시 누르면 합계보다 두 배를 긁을 수 있었어요. 이제는 승인된 금액과 새 금액을 합쳐 합계를 넘으면 거절해요. 단말기로 보내는 금액도 방금 다시 읽은 남은 금액이에요.", "screen": "마지막으로 화면 두 곳이에요. 결제 창에 세전 금액이 크게 보이던 것을 세금 포함 Total Due 로 바꿨어요. 그리고 앞 팀 계산서가 열려 있으면, 다음 팀을 같은 계산서에 담을지 새로 열지 물어봐요.", "todo": "지금 하실 일은 SQL 0080 을 Supabase 에 붙여 한 번 실행하는 거예요. 그리고 GolfNow 연동 방식, 선결제 손님 처리, 일이 센트 차이, 금요일 요금을 정해 주세요. 예약 메일이나 CSV 샘플 하나를 보내 주시면 바로 만들게요."}, "en": {"ov": "The club reported two problems. GolfNow bookings don't show up on the new tee sheet, and payment amounts are never right. I found and fixed six causes of the payment problem. GolfNow needs your choice of connection before it can be built.", "gn": "GolfNow bookings used to land in Chronogolf, and only reached the tee sheet when someone ran the CSV import by hand. The new tee sheet has nothing that connects to GolfNow. It isn't a bug; the feature was never built.", "clamp": "First cause. Put a sixty-dollar staff discount on the bill, then take three players off for a moment. The subtotal drops to fifty-one thirty-three, and the discount was saved at that amount. Putting them back never restored it, so the customer paid more. Now the staff discount is stored on its own and never shrinks.", "promo": "Second, promo codes. A ten-dollar-per-player code scanned for four players froze at forty dollars. Remove two players and it stayed at forty, so the bill came out short. Now it is re-priced from the current players every time: two players, twenty dollars.", "manual": "Third, the discount field. It showed the promo inside it, so when staff typed five dollars, the forty-dollar promo disappeared. Now the field shows only the staff discount, and the promo is added on top, for forty-five dollars off.", "card": "Fourth, the card reader. It ignored amounts already approved, so pressing again could charge twice the total. Now, if what's already approved plus the new amount goes over the total, it's refused. The amount sent to the reader is also the balance just reloaded.", "screen": "Last, two screen fixes. The payment panel showed the pre-tax amount in large type; it now shows Total Due with tax. And if the last group's bill is still open, it asks whether to add the next group to the same bill or start a new one.", "todo": "Your next step is to paste SQL 0080 into Supabase and run it once. Then decide the GolfNow connection, prepaid players, the one-to-two cent drift, and the Friday rate. Send me one booking email or a report CSV, and I'll build it right away."}};
+/* ---------- state ---------- */
+let LANG="ko", SC=0, SPEED=1, playing=false, finished=false, prog=0, runId=0;
+let audio=null, t0=0, acc=0, tick=null;
+try{const v=localStorage.getItem("phgf-lang");if(v==="en"||v==="ko")LANG=v}catch(e){}
+try{const v=parseFloat(localStorage.getItem("phgf-speed"));if([1,1.25,1.5,2].includes(v))SPEED=v}catch(e){}
+
+const clip=(l,i)=>"audio/"+l+"-"+S[i].a+".mp3";
+const durOf=i=>DUR[S[i].a][LANG]*1000+700;
+function fmt(ms){const x=Math.max(0,Math.round(ms/1000));return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+
+function fmtJson(o){
+  return "{\n"+Object.entries(o).map(([k,v])=>{
+    const val=v===null?'<span class="d">null</span>':typeof v==="string"?'<span class="s">"'+esc(v)+'"</span>':esc(v);
+    return '  <span class="k">'+esc(k)+'</span>: '+val;
+  }).join(",\n")+"\n}";
+}
+function ledgerAt(sc,p){
+  const st={};const fl=new Set();
+  for(const c of S[sc].ledger){if(c.at<=p){Object.assign(st,c);if(c.flash&&p-c.at<.08)c.flash.forEach(f=>fl.add(f))}}
+  return {st,fl};
+}
+let lastLogN=-1,lastGuestKey="",lastLedgerKey="";
+function renderLog(p,force){
+  const items=S[SC].log.filter(e=>e.at<=p);
+  if(!force&&items.length===lastLogN)return;
+  const animate=!force&&items.length>lastLogN; lastLogN=items.length;
+  if(!items.length){$("log").innerHTML='<p class="empty">'+UI[LANG].waitLog+'</p>';return}
+  $("log").innerHTML=items.map((e,i)=>'<div class="ent'+(animate&&i===items.length-1?" new":"")+'"><div class="eh"><span class="tag '+e.tag+'">'+TAGS[e.tag]+'</span><span class="tn">'+esc(e.name)+'</span><span class="ep">'+esc(e.ep||"")+'</span></div>'+(e.why?'<p class="why">'+esc(e.why[LANG])+'</p>':"")+(e.body?'<div class="json">'+fmtJson(e.body)+'</div>':"")+'</div>').join("");
+  const w=$("logWrap");w.scrollTop=w.scrollHeight;
+}
+function renderGuest(p,force){
+  const html=S[SC].screen(LANG,p);
+  if(!force&&html===lastGuestKey)return; lastGuestKey=html;
+  $("gSub").textContent=S[SC][LANG];
+  $("guest").innerHTML=html;
+}
+function renderStage(p,force){
+  renderGuest(p,force);renderLog(p,force);
+  const l=ledgerAt(SC,p);const key=JSON.stringify(l.st)+[...l.fl].join()+LANG;
+  if(force||key!==lastLedgerKey){lastLedgerKey=key;renderLedger(p)}
+}
+function renderChips(){
+  $("scen").innerHTML=S.map((s,i)=>'<button type="button" class="chip" aria-pressed="'+(i===SC)+'" data-s="'+i+'"><span class="no">'+String(i+1).padStart(2,"0")+'</span><span class="ph '+s.ph+'">'+PH[s.ph][LANG]+'</span>'+esc(s[LANG])+'</button>').join("");
+  const b=$("scen").querySelector('[aria-pressed="true"]');if(b)b.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+function renderCaption(){
+  $("stepno").textContent=(SC+1)+" / "+S.length;
+  $("capWho").textContent=UI[LANG].narr+" · "+(LANG==="ko"?"한국어":"English");
+  $("capText").textContent=NARR[LANG][S[SC].a];
+  $("dots").innerHTML=S.map((_,i)=>'<button type="button" class="dot'+(i<SC?" done":"")+(i===SC?" now":"")+'" data-i="'+i+'" aria-label="'+(i+1)+'"></button>').join("");
+}
+function renderUI(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-i]").forEach(el=>{el.textContent=UI[LANG][el.dataset.i]});
+  $("h1").innerHTML=UI[LANG].h1;
+  $("lang").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(b.dataset.v===LANG)));
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===SPEED)));
+  renderChips();renderCaption();updatePlay();renderStage(prog,true);updateTimes();
+}
+function updatePlay(){
+  $("bPlay").innerHTML=playing?'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>'+UI[LANG].pause:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>'+(finished||(SC===0&&prog>=1)?UI[LANG].play:UI[LANG].resume);
+  $("cap").classList.toggle("speaking",playing&&$("tVoice").checked);
+}
+function updateTimes(){
+  const sd=durOf(SC);const tot=S.reduce((a,_,i)=>a+durOf(i),0);const before=S.slice(0,SC).reduce((a,_,i)=>a+durOf(i),0);
+  const el=before+sd*Math.min(1,prog);
+  $("tmScene").textContent=fmt(sd*Math.min(1,prog)/SPEED)+" / "+fmt(sd/SPEED);
+  $("tmAll").textContent=fmt(el/SPEED)+" / "+fmt(tot/SPEED);
+  $("tmBar").style.width=(100*el/tot).toFixed(2)+"%";
+}
+
+/* ---------- player ---------- */
+function stopAll(){runId++;if(audio){audio.onended=null;audio.pause();audio=null}clearInterval(tick);tick=null}
+function elapsed(){return acc+(playing?(performance.now()-t0)*SPEED:0)}
+function startTick(id){
+  clearInterval(tick);
+  tick=setInterval(()=>{
+    if(id!==runId)return;
+    const d=durOf(SC);
+    let e=elapsed();
+    if(audio&&isFinite(audio.duration)&&audio.duration>0&&!audio.paused)e=Math.max(e,audio.currentTime*1000);
+    prog=Math.min(1,e/d);
+    renderStage(prog,false);updateTimes();
+    if(prog>=1&&(!audio||audio.ended||audio.paused))sceneDone(id);
+  },120);
+}
+function sceneDone(id){
+  if(id!==runId)return;
+  stopAll();playing=false;prog=1;renderStage(1,false);
+  const rid=runId;
+  if($("tAll").checked&&SC<S.length-1){setTimeout(()=>{if(rid===runId&&!playing)playScene(SC+1,0)},900/SPEED)}
+  else{finished=SC===S.length-1;}
+  updatePlay();updateTimes();
+}
+function playScene(i,fromProg){
+  stopAll();const id=runId;
+  SC=i;finished=false;prog=fromProg||0;acc=prog*durOf(SC);t0=performance.now();playing=true;
+  lastLogN=-1;lastGuestKey="";lastLedgerKey="";
+  renderChips();renderCaption();renderStage(prog,true);updatePlay();updateTimes();
+  if($("tVoice").checked){
+    const a=new Audio(clip(LANG,SC));a.playbackRate=SPEED;a.preservesPitch=true;audio=a;
+    a.addEventListener("loadedmetadata",()=>{if(id!==runId)return;const sec=a.duration;if(isFinite(sec)&&sec>0){DUR[S[SC].a][LANG]=sec;}if(fromProg)try{a.currentTime=Math.min(sec-0.1,fromProg*sec)}catch(e){}updateTimes()},{once:true});
+    a.onended=()=>{if(id!==runId)return;acc=Math.max(elapsed(),durOf(SC)-700);t0=performance.now()};
+    a.onerror=()=>{if(id===runId){audio=null}};
+    a.play().catch(()=>{if(id===runId)audio=null});
+  }
+  startTick(id);
+}
+function pause(){acc=elapsed();if(audio)audio.pause();playing=false;clearInterval(tick);tick=null;updatePlay();updateTimes()}
+function resume(){
+  if(prog>=1||finished){playScene(finished?0:SC,0);return}
+  if(audio&&audio.paused){playing=true;t0=performance.now();audio.play().catch(()=>{});startTick(runId);updatePlay();return}
+  playScene(SC,prog);
+}
+function show(i){stopAll();playing=false;finished=false;SC=i;prog=1;lastLogN=-1;lastGuestKey="";lastLedgerKey="";renderChips();renderCaption();renderStage(1,true);updatePlay();updateTimes()}
+function setLang(l){
+  if(l===LANG)return;
+  const was=playing;LANG=l;try{localStorage.setItem("phgf-lang",l)}catch(e){}
+  if(was){playScene(SC,0)}else{stopAll()}
+  renderUI();
+}
+function setSpeed(v){
+  if(v===SPEED)return;
+  if(playing){acc=elapsed();t0=performance.now()}
+  SPEED=v;if(audio)audio.playbackRate=v;
+  try{localStorage.setItem("phgf-speed",String(v))}catch(e){}
+  $("speed").querySelectorAll("button").forEach(b=>b.setAttribute("aria-checked",String(+b.dataset.v===v)));
+  updateTimes();
+}
+
+$("bPlay").addEventListener("click",()=>{if(playing)pause();else if(SC===0&&prog>=1&&!finished)playScene(0,0);else resume()});
+$("bRestart").addEventListener("click",()=>playScene(0,0));
+$("bNext").addEventListener("click",()=>{const n=Math.min(SC+1,S.length-1);if(playing)playScene(n,0);else show(n)});
+$("bPrev").addEventListener("click",()=>{const n=Math.max(SC-1,0);if(playing)playScene(n,0);else show(n)});
+$("scen").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;const n=+b.dataset.s;if(playing)playScene(n,0);else show(n)});
+$("dots").addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b)return;const n=+b.dataset.i;if(playing)playScene(n,0);else show(n)});
+$("lang").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setLang(b.dataset.v)});
+$("speed").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(b)setSpeed(+b.dataset.v)});
+$("tVoice").addEventListener("change",()=>{if(!$("tVoice").checked&&audio){audio.pause();audio=null}updatePlay()});
+document.addEventListener("keydown",e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();$("bPlay").click()}
+  else if(e.key==="ArrowRight")$("bNext").click();
+  else if(e.key==="ArrowLeft")$("bPrev").click();
+  else if(e.key==="l"||e.key==="L")setLang(LANG==="ko"?"en":"ko");
+});
+
+prog=1;renderUI();
+})();
+</script>
+
+</body></html>
