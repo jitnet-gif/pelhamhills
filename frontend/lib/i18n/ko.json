@@ -3274,5 +3274,22 @@
  "e.g. Course maintenance contract": "예: 코스 관리 계약",
  "e.g. Paid April to October; includes fertilizer": "예: 4–10월 지급, 비료 포함",
  "Write the amount as a number, for example 4500.": "금액은 숫자로 쓰세요. 예: 4500",
- "Manager facts switch on once 0117_ai_marketing_facts.sql is run in the Supabase SQL Editor.": "Supabase SQL Editor 에서 0117_ai_marketing_facts.sql 을 실행하면 매니저 팩트가 켜집니다."
+ "Manager facts switch on once 0117_ai_marketing_facts.sql is run in the Supabase SQL Editor.": "Supabase SQL Editor 에서 0117_ai_marketing_facts.sql 을 실행하면 매니저 팩트가 켜집니다.",
+ "Weather alert": "날씨 알림",
+ "1. Day and situation": "1. 날짜와 상황",
+ "Tomorrow": "내일",
+ "Rain delay": "비로 지연",
+ "Lightning — play stopped": "번개 — 경기 중단",
+ "All clear": "재개",
+ "= first name,": "= 이름,",
+ "= their tee time": "= 그 손님의 티 타임",
+ "This is a notice about their booking, so no opt-out line is added. Numbers that replied STOP are still left out.": "예약에 대한 안내라 수신거부 문구는 붙지 않습니다. STOP 으로 답한 번호는 그래도 빠집니다.",
+ "Weather alerts are not switched on yet. Run supabase/migrations/0118_marketing_weather_alert.sql in the Supabase SQL editor.": "날씨 알림이 아직 켜지지 않았습니다. Supabase SQL editor 에서 supabase/migrations/0118_marketing_weather_alert.sql 을 실행하세요.",
+ "Tee times picked": "고른 티 타임",
+ "From now on": "지금부터",
+ "No bookings on the tee sheet for this day.": "이 날 티 시트에 예약이 없습니다.",
+ "(already started)": "(이미 시작)",
+ "A phone number on several tee times gets one text, with its earliest tee time.": "여러 티 타임에 같은 번호가 있으면 가장 이른 티 타임으로 한 번만 보냅니다.",
+ "Weather alert to the {0} tee sheet": "{0} 티 시트 날씨 알림",
+ "Sent texts cannot be taken back.": "보낸 문자는 되돌릴 수 없습니다."
 }

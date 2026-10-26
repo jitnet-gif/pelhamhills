@@ -199,3 +199,63 @@ def test_voice_opt_out_records_both_channels(env, monkeypatch):
     res = client.post(f"{API}/marketing/voice/opt-out", json={"caller_phone": "416-555-0001"})
     assert res.json()["ok"] is True
     assert [args["p_channel"] for _, args in recorded] == ["call", "sms"]
+
+
+# ===== 날씨 알림(0118) =====================================================
+
+def test_alert_window_is_every_day_6_to_22():
+    assert marketing.alert_window_open(datetime(2026, 10, 24, 6, 0, tzinfo=TZ))  # 토요일 이른 아침
+    assert not marketing.alert_window_open(datetime(2026, 10, 24, 5, 59, tzinfo=TZ))
+    assert marketing.alert_window_open(datetime(2026, 10, 20, 21, 59, tzinfo=TZ))
+    assert not marketing.alert_window_open(datetime(2026, 10, 20, 22, 0, tzinfo=TZ))
+
+
+def test_alert_body_fills_name_and_time_without_opt_out_line():
+    msg = "Hi {name}, frost delay: your {time} tee time moves back 30 minutes."
+    assert marketing.alert_body(msg, "Ann Lee", "7:10 AM") == (
+        "Pelham Hills Golf: Hi Ann, frost delay: your 7:10 AM tee time moves back 30 minutes."
+    )
+    assert marketing.alert_body(msg, "Guest", None) == (
+        "Pelham Hills Golf: Hi there, frost delay: your tee time moves back 30 minutes."
+    )
+
+
+def _weather(state, day="2026-10-25"):
+    state["campaign"]["audience"] = {"kind": "weather", "channel": "sms", "date": day}
+    state["campaign"]["message"] = "Hi {name}, rain: the course is closed. Your {time} tee time is cancelled."
+
+
+def test_weather_alert_sends_personal_text(env, monkeypatch):
+    client, state = env
+    _weather(state, datetime.now(TZ).date().isoformat())
+    state["queue"] = [{"id": 1, "name": "Ann Lee", "phone": "4165550001", "tee_time": "9:20 AM"}]
+    # 프로모션 시각이 닫혀 있어도 날씨 알림 시각이 열려 있으면 나간다.
+    monkeypatch.setattr(marketing, "window_open", lambda now=None: False)
+    monkeypatch.setattr(marketing, "alert_window_open", lambda now=None: True)
+    res = client.post(f"{API}/marketing/campaigns/7/send", headers={"Authorization": "Bearer t"})
+    assert res.status_code == 200, res.text
+    asyncio.run(marketing.run_campaign(state["campaign"]))
+    assert state["sent"] == [(
+        "+14165550001",
+        "Pelham Hills Golf: Hi Ann, rain: the course is closed. Your 9:20 AM tee time is cancelled.",
+        "weather_alert",
+        "MK-7",
+    )]
+    assert state["finished"] is True
+
+
+def test_weather_alert_for_a_past_day_is_refused(env, monkeypatch):
+    client, state = env
+    _weather(state, "2026-01-02")
+    monkeypatch.setattr(marketing, "alert_window_open", lambda now=None: True)
+    res = client.post(f"{API}/marketing/campaigns/7/send", headers={"Authorization": "Bearer t"})
+    assert res.status_code == 409
+    assert "passed" in res.json()["detail"]
+
+
+def test_weather_alert_refused_outside_alert_hours(env, monkeypatch):
+    client, state = env
+    _weather(state, datetime.now(TZ).date().isoformat())
+    monkeypatch.setattr(marketing, "alert_window_open", lambda now=None: False)
+    res = client.post(f"{API}/marketing/campaigns/7/send", headers={"Authorization": "Bearer t"})
+    assert res.status_code == 409

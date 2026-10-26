@@ -14,6 +14,11 @@ POST /marketing/voice/opt-out           (에이전트 도구) 통화 중 "다시
 
 문자 끝에는 언제나 보낸 곳과 수신거부 방법을 붙인다(CASL). 손님이 STOP 으로 답하면 `/sms/inbound` 가
 `pelham_marketing_optout_record` 로 남기고, 다음 캠페인부터 빠진다.
+
+날씨 알림(Weather alert 탭, 0118 — audience.kind = 'weather'): 그날 티 시트 손님에게 서리 지연·비·번개
+같은 돌발상황을 알리는 **거래 메시지**다. 프로모션이 아니라 수신거부 문구를 붙이지 않고, 문자 안 {name}·{time}
+을 그 사람의 첫 이름·티 타임으로 바꾼다. 보내는 시각도 따로 — 매일 6:00–22:00 (첫 티 타임 전 서리 지연).
+지난 날짜의 알림은 보내지 않는다.
 """
 
 from __future__ import annotations
@@ -21,7 +26,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -75,6 +80,33 @@ def window_open(now: datetime | None = None) -> bool:
 WINDOW_TEXT = "Weekdays 9:00 AM–9:30 PM, weekends 10:00 AM–6:00 PM"
 
 
+def alert_window_open(now: datetime | None = None) -> bool:
+    """날씨 알림: 매일 6:00–22:00 (클럽 현지 시각). 예약 손님에게 그날 일을 알리는 문자라 텔레마케팅 시각이 아니다."""
+    local = (now or datetime.now(CLUB_TIMEZONE)).astimezone(CLUB_TIMEZONE)
+    return 6 <= local.hour < 22
+
+
+ALERT_WINDOW_TEXT = "Every day 6:00 AM–10:00 PM"
+
+
+def is_weather_alert(campaign: dict[str, Any]) -> bool:
+    return (campaign.get("audience") or {}).get("kind") == "weather"
+
+
+def _window_for(campaign: dict[str, Any]):
+    return alert_window_open if is_weather_alert(campaign) else window_open
+
+
+def alert_expired(campaign: dict[str, Any], today: date | None = None) -> bool:
+    """그날이 지난 날씨 알림 — 어제 서리 지연을 오늘 보내지 않는다."""
+    raw = str((campaign.get("audience") or {}).get("date") or "")
+    try:
+        day = date.fromisoformat(raw[:10])
+    except ValueError:
+        return False
+    return day < (today or datetime.now(CLUB_TIMEZONE).date())
+
+
 def campaign_barcode_url(campaign: dict[str, Any]) -> Optional[str]:
     """프로모션 화면의 Text it 으로 만든 캠페인은 audience.barcode 에 PROMO-코드가 있다(0078).
     그 바코드 그림을 MMS 로 붙여, 손님이 휴대폰 화면을 내밀면 프로 샵이 찍을 수 있게 한다."""
@@ -87,6 +119,17 @@ def sms_body(message: str) -> str:
     if not text.lower().startswith("pelham hills"):
         text = f"{SMS_SENDER}: {text}"
     return f"{text} {SMS_FOOTER}"
+
+
+def alert_body(message: str, name: str | None, tee_time: str | None) -> str:
+    """날씨 알림 한 통. {name}·{time} 을 바꾸고 보낸 곳만 앞에 붙인다(거래 메시지라 수신거부 문구 없음)."""
+    first = _first_name(name)
+    text = message.strip().replace("{name}", "there" if first.lower() == "guest" else first)
+    # 티 타임을 모르면 "your {time} tee time" → "your tee time".
+    text = " ".join(text.replace("{time}", (tee_time or "").strip()).split())
+    if not text.lower().startswith("pelham hills"):
+        text = f"{SMS_SENDER}: {text}"
+    return text
 
 
 def calls_ready() -> bool:
@@ -116,8 +159,12 @@ async def _send_one(channel: str, campaign: dict[str, Any], send: dict[str, Any]
         await _record(send["id"], "skipped", error="bad phone number")
         return
     if channel == "sms":
-        msg = await send_sms(phone, sms_body(campaign["message"]), template="marketing",
-                             booking_ref=f"MK-{campaign['id']}", media_url=campaign_barcode_url(campaign))
+        if is_weather_alert(campaign):
+            msg = await send_sms(phone, alert_body(campaign["message"], send.get("name"), send.get("tee_time")),
+                                 template="weather_alert", booking_ref=f"MK-{campaign['id']}")
+        else:
+            msg = await send_sms(phone, sms_body(campaign["message"]), template="marketing",
+                                 booking_ref=f"MK-{campaign['id']}", media_url=campaign_barcode_url(campaign))
         if msg.status == "failed":
             await _record(send["id"], "failed", msg.twilio_sid, msg.error)
         elif msg.status == "skipped":
@@ -145,10 +192,11 @@ async def run_campaign(campaign: dict[str, Any]) -> None:
     campaign_id = int(campaign["id"])
     channel = campaign["channel"]
     gap = SMS_GAP_SECONDS if channel == "sms" else _call_gap_seconds()
+    open_now = _window_for(campaign)
     try:
         await asyncio.to_thread(_service, "pelham_marketing_requeue_stuck", {"p_campaign": campaign_id})
         while True:
-            if not window_open():
+            if not open_now():
                 logger.info("마케팅 %s: 보내는 시각이 끝나 멈춤", campaign_id)
                 return
             batch = await asyncio.to_thread(_service, "pelham_marketing_claim",
@@ -157,7 +205,7 @@ async def run_campaign(campaign: dict[str, Any]) -> None:
             if not sends:
                 break
             for index, send in enumerate(sends):
-                if not window_open():
+                if not open_now():
                     # 집었지만 못 보낸 사람은 다시 줄로.
                     for rest in sends[index:]:
                         await _record(rest["id"], "queued")
@@ -183,6 +231,8 @@ async def marketing_status(request: Request) -> dict[str, Any]:
         "call": calls_ready(),
         "window_open": window_open(),
         "window": WINDOW_TEXT,
+        "alert_window_open": alert_window_open(),
+        "alert_window": ALERT_WINDOW_TEXT,
         "sms_footer": SMS_FOOTER,
         "sms_sender": SMS_SENDER,
         "running": sorted(_running),
@@ -204,7 +254,13 @@ async def send_campaign(campaign_id: int, request: Request) -> dict[str, Any]:
             detail="AI calls are not set up on the server yet "
                    "(ELEVENLABS_API_KEY, ELEVENLABS_PHONE_NUMBER_ID, agent id).",
         )
-    if not window_open():
+    if is_weather_alert(campaign):
+        if alert_expired(campaign):
+            raise HTTPException(status_code=409, detail="This weather alert was for a day that has passed.")
+        if not alert_window_open():
+            raise HTTPException(status_code=409,
+                                detail=f"Weather alerts can only go out {ALERT_WINDOW_TEXT} (club time).")
+    elif not window_open():
         raise HTTPException(status_code=409, detail=f"Promotions can only go out {WINDOW_TEXT} (club time).")
     if campaign_id in _running:
         return {"ok": True, "already_running": True}

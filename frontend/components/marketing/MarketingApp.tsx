@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 고객 마케팅 화면 네 칸: 새 캠페인 · 캠페인 기록 · 동의 · 수신거부.
+ * 고객 마케팅 화면 다섯 칸: 새 캠페인 · 날씨 알림(그날 티 시트 손님, WeatherAlert.tsx) · 캠페인 기록 · 동의 · 수신거부.
  *
  * 누구에게 보낼 수 있는지는 서버(0047)가 정한다 — 이 화면은 그 결과를 보여 주고 고를 뿐이다.
  *   문자: 동의 표시가 있거나, 표시가 없으면 회원·라운드 기록이 있는 손님. 끝에 "Reply STOP to opt out."
@@ -28,10 +28,13 @@ import {
   marketingApi,
 } from "@/lib/marketing/api";
 
-type Tab = "compose" | "campaigns" | "consent" | "optouts";
+import WeatherAlert from "./WeatherAlert";
+
+type Tab = "compose" | "weather" | "campaigns" | "consent" | "optouts";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "compose", label: "New campaign" },
+  { key: "weather", label: "Weather alert" },
   { key: "campaigns", label: "Campaigns" },
   { key: "consent", label: "Consent" },
   { key: "optouts", label: "Opt-outs" },
@@ -74,6 +77,7 @@ export default function MarketingApp() {
       <ServerBanner status={status} error={statusError} />
 
       {tab === "compose" ? <Compose status={status} onCreated={onCreated} /> : null}
+      {tab === "weather" ? <WeatherAlert status={status} onCreated={onCreated} /> : null}
       {tab === "campaigns" ? <Campaigns initial={openCampaign} status={status} /> : null}
       {tab === "consent" ? <Consent /> : null}
       {tab === "optouts" ? <OptOuts /> : null}
@@ -611,7 +615,8 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                     </span>
                   </span>
                   <span className="mt-0.5 block text-xs text-[#6b7280]">
-                    {CHANNEL_LABEL[campaign.channel]} · {total} people · {clubTime(campaign.created_at)}
+                    {campaign.audience?.kind === "weather" ? "Weather alert" : CHANNEL_LABEL[campaign.channel]} · {total}{" "}
+                    people · {clubTime(campaign.created_at)}
                   </span>
                   {campaign.opted_out_after ? (
                     <span className="mt-0.5 block text-xs font-bold text-[#8c1d1d]">
@@ -639,7 +644,10 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
               <div className="min-w-0">
                 <h2 className="text-base font-bold">{detail.name}</h2>
                 <p className="text-xs text-[#6b7280]">
-                  {CHANNEL_LABEL[detail.channel]} · created {clubTime(detail.created_at)}
+                  {detail.audience?.kind === "weather"
+                    ? `Weather alert to the ${detail.audience.date ?? ""} tee sheet`
+                    : CHANNEL_LABEL[detail.channel]}{" "}
+                  · created {clubTime(detail.created_at)}
                   {detail.created_by ? ` by ${detail.created_by}` : ""}
                 </p>
               </div>
@@ -684,9 +692,12 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                 </span>
               ) : null}
             </div>
-            {detail.status === "sending" && waiting > 0 && status && !status.window_open ? (
+            {detail.status === "sending" && waiting > 0 && status &&
+            !(detail.audience?.kind === "weather" ? status.alert_window_open : status.window_open) ? (
               <p className="mt-2 text-xs text-[#8a5a00]">
-                Paused outside sending hours ({status.window}). Press Resume when the window opens.
+                Paused outside sending hours (
+                {detail.audience?.kind === "weather" ? status.alert_window : status.window}). Press Resume when the
+                window opens.
               </p>
             ) : null}
 
@@ -696,6 +707,7 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                   <tr className="border-b border-[#d4d4d8]">
                     <th className="px-2 py-1.5">Name</th>
                     <th className="px-2 py-1.5">Phone</th>
+                    {detail.audience?.kind === "weather" ? <th className="px-2 py-1.5">Tee time</th> : null}
                     <th className="px-2 py-1.5">Status</th>
                     <th className="px-2 py-1.5">Note</th>
                   </tr>
@@ -705,6 +717,9 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                     <tr className="border-b border-[#f0f0f2]" key={send.id}>
                       <td className="px-2 py-1.5 font-bold">{send.name}</td>
                       <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(send.phone)}</td>
+                      {detail.audience?.kind === "weather" ? (
+                        <td className="px-2 py-1.5 whitespace-nowrap">{send.tee_time ?? ""}</td>
+                      ) : null}
                       <td className="px-2 py-1.5">{SEND_STATUS_LABEL[send.status]}</td>
                       <td className="max-w-[16rem] truncate px-2 py-1.5 text-[#6b7280]" title={send.error ?? ""}>
                         {send.optout ? (

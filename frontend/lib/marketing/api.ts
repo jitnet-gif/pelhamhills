@@ -53,6 +53,8 @@ export type CampaignSend = {
   provider_ref: string | null;
   error: string | null;
   updated_at: string;
+  /** 날씨 알림(0118)만 — 이 사람의 티 타임. 문자의 {time} 자리. */
+  tee_time?: string | null;
   /** 지금 이 번호가 같은 채널에서 수신거부 상태면(0116). after_send = 캠페인이 시작된 뒤 거부. */
   optout?: { created_at: string; source: string; after_send: boolean } | null;
 };
@@ -63,7 +65,15 @@ export type Campaign = {
   name: string;
   message: string;
   /** barcode: 프로모션 화면에서 온 캠페인의 PROMO-코드(0078). 문자에 바코드 그림이 MMS 로 붙는다. */
-  audience: AudienceFilter & { channel: Channel; picked?: number; barcode?: string };
+  /** kind = "weather": Weather alert 탭에서 그날 티 시트 손님에게 보낸 알림(0118). date = 그 날. */
+  audience: AudienceFilter & {
+    channel: Channel;
+    picked?: number;
+    barcode?: string;
+    kind?: "weather";
+    date?: string;
+    tee_times?: number;
+  };
   status: "ready" | "sending" | "sent" | "cancelled";
   created_by: string | null;
   created_at: string;
@@ -82,9 +92,35 @@ export type MarketingStatus = {
   call: boolean;
   window_open: boolean;
   window: string;
+  /** 날씨 알림 보내는 시각(매일 6:00–22:00). 이 칸이 생기기 전 서버에는 없다. */
+  alert_window_open?: boolean;
+  alert_window?: string;
   sms_footer: string;
   sms_sender: string;
   running: number[];
+};
+
+export type WeatherPlayer = { name: string; phone: string | null; ok: boolean; reason: "no_phone" | "opted_out" | null };
+
+export type WeatherTeeTime = {
+  booking_id: string;
+  time: string;
+  /** 자정부터 분 — 정렬·"지금부터" 거르기. */
+  minutes: number;
+  title: string;
+  status: string;
+  players: WeatherPlayer[];
+};
+
+export type WeatherAudience = {
+  date: string;
+  today: string;
+  now_minutes: number;
+  players: number;
+  phones: number;
+  no_phone: number;
+  opted_out: number;
+  tee_times: WeatherTeeTime[];
 };
 
 async function backend<T>(method: "GET" | "POST", path: string): Promise<T> {
@@ -126,6 +162,10 @@ export const marketingApi = {
   optOuts: () => staffRpc<OptOut[]>("pelham_marketing_optouts"),
   setOptOut: (phone: string, channel: Channel, opted_out: boolean) =>
     staffRpc<unknown>("pelham_marketing_optout_set", { p: { phone, channel, opted_out } }),
+  weatherAudience: (date: string) =>
+    staffRpc<WeatherAudience>("pelham_marketing_weather_audience", { p: { date } }),
+  createWeatherAlert: (fields: { date: string; name: string; message: string; booking_ids: string[] }) =>
+    staffRpc<Campaign>("pelham_marketing_weather_create", { p: fields }),
   status: () => backend<MarketingStatus>("GET", "/marketing/status"),
   send: (id: number) => backend<{ ok: boolean; already_running: boolean }>("POST", `/marketing/campaigns/${id}/send`),
 };
