@@ -23,6 +23,7 @@ import { useSlotLocks } from "@/hooks/useSlotLocks";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
 import { checkInByQr, checkinMessage, customerQrCode, type CheckinResult } from "@/lib/pos/customerQr";
 import { isIdCardScan, parseIdCard, type IdCard } from "@/lib/pos/idCard";
+import { isGiftCardCode, offerGiftCardCode } from "@/lib/pos/giftCard";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
 import { isPromoBarcode } from "@/lib/pos/promo";
 import { retailApi, toRetailError } from "@/lib/retail/api";
@@ -220,6 +221,18 @@ export default function TeeSheetPage() {
           return;
         }
         offerRainCheckCode(raw);
+        setBillOpen(true);
+        setRevealPayments((n) => n + 1);
+        return;
+      }
+      // 기프트카드(0120): 레인체크처럼 계산서 서랍의 결제 칸으로 넘긴다.
+      if (isGiftCardCode(raw)) {
+        const current = getBillState().bill;
+        if (!current || current.lines.length === 0) {
+          pushToast("error", "That is a gift card. Add the green fee to the bill first, then scan the gift card again.");
+          return;
+        }
+        offerGiftCardCode(raw);
         setBillOpen(true);
         setRevealPayments((n) => n + 1);
         return;

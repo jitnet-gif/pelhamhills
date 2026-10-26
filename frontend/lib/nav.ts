@@ -121,6 +121,9 @@ export const ADMIN_EVENTS = "/admin/events";
 export const ADMIN_PROMOTIONS = "/admin/promotions";
 export const ADMIN_CALLS = "/admin/calls";
 
+/** 기프트카드 발행(0120). 매니저와 계정 관리자에게만 메뉴에 뜬다(proshop@ 제외, `lib/pos/giftCard.ts`). */
+export const ADMIN_GIFT_CARDS = "/admin/gift-cards";
+
 export const GOLF_GPS_MAP_EDITOR = "https://golf-gps-pelhamhills-seven.vercel.app/admin/map";
 
 /**
@@ -140,6 +143,7 @@ export const adminNav: NavItem[] = [
   { label: "Memberships", href: "/admin/memberships", glyph: "★" },
   { label: "Tour Operators", href: "/admin/tour-operators", glyph: "✈" },
   { label: "Promotions", href: ADMIN_PROMOTIONS, glyph: "▶" },
+  { label: "Gift Cards", href: ADMIN_GIFT_CARDS, glyph: "🎁" },
   // 공개 사이트·예약 화면에 뜨는 팝업 공지(서리 지연·프로모션 등, 0060).
   { label: "Website Pop-ups", href: "/admin/notices", glyph: "📣" },
   { label: "Calls & SMS", href: ADMIN_CALLS, glyph: "☏" },
@@ -228,6 +232,7 @@ export const adminDivisions: AdminDivision[] = [
       { label: "Snack Bar / Bev Cart", href: ADMIN_SNACK_BAR, glyph: "☕" },
       { label: "Pro Shop Retail", href: ADMIN_RETAIL, glyph: "🛒" },
       { label: "Camera Scan", href: ADMIN_SCAN, glyph: "📷" },
+      pick("Gift Cards"),
       { label: "Register Guide", href: REGISTER_GUIDE, glyph: "▶" },
       { label: "Staff Guides", href: GUIDE_HOME, glyph: "▶" },
       pick("Reports"),

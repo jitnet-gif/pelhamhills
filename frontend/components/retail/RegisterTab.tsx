@@ -25,6 +25,7 @@ import type { BillStation, OpenItemInput } from "@/lib/pos/api";
 import { findProductByCode } from "@/lib/retail/findProduct";
 import { matchPhoto } from "@/lib/retail/productPhoto";
 import { billActions, getBillState, useCurrentBill } from "@/lib/pos/currentBill";
+import { isGiftCardCode, offerGiftCardCode } from "@/lib/pos/giftCard";
 import { isRainCheckCode, offerRainCheckCode } from "@/lib/pos/rainCheck";
 import { isPromoBarcode } from "@/lib/pos/promo";
 import { groupProducts, type MenuGroup } from "@/lib/retail/menuGroups";
@@ -173,6 +174,18 @@ export default function RegisterTab({
       setRevealPayments((n) => n + 1);
       return;
     }
+    // 기프트카드(0120): 레인체크와 같다 — 결제 칸이 카드를 찾고 잔액만큼 잡는다.
+    if (isGiftCardCode(code)) {
+      if (!bill || bill.lines.length === 0) {
+        setScanNote("That is a gift card. Ring in what it pays for first, then scan the gift card again.");
+        return;
+      }
+      setScanNote("");
+      offerGiftCardCode(code);
+      if (!window.matchMedia("(min-width: 1024px)").matches) setSheetOpen(true);
+      setRevealPayments((n) => n + 1);
+      return;
+    }
     // 프로모션 바코드(0078): 그린피 줄이 있는 계산서에 할인을 건다.
     if (isPromoBarcode(code)) {
       if (!bill || !bill.lines.some((line) => line.kind === "tee_player")) {
@@ -226,6 +239,14 @@ export default function RegisterTab({
       offerRainCheckCode(code);
       payFromCamera();
       return { ok: true, message: `Rain check ${code.trim().toUpperCase()}` };
+    }
+    if (isGiftCardCode(code)) {
+      if (!bill || bill.lines.length === 0) {
+        return { ok: false, message: "That is a gift card. Scan what it pays for first, then the gift card." };
+      }
+      offerGiftCardCode(code);
+      payFromCamera();
+      return { ok: true, message: "Gift card" };
     }
     if (isPromoBarcode(code)) {
       if (!bill || !bill.lines.some((line) => line.kind === "tee_player")) {

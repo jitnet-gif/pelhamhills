@@ -52,6 +52,15 @@ import {
   type TerminalSettings,
 } from "@/lib/pos/terminal";
 import {
+  describeGiftCardError,
+  giftCardApi,
+  isGiftCardCode,
+  maskGiftCard,
+  subscribeGiftCardCode,
+  takeGiftCardCode,
+  type GiftCard,
+} from "@/lib/pos/giftCard";
+import {
   describeRainCheckError,
   isRainCheckCode,
   rainCheckApi,
@@ -1144,6 +1153,11 @@ function PaymentsEditor({
   const [rcLooking, setRcLooking] = useState(false);
 
   const isRainCheck = method === "rain_check";
+  // 기프트카드(0120): 친 코드와 서버에서 찾은 카드.
+  const [gcCode, setGcCode] = useState("");
+  const [gcFound, setGcFound] = useState<GiftCard | null>(null);
+  const [gcLooking, setGcLooking] = useState(false);
+  const isGiftCard = method === "gift_card";
 
   const lookUpRainCheck = useCallback(async (raw: string) => {
     const code = raw.trim().toUpperCase();
@@ -1177,6 +1191,56 @@ function PaymentsEditor({
     if (waiting) use(waiting);
     return subscribeRainCheckCode(use);
   }, [lookUpRainCheck]);
+
+  const lookUpGiftCard = useCallback(async (raw: string) => {
+    const code = raw.trim().toUpperCase();
+    setGcCode(code);
+    setGcFound(null);
+    setFormError("");
+    if (!code) return;
+    if (!isGiftCardCode(code)) {
+      setFormError(`"${code}" is not a gift card number. It looks like GIFT-1A2B3C4D5E.`);
+      return;
+    }
+    setGcLooking(true);
+    try {
+      setGcFound(await giftCardApi.byCode(code));
+    } catch (error) {
+      setFormError(describeGiftCardError(error));
+    } finally {
+      setGcLooking(false);
+    }
+  }, []);
+
+  // 계산대·티 시트에서 쏜 기프트카드. 수단을 기프트카드로 바꾸고 바로 찾는다.
+  useEffect(() => {
+    const use = (code: string) => {
+      setMethod("gift_card");
+      setAmountInput("");
+      setTipInput("");
+      void lookUpGiftCard(code);
+    };
+    const waiting = takeGiftCardCode();
+    if (waiting) use(waiting);
+    return subscribeGiftCardCode(use);
+  }, [lookUpGiftCard]);
+
+  // 이 계산서에 이미 올린 같은 카드의 몫을 빼고 남은 잔액.
+  const gcOnBill = gcFound
+    ? payments.filter((p) => p.method === "gift_card" && p.auth_code === gcFound.code).reduce((sum, p) => sum + p.amount, 0)
+    : 0;
+  const gcBalance = gcFound ? Math.max(gcFound.balance - gcOnBill, 0) : 0;
+  const gcUsable = gcFound !== null && gcFound.status === "active" && gcBalance > 0;
+  const gcProblem = !gcFound
+    ? ""
+    : gcFound.status === "void"
+      ? `Voided${gcFound.void_reason ? ` — ${gcFound.void_reason}` : ""}.`
+      : gcBalance <= 0
+        ? "Nothing is left on this card."
+        : "";
+  // 금액을 치면 그만큼(잔액·남은 금액 안에서), 안 치면 쓸 수 있는 최대.
+  const gcMax = Math.min(gcBalance, remaining);
+  const gcApplied = gcUsable ? (amountInput.trim() ? Math.min(parseMoney(amountInput), gcMax) : gcMax) : 0;
 
   const rcUsable = rcFound !== null && rcFound.status === "issued" && !rcFound.expired;
   const rcProblem = !rcFound
@@ -1254,6 +1318,29 @@ function PaymentsEditor({
       ]);
       setRcCode("");
       setRcFound(null);
+      return;
+    }
+    if (isGiftCard) {
+      if (!gcFound || !gcUsable) {
+        setFormError(gcProblem || "Scan the gift card, or type its number and press Enter.");
+        return;
+      }
+      setPreparing(true);
+      const fresh = await billActions.reload();
+      setPreparing(false);
+      if (!fresh) return;
+      const freshRemaining = Math.max(fresh.total - payments.reduce((sum, p) => sum + p.amount, 0), 0);
+      const wanted = amountInput.trim() ? parseMoney(amountInput) : gcBalance;
+      const applied = Math.min(wanted, gcBalance, freshRemaining);
+      if (applied <= 0) {
+        setFormError(freshRemaining <= 0 ? "Nothing is left to pay on this bill." : "Enter an amount above $0.00.");
+        return;
+      }
+      const key = keyRef.current++;
+      setPayments((current) => [...current, { key, method: "gift_card", amount: applied, auth_code: gcFound.code }]);
+      setAmountInput("");
+      setGcCode("");
+      setGcFound(null);
       return;
     }
     if (needsTerminal) {
@@ -1429,7 +1516,9 @@ function PaymentsEditor({
                 {payment.rain_check_code ? (
                   <span className="block text-[11px] text-[#6b7280]">{payment.rain_check_code}</span>
                 ) : null}
-                {payment.auth_code ? (
+                {payment.method === "gift_card" && payment.auth_code ? (
+                  <span className="block text-[11px] text-[#6b7280]">{maskGiftCard(payment.auth_code)}</span>
+                ) : payment.auth_code ? (
                   <span className="block text-[11px] text-[#6b7280]">
                     {payment.terminalRecord?.card_brand ? `${payment.terminalRecord.card_brand} · ` : ""}
                     Approval {payment.auth_code}
@@ -1504,17 +1593,72 @@ function PaymentsEditor({
                   value={rcCode}
                 />
               </Field>
+            ) : isGiftCard && !gcFound ? (
+              <Field label="Gift card number">
+                <TextInput
+                  autoComplete="off"
+                  onBlur={(event) => {
+                    const typed = event.target.value.trim().toUpperCase();
+                    if (typed) void lookUpGiftCard(typed);
+                  }}
+                  onChange={(event) => setGcCode(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void lookUpGiftCard(event.currentTarget.value);
+                    }
+                  }}
+                  placeholder="Scan the card"
+                  value={gcCode}
+                />
+              </Field>
             ) : (
               <Field label={method === "cash" ? "Cash received" : "Amount"}>
                 <TextInput
                   inputMode="decimal"
                   onChange={(event) => setAmountInput(event.target.value)}
-                  placeholder={((remaining + (isCash ? tip : 0)) / 100).toFixed(2)}
+                  placeholder={((isGiftCard ? gcMax : remaining + (isCash ? tip : 0)) / 100).toFixed(2)}
                   value={amountInput}
                 />
               </Field>
             )}
           </div>
+          {isGiftCard && gcLooking ? <p className="text-xs text-[#6b7280]">Looking up the gift card…</p> : null}
+          {isGiftCard && gcFound ? (
+            <div
+              className={`grid gap-0.5 border p-2 text-xs ${
+                gcUsable ? "border-[#1f6b3a] bg-white" : "border-[#8a1f1f] bg-[#fff1ee] text-[#8a1f1f]"
+              }`}
+            >
+              <p className="flex items-baseline justify-between gap-2 font-bold">
+                <span>
+                  {maskGiftCard(gcFound.code)}
+                  {gcFound.recipient ? ` · ${gcFound.recipient}` : ""}
+                </span>
+                <button
+                  className="font-normal text-[#4533ff] underline"
+                  onClick={() => {
+                    setGcFound(null);
+                    setGcCode("");
+                    setAmountInput("");
+                  }}
+                  type="button"
+                >
+                  Other card
+                </button>
+              </p>
+              <p>
+                Balance {formatMoney(gcBalance)}
+                {gcOnBill > 0 ? ` (after ${formatMoney(gcOnBill)} already on this bill)` : ""}
+              </p>
+              {gcProblem ? <p className="font-bold">{gcProblem}</p> : null}
+              {gcUsable && gcBalance > gcApplied ? (
+                <p className="font-bold text-[#1f6b3a]">
+                  {formatMoney(gcBalance - gcApplied)} stays on the card for next time.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {isRainCheck && rcLooking ? <p className="text-xs text-[#6b7280]">Looking up the rain check…</p> : null}
           {isRainCheck && rcFound ? (
             <div
@@ -1593,7 +1737,7 @@ function PaymentsEditor({
               </div>
             </>
           ) : null}
-          {isRainCheck || integrated || !takesTip ? null : (
+          {isRainCheck || isGiftCard || integrated || !takesTip ? null : (
             <Field
               hint={needsTerminal ? "From the terminal slip" : isCash ? "Only if they leave it as a tip" : undefined}
               label="Tip (optional)"
@@ -1611,7 +1755,9 @@ function PaymentsEditor({
           ) : null}
           {formError ? <ErrorNote>{formError}</ErrorNote> : null}
           <Button
-            disabled={preparing || running || removing !== null || (isRainCheck && (rcLooking || !rcUsable))}
+            disabled={preparing || running || removing !== null || (isRainCheck && (rcLooking || !rcUsable)) ||
+              (isGiftCard && (gcLooking || !gcUsable))
+            }
             full
             onClick={() => void add()}
             tone={integrated ? "primary" : undefined}
@@ -1622,6 +1768,8 @@ function PaymentsEditor({
                 ? "On the terminal…"
                 : isRainCheck && rcUsable
                   ? `Add rain check ${formatMoney(rcApplied)}`
+                  : isGiftCard && gcUsable
+                    ? `Add gift card ${formatMoney(gcApplied)}`
                   : integrated
                     ? `Send ${formatMoney(typed)} to terminal`
                     : `Add ${PAYMENT_LABELS[method]} payment`}

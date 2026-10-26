@@ -17,6 +17,7 @@
  */
 
 import { CLUB } from "@/lib/nav";
+import { giftCardBlocks, type GiftCard } from "@/lib/pos/giftCard";
 import { rainCheckBlocks, type RainCheck } from "@/lib/pos/rainCheck";
 import { shiftReportBlocks, type ShiftCashDrop, type ShiftInput, type ShiftSummary } from "@/lib/reports/shiftReport";
 
@@ -105,6 +106,16 @@ export function rainCheckSheetHtml(check: RainCheck, options: { reprint?: boolea
 export function printRainChecks(checks: readonly RainCheck[], options: { reprint?: boolean } = {}): void {
   if (checks.length === 0) return;
   printSheets(checks.map((check) => rainCheckBlocks(check, { header: CLUB_HEADER, reprint: options.reprint })));
+}
+
+/** 기프트카드 한 장의 HTML(Gift Cards 화면의 미리보기). */
+export function giftCardSheetHtml(card: GiftCard, options: { reprint?: boolean } = {}): string {
+  return receiptHtml(giftCardBlocks(card, { header: CLUB_HEADER, reprint: options.reprint }));
+}
+
+/** 기프트카드 한 장을 찍는다. 보관용 사본은 없다 — 기록은 서버에 있다. */
+export function printGiftCard(card: GiftCard, options: { reprint?: boolean } = {}): void {
+  printSheets([giftCardBlocks(card, { header: CLUB_HEADER, reprint: options.reprint })]);
 }
 
 /**

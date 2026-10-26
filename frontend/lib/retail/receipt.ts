@@ -128,6 +128,8 @@ export type ReceiptPayment = {
 function paymentDetail(payment: NonNullable<Sale["payments"]>[number]): string | null {
   if (payment.rain_check_code) return payment.rain_check_code;
   if (!payment.auth_code) return null;
+  // 기프트카드(0120): auth_code 가 카드 코드다. 영수증에는 끝 4자만 — 전체 코드는 돈과 같다.
+  if (payment.method === "gift_card") return `Card ****${payment.auth_code.slice(-4)}`;
   const parts = [`Approval ${payment.auth_code}`];
   if (payment.card_last4) parts.push(`****${payment.card_last4}`);
   if (payment.entry === "keyed") parts.push(`keyed on ${payment.terminal ?? "card terminal"}`);
