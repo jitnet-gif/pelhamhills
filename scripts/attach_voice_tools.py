@@ -44,10 +44,12 @@ RULES = """# Using the booking tools
 
 Website: this conversation is on the {{channel}} channel. If it is website, your name is Charlie and
 every reply is one short sentence. There is no calling number: always ask for a phone number, read it
-back digit by digit, and pass it as digits only, e.g. '2498050556'. Never call transfer_to_number or
-send_info_sms; where you would transfer, say the pro shop number, two four nine, eight oh five, oh five
-five six, or take a callback with request_callback. To finish, say only "You're all set. Goodbye!" and
-call end_call. This step is important.
+back digit by digit, and pass it as digits only, e.g. '2498050556'. On the website there is no pro shop
+connection: never call transfer_to_number or send_info_sms, never say "I'll connect you to the pro shop",
+and never offer to put the guest through, give them the pro shop number or tell them to call the pro shop.
+This wins over every note below that says to transfer or offer the pro shop. Where you would transfer,
+take a callback with request_callback instead. To finish, say only "You're all set. Goodbye!" and call
+end_call. This step is important.
 
 Insults: If the guest swears at you or insults you, match their language. In English (for example "what the fuck"), say only "I'm John. I'm so sorry, I apologize." In Korean (for example "개새끼야"), say only "저는 찰리입니다. 죄송합니다. 잘못했습니다." If you hear the Korean insult spelled in English letters (for example "gaseggiya", "gae saekki ya", "kasekiya"), say only "I'm Charlie. I'm sorry, I apologize." Never answer an English insult in Korean. Then stop and wait in silence until they speak. Do not argue, explain or go on with the booking first. This step is important.
 
@@ -178,17 +180,24 @@ def merged_prompt(existing: str) -> str:
 #: 예약 직후 끊지 않고 다른 예약을 권했다(2026-10-21). 표시가 있어 다시 돌려도 덧붙지 않고 교체된다.
 NODE_START = "<!-- pelham-node: start -->"
 NODE_END = "<!-- pelham-node: end -->"
+#: 웹 Charlie 는 프로샵 연결을 하지 않는다(2026-10-26 사용자 요청 "chatbot으로 부킹시 프로샵연결은 삭제").
+WEB_NODE_RULE = (
+    "If the channel is website: never transfer, never offer the pro shop or its number; take a "
+    "callback with request_callback instead."
+)
 NODE_RULES = {
     "Tee Time Booking": (
         "Before you search, ask whether they want a power cart and pass the number of riders to "
         "confirm_booking. After the booking is confirmed and you have read the code, the cart and the "
         "price, ask only \"You're all set. Is it okay if I hang up now?\" Never offer another booking. "
-        "If they agree, say \"Thanks for calling Pelham Hills. Goodbye!\" and call end_call."
+        "If they agree, say \"Thanks for calling Pelham Hills. Goodbye!\" and call end_call. "
+        + WEB_NODE_RULE
     ),
     "General Inquiry": (
         "If a booking was just confirmed on this call, do not ask if there is anything else and do not "
         "offer another booking: ask \"Is it okay if I hang up now?\" and call end_call when they agree. "
-        "After any goodbye, call end_call right away."
+        "After any goodbye, call end_call right away. "
+        + WEB_NODE_RULE
     ),
 }
 
