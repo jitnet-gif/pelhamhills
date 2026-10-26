@@ -977,6 +977,18 @@ def test_confirm_falls_back_to_the_caller_id(client):
     assert lookup_first(client, "c-check", phone="905-892-1234", last="Tanath").json()["found"] == 1
 
 
+def test_website_confirm_with_no_caller_id_books(client):
+    """2026-10-26 웹 Charlie: 발신번호가 없어 caller_number 가 null 로 와서 확정이 매번 422 였다."""
+    for n, missing in enumerate([None, "{{system__caller_id}}"]):
+        held = hold(client, time="8:19 AM", party=1, conversation=f"c-web{n}")
+        done = client.post(
+            f"{API}/voice/tools/confirm-booking",
+            json={"hold_id": held.json()["hold_id"], "first_name": "Kenneth", "last_name": f"Web{n}",
+                  "phone": "2498050556", "caller_number": missing, "conversation_id": f"c-web{n}"},
+        )
+        assert done.json().get("ok") is True, done.text
+
+
 def test_confirm_without_any_number_is_refused(client):
     held = hold(client, time="8:10 AM", party=2, conversation="c-nonum")
     refused = client.post(

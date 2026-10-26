@@ -34,7 +34,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.api.routes import tee_sheet as ts
 # HST 는 리테일이 이미 상수로 갖고 있다. 여기에 13% 를 또 적으면 언젠가 한쪽만 바뀐다.
@@ -478,6 +478,18 @@ class _VoiceRequest(BaseModel):
         default=None,
         description="ElevenLabs conversation id. 취소 권한을 이 통화에 묶는 데 쓴다.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_caller_id_on_website(cls, data: Any) -> Any:
+        # 웹 Charlie 세션에는 발신번호가 없어 `system__caller_id` 가 null(또는 채워지지 않은
+        # `{{system__caller_id}}`)로 온다. 그대로 두면 str 검증에서 422 가 나 confirm_booking 이
+        # 매번 거절됐다 — 웹 예약이 하나도 확정되지 않은 원인(2026-10-26). 빈 값으로 받는다.
+        if isinstance(data, dict):
+            value = data.get("caller_number", "")
+            if value is None or (isinstance(value, str) and value.strip().startswith("{{")):
+                data = {**data, "caller_number": ""}
+        return data
 
 
 class FindTeeTimesRequest(_VoiceRequest):
