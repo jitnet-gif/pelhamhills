@@ -51,12 +51,13 @@ export async function requestVoiceSession(): Promise<VoiceSession> {
     throw new VoiceUnavailableError(VOICE_UNAVAILABLE_MESSAGE);
   }
 
-  const body = (await response.json()) as Partial<VoiceSession>;
-  if (!body.signedUrl || !body.agentId) {
+  // 서버(`SessionResponse`)는 snake_case 로 보낸다.
+  const body = (await response.json()) as { signed_url?: string; agent_id?: string };
+  if (!body.signed_url || !body.agent_id) {
     throw new VoiceUnavailableError(VOICE_UNAVAILABLE_MESSAGE);
   }
 
-  return { signedUrl: body.signedUrl, agentId: body.agentId };
+  return { signedUrl: body.signed_url, agentId: body.agent_id };
 }
 
 /**
