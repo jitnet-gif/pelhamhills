@@ -8,7 +8,7 @@ claude.ai 에 올렸던 나레이션 프레젠테이션(장면별 재생 + Eleve
 
 `2026-10-25-marketing-strategy/src/` 에는 그 덱을 다시 만드는 원본(page.tpl.html, narr_ko/en.json, dur.json, tts.py)이 있습니다.
 
-총 55개.
+총 56개.
 
 | 날짜 | 제목 | 장면 | 폴더 | 원본 |
 |---|---|---|---|---|
@@ -67,3 +67,4 @@ claude.ai 에 올렸던 나레이션 프레젠테이션(장면별 재생 + Eleve
 | 2026-10-24 | What Fly Does | 7 | [2026-10-24-what-fly-does/](./2026-10-24-what-fly-does/index.html) | [claude.ai](https://claude.ai/artifact/TJg8VyvftN773Sq6grkrZf) |
 | 2026-10-25 | Pelham Hills Marketing Strategy | 8 | [2026-10-25-marketing-strategy/](./2026-10-25-marketing-strategy/index.html) | [claude.ai](https://claude.ai/artifact/8cNcNFcMDT3NRaXNYocw13) |
 | 2026-10-25 | 스낵바 바코드 복원 | 5 | [2026-10-25-snack-barcode-restore/](./2026-10-25-snack-barcode-restore/index.html) | [claude.ai](https://claude.ai/artifact/HCe4RxSHRC3z8ox1PRMzxB) |
+| 2026-10-26 | 기프트카드 바코드·금액 버튼 | 5 | [2026-10-26-gift-card-barcode-amount/](./2026-10-26-gift-card-barcode-amount/index.html) | [claude.ai](https://claude.ai/artifact/YK3Cf5vPC7KfxJrPdLTkW6) |

@@ -1,0 +1,7 @@
+[
+  "The question was why the barcode does not show when a gift card is issued. The barcode was being made. It is on the printed card and in the text to the guest. The problem was where the screen showed it.",
+  "The barcode sat inside the card list on the right, and only after you opened Barcode and history. On a wide screen the list is beside the form. On a tablet or laptop narrower than 1280 pixels, the list drops below the form, so after issuing, the barcode was off the screen.",
+  "Now, right after issuing, a Just issued box under the form shows that card's barcode, with the card number and the value, and a Reprint button. It sits right under the Issue button at any screen width.",
+  "The amount buttons changed too. They used to replace the amount. Now each tap adds to it. Fifty, fifty, then twenty-five makes one hundred twenty-five dollars. Clear empties it if you tap the wrong one, and you can still type an amount.",
+  "One file changed, the admin gift cards page. It has no lint or type errors. It has not been clicked through in a browser yet, and it is not committed or deployed. After deploying, please check it with one card."
+]

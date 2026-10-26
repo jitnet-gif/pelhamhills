@@ -1,0 +1,45 @@
+/* gift card barcode · amount mocks — admin screen is white paper, so barcodes always sit on white */
+.gc-bc{background:#fff;padding:6px 10px;border:1px solid var(--line)}
+.gc-bc svg{display:block;width:100%;height:44px;fill:#000}
+.gc-bc.sm svg{height:26px}
+.gc-bc.lg svg{height:72px}
+.gc-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.gc-three{grid-template-columns:minmax(0,1fr)}}
+.gc-tile{border:1px solid var(--line);padding:10px;display:grid;gap:8px;align-content:start;font-size:13px}
+.gc-tile.no{border:2px dashed var(--red)}
+.gc-empty{height:40px;display:grid;place-items:center;border:1px dashed var(--line);color:var(--red);font:700 20px var(--mono)}
+.gc-two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px;align-items:start}
+@media (max-width:560px){.gc-two{grid-template-columns:minmax(0,1fr)}}
+.gc-scr{border:6px solid var(--ink);border-radius:8px;padding:8px;display:grid;gap:6px;background:var(--bg);font-size:12px}
+.gc-cap{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.gc-view{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:6px}
+.gc-scr.narrow .gc-view{grid-template-columns:minmax(0,1fr)}
+.gc-form,.gc-list{border:1px solid var(--line);background:var(--panel);padding:8px;display:grid;gap:6px;align-content:start;min-width:0}
+.gc-in{border:1px solid var(--line);padding:3px 6px;font-family:var(--mono)}
+.gc-go{background:var(--green);color:#fff;font-weight:700;padding:4px 8px;justify-self:start}
+.gc-row{display:flex;justify-content:space-between;gap:6px;font-family:var(--mono);font-size:11px}
+.gc-row i{font-style:normal;font-family:var(--sans);color:var(--green);font-weight:700}
+.gc-scr.narrow .gc-list{opacity:.4;border-style:dashed}
+.gc-fold{border-top:2px dashed var(--red);padding-top:4px;color:var(--red);font-weight:700;font-size:11px}
+.gc-scr.narrow{position:relative}
+.gc-just{border:2px solid var(--green);background:var(--green-soft);padding:6px;display:grid;gap:4px}
+.gc-just code,.gc-card code{font-family:var(--mono);font-size:11px;text-align:center}
+.gc-big{display:grid;place-items:center;padding:12px 0}
+.gc-card{width:340px;max-width:100%;border:2px solid var(--green);background:var(--green-soft);padding:12px;display:grid;gap:8px;justify-items:stretch}
+.gc-card small{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+.gc-btn{justify-self:center;border:1px solid var(--line);background:var(--panel);padding:4px 10px;font-size:12px;font-weight:700}
+.gc-sum{display:grid;gap:14px}
+.gc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.gc-chips span{border:1px solid var(--line);background:var(--panel);padding:5px 10px;font:700 13px var(--mono)}
+.gc-chips span.on{border-color:var(--green);background:var(--green-soft);color:var(--green)}
+.gc-chips span.clr{font-family:var(--sans);color:var(--muted)}
+.gc-eq{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-variant-numeric:tabular-nums}
+.gc-eq span{border:1px solid var(--line);padding:8px 12px;font:700 18px var(--mono)}
+.gc-eq span.on{border-color:var(--green);color:var(--green)}
+.gc-eq i{font-style:normal;font-size:20px;color:var(--muted)}
+.gc-eq b{font:700 30px var(--mono);color:var(--green)}
+.gc-was{font-size:13px;color:var(--muted)}
+.gc-check{display:grid;gap:8px}
+.gc-check div{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;border:1px solid var(--line);padding:10px;font-size:14px}
+.tag.no{background:color-mix(in srgb,var(--red) 14%,var(--panel));color:var(--red)}
+select:focus-visible{outline:2px solid var(--green);outline-offset:2px}
