@@ -1,0 +1,9 @@
+[
+  "When guests booked with Charlie on the website, the time got held but the booking never finished. After taking the name and phone number, Charlie kept saying there was a system problem, then tried a pro shop transfer the website can't do.",
+  "I ran a real web session end to end in text. Finding times and holding a time worked. Only the confirmation was refused, all four tries. The server log shows the confirm request ended before it ever reached the database.",
+  "The cause was the caller ID. On the phone, the line fills in the number. The website has none, so it arrived empty, and the server refused it as a bad field. The guest can't fix that field, so Charlie just repeated itself.",
+  "At the shared entry for every voice tool, a missing caller ID is now taken as blank, and the booking uses the number the guest says. Before the fix the new test failed with the same error; after it, all 134 tests pass.",
+  "Web Charlie no longer transfers to the pro shop or reads out its number. Anything it can't handle becomes a callback request. Phone callers can still be transferred as before.",
+  "After pushing and deploying to Fly, I tested again with a real web session. Eight ten, two players, with a cart, confirmed with a code. The test booking was cancelled right away, so nothing is left on the tee sheet.",
+  "One step is left. Applying the no-transfer rule to Charlie is blocked by auto mode and needs your approval. And the dashboard workflow skipping the member question is the next thing to fix."
+]

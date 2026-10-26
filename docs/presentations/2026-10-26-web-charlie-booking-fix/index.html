@@ -1,0 +1,444 @@
+<title>Gift Card Barcode and Amounts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one presenter column — header, scene chips, two-lane stage (picture · key points), dark narration band, player bar */
+:root{
+  --bg:#f3f5f1; --panel:#ffffff; --ink:#1c2420; --muted:#5d6a62; --line:#d6ddd6;
+  --green:#1a7f4b; --green-soft:#dcefe3; --gold:#b7791f; --gold-soft:#f8ecd6; --red:#b4412f;
+  --band:#14201a; --band-ink:#e9f2ec; --band-muted:#9fb5a8;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-size:24px;line-height:1.25;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+.seg{display:inline-flex;border:1px solid var(--line);background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);font:600 13px var(--sans);padding:7px 12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg svg{width:20px;height:20px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 13px var(--sans);padding:6px 10px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip b{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.chip[aria-current="true"]{border-color:var(--green);background:var(--green-soft)}
+.chip[aria-current="true"] b{color:var(--green)}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;min-height:400px}
+@media (max-width:820px){.stage{grid-template-columns:minmax(0,1fr)}}
+.lane{background:var(--panel);border:1px solid var(--line);padding:16px;min-width:0;display:grid;align-content:start;gap:12px}
+.lane h2{margin:0;font-size:19px;line-height:1.3;text-wrap:balance}
+.lane .lt{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pts{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.pts li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start}
+.pts li i{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--green);padding-top:2px}
+.band{background:var(--band);color:var(--band-ink);padding:14px 16px;min-height:96px;display:grid;gap:4px}
+.band .who{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--band-muted)}
+.band p{margin:0;font-size:16px;line-height:1.6}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 14px var(--sans);min-height:44px;min-width:44px;padding:0 14px;cursor:pointer}
+.pbtn.main{background:var(--green);border-color:var(--green);color:#fff;min-width:120px}
+.bar{flex:1 1 160px;height:6px;background:var(--line);position:relative}
+.bar span{position:absolute;inset:0 auto 0 0;background:var(--green);width:0}
+.speed{font:500 13px var(--sans);color:var(--muted)}
+.note{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 6px;background:var(--gold-soft);color:var(--gold)}
+.tag.ok{background:var(--green-soft);color:var(--green)}
+/* scene visuals */
+.mock{border:1px solid var(--line);display:grid}
+.mock .mh{padding:8px 10px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px}
+.mock .mb{padding:10px;display:grid;gap:8px}
+.mta{border:1px solid var(--line);padding:8px;color:var(--muted);font-size:13px;min-height:52px}
+.mbtn{justify-self:start;background:var(--green);color:#fff;font-weight:700;font-size:13px;padding:8px 12px}
+.msec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.msec div{border:1px dashed var(--line);padding:8px;font-size:12px;color:var(--muted)}
+.msec div b{display:block;color:var(--ink);font-size:13px}
+.tw{overflow-x:auto}
+table.hm{border-collapse:separate;border-spacing:3px;width:100%;min-width:460px;font-size:13px;font-variant-numeric:tabular-nums}
+table.hm th{font-size:11px;color:var(--muted);font-weight:700;text-align:center}
+table.hm th.r{text-align:left;color:var(--ink);font-size:13px;white-space:nowrap}
+table.hm td{text-align:center;padding:6px 2px;font-weight:600}
+table.hm td.empty{outline:2px dashed var(--gold);outline-offset:-2px}
+.chart{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:118px minmax(0,1fr) 62px;gap:8px;align-items:center;font-size:13px}
+.row .t{height:16px;background:var(--line)}
+.row .t span{display:block;height:100%;background:var(--green)}
+.row.hl .t span{background:var(--gold)}
+.row .v{text-align:right;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.stack{display:flex;height:34px}
+.stack span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;overflow:hidden;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+.offer{border:1px solid var(--green);background:var(--green-soft);padding:10px;display:grid;gap:4px;font-size:13px}
+.offer b{font-size:14px}
+.code{font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid var(--line);padding:1px 6px}
+.ladder{position:relative;height:210px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);margin:4px 4px 22px 4px}
+.ladder .zone{position:absolute;top:0;bottom:0;background:var(--gold-soft)}
+.ladder .zone em{position:absolute;top:4px;left:6px;font-style:normal;font-size:11px;font-weight:700;color:var(--gold)}
+.ladder .pin{position:absolute;transform:translateX(-50%);display:grid;justify-items:center;gap:2px;font-size:11px;white-space:nowrap}
+.ladder .pin s{display:block;width:10px;height:10px;border-radius:50%;background:var(--green);text-decoration:none}
+.ladder .pin.h s{background:var(--gold)}
+.ladder .tick{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-family:var(--mono)}
+.plan{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.plan{grid-template-columns:minmax(0,1fr)}}
+.plan div{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px}
+.plan h3{margin:0;font-size:14px}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.check{display:grid;gap:8px}
+.check div{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;border:1px solid var(--line);padding:10px;font-size:14px}
+/* gift card barcode · amount mocks — admin screen is white paper, so barcodes always sit on white */
+.gc-bc{background:#fff;padding:6px 10px;border:1px solid var(--line)}
+.gc-bc svg{display:block;width:100%;height:44px;fill:#000}
+.gc-bc.sm svg{height:26px}
+.gc-bc.lg svg{height:72px}
+.gc-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.gc-three{grid-template-columns:minmax(0,1fr)}}
+.gc-tile{border:1px solid var(--line);padding:10px;display:grid;gap:8px;align-content:start;font-size:13px}
+.gc-tile.no{border:2px dashed var(--red)}
+.gc-empty{height:40px;display:grid;place-items:center;border:1px dashed var(--line);color:var(--red);font:700 20px var(--mono)}
+.gc-two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px;align-items:start}
+@media (max-width:560px){.gc-two{grid-template-columns:minmax(0,1fr)}}
+.gc-scr{border:6px solid var(--ink);border-radius:8px;padding:8px;display:grid;gap:6px;background:var(--bg);font-size:12px}
+.gc-cap{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.gc-view{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:6px}
+.gc-scr.narrow .gc-view{grid-template-columns:minmax(0,1fr)}
+.gc-form,.gc-list{border:1px solid var(--line);background:var(--panel);padding:8px;display:grid;gap:6px;align-content:start;min-width:0}
+.gc-in{border:1px solid var(--line);padding:3px 6px;font-family:var(--mono)}
+.gc-go{background:var(--green);color:#fff;font-weight:700;padding:4px 8px;justify-self:start}
+.gc-row{display:flex;justify-content:space-between;gap:6px;font-family:var(--mono);font-size:11px}
+.gc-row i{font-style:normal;font-family:var(--sans);color:var(--green);font-weight:700}
+.gc-scr.narrow .gc-list{opacity:.4;border-style:dashed}
+.gc-fold{border-top:2px dashed var(--red);padding-top:4px;color:var(--red);font-weight:700;font-size:11px}
+.gc-scr.narrow{position:relative}
+.gc-just{border:2px solid var(--green);background:var(--green-soft);padding:6px;display:grid;gap:4px}
+.gc-just code,.gc-card code{font-family:var(--mono);font-size:11px;text-align:center}
+.gc-big{display:grid;place-items:center;padding:12px 0}
+.gc-card{width:340px;max-width:100%;border:2px solid var(--green);background:var(--green-soft);padding:12px;display:grid;gap:8px;justify-items:stretch}
+.gc-card small{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+.gc-btn{justify-self:center;border:1px solid var(--line);background:var(--panel);padding:4px 10px;font-size:12px;font-weight:700}
+.gc-sum{display:grid;gap:14px}
+.gc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.gc-chips span{border:1px solid var(--line);background:var(--panel);padding:5px 10px;font:700 13px var(--mono)}
+.gc-chips span.on{border-color:var(--green);background:var(--green-soft);color:var(--green)}
+.gc-chips span.clr{font-family:var(--sans);color:var(--muted)}
+.gc-eq{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-variant-numeric:tabular-nums}
+.gc-eq span{border:1px solid var(--line);padding:8px 12px;font:700 18px var(--mono)}
+.gc-eq span.on{border-color:var(--green);color:var(--green)}
+.gc-eq i{font-style:normal;font-size:20px;color:var(--muted)}
+.gc-eq b{font:700 30px var(--mono);color:var(--green)}
+.gc-was{font-size:13px;color:var(--muted)}
+.gc-check{display:grid;gap:8px}
+.gc-check div{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;border:1px solid var(--line);padding:10px;font-size:14px}
+.tag.no{background:color-mix(in srgb,var(--red) 14%,var(--panel));color:var(--red)}
+select:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+/* web Charlie booking fix — chat + tool timeline mocks */
+.wc-chat{display:grid;gap:6px;font-size:13px}
+.wc-b{max-width:88%;padding:7px 10px;border:1px solid var(--line);background:var(--panel)}
+.wc-b.me{justify-self:end;background:var(--green-soft);border-color:var(--green)}
+.wc-b.bad{border:2px solid var(--red)}
+.wc-b small{display:block;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.wc-tl{display:grid;gap:6px}
+.wc-step{display:grid;grid-template-columns:150px minmax(0,1fr) 64px;gap:8px;align-items:center;border:1px solid var(--line);padding:8px;font-size:13px;background:var(--panel)}
+@media (max-width:560px){.wc-step{grid-template-columns:minmax(0,1fr) 64px}.wc-step span:nth-child(2){grid-column:1/-1;order:3}}
+.wc-step code{font-family:var(--mono);font-size:12px}
+.wc-step.no{border:2px solid var(--red)}
+.wc-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.wc-two{grid-template-columns:minmax(0,1fr)}}
+.wc-card{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px;background:var(--panel)}
+.wc-card.no{border:2px solid var(--red)}
+.wc-card.ok{border:2px solid var(--green)}
+.wc-card pre{margin:0;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:6px;border:1px solid var(--line)}
+.wc-card h4{margin:0;font-size:13px}
+.wc-err{font-family:var(--mono);font-size:11.5px;color:var(--red);border:1px dashed var(--red);padding:6px}
+@media (prefers-reduced-motion:no-preference){.lane{animation:in .35s ease both}@keyframes in{from{transform:translateY(6px)}to{transform:none}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="title"></h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Language">
+      <button id="lang-ko" type="button" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">가</text></svg>한국어</button>
+      <button id="lang-en" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">Aa</text></svg>English</button>
+    </div>
+  </header>
+  <nav class="chips" id="chips" aria-label="Scenes"></nav>
+  <section class="stage" id="stage"></section>
+  <section class="band" aria-live="polite"><div class="who" id="who"></div><p id="narr"></p></section>
+  <div class="player">
+    <button class="pbtn" id="prev" type="button" aria-label="Previous">◀</button>
+    <button class="pbtn main" id="play" type="button"></button>
+    <button class="pbtn" id="next" type="button" aria-label="Next">▶</button>
+    <div class="bar" aria-hidden="true"><span id="prog"></span></div>
+    <label class="speed" for="speed"><span id="speedL"></span>
+      <select id="speed"><option value="0.75">0.75×</option><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.1">1.1×</option><option value="1.2">1.2×</option><option value="1.3">1.3×</option><option value="1.5">1.5×</option></select>
+    </label>
+    <label class="speed" for="pitch"><span id="pitchL"></span>
+      <select id="pitch"><option value="-4">−4</option><option value="-3">−3</option><option value="-2">−2</option><option value="-1">−1</option><option value="0" selected>0</option><option value="1">+1</option><option value="2">+2</option><option value="3">+3</option><option value="4">+4</option></select>
+    </label>
+  </div>
+  <p class="note" id="keyhint"></p>
+  <p class="note" id="foot"></p>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script>
+const NARR = {"ko": ["웹사이트에서 Charlie 로 예약하면 시간은 잡히는데 예약이 끝나지 않았습니다. 이름과 전화번호까지 받은 뒤 시스템 문제가 있다는 말만 반복하고, 웹에서는 할 수 없는 프로샵 연결을 시도했습니다.", "실제 웹 세션을 글자로 끝까지 돌려 봤습니다. 빈 시간 찾기와 자리 잡기는 정상이었습니다. 예약 확정만 네 번 모두 거절됐습니다. 서버 기록을 보면 확정 요청이 데이터베이스에 닿기도 전에 끝났습니다.", "원인은 발신번호였습니다. 전화는 전화선이 번호를 채워 주지만, 웹에는 발신번호가 없어서 빈 값으로 왔습니다. 서버는 이것을 형식 오류로 보고 거절했습니다. 손님이 고칠 수 없는 칸이라 Charlie 는 같은 말만 반복했습니다.", "모든 음성 도구가 함께 쓰는 입구에서, 비어 온 발신번호를 빈 값으로 받게 고쳤습니다. 예약에는 손님이 말한 전화번호가 쓰입니다. 수정 전에는 새 테스트가 같은 오류로 실패했고, 수정 후에는 테스트 134개가 모두 통과했습니다.", "웹 Charlie 는 이제 프로샵 연결을 하지 않습니다. 프로샵 번호도 안내하지 않고, 직접 처리할 수 없는 일은 콜백 요청으로 받습니다. 전화로 온 손님은 지금처럼 연결할 수 있습니다.", "푸시하고 Fly 에 배포한 뒤, 실제 웹 세션으로 다시 시험했습니다. 8시 10분, 두 명, 카트로 예약이 확정되고 확인번호가 나왔습니다. 시험 예약은 바로 취소해서 티 시트에 남아 있지 않습니다.", "남은 일은 하나입니다. 프로샵 연결 금지 규칙을 Charlie 에 실제로 적용하는 단계가 자동 모드에 막혀 승인이 필요합니다. 그리고 대시보드 워크플로가 회원 질문을 건너뛰는 문제는 다음에 손볼 부분입니다."], "en": ["When guests booked with Charlie on the website, the time got held but the booking never finished. After taking the name and phone number, Charlie kept saying there was a system problem, then tried a pro shop transfer the website can't do.", "I ran a real web session end to end in text. Finding times and holding a time worked. Only the confirmation was refused, all four tries. The server log shows the confirm request ended before it ever reached the database.", "The cause was the caller ID. On the phone, the line fills in the number. The website has none, so it arrived empty, and the server refused it as a bad field. The guest can't fix that field, so Charlie just repeated itself.", "At the shared entry for every voice tool, a missing caller ID is now taken as blank, and the booking uses the number the guest says. Before the fix the new test failed with the same error; after it, all 134 tests pass.", "Web Charlie no longer transfers to the pro shop or reads out its number. Anything it can't handle becomes a callback request. Phone callers can still be transferred as before.", "After pushing and deploying to Fly, I tested again with a real web session. Eight ten, two players, with a cart, confirmed with a code. The test booking was cancelled right away, so nothing is left on the tee sheet.", "One step is left. Applying the no-transfer rule to Charlie is blocked by auto mode and needs your approval. And the dashboard workflow skipping the member question is the next thing to fix."]};
+const DUR = {"ko": [], "en": []};
+let LANG = "ko";
+try { const s = localStorage.getItem("pelham-deck-lang"); if (s === "en" || s === "ko") LANG = s; } catch (e) {}
+const T = (o) => (typeof o === "string" ? o : o[LANG]);
+
+const UI = {
+  eyebrow: { ko: "웹사이트 · Book with Charlie", en: "Website · Book with Charlie" },
+  title: { ko: "웹 음성 예약이 확정되지 않던 이유와 수정", en: "Why web voice bookings never confirmed, and the fix" },
+  sub: { ko: "pelhamhills.com · 2026-10-26 · 브라우저 음성(ElevenLabs 크레딧 소진)", en: "pelhamhills.com · 2026-10-26 · browser voice (ElevenLabs credits used up)" },
+  play: { ko: "▶ 재생", en: "▶ Play" }, pause: { ko: "❚❚ 멈춤", en: "❚❚ Pause" },
+  speed: { ko: "속도", en: "Speed" }, pitch: { ko: "피치", en: "Pitch" },
+  who: { ko: "나레이션 · 브라우저 음성", en: "Narration · browser voice" },
+  pic: { ko: "화면", en: "Picture" }, keys: { ko: "핵심", en: "Key points" },
+  keyhint: { ko: "한/영 키 또는 L: 언어 · ←/→: 장면 · 스페이스: 재생", en: "Han/Eng key or L: language · ←/→: scene · Space: play" },
+  nopitch: { ko: "이 브라우저에서는 피치를 바꿀 수 없습니다", en: "Pitch can't be changed in this browser" },
+  foot: { ko: "대화 내용은 2026-10-26 실제 웹 세션 시험 기록입니다. 시험 예약(Test Claudetest, 확인번호 310564)은 바로 취소했습니다.",
+          en: "The dialogue is from real web-session tests on 2026-10-26. The test booking (Test Claudetest, code 310564) was cancelled right away." },
+};
+
+const step = (tool, what, ok) => `<div class="wc-step ${ok ? "" : "no"}"><code>${tool}</code><span>${T(what)}</span><span class="tag ${ok ? "ok" : "no"}">${ok ? T({ ko: "성공", en: "OK" }) : T({ ko: "거절", en: "Refused" })}</span></div>`;
+
+const S = [
+  { n: { ko: "증상", en: "Symptom" },
+    h: { ko: "시간은 잡히는데 예약이 안 끝난다", en: "The time gets held, but the booking never finishes" },
+    pic: () => `<div class="wc-chat">
+      <div class="wc-b"><small>Charlie</small>I've held 8:10 AM on Tuesday, October 27th for you. May I have your first and last name?</div>
+      <div class="wc-b me"><small>${T({ ko: "손님", en: "Guest" })}</small>Test Claudetest · 249-805-0556</div>
+      <div class="wc-b bad"><small>Charlie</small>I'm very sorry, but the system keeps having trouble processing your booking… I'll connect you to the pro shop now.</div>
+      <div class="wc-b bad"><small>Charlie</small>I'm very sorry, but the system is still having trouble…</div>
+    </div>`,
+    pts: [
+      { ko: "이름·전화번호까지 받은 뒤 \"시스템 문제\"를 반복", en: "After name and phone it keeps saying \"system trouble\"" },
+      { ko: "그리고 웹에서 할 수 없는 <b>프로샵 연결</b>을 시도", en: "Then it tries a <b>pro shop transfer</b> the website can't do" },
+    ] },
+  { n: { ko: "시험", en: "Test" },
+    h: { ko: "실제 웹 세션을 글자로 끝까지 돌려 봄", en: "Ran a real web session end to end in text" },
+    pic: () => `<div class="wc-tl">
+      ${step("find_tee_times", { ko: "빈 시간 찾기", en: "Find open times" }, true)}
+      ${step("hold_tee_time", { ko: "8:10 AM 자리 잡기(홀드)", en: "Hold 8:10 AM" }, true)}
+      ${step("confirm_booking", { ko: "예약 확정 — 1번째", en: "Confirm — try 1" }, false)}
+      ${step("confirm_booking", { ko: "예약 확정 — 2·3·4번째", en: "Confirm — tries 2, 3, 4" }, false)}
+      ${step("release_hold", { ko: "결국 홀드 풀림", en: "Hold released in the end" }, true)}
+    </div>`,
+    pts: [
+      { ko: "찾기·홀드는 정상, <b>확정만</b> 매번 거절", en: "Find and hold work — <b>only confirm</b> is refused, every time" },
+      { ko: "서버 로그: 확정 요청이 DB에 닿기 전에 끝남", en: "Server log: confirm ends before it ever reaches the database" },
+    ] },
+  { n: { ko: "원인", en: "Cause" },
+    h: { ko: "웹에는 발신번호가 없다", en: "The website has no calling number" },
+    pic: () => `<div class="wc-two">
+      <div class="wc-card ok"><h4>📞 ${T({ ko: "전화", en: "Phone" })}</h4><pre>caller_number: "+19058921234"</pre><span>${T({ ko: "전화선이 번호를 채워 줌", en: "The phone line fills the number" })}</span></div>
+      <div class="wc-card no"><h4>🌐 ${T({ ko: "웹사이트", en: "Website" })}</h4><pre>caller_number: null</pre><div class="wc-err">422 · Some details were missing or not understood (caller_number). Ask the caller for them again…</div></div>
+    </div>`,
+    pts: [
+      { ko: "웹에선 <span class=\"code\">system__caller_id</span> 가 비어 null 로 옴", en: "On the web <span class=\"code\">system__caller_id</span> is empty, so it arrives as null" },
+      { ko: "서버가 \"글자여야 한다\"며 거절 → 손님이 고칠 수 없는 칸", en: "Server refuses it as \"not text\" — a field the guest can't fix" },
+      { ko: "확정·콜백·음식 주문 등 이 칸이 있는 도구만 실패", en: "Only tools with this field failed: confirm, callback, food order…" },
+    ] },
+  { n: { ko: "수정 1", en: "Fix 1" },
+    h: { ko: "빈 발신번호는 빈 값으로 받는다", en: "A missing caller ID is taken as blank" },
+    pic: () => `<div class="wc-two">
+      <div class="wc-card"><h4>${T({ ko: "모든 음성 도구 공통 입구", en: "Shared entry for every voice tool" })}</h4><pre>null                  → ""
+"{{system__caller_id}}" → ""
+"+19058921234"          → ${T({ ko: "그대로", en: "unchanged" })}</pre><span>${T({ ko: "번호는 손님이 말한 전화번호를 씀", en: "Booking uses the number the guest says" })}</span></div>
+      <div class="wc-card ok"><h4>${T({ ko: "테스트", en: "Tests" })}</h4><span><span class="tag no">${T({ ko: "수정 전", en: "Before" })}</span> ${T({ ko: "새 테스트 실패(같은 422)", en: "New test fails (same 422)" })}</span><span><span class="tag ok">${T({ ko: "수정 후", en: "After" })}</span> 134 passed</span><span class="code">f4f5a9a</span></div>
+    </div>`,
+    pts: [
+      { ko: "<span class=\"code\">backend/api/routes/voice.py</span> 한 곳", en: "One place: <span class=\"code\">backend/api/routes/voice.py</span>" },
+      { ko: "전화 예약은 영향 없음(번호가 있으면 그대로)", en: "Phone bookings unaffected (a real number passes through)" },
+    ] },
+  { n: { ko: "수정 2", en: "Fix 2" },
+    h: { ko: "웹 Charlie 는 프로샵 연결 안 함", en: "Web Charlie never transfers to the pro shop" },
+    pic: () => `<div class="wc-two">
+      <div class="wc-card no"><h4>${T({ ko: "예전", en: "Before" })}</h4><s>I'll connect you to the pro shop now, please stay on the line.</s><s>${T({ ko: "프로샵 번호 안내", en: "Reads out the pro shop number" })}</s></div>
+      <div class="wc-card ok"><h4>${T({ ko: "이제", en: "Now" })}</h4><span>${T({ ko: "연결·번호 안내 금지", en: "No transfer, no pro shop number" })}</span><span>${T({ ko: "직접 못 하는 일 → 콜백 요청(request_callback)", en: "Anything it can't do → callback request (request_callback)" })}</span><span class="code">b98955b</span></div>
+    </div>`,
+    pts: [
+      { ko: "기본 안내문 + 대시보드 워크플로 두 단계에 같은 규칙", en: "Same rule in the main prompt and two dashboard workflow steps" },
+      { ko: "전화(📞) 손님은 지금처럼 연결 가능", en: "Phone callers can still be transferred as before" },
+    ] },
+  { n: { ko: "확인", en: "Verified" },
+    h: { ko: "배포 후 웹 예약 확정 성공", en: "After deploy, a web booking confirms" },
+    pic: () => `<div class="wc-tl">
+      ${step("hold_tee_time", { ko: "8:10 AM · 2명 · 카트", en: "8:10 AM · 2 players · cart" }, true)}
+      ${step("confirm_booking", { ko: "확인번호 3-1-0-5-6-4 · 확인 문자 발송", en: "Code 3-1-0-5-6-4 · confirmation text sent" }, true)}
+      ${step("cancel_booking", { ko: "시험 예약 바로 취소(미리보기 → 취소)", en: "Test booking cancelled (preview → cancel)" }, true)}
+    </div>`,
+    pts: [
+      { ko: "push·Fly 배포 완료 → 실제 웹 세션으로 확인", en: "Pushed and deployed to Fly → checked with a real web session" },
+      { ko: "시험 예약은 남아 있지 않음", en: "No test booking left on the sheet" },
+    ] },
+  { n: { ko: "상태", en: "Status" },
+    h: { ko: "남은 일 하나 · 다음 개선", en: "One step left · next improvement" },
+    pic: () => `<div class="gc-check">
+      <div><span class="tag ok">${T({ ko: "완료", en: "Done" })}</span><span>${T({ ko: "확정 오류 수정 · push · Fly 배포 · 실제 확인", en: "Confirm fix · push · Fly deploy · live check" })}</span></div>
+      <div><span class="tag">${T({ ko: "남음", en: "To do" })}</span><span>${T({ ko: "프로샵 연결 금지 규칙을 Charlie 에 적용(attach --apply) — 자동 모드가 막음, 승인 필요", en: "Apply the no-transfer rule to Charlie (attach --apply) — blocked by auto mode, needs approval" })}</span></div>
+      <div><span class="tag">${T({ ko: "다음", en: "Next" })}</span><span>${T({ ko: "대시보드 워크플로가 회원 질문을 건너뛰고 질문 순서가 매번 다름", en: "Dashboard workflow skips the member question; order changes each time" })}</span></div>
+    </div>`,
+    pts: [
+      { ko: "적용 전까지 웹 Charlie 가 아직 프로샵 연결을 말할 수 있음", en: "Until applied, web Charlie may still offer a pro shop transfer" },
+      { ko: "예약 확정 자체는 지금 정상", en: "Booking confirmation itself works now" },
+    ] },
+];
+
+const $ = (id) => document.getElementById(id);
+const audio = $("audio");
+let cur = 0, playing = false, timer = null;
+
+// 속도·피치는 AI 매니저(StrategyDeck)와 같은 열쇠·모양으로 기억한다: {tone, speed, pitch}.
+// 소리는 ElevenLabs Hope 가 natural · 1× 로 미리 만든 것이고, 속도는 <audio> 재생 속도(음높이 유지),
+// 피치는 Web Audio 피치 시프터(반음 ±4)가 바꾼다.
+const VOICE_KEY = "pelham-narration-voice";
+let voice = { tone: "natural", speed: 1, pitch: 0 };
+try { const v = JSON.parse(localStorage.getItem(VOICE_KEY) || "null"); if (v) voice = { ...voice, ...v }; } catch (e) {}
+$("speed").value = String(voice.speed); if (!$("speed").value) $("speed").value = "1";
+$("pitch").value = String(voice.pitch); if (!$("pitch").value) $("pitch").value = "0";
+function saveVoice() {
+  voice = { ...voice, speed: Number($("speed").value), pitch: Number($("pitch").value) };
+  try { localStorage.setItem(VOICE_KEY, JSON.stringify(voice)); } catch (e) {}
+}
+
+const PITCH_WORKLET = `
+class PelhamPitch extends AudioWorkletProcessor {
+  static get parameterDescriptors() { return [{ name: "ratio", defaultValue: 1, minValue: 0.5, maxValue: 2 }]; }
+  constructor() { super(); this.win = Math.round(sampleRate * 0.05); this.len = this.win * 2 + 4; this.buf = []; this.w = 0; this.phase = 0; }
+  read(b, d) { let pos = this.w - d; while (pos < 0) pos += this.len; const i = Math.floor(pos); const f = pos - i; return b[i] * (1 - f) + b[(i + 1) % this.len] * f; }
+  process(inputs, outputs, params) {
+    const input = inputs[0] || [], output = outputs[0], ratio = params.ratio[0];
+    for (let c = 0; c < output.length; c++) if (!this.buf[c]) this.buf[c] = new Float32Array(this.len);
+    for (let i = 0; i < output[0].length; i++) {
+      const p1 = this.phase, p2 = (p1 + 0.5) % 1;
+      const g1 = Math.sin(Math.PI * p1) ** 2, g2 = Math.sin(Math.PI * p2) ** 2;
+      for (let c = 0; c < output.length; c++) {
+        const src = input[c] || input[0];
+        const x = src ? src[i] : 0;
+        const b = this.buf[c];
+        b[this.w] = x;
+        output[c][i] = ratio === 1 ? x : this.read(b, p1 * this.win + 1) * g1 + this.read(b, p2 * this.win + 1) * g2;
+      }
+      this.w = (this.w + 1) % this.len;
+      this.phase += (1 - ratio) / this.win;
+      if (this.phase >= 1) this.phase -= 1;
+      if (this.phase < 0) this.phase += 1;
+    }
+    return true;
+  }
+}
+registerProcessor("pelham-pitch", PelhamPitch);
+`;
+// 피치를 처음 0 이 아닌 값으로 둘 때만 그래프를 잇는다 — file:// 로 열면 Web Audio 가 소리를 막으므로 그때는 쓰지 않는다.
+let graph = null, graphTried = false;
+const ratioOf = (semi) => 2 ** (semi / 12);
+async function ensureGraph() {
+  if (graph || graphTried || location.protocol === "file:") return graph;
+  graphTried = true;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const context = new Ctx();
+    await context.audioWorklet.addModule(URL.createObjectURL(new Blob([PITCH_WORKLET], { type: "application/javascript" })));
+    const node = new AudioWorkletNode(context, "pelham-pitch", { outputChannelCount: [2] });
+    context.createMediaElementSource(audio).connect(node).connect(context.destination);
+    graph = { context, node };
+  } catch (e) { graph = null; }
+  return graph;
+}
+async function applyPitch() {
+  const semi = Number($("pitch").value);
+  if (semi === 0 && !graph) return;
+  const g = await ensureGraph();
+  if (!g) { $("pitch").value = "0"; $("pitch").disabled = true; $("pitch").title = T(UI.nopitch); return; }
+  g.context.resume();
+  g.node.parameters.get("ratio").setValueAtTime(ratioOf(semi), g.context.currentTime);
+}
+function applySpeed() { audio.preservesPitch = true; audio.playbackRate = Number($("speed").value); }
+
+function renderUI() {
+  $("eyebrow").textContent = T(UI.eyebrow); $("title").textContent = T(UI.title); $("sub").textContent = T(UI.sub);
+  $("who").textContent = T(UI.who); $("speedL").textContent = T(UI.speed) + " "; $("pitchL").textContent = T(UI.pitch) + " ";
+  $("foot").textContent = T(UI.foot); $("keyhint").textContent = T(UI.keyhint);
+  $("play").textContent = playing ? T(UI.pause) : T(UI.play);
+  $("lang-ko").setAttribute("aria-pressed", LANG === "ko"); $("lang-en").setAttribute("aria-pressed", LANG === "en");
+  document.documentElement.lang = LANG;
+  $("chips").innerHTML = S.map((s, i) => `<button class="chip" type="button" data-i="${i}" aria-current="${i === cur}"><b>${i + 1}</b>${T(s.n)}</button>`).join("");
+}
+
+function show(i) {
+  cur = Math.max(0, Math.min(S.length - 1, i));
+  const s = S[cur];
+  $("stage").innerHTML = `<div class="lane"><div class="lt">${T(UI.pic)}</div><h2>${T(s.h)}</h2>${s.pic()}</div>
+    <div class="lane"><div class="lt">${T(UI.keys)}</div><ul class="pts">${s.pts.map((p, k) => `<li><i>${k + 1}</i><span>${T(p)}</span></li>`).join("")}</ul></div>`;
+  $("narr").textContent = NARR[LANG][cur];
+  $("prog").style.width = "0";
+  renderUI();
+}
+
+// ElevenLabs 크레딧이 바닥나(2026-10-26) 이 발표는 브라우저 음성으로 읽는다.
+let utter = null;
+function stopAudio() { clearInterval(timer); utter = null; try { speechSynthesis.cancel(); } catch (e) {} }
+function playScene() {
+  stopAudio();
+  if (!("speechSynthesis" in window)) { playing = false; renderUI(); return; }
+  const u = new SpeechSynthesisUtterance(NARR[LANG][cur]);
+  u.lang = LANG === "ko" ? "ko-KR" : "en-US";
+  u.rate = Number($("speed").value) || 1;
+  u.pitch = Math.max(0, Math.min(2, 1 + Number($("pitch").value || 0) / 12));
+  const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.replace("_", "-").startsWith(u.lang));
+  if (v) u.voice = v;
+  const start = Date.now(), est = (NARR[LANG][cur].length / (LANG === "ko" ? 7 : 15)) / u.rate;
+  timer = setInterval(() => { $("prog").style.width = `${Math.min(100, ((Date.now() - start) / 1000 / est) * 100)}%`; }, 200);
+  u.onend = () => {
+    if (utter !== u) return;
+    clearInterval(timer); $("prog").style.width = "100%";
+    if (playing && cur < S.length - 1) setTimeout(() => { if (playing) { show(cur + 1); playScene(); } }, 700);
+    else { playing = false; renderUI(); }
+  };
+  utter = u;
+  speechSynthesis.speak(u);
+}
+$("play").onclick = () => { playing = !playing; if (playing) { playScene(); } else stopAudio(); renderUI(); };
+$("prev").onclick = () => { show(cur - 1); if (playing) playScene(); };
+$("next").onclick = () => { show(cur + 1); if (playing) playScene(); };
+$("chips").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (!b) return; show(Number(b.dataset.i)); if (playing) playScene(); };
+$("speed").onchange = () => { saveVoice(); if (playing) playScene(); };
+$("pitch").onchange = () => { saveVoice(); if (playing) playScene(); };
+function setLang(l) { LANG = l; try { localStorage.setItem("pelham-deck-lang", l); } catch (e) {} show(cur); if (playing) playScene(); }
+$("lang-ko").onclick = () => setLang("ko");
+$("lang-en").onclick = () => setLang("en");
+
+// 한/영 키: Windows 한글 키보드는 HangulMode(Lang1), Mac 은 Caps Lock 으로 입력 소스를 바꾸는 경우가 많다.
+// Caps Lock 은 누름·뗌이 둘 다 올 수 있어 0.4초 안의 두 번째는 무시한다. L 키도 같다.
+let lastToggle = 0;
+function toggleLang() { const now = Date.now(); if (now - lastToggle < 400) return; lastToggle = now; setLang(LANG === "ko" ? "en" : "ko"); }
+const isHanEng = (e) => e.key === "HangulMode" || e.code === "Lang1" || e.key === "CapsLock";
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest && e.target.closest("select")) return;
+  if (isHanEng(e) || ((e.key === "l" || e.key === "L" || e.key === "ㅣ") && !e.metaKey && !e.ctrlKey && !e.altKey)) { toggleLang(); return; }
+  if (e.key === "ArrowRight") $("next").click();
+  if (e.key === "ArrowLeft") $("prev").click();
+  if (e.key === " " && !(e.target.closest && e.target.closest("button"))) { e.preventDefault(); $("play").click(); }
+});
+document.addEventListener("keyup", (e) => { if (e.key === "CapsLock") toggleLang(); });
+show(0);
+</script>
