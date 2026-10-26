@@ -11,6 +11,8 @@ import { ApiError } from "@/lib/teeSheet/api";
 import { accessToken } from "@/lib/teeSheet/session";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
+import type { Tone } from "./voice";
+
 export type Segment = "member" | "public" | "golfnow" | "junior_senior" | "league" | "tour" | "staff";
 export type DayType = "weekday" | "weekend";
 export type DayPart = "am" | "pm" | "twilight" | "unknown";
@@ -244,12 +246,16 @@ export async function askStrategy(from: string, to: string, lang: "en" | "ko", f
   return (await response.json()) as Strategy;
 }
 
-/** 나레이션 한 장면 → mp3 blob 주소. 같은 글은 이 탭에서 한 번만 받는다.
- * `share` 가 있으면 공유 링크 모드 — 로그인 없이 그 보고서의 대본만 읽힌다(서버가 확인한다). */
+/** 나레이션 한 장면 → mp3 blob 주소. 같은 글·같은 목소리 설정은 이 탭에서 한 번만 받는다.
+ * `share` 가 있으면 공유 링크 모드 — 로그인 없이 그 보고서의 대본만 읽힌다(서버가 확인한다).
+ * `voice` 는 ElevenLabs 톤·속도(`lib/aiMarketing/voice.ts` 의 voiceParts). 없으면 목소리 그대로. */
 const narrationUrls = new Map<string, Promise<string>>();
 
-export function narrationUrl(text: string, share = ""): Promise<string> {
-  const known = narrationUrls.get(text);
+export function narrationUrl(text: string, share = "", voice?: { tone: Tone; speed: number }): Promise<string> {
+  const tone = voice?.tone ?? "natural";
+  const speed = voice?.speed ?? 1;
+  const cacheKey = `${tone}|${speed}|${text}`;
+  const known = narrationUrls.get(cacheKey);
   if (known) return known;
   const pending = (async () => {
     const token = share ? "" : await accessToken();
@@ -259,7 +265,7 @@ export function narrationUrl(text: string, share = ""): Promise<string> {
       response = await fetch(`${paymentsApiBase()}/ai-marketing/narrate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ text, share }),
+        body: JSON.stringify({ text, share, tone, speed }),
       });
     } catch {
       throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
@@ -267,10 +273,79 @@ export function narrationUrl(text: string, share = ""): Promise<string> {
     if (!response.ok) throw await failure(response, "The narrator is not on the server yet. Deploy the API (Fly) first.");
     return URL.createObjectURL(await response.blob());
   })();
-  narrationUrls.set(text, pending);
+  narrationUrls.set(cacheKey, pending);
   // 실패한 것은 기억하지 않는다 — 다시 누르면 다시 받는다.
-  pending.catch(() => narrationUrls.delete(text));
+  pending.catch(() => narrationUrls.delete(cacheKey));
   return pending;
+}
+
+/** Hope 가 화면에 넘기는 동작. 서버는 아무것도 보내지 않는다 — 문자·팝업은 화면이 확인을 받고 실행한다. */
+export type HopeAction =
+  | { type: "strategy"; from: string; to: string; focus: string }
+  | { type: "present" }
+  | ({
+      type: "launch";
+      report_id: string;
+      strategy: number;
+      title: string;
+      sms: string;
+      popup: boolean;
+    } & Pick<StrategyLaunchCopy, "segment" | "popup_title" | "popup_body" | "popup_link_label" | "popup_link" | "days">);
+
+/** Hope 가 이번 답에서 찾아본 기간 숫자(0094 요약 그대로). 금액은 센트. */
+export type HopeLookup = {
+  from: string;
+  to: string;
+  rounds: number;
+  bookings: number;
+  no_shows: number;
+  paid_bills: number;
+  net_sales: number;
+  bill_discount: number;
+};
+
+export type HopeReply = { reply: string; actions: HopeAction[]; lookups: HopeLookup[]; log_id: string | null };
+
+/** Hope 기록 한 줄(0119). */
+export type HopeLogRow = {
+  id: string;
+  created_at: string;
+  created_by: string;
+  lang: "en" | "ko";
+  kind: "chat" | "launch" | "strategy" | "present";
+  question: string;
+  answer: string;
+  detail: Record<string, unknown>;
+};
+
+export const hopeApi = {
+  log: (limit = 50) => staffRpc<HopeLogRow[]>("pelham_staff_ai_manager_log", { p_limit: limit }),
+  save: (kind: HopeLogRow["kind"], lang: "en" | "ko", question: string, answer: string, detail: Record<string, unknown>) =>
+    staffRpc<{ id: string }>("pelham_staff_ai_manager_log_save", {
+      p_kind: kind,
+      p_lang: lang,
+      p_question: question,
+      p_answer: answer,
+      p_detail: detail,
+    }),
+};
+
+/** Hope 와 대화 한 번(Fly `POST /ai-marketing/chat`). 지난 대화를 같이 보내 이어서 말한다. */
+export async function askHope(messages: { role: "user" | "assistant"; text: string }[], lang: "en" | "ko"): Promise<HopeReply> {
+  const token = await accessToken();
+  if (!token) throw new ApiError(401, "Sign in again to talk to Hope.");
+  let response: Response;
+  try {
+    response = await fetch(`${paymentsApiBase()}/ai-marketing/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ messages: messages.slice(-20), lang }),
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
+  }
+  if (!response.ok) throw await failure(response, "Hope is not on the server yet. Deploy the API (Fly) first.");
+  return (await response.json()) as HopeReply;
 }
 
 /** Claude 가 받을 것을 그대로 받아 본다(전략은 쓰지 않는다 — Claude 요금 없음). */

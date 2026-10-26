@@ -15,6 +15,8 @@
  *   - "Strategy reports" 탭: 보관함(0113) — 지금까지의 전략 보고서 모두, 공유 링크. 주소 끝 #reports 로 바로 연다.
  *   - "Texts & website" 탭: 기획안 → 실행 타일(0115) — 전략마다 문자·AI 전화 캠페인과 웹사이트 팝업. #launch.
  *   - "Analysis facts" 탭: Claude 가 받는 것 그대로(인건비 pelham-shift 포함)와 매니저 팩트(0117, 고정비·목표). #facts.
+ *   - 맨 위 **Hope 타일**(`HopeAssistant`): "Hope" 하고 부르면 듣고 오늘 예약·매출 등을 말로 답한다. "전략 만들어 줘"·
+ *     "프레젠테이션 틀어 줘"는 아래 `HopeCommand` 로 고객 분석 탭의 전략 패널에 넘긴다. 문자·팝업은 타일이 확인 후 실행한다.
  *
  * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, 마케팅 믹스 보드)는 이 화면에 붙는다.
  * 데모 숫자로 내려가지 않는다 — 서버가 안 되면 오류를 보여 준다(옛 Business Intelligence 화면이 고치려던 문제).
@@ -39,6 +41,7 @@ import { localBusinessDate } from "@/lib/retail/api";
 import { ApiError } from "@/lib/teeSheet/api";
 import { addDays } from "@/lib/teeSheet/dates";
 
+import { HopeAssistant } from "./HopeAssistant";
 import { StrategyBody, StrategyDeck } from "./StrategyDeck";
 import { StrategyFacts } from "./StrategyFacts";
 import { StrategyLaunch } from "./StrategyLaunch";
@@ -103,7 +106,15 @@ function describe(cause: unknown): string {
   return cause instanceof Error ? cause.message : "Could not load the numbers.";
 }
 
+/** Hope 가 전략 패널에 시키는 일. id 는 한 번만 처리한다(패널이 다시 그려져도). */
+type HopeCommand = { id: number; kind: "strategy" | "present"; from?: string; to?: string; focus?: string };
+const handledCommands = new Set<number>();
+type HopeNotice = { id: number; text: string };
+
 export default function AiMarketingView() {
+  const [command, setCommand] = useState<HopeCommand | null>(null);
+  const [notice, setNotice] = useState<HopeNotice | null>(null);
+  const tell = (text: string) => setNotice({ id: Date.now(), text });
   const [tab, setTab] = useState<Tab>(() => {
     const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
     return hash === "reports" || hash === "launch" || hash === "facts" ? hash : "analysis";
@@ -124,6 +135,19 @@ export default function AiMarketingView() {
   };
   return (
     <div className="grid min-w-0 gap-0">
+      <div className="px-4 pt-4">
+        <HopeAssistant
+          notice={notice}
+          onPresent={() => {
+            pickTab("analysis");
+            setCommand({ id: Date.now(), kind: "present" });
+          }}
+          onStrategy={(action) => {
+            pickTab("analysis");
+            setCommand({ id: Date.now(), kind: "strategy", from: action.from, to: action.to, focus: action.focus });
+          }}
+        />
+      </div>
       <div className="flex gap-2 px-4 pt-4">
         <Chip active={tab === "analysis"} onClick={() => pickTab("analysis")}>Customer analysis</Chip>
         <Chip active={tab === "reports"} onClick={() => pickTab("reports")}>Strategy reports</Chip>
@@ -131,7 +155,7 @@ export default function AiMarketingView() {
         <Chip active={tab === "facts"} onClick={() => pickTab("facts")}>Analysis facts</Chip>
       </div>
       {tab === "analysis" ? (
-        <AnalysisTab onLaunch={openLaunch} />
+        <AnalysisTab command={command} onLaunch={openLaunch} tell={tell} />
       ) : tab === "facts" ? (
         <div className="grid min-w-0 gap-3 p-4">
           <p className="text-sm text-[#4e5560]">
@@ -163,7 +187,15 @@ export default function AiMarketingView() {
 
 type Tab = "analysis" | "reports" | "launch" | "facts";
 
-function AnalysisTab({ onLaunch }: { onLaunch: (reportId: string) => void }) {
+function AnalysisTab({
+  onLaunch,
+  command,
+  tell,
+}: {
+  onLaunch: (reportId: string) => void;
+  command: HopeCommand | null;
+  tell: (text: string) => void;
+}) {
   const today = localBusinessDate();
   const [period, setPeriod] = useState<Period>("30");
   const [custom, setCustom] = useState(() => periodRange("30", today));
@@ -190,6 +222,19 @@ function AnalysisTab({ onLaunch }: { onLaunch: (reportId: string) => void }) {
       cancelled = true;
     };
   }, [request, requestKey]);
+
+  // Hope 가 기간을 정해 전략을 시키면 그 기간을 연다(새 명령을 본 그 렌더에서).
+  const [seenCommand, setSeenCommand] = useState(0);
+  if (command && command.id !== seenCommand) {
+    setSeenCommand(command.id);
+    if (command.from && command.to && !handledCommands.has(command.id)) {
+      setPeriod("custom");
+      setCustom({ from: command.from, to: command.to });
+      setRequest({ from: command.from, to: command.to });
+    }
+  }
+  // 기간이 없는 명령(프레젠테이션)은 지금 보는 기간에.
+  const panelCommand = command ? { ...command, from: command.from ?? request.from, to: command.to ?? request.to } : null;
 
   const pick = (next: Period) => {
     setPeriod(next);
@@ -232,7 +277,7 @@ function AnalysisTab({ onLaunch }: { onLaunch: (reportId: string) => void }) {
         </>
       ) : data && !error ? (
         <>
-          <StrategyPanel from={request.from} key={requestKey} onLaunch={onLaunch} to={request.to} />
+          <StrategyPanel command={panelCommand} from={request.from} key={requestKey} onLaunch={onLaunch} tell={tell} to={request.to} />
           <Summary data={data} />
         </>
       ) : null}
@@ -632,7 +677,19 @@ function storedStrategy(key: string): Strategy | null {
  *
  * 결과는 먼저 **프레젠테이션**(장면 넘기기 + Hope 목소리 나레이션)으로 보이고, "Full text" 로 전체 글을 본다.
  */
-function StrategyPanel({ from, to, onLaunch }: { from: string; to: string; onLaunch: (reportId: string) => void }) {
+function StrategyPanel({
+  from,
+  to,
+  onLaunch,
+  command,
+  tell,
+}: {
+  from: string;
+  to: string;
+  onLaunch: (reportId: string) => void;
+  command: HopeCommand | null;
+  tell: (text: string) => void;
+}) {
   const [lang, setLangState] = useState<Lang>(() => getLang());
   useEffect(() => onLangChange(setLangState), []);
   const key = `pelham-ai-strategy:${from}|${to}|${lang}`;
@@ -645,26 +702,78 @@ function StrategyPanel({ from, to, onLaunch }: { from: string; to: string; onLau
   const [focus, setFocus] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // 나레이터 아이콘·"프레젠테이션 틀어 줘" 때마다 새 값 — 프레젠테이션이 1장부터 튼다.
+  const [autoPlay, setAutoPlay] = useState(0);
 
-  const ask = async () => {
+  const ask = async (askFocus = focus): Promise<boolean> => {
     const askedKey = key;
+    if (askFocus !== focus) setFocus(askFocus);
     setBusy(true);
     setError("");
     try {
-      const next = await askStrategy(from, to, lang, focus);
+      const next = await askStrategy(from, to, lang, askFocus);
       setFresh((all) => ({ ...all, [askedKey]: { strategy: next, version: (all[askedKey]?.version ?? 0) + 1 } }));
       setView("deck");
+      // 새 프레젠테이션이 지난 "틀어 줘" 로 저절로 시작하지 않게.
+      setAutoPlay(0);
       try {
         localStorage.setItem(askedKey, JSON.stringify(next));
       } catch {
         // 저장 못 해도 화면에는 보인다.
       }
+      return true;
     } catch (cause) {
       setError(describe(cause));
+      return false;
     } finally {
       setBusy(false);
     }
   };
+
+  // Hope 의 명령. 기간이 맞는 패널만 처리한다(기간을 바꾸는 중에 옛 패널이 먼저 받지 않게).
+  const mine = Boolean(command && !handledCommands.has(command.id) && command.from === from && command.to === to);
+  // 프레젠테이션: 결과가 있으면 그 렌더에서 바로 프레젠테이션으로 바꾸고 튼다.
+  const [seenPresent, setSeenPresent] = useState(0);
+  if (mine && command?.kind === "present" && strategy && command.id !== seenPresent) {
+    setSeenPresent(command.id);
+    setView("deck");
+    setAutoPlay(command.id);
+  }
+  useEffect(() => {
+    if (!command || !mine) return;
+    handledCommands.add(command.id);
+    const ko = lang === "ko";
+    if (command.kind === "present") {
+      // 결과가 없으면 먼저 만들고, 다 되면 바로 프레젠테이션을 튼다.
+      if (!strategy && !busy) {
+        tell(ko
+          ? "이 기간의 분석 자료를 먼저 만들게요. 1–2분 걸리고, 다 되면 바로 프레젠테이션을 틀어 드릴게요."
+          : "Let me make the strategy for this period first. It takes a minute or two, then the presentation starts.");
+        void Promise.resolve()
+          .then(() => ask(command.focus ?? ""))
+          .then((ok) => {
+            if (ok) setAutoPlay(command.id);
+            else tell(ko ? "전략을 만들지 못했어요. 화면의 오류를 확인해 주세요." : "I could not make the strategy. Please check the error on the screen.");
+          });
+      }
+      return;
+    }
+    if (busy) return;
+    // 명령은 바깥(Hope)에서 온 일 — 이 effect 가 끝난 뒤에 시작한다.
+    void Promise.resolve()
+      .then(() => ask(command.focus ?? ""))
+      .then((ok) =>
+      tell(ok
+        ? ko
+          ? "분석 자료가 준비됐어요. 프레젠테이션 나레이터 아이콘을 누르시거나, 프레젠테이션 틀어 줘 라고 말씀해 주세요."
+          : "The strategy is ready. Press the presentation narrator icon, or say play the presentation."
+        : ko
+          ? "전략을 만들지 못했어요. 화면의 오류를 확인해 주세요."
+          : "I could not make the strategy. Please check the error on the screen."),
+    );
+    // 명령 id 에만 반응한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [command?.id, from, to]);
 
   return (
     <Panel
@@ -688,7 +797,7 @@ function StrategyPanel({ from, to, onLaunch }: { from: string; to: string; onLau
               value={focus}
             />
           </Field>
-          <Button disabled={busy} onClick={ask} tone="primary">
+          <Button disabled={busy} onClick={() => void ask()} tone="primary">
             {busy ? "Claude is writing… (1–2 min)" : strategy ? "Ask again" : "Ask Claude for a strategy"}
           </Button>
         </div>
@@ -721,7 +830,7 @@ function StrategyPanel({ from, to, onLaunch }: { from: string; to: string; onLau
           </EmptyNote>
         ) : null}
         {strategy && view === "deck" ? (
-          <StrategyDeck key={`${key}#${version}`} lang={lang} onLang={setLang} strategy={strategy} />
+          <StrategyDeck autoPlay={autoPlay} key={`${key}#${version}`} lang={lang} onLang={setLang} strategy={strategy} />
         ) : null}
         {strategy && view === "text" ? <StrategyBody strategy={strategy} /> : null}
       </div>

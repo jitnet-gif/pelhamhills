@@ -7,17 +7,20 @@
  * 프레젠테이션: 장면 칩, 무대, 어두운 나레이션 띠, 재생 막대. 나레이션 소리는 장면을 틀 때 Fly
  * (`/ai-marketing/narrate`, ElevenLabs Hope)가 만든다. 다음 장면은 미리 받아 둔다.
  *
- * ## 속도 · 피치
- * - 속도는 `<audio>` 의 playbackRate(음높이는 그대로 — 브라우저의 preservesPitch).
+ * ## 톤 · 속도 · 피치
+ * - 톤과 속도는 ElevenLabs 가 Hope 목소리를 만들 때 바꾼다(`lib/aiMarketing/voice.ts`). 1.2× 넘는 속도만
+ *   `<audio>` 의 playbackRate 로 더한다(음높이는 그대로 — 브라우저의 preservesPitch). 바꾸면 다음 장면부터 그 소리다.
  * - 피치는 Web Audio 로 바꾼다: 오디오를 AudioWorklet(지연선 두 개를 엇갈려 읽는 피치 시프터)에 통과시킨다.
  *   0 이면 손대지 않고 그대로 내보낸다. 속도와 따로 움직인다(반음 단위, ±4).
- * - 둘 다 이 브라우저(localStorage `pelham-narration-voice`)에 기억한다 — 다음에 열어도 그대로.
+ * - 모두 이 브라우저(localStorage `pelham-narration-voice`)에 기억하고 Hope 타일과 같이 쓴다.
+ * - `autoPlay` 가 바뀌면 처음 장면부터 튼다 — Hope 의 "프레젠테이션 틀어 줘"·나레이터 아이콘.
  */
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, ErrorNote } from "@/components/retail/ui";
 import { narrationUrl, type Strategy } from "@/lib/aiMarketing/api";
+import { type HopeVoice, onVoiceChange, PITCHES, saveVoice, SPEEDS, storedVoice, TONES, type Tone, voiceParts } from "@/lib/aiMarketing/voice";
 import type { Lang } from "@/lib/i18n/engine";
 import { ApiError } from "@/lib/teeSheet/api";
 
@@ -188,26 +191,6 @@ function BreakEven({ breakEven }: { breakEven: NonNullable<Strategy["break_even"
   );
 }
 
-const SPEEDS = [0.75, 0.85, 1, 1.1, 1.2, 1.3, 1.5];
-const PITCHES = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
-const VOICE_KEY = "pelham-narration-voice";
-
-type Voice = { speed: number; pitch: number };
-
-function storedVoice(): Voice {
-  try {
-    const raw = JSON.parse(localStorage.getItem(VOICE_KEY) ?? "null") as Partial<Voice> | null;
-    const speed = Number(raw?.speed);
-    const pitch = Number(raw?.pitch);
-    return {
-      speed: SPEEDS.includes(speed) ? speed : 1,
-      pitch: PITCHES.includes(pitch) ? pitch : 0,
-    };
-  } catch {
-    return { speed: 1, pitch: 0 };
-  }
-}
-
 /**
  * 피치 시프터(AudioWorklet). 지연선을 두 탭이 톱니 모양으로 엇갈려 읽는다 — 읽는 속도가 ratio 배라서
  * 음높이가 ratio 배가 되고, 길이는 그대로다. 두 탭은 반 주기 어긋나 sin² · cos² 로 섞여 이음매가 들리지 않는다.
@@ -279,11 +262,14 @@ export function StrategyDeck({
   lang,
   onLang,
   share = "",
+  autoPlay = 0,
 }: {
   strategy: Strategy;
   lang: Lang;
   onLang: (lang: Lang) => void;
   share?: string;
+  /** 0 이 아닌 새 값이 오면 1장부터 튼다. */
+  autoPlay?: number;
 }) {
   const scenes = useMemo(() => strategyScenes(strategy), [strategy]);
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -293,7 +279,12 @@ export function StrategyDeck({
   // 소리가 실제로 나기 시작한 장면. playing 인데 index 와 다르면 아직 준비 중이다.
   const [sounding, setSounding] = useState(-1);
   const [progress, setProgress] = useState(0);
-  const [voice, setVoice] = useState<Voice>(() => storedVoice());
+  const [voice, setVoiceState] = useState<HopeVoice>(() => storedVoice());
+  useEffect(() => onVoiceChange(setVoiceState), []);
+  const setVoice = (next: HopeVoice) => {
+    setVoiceState(next);
+    saveVoice(next);
+  };
   const [error, setError] = useState("");
   const scene = scenes[Math.min(index, scenes.length - 1)];
   const preparing = playing && sounding !== index;
@@ -306,12 +297,13 @@ export function StrategyDeck({
       return;
     }
     let cancelled = false;
-    narrationUrl(scene.say, share).then(
+    const parts = voiceParts(voice);
+    narrationUrl(scene.say, share, parts).then(
       (url) => {
         if (cancelled) return;
         player.src = url;
         player.preservesPitch = true;
-        player.playbackRate = voice.speed;
+        player.playbackRate = parts.playbackRate;
         player.play().then(
           () => {
             if (!cancelled) setSounding(index);
@@ -328,7 +320,7 @@ export function StrategyDeck({
       },
     );
     const next = scenes[index + 1];
-    if (next) narrationUrl(next.say, share).catch(() => undefined);
+    if (next) narrationUrl(next.say, share, parts).catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -337,19 +329,12 @@ export function StrategyDeck({
   }, [playing, index, scene.say, scenes, share]);
 
   useEffect(() => {
-    if (audio.current) audio.current.playbackRate = voice.speed;
     graph.current?.node.parameters.get("ratio")?.setValueAtTime(ratioOf(voice.pitch), graph.current.context.currentTime);
-    try {
-      localStorage.setItem(VOICE_KEY, JSON.stringify(voice));
-    } catch {
-      // 기억 못 해도 이번에는 그대로 쓴다.
-    }
   }, [voice]);
 
-  const togglePlay = () => {
-    setError("");
+  const startGraph = () => {
     const player = audio.current;
-    if (!playing && player) {
+    if (player) {
       // 첫 재생 때(사용자가 누른 순간) 오디오 그래프를 만든다 — 브라우저가 소리를 허락하는 때.
       void audioGraph(player).then((made) => {
         graph.current = made;
@@ -358,8 +343,27 @@ export function StrategyDeck({
         made.node.parameters.get("ratio")?.setValueAtTime(ratioOf(voice.pitch), made.context.currentTime);
       });
     }
+  };
+  const togglePlay = () => {
+    setError("");
+    if (!playing) startGraph();
     setPlaying(!playing);
   };
+
+  // 새 autoPlay 값을 본 렌더에서 1장으로 돌리고 튼다. 오디오 그래프는 아래 effect 가 잇는다.
+  const [seenAutoPlay, setSeenAutoPlay] = useState(0);
+  if (autoPlay && autoPlay !== seenAutoPlay) {
+    setSeenAutoPlay(autoPlay);
+    setError("");
+    setIndex(0);
+    setProgress(0);
+    setPlaying(true);
+  }
+  useEffect(() => {
+    if (autoPlay) startGraph();
+    // 새 autoPlay 값에만 반응한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay]);
   const go = (next: number) => {
     setIndex(Math.max(0, Math.min(scenes.length - 1, next)));
     setProgress(0);
@@ -436,6 +440,20 @@ export function StrategyDeck({
         <div aria-hidden="true" className="relative h-1.5 min-w-[120px] flex-1 bg-[#e5e7eb]">
           <span className="absolute inset-y-0 left-0 bg-[#1a7f4b]" style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
+        <label className="flex items-center gap-1 text-xs text-[#6b7280]">
+          Tone
+          <select
+            className="border border-[#d4d4d8] bg-white px-1 py-1 text-xs"
+            onChange={(event) => setVoice({ ...voice, tone: event.target.value as Tone })}
+            value={voice.tone}
+          >
+            {TONES.map((tone) => (
+              <option key={tone.value} value={tone.value}>
+                {tone.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex items-center gap-1 text-xs text-[#6b7280]">
           Speed
           <select
