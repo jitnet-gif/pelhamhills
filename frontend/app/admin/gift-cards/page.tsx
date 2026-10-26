@@ -12,6 +12,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
 import { describeGiftCardError, giftCardApi, type GiftCard } from "@/lib/pos/giftCard";
+import { printGiftCertificate } from "@/lib/pos/giftCertificate";
 import { code128Svg } from "@/lib/retail/barcode";
 import { printGiftCard } from "@/lib/retail/printReceipt";
 import { formatMoney, parseMoney } from "@/lib/retail/types";
@@ -137,6 +138,13 @@ export default function GiftCardsPage() {
     setBusy(card.id);
     await sendText(card, phone.trim());
     setBusy(null);
+  }
+
+  /** 클럽 종이 상품권 양식(Letter 가로)으로. */
+  function printCertificate(card: GiftCard, reprint: boolean) {
+    if (!printGiftCertificate(card, { reprint })) {
+      setError("The browser blocked the print window. Allow pop-ups for this site and try again.");
+    }
   }
 
   async function voidCard(card: GiftCard) {
@@ -303,13 +311,22 @@ export default function GiftCardsPage() {
                     dangerouslySetInnerHTML={{ __html: code128Svg(issued.code) }}
                   />
                   <span className="font-mono text-[11px]">{issued.code}</span>
-                  <button
-                    className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold"
-                    onClick={() => printGiftCard(issued, { reprint: true })}
-                    type="button"
-                  >
-                    Reprint
-                  </button>
+                  <span className="flex gap-1">
+                    <button
+                      className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold"
+                      onClick={() => printGiftCard(issued, { reprint: true })}
+                      type="button"
+                    >
+                      Reprint
+                    </button>
+                    <button
+                      className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold"
+                      onClick={() => printCertificate(issued, false)}
+                      type="button"
+                    >
+                      Print certificate
+                    </button>
+                  </span>
                 </div>
               ) : null}
               {error ? (
@@ -391,6 +408,13 @@ export default function GiftCardsPage() {
                                 type="button"
                               >
                                 Reprint
+                              </button>
+                              <button
+                                className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold"
+                                onClick={() => printCertificate(card, true)}
+                                type="button"
+                              >
+                                Certificate
                               </button>
                               <button
                                 className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold disabled:opacity-50"
