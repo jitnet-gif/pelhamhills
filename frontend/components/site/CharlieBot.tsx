@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 공개 사이트·예약 화면 어디서든 오른쪽 아래에 뜨는 **Hope** 버튼(2026-10-26).
+ * 공개 사이트·예약 화면 어디서든 오른쪽 아래에 뜨는 **Charlie** 버튼(목소리는 ElevenLabs Hope)(2026-10-26).
  *
  * 누르면 바로 마이크를 열고 전화와 같은 ElevenLabs 에이전트에 붙는다 — 예약은
  * `VoiceBooking` 이 쓰는 도구 그대로 `backend/api/routes/voice.py` 에서 만들어진다.
@@ -14,7 +14,7 @@ import { useState } from "react";
 import VoiceBooking from "@/components/booking/VoiceBooking";
 import { BOOK_TEE_TIME } from "@/lib/nav";
 
-export default function HopeBot() {
+export default function CharlieBot() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -34,7 +34,7 @@ export default function HopeBot() {
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
-        {open ? "Close Hope" : "🎙 Book with Hope"}
+        {open ? "Close Charlie" : "🎙 Book with Charlie"}
       </button>
     </div>
   );

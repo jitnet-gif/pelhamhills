@@ -31,12 +31,12 @@ import {
 type Props = {
   /** 통화가 끝났다. 예약이 생겼을 수 있으니 부모는 빈 시간을 다시 읽어야 한다. */
   onFinished?: () => void;
-  /** 눌러서 열린 자리(HopeBot)라 바로 마이크를 연다. */
+  /** 눌러서 열린 자리(CharlieBot)라 바로 마이크를 연다. */
   autoStart?: boolean;
 };
 
-/** 웹에서 Hope 가 하는 첫마디. 전화 인사는 agent.json 기본값. 짧게 둔다(2026-10-26 요청). */
-const HOPE_GREETING = "Hi, I'm Hope. Would you like to book a tee time?";
+/** 웹에서 Charlie 가 하는 첫마디. 전화 인사는 agent.json 기본값. 짧게 둔다(2026-10-26 요청). */
+const GREETING = "Hi, I'm Charlie. Would you like to book a tee time?";
 
 type Phase = "idle" | "connecting" | "live" | "error";
 
@@ -112,7 +112,7 @@ export default function VoiceBooking({ onFinished, autoStart }: Props) {
           today_iso: browserTodayIso(),
           club_name: CLUB.shortName,
           channel: "website",
-          greeting: HOPE_GREETING,
+          greeting: GREETING,
         },
         onModeChange: ({ mode }) => {
           if (mounted.current) setSpeaking(mode === "speaking");
@@ -203,7 +203,7 @@ export default function VoiceBooking({ onFinished, autoStart }: Props) {
         <div className="min-w-0">
           <p className="font-semibold">Rather just say it?</p>
           <p className="text-sm text-[#5b6155]">
-            Hope can book or cancel a tee time by voice.
+            Charlie can book or cancel a tee time by voice.
           </p>
         </div>
         <button
@@ -211,7 +211,7 @@ export default function VoiceBooking({ onFinished, autoStart }: Props) {
           onClick={() => void start()}
           type="button"
         >
-          Talk to Hope
+          Talk to Charlie
         </button>
       </div>
     );
@@ -234,7 +234,7 @@ export default function VoiceBooking({ onFinished, autoStart }: Props) {
           {phase === "connecting"
             ? "Connecting…"
             : speaking
-              ? "Hope is speaking"
+              ? "Charlie is speaking"
               : "Listening — go ahead"}
         </p>
         <button
@@ -253,7 +253,7 @@ export default function VoiceBooking({ onFinished, autoStart }: Props) {
           {lines.map((line) => (
             <li className="text-sm" key={line.id}>
               <span className="font-semibold text-[#5b6155]">
-                {line.who === "you" ? "You: " : "Hope: "}
+                {line.who === "you" ? "You: " : "Charlie: "}
               </span>
               <span>{line.text}</span>
             </li>
