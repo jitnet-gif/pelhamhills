@@ -29,6 +29,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 
+import HopeBot from "@/components/site/HopeBot";
 import SiteNoticePopup from "@/components/site/SiteNoticePopup";
 import { BOOK_INDOOR, BOOK_TEE_TIME, CLUB, SITE_HOME, siteNav } from "@/lib/nav";
 
@@ -94,6 +95,8 @@ export default function SiteHeader() {
     <>
       {/* 직원이 `/admin/notices` 에 올린 공지·프로모션 창(0060). */}
       <SiteNoticePopup surface="site" />
+      {/* 말로 바로 예약하는 Hope 버튼(2026-10-26). */}
+      <HopeBot />
       <header className="sticky top-0 z-30 border-b border-[#d8d1c3] bg-[#f7f4ed]/92 backdrop-blur">
         <nav
           aria-label="Main"

@@ -23,6 +23,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import HopeBot from "@/components/site/HopeBot";
 import SiteNoticePopup from "@/components/site/SiteNoticePopup";
 import { useMemberSession } from "@/lib/booking/memberSession";
 import { BOOK_HOME, BOOK_LOGIN, CLUB, SITE_HOME, bookNav, isActive } from "@/lib/nav";
@@ -44,6 +45,8 @@ export default function BookingShell({ title, subtitle, children }: Props) {
     <div className="min-h-dvh bg-[#f7f4ed] text-[#182118]">
       {/* 직원이 `/admin/notices` 에 올린 공지(0060). 결제 화면에서는 스스로 쉰다. */}
       <SiteNoticePopup surface="book" />
+      {/* 말로 바로 예약하는 Hope 버튼(2026-10-26). */}
+      <HopeBot />
       <header className="sticky top-0 z-30 border-b border-[#d8d1c3] bg-[#f7f4ed]/95 backdrop-blur">
         <div className="mx-auto flex min-w-0 max-w-5xl items-center gap-3 px-4 py-3 lg:px-8">
           {/* 뒤로 가기: 허브에서는 공개 사이트로, 하위 화면에서는 허브로.

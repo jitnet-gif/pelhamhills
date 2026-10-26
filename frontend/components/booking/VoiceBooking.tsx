@@ -30,8 +30,13 @@ import {
 
 type Props = {
   /** 통화가 끝났다. 예약이 생겼을 수 있으니 부모는 빈 시간을 다시 읽어야 한다. */
-  onFinished: () => void;
+  onFinished?: () => void;
+  /** 눌러서 열린 자리(HopeBot)라 바로 마이크를 연다. */
+  autoStart?: boolean;
 };
+
+/** 웹에서 Hope 가 하는 첫마디. 전화 인사는 agent.json 기본값. 짧게 둔다(2026-10-26 요청). */
+const HOPE_GREETING = "Hi, I'm Hope. Would you like to book a tee time?";
 
 type Phase = "idle" | "connecting" | "live" | "error";
 
@@ -40,7 +45,7 @@ type Line = { id: number; who: "you" | "assistant"; text: string };
 
 const MAX_LINES = 4;
 
-export default function VoiceBooking({ onFinished }: Props) {
+export default function VoiceBooking({ onFinished, autoStart }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
@@ -107,6 +112,7 @@ export default function VoiceBooking({ onFinished }: Props) {
           today_iso: browserTodayIso(),
           club_name: CLUB.shortName,
           channel: "website",
+          greeting: HOPE_GREETING,
         },
         onModeChange: ({ mode }) => {
           if (mounted.current) setSpeaking(mode === "speaking");
@@ -121,7 +127,7 @@ export default function VoiceBooking({ onFinished }: Props) {
           setSpeaking(false);
           stopRef.current = null;
           // 통화 중에 예약이 만들어졌을 수 있다. 화면의 빈 시간은 이미 낡았다.
-          onFinished();
+          onFinished?.();
         },
         onError: (reason) => {
           if (!mounted.current) return;
@@ -155,8 +161,15 @@ export default function VoiceBooking({ onFinished }: Props) {
     stopRef.current = null;
     setPhase("idle");
     setSpeaking(false);
-    onFinished();
+    onFinished?.();
   }, [onFinished]);
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoStart || started.current) return;
+    started.current = true;
+    void start();
+  }, [autoStart, start]);
 
   if (phase === "error") {
     return (
@@ -190,7 +203,7 @@ export default function VoiceBooking({ onFinished }: Props) {
         <div className="min-w-0">
           <p className="font-semibold">Rather just say it?</p>
           <p className="text-sm text-[#5b6155]">
-            Talk to our booking assistant. It can book a tee time or cancel one.
+            Hope can book or cancel a tee time by voice.
           </p>
         </div>
         <button
@@ -198,7 +211,7 @@ export default function VoiceBooking({ onFinished }: Props) {
           onClick={() => void start()}
           type="button"
         >
-          Book by voice
+          Talk to Hope
         </button>
       </div>
     );
@@ -221,7 +234,7 @@ export default function VoiceBooking({ onFinished }: Props) {
           {phase === "connecting"
             ? "Connecting…"
             : speaking
-              ? "Assistant is speaking"
+              ? "Hope is speaking"
               : "Listening — go ahead"}
         </p>
         <button
@@ -240,7 +253,7 @@ export default function VoiceBooking({ onFinished }: Props) {
           {lines.map((line) => (
             <li className="text-sm" key={line.id}>
               <span className="font-semibold text-[#5b6155]">
-                {line.who === "you" ? "You: " : "Assistant: "}
+                {line.who === "you" ? "You: " : "Hope: "}
               </span>
               <span>{line.text}</span>
             </li>
