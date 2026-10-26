@@ -9,9 +9,12 @@
  *
  * 묶음 경계: 오전 11시, 오후 2시. 2시는 트와일라잇 요금(0041)이 시작되는 시각이라
  * Afternoon 카드는 모두 트와일라잇 가격이다.
+ *
+ * 로그인한 회원이면(`memberPrices`, 0122) 큰 가격은 회원 본인 요금이고, 일행(손님) 요금은 아래 작게 붙는다.
  */
 
 import type { OpenTeeTime } from "@/components/booking/availability";
+import type { MemberPrices } from "@/lib/booking/memberPrices";
 import { nineHolesOpen } from "@/lib/greenFee";
 
 const GROUPS = [
@@ -21,10 +24,12 @@ const GROUPS = [
 ] as const;
 
 export function TeeTimeGroups({
+  memberPrices = null,
   onPick,
   party,
   slots,
 }: {
+  memberPrices?: MemberPrices | null;
   onPick: (slot: OpenTeeTime) => void;
   party: number;
   slots: OpenTeeTime[];
@@ -44,7 +49,13 @@ export function TeeTimeGroups({
             </h3>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {list.map((slot) => (
-                <TeeTimeCard key={slot.time} onPick={onPick} party={party} slot={slot} />
+                <TeeTimeCard
+                  key={slot.time}
+                  memberRate={memberPrices?.byTime.get(slot.time)?.rate ?? null}
+                  onPick={onPick}
+                  party={party}
+                  slot={slot}
+                />
               ))}
             </div>
           </section>
@@ -55,22 +66,29 @@ export function TeeTimeGroups({
 }
 
 function TeeTimeCard({
+  memberRate,
   onPick,
   party,
   slot,
 }: {
+  memberRate: number | null;
   onPick: (slot: OpenTeeTime) => void;
   party: number;
   slot: OpenTeeTime;
 }) {
   const short = slot.remaining < party;
   const [clock, meridiem] = slot.time.split(" ");
-  const [dollars, cents] = slot.rate.toFixed(2).split(".");
+  const price = memberRate ?? slot.rate;
+  const [dollars, cents] = price.toFixed(2).split(".");
   const nine = nineHolesOpen(slot);
   const golfers = slot.remaining === 1 ? "1" : `1-${slot.remaining}`;
   return (
     <button
-      aria-label={`${slot.time}, $${slot.rate.toFixed(2)} per golfer, ${slot.remaining} spot${slot.remaining === 1 ? "" : "s"} left`}
+      aria-label={`${slot.time}, ${
+        memberRate === null
+          ? `$${slot.rate.toFixed(2)} per golfer`
+          : `$${memberRate.toFixed(2)} member rate, guests $${slot.rate.toFixed(2)}`
+      }, ${slot.remaining} spot${slot.remaining === 1 ? "" : "s"} left`}
       className={`min-w-0 overflow-hidden rounded-md border text-center shadow-sm transition ${
         short
           ? "cursor-not-allowed border-[#e2ddd0] bg-[#efece3] opacity-60 grayscale"
@@ -90,9 +108,13 @@ function TeeTimeCard({
           <sup className="ml-0.5 text-xs font-semibold">{cents}</sup>
         </span>
         <span className="block text-xs text-[#5c6459]">
+          {memberRate !== null ? <span className="font-bold text-[#2f7d4f]">Member · </span> : null}
           {slot.twilight ? <span className="font-bold text-[#8a6f30]">Twilight · </span> : null}
           18 Holes
         </span>
+        {memberRate !== null && party > 1 ? (
+          <span className="block text-[11px] text-[#5c6459]">Guests ${slot.rate.toFixed(2)}</span>
+        ) : null}
         <span className="mt-1 flex items-center justify-center gap-1 text-xs text-[#3d453d]">
           <FlagIcon />
           {nine ? "18·9" : "18"}

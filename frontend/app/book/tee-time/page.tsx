@@ -34,6 +34,7 @@ import {
 } from "@/components/booking/availability";
 import { NO_API_MESSAGE } from "@/lib/apiHost";
 import { recordBookingSource } from "@/lib/booking/attribution";
+import { memberPriceAt, useMemberPrices } from "@/lib/booking/memberPrices";
 import { memberSessionExpired, useMemberSession } from "@/lib/booking/memberSession";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
 import { greenFeeFor, nineHoleRule, nineHolesOpen } from "@/lib/greenFee";
@@ -68,6 +69,11 @@ export default function TeeTimeBookingPage() {
   const pendingTime = useRef<string | null>(null);
 
   const dates = useMemo(() => upcomingDates(DAYS_AHEAD), []);
+
+  // 로그인한 회원이면 카드에 그 회원권의 요금을 띄운다(0122). 손님 계정·회원권 없는 날은 null.
+  const session = useMemberSession();
+  const memberToken = session && session.member.kind !== "guest" && session.member.membershipType ? session.token : null;
+  const memberPrices = useMemberPrices(date, memberToken, null);
 
   useEffect(() => {
     setApiReady(bookingConfigured());
@@ -257,7 +263,15 @@ export default function TeeTimeBookingPage() {
               }}
             />
           ) : (
-            <TeeTimeGroups onPick={pick} party={party} slots={visible} />
+            <>
+              {memberPrices ? (
+                <p className="mb-4 rounded-sm border border-[#b9d3c0] bg-[#eef6f0] px-4 py-3 text-sm text-[#214d2f]">
+                  <span className="font-semibold">Prices shown at your {memberPrices.label} rate.</span>
+                  {party > 1 ? " Guests in your group pay the regular rate shown under each price." : null}
+                </p>
+              ) : null}
+              <TeeTimeGroups memberPrices={memberPrices} onPick={pick} party={party} slots={visible} />
+            </>
           )}
         </div>
       </div>
@@ -433,6 +447,8 @@ function BookingForm({
     : signedIn?.membershipType && signedIn.season
       ? memberLabel({ membershipType: signedIn.membershipType, season: signedIn.season })
       : null;
+  // 회원 본인의 그 시각 요금(0122). 이름으로 고른 회원은 예약 때 이메일·전화가 맞아야 이 값이 된다.
+  const memberPrices = useMemberPrices(date, session?.token ?? null, member?.ref ?? null);
 
   const maxParty = Math.min(4, slot.remaining);
   const size = Math.min(party, maxParty);
@@ -494,10 +510,15 @@ function BookingForm({
 
   const [step, setStep] = useState<"choose" | "details">("choose");
   // 회원 본인 그린피는 회원권 요금제로 서버가 매긴다(대부분 $0). 미리보기는 손님 몫만 더한다.
+  // 0122 전 서버면 `mine` 이 없다 — 그때는 예전처럼 회원 그린피 0, 카트는 퍼블릭가로 본다.
   const memberSeats = memberBadge ? 1 : 0;
-  const total = fee * (size - memberSeats) + cartFee * size;
-  const greenTotal = fee * (size - memberSeats);
-  const cartTotal = cartFee * size;
+  const mine = memberBadge ? memberPriceAt(memberPrices, slot.time, holes) : null;
+  const myGreen = mine ? mine.green : 0;
+  const myCart = memberSeats && cart ? (mine ? mine.cart : cartFee) : 0;
+  const guestSeats = size - memberSeats;
+  const greenTotal = fee * guestSeats + myGreen;
+  const cartTotal = cartFee * guestSeats + myCart;
+  const total = greenTotal + cartTotal;
   // 미리보기 HST. 진짜 세금은 결제할 때 서버 견적(PayOnline)이 매긴다.
   const tax = Math.round((greenTotal + cartTotal) * 13) / 100;
   const segment = (on: boolean) =>
@@ -577,10 +598,20 @@ function BookingForm({
             </div>
             {nineOpen ? null : <p className="mt-1 text-xs text-[#8a6f30]">{nineHoleRule(slot)}.</p>}
 
-            <p className="mt-5 text-sm">
-              <span className="text-lg font-bold">${fee.toFixed(2)}</span>
-              <span className="text-xs font-semibold text-[#5c6459]"> CAD / golfer</span>
-            </p>
+            {mine ? (
+              <p className="mt-5 text-sm">
+                <span className="text-lg font-bold text-[#2f7d4f]">${mine.green.toFixed(2)}</span>
+                <span className="text-xs font-semibold text-[#5c6459]"> CAD your member rate</span>
+                <span className="block text-xs text-[#5c6459]">
+                  {memberPrices?.plan} · Guests ${fee.toFixed(2)} CAD / golfer
+                </span>
+              </p>
+            ) : (
+              <p className="mt-5 text-sm">
+                <span className="text-lg font-bold">${fee.toFixed(2)}</span>
+                <span className="text-xs font-semibold text-[#5c6459]"> CAD / golfer</span>
+              </p>
+            )}
             <p className="mt-2 text-sm font-semibold text-[#3d453d]">Number of Golfers</p>
             <div className="mt-2 flex overflow-hidden rounded-md border border-[#d8d1c3]">
               {PARTY_SIZES.map((count) => (
@@ -626,24 +657,30 @@ function BookingForm({
               {memberBadge ? (
                 <div className="flex justify-between gap-3">
                   <dt className="text-[#3d453d]">You ({memberBadge})</dt>
-                  <dd className="text-[#2f7d4f]">Member rate</dd>
+                  <dd className="tabular-nums text-[#2f7d4f]">{mine ? `$${mine.green.toFixed(2)}` : "Member rate"}</dd>
                 </div>
               ) : null}
-              {size - memberSeats > 0 ? (
+              {memberSeats && cart ? (
                 <div className="flex justify-between gap-3">
-                  <dt className="text-[#3d453d]">
-                    Green Fees ({size - memberSeats} {memberBadge ? "Guest" : "Golfer"}
-                    {size - memberSeats === 1 ? "" : "s"} × ${fee.toFixed(2)})
-                  </dt>
-                  <dd className="tabular-nums">${greenTotal.toFixed(2)}</dd>
+                  <dt className="text-[#3d453d]">Your power cart</dt>
+                  <dd className="tabular-nums">{myCart > 0 ? `$${myCart.toFixed(2)}` : "Included"}</dd>
                 </div>
               ) : null}
-              {cartTotal > 0 ? (
+              {guestSeats > 0 ? (
                 <div className="flex justify-between gap-3">
                   <dt className="text-[#3d453d]">
-                    Power cart ({size} × ${cartFee.toFixed(2)})
+                    Green Fees ({guestSeats} {memberBadge ? "Guest" : "Golfer"}
+                    {guestSeats === 1 ? "" : "s"} × ${fee.toFixed(2)})
                   </dt>
-                  <dd className="tabular-nums">${cartTotal.toFixed(2)}</dd>
+                  <dd className="tabular-nums">${(fee * guestSeats).toFixed(2)}</dd>
+                </div>
+              ) : null}
+              {cart && guestSeats > 0 ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#3d453d]">
+                    Power cart ({guestSeats} × ${cartFee.toFixed(2)})
+                  </dt>
+                  <dd className="tabular-nums">${(cartFee * guestSeats).toFixed(2)}</dd>
                 </div>
               ) : null}
               <div className="flex justify-between gap-3">
