@@ -13,6 +13,7 @@
  *     받으면 나레이션(ElevenLabs Hope, Fly `/ai-marketing/narrate`) 프레젠테이션으로 보여 준다.
  *     Claude 는 문자(Twilio)·전화 비서(ElevenLabs) 숫자도 본다(0114 + Fly). 결과는 보관함(0113)에 저장된다.
  *   - "Strategy reports" 탭: 보관함(0113) — 지금까지의 전략 보고서 모두, 공유 링크. 주소 끝 #reports 로 바로 연다.
+ *   - "Texts & website" 탭: 기획안 → 실행 타일(0115) — 전략마다 문자·AI 전화 캠페인과 웹사이트 팝업. #launch.
  *
  * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, 마케팅 믹스 보드)는 이 화면에 붙는다.
  * 데모 숫자로 내려가지 않는다 — 서버가 안 되면 오류를 보여 준다(옛 Business Intelligence 화면이 고치려던 문제).
@@ -38,6 +39,7 @@ import { ApiError } from "@/lib/teeSheet/api";
 import { addDays } from "@/lib/teeSheet/dates";
 
 import { StrategyBody, StrategyDeck } from "./StrategyDeck";
+import { StrategyLaunch } from "./StrategyLaunch";
 import { StrategyReports } from "./StrategyReports";
 
 const SEG_LABEL: Record<Segment | "no_golfer", string> = {
@@ -100,39 +102,57 @@ function describe(cause: unknown): string {
 }
 
 export default function AiMarketingView() {
-  const [tab, setTab] = useState<"analysis" | "reports">(() =>
-    typeof window !== "undefined" && window.location.hash === "#reports" ? "reports" : "analysis",
-  );
-  const pickTab = (next: "analysis" | "reports") => {
+  const [tab, setTab] = useState<Tab>(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    return hash === "reports" || hash === "launch" ? hash : "analysis";
+  });
+  // 실행 타일에서 처음 고를 보고서(전략 패널·보관함의 "Launch" 버튼이 정한다).
+  const [launchReport, setLaunchReport] = useState<string | null>(null);
+  const pickTab = (next: Tab) => {
     setTab(next);
     try {
-      history.replaceState(null, "", next === "reports" ? "#reports" : window.location.pathname);
+      history.replaceState(null, "", next === "analysis" ? window.location.pathname : `#${next}`);
     } catch {
       // 주소를 못 바꿔도 탭은 바뀐다.
     }
+  };
+  const openLaunch = (reportId: string) => {
+    setLaunchReport(reportId);
+    pickTab("launch");
   };
   return (
     <div className="grid min-w-0 gap-0">
       <div className="flex gap-2 px-4 pt-4">
         <Chip active={tab === "analysis"} onClick={() => pickTab("analysis")}>Customer analysis</Chip>
         <Chip active={tab === "reports"} onClick={() => pickTab("reports")}>Strategy reports</Chip>
+        <Chip active={tab === "launch"} onClick={() => pickTab("launch")}>Texts &amp; website</Chip>
       </div>
       {tab === "analysis" ? (
-        <AnalysisTab />
+        <AnalysisTab onLaunch={openLaunch} />
+      ) : tab === "launch" ? (
+        <div className="grid min-w-0 gap-3 p-4">
+          <p className="text-sm text-[#4e5560]">
+            Turn a strategy into real campaigns: a text (Twilio), an AI phone call (ElevenLabs) and a website pop-up for each
+            strategy, filled in from Claude&apos;s plan.
+          </p>
+          <StrategyLaunch initialReportId={launchReport} key={launchReport ?? "latest"} />
+        </div>
       ) : (
         <div className="grid min-w-0 gap-3 p-4">
           <p className="text-sm text-[#4e5560]">
             Every strategy Claude has written, kept for good. Open one as a narrated presentation or as full text, or make
             a share link for someone outside the admin.
           </p>
-          <StrategyReports />
+          <StrategyReports onLaunch={openLaunch} />
         </div>
       )}
     </div>
   );
 }
 
-function AnalysisTab() {
+type Tab = "analysis" | "reports" | "launch";
+
+function AnalysisTab({ onLaunch }: { onLaunch: (reportId: string) => void }) {
   const today = localBusinessDate();
   const [period, setPeriod] = useState<Period>("30");
   const [custom, setCustom] = useState(() => periodRange("30", today));
@@ -201,7 +221,7 @@ function AnalysisTab() {
         </>
       ) : data && !error ? (
         <>
-          <StrategyPanel from={request.from} key={requestKey} to={request.to} />
+          <StrategyPanel from={request.from} key={requestKey} onLaunch={onLaunch} to={request.to} />
           <Summary data={data} />
         </>
       ) : null}
@@ -601,7 +621,7 @@ function storedStrategy(key: string): Strategy | null {
  *
  * 결과는 먼저 **프레젠테이션**(장면 넘기기 + Hope 목소리 나레이션)으로 보이고, "Full text" 로 전체 글을 본다.
  */
-function StrategyPanel({ from, to }: { from: string; to: string }) {
+function StrategyPanel({ from, to, onLaunch }: { from: string; to: string; onLaunch: (reportId: string) => void }) {
   const [lang, setLangState] = useState<Lang>(() => getLang());
   useEffect(() => onLangChange(setLangState), []);
   const key = `pelham-ai-strategy:${from}|${to}|${lang}`;
@@ -668,11 +688,18 @@ function StrategyPanel({ from, to }: { from: string; to: string }) {
         </p>
         {error ? <ErrorNote>{error}</ErrorNote> : null}
         {fresh[key] ? (
-          <p className="text-xs text-[#1a7f4b]">
-            {fresh[key].strategy.report_id
-              ? "Saved to Strategy reports."
-              : "Not saved to Strategy reports yet — 0113_ai_marketing_reports.sql has to be run first."}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs text-[#1a7f4b]">
+              {fresh[key].strategy.report_id
+                ? "Saved to Strategy reports."
+                : "Not saved to Strategy reports yet — 0113_ai_marketing_reports.sql has to be run first."}
+            </p>
+            {fresh[key].strategy.report_id ? (
+              <Button onClick={() => onLaunch(fresh[key].strategy.report_id as string)} tone="primary">
+                Launch texts &amp; pop-ups →
+              </Button>
+            ) : null}
+          </div>
         ) : null}
         {busy && !strategy ? <SkeletonRows count={5} /> : null}
         {!strategy && !busy && (fresh[otherKey(key)] || storedStrategy(otherKey(key))) ? (

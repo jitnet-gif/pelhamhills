@@ -82,6 +82,14 @@ export const aiMarketingApi = {
     }),
   share: (id: string, on: boolean) =>
     staffRpc<{ id: string; share_token: string | null }>("pelham_staff_ai_marketing_report_share", { p_id: id, p_on: on }),
+  launches: (reportId: string) => staffRpc<LaunchRow[]>("pelham_staff_ai_marketing_launches", { p_report: reportId }),
+  recordLaunch: (reportId: string, strategy: number, channel: LaunchRow["channel"], ref: string) =>
+    staffRpc<{ ok: boolean }>("pelham_staff_ai_marketing_launch_record", {
+      p_report: reportId,
+      p_strategy: strategy,
+      p_channel: channel,
+      p_ref: ref,
+    }),
   shared: (token: string) => bookingRpc<SharedReport>("pelham_ai_marketing_shared_report", { p_token: token }),
   access: () => staffRpc<boolean>("pelham_staff_ai_marketing_access"),
   summary: (from: string, to: string) =>
@@ -107,6 +115,8 @@ export type Strategy = {
     budget: "low" | "medium" | "high";
     /** 프레젠테이션에서 이 전략 장면의 나레이션. 이 기능 전에 받은 결과에는 없다. */
     narration?: string;
+    /** 실행 타일에 미리 채울 손님용 문구(영어). 이 기능 전에 받은 결과에는 없다. */
+    launch?: StrategyLaunchCopy;
   }[];
   niche_markets: { area: string; population: string; drive: string; why: string; hook: string }[];
   plan: { window: "30" | "60" | "90"; actions: string[] }[];
@@ -116,6 +126,28 @@ export type Strategy = {
   period: { from: string; to: string };
   /** 보관함(0113)에 저장된 번호. 0113 을 안 돌렸으면 없다. */
   report_id?: string | null;
+};
+
+export type StrategyLaunchCopy = {
+  sms: string;
+  call: string;
+  segment: "all" | "members" | "non_members" | "regulars" | "new";
+  popup_title: string;
+  popup_body: string;
+  popup_link_label: string;
+  popup_link: "/book/tee-time" | "/book/indoor" | "/book/login" | "/";
+  days: number;
+};
+
+/** 전략에서 만든 캠페인·팝업과 지금 상태(0115). */
+export type LaunchRow = {
+  strategy: number;
+  channel: "sms" | "call" | "popup";
+  ref: string;
+  created_at: string;
+  created_by: string;
+  campaign: { status: "ready" | "sending" | "sent" | "cancelled"; name: string; recipients: number; sent: number; failed: number } | null;
+  popup: { title: string; active: boolean; starts_at: string | null; ends_at: string | null; live: boolean } | null;
 };
 
 /** 보관함 목록 한 줄(0113). */

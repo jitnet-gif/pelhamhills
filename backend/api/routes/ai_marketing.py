@@ -125,6 +125,14 @@ For each give the approximate population, the drive time, why they would come, a
 season (season passes for next year, gift cards, early-bird memberships, winter simulator or events if any), \
 spring is opening.
 - cautions: data gaps and risks (for example low linked-rounds share, small sample, CASL consent for email and texts).
+- launch: for each strategy, ready-to-use copy the club can launch from the page (staff review it first):
+  `sms` = one marketing text, at most 280 characters, naming Pelham Hills, the offer, how to claim it (promo \
+code or "book at pelhamhills.com") and when it ends; no "Reply STOP" (the system adds it). `call` = what the \
+AI phone caller offers in two or three friendly sentences. `popup_title`, `popup_body` (at most 240 characters) \
+and `popup_link_label` for a website pop-up; `popup_link` is where its button goes. `segment` = who gets the \
+text or call (all, members, non_members, regulars = 5+ rounds, new = joined in the last year). `days` = how \
+long the pop-up and offer run. Leave `sms` or `call` empty when that channel does not suit the strategy. \
+Customers read this copy, so always write `launch` in English, even when the rest of the report is in Korean.
 - narration: the managers watch this as a narrated presentation, one scene per part. Write what the narrator \
 says for each scene: `narration.intro` (headline and the key facts), each strategy's own `narration`, \
 `narration.niches`, `narration.plan` and `narration.close` (cautions and the first thing to do). Two to four \
@@ -137,7 +145,7 @@ approximate — say "about".
 - Do not name specific competing golf courses or businesses; describe them generically.
 - Never repeat a person's name, phone number or email, even if one appears in a callback reason or call topic.
 - Budget levels are relative: low (staff time, existing channels), medium, high (paid ads, printed mail).
-- Write everything in {language}. Keep each text field short (one to three sentences).
+- Write everything except `launch` in {language}. Keep each text field short (one to three sentences).
 """
 
 OUTPUT_SCHEMA: dict[str, Any] = {
@@ -169,9 +177,25 @@ OUTPUT_SCHEMA: dict[str, Any] = {
                     "kpi": {"type": "string"},
                     "budget": {"type": "string", "enum": ["low", "medium", "high"]},
                     "narration": {"type": "string"},
+                    "launch": {
+                        "type": "object",
+                        "properties": {
+                            "sms": {"type": "string"},
+                            "call": {"type": "string"},
+                            "segment": {"type": "string", "enum": ["all", "members", "non_members", "regulars", "new"]},
+                            "popup_title": {"type": "string"},
+                            "popup_body": {"type": "string"},
+                            "popup_link_label": {"type": "string"},
+                            "popup_link": {"type": "string", "enum": ["/book/tee-time", "/book/indoor", "/book/login", "/"]},
+                            "days": {"type": "integer"},
+                        },
+                        "required": ["sms", "call", "segment", "popup_title", "popup_body", "popup_link_label",
+                                     "popup_link", "days"],
+                        "additionalProperties": False,
+                    },
                 },
                 "required": ["title", "target_group", "time_slot", "area", "why", "offer", "channels", "steps",
-                             "kpi", "budget", "narration"],
+                             "kpi", "budget", "narration", "launch"],
                 "additionalProperties": False,
             },
         },

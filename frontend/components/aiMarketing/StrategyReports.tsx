@@ -75,7 +75,14 @@ async function importBrowserReports(): Promise<number> {
   return saved;
 }
 
-export function StrategyReports({ allowShare = true }: { allowShare?: boolean }) {
+export function StrategyReports({
+  allowShare = true,
+  onLaunch,
+}: {
+  allowShare?: boolean;
+  /** 있으면 보고서 화면에 "Launch texts & pop-ups" 버튼(어드민). /strategy 에는 없다. */
+  onLaunch?: (reportId: string) => void;
+}) {
   const [rows, setRows] = useState<ReportRow[] | null>(null);
   const [error, setError] = useState("");
   const [imported, setImported] = useState(0);
@@ -113,6 +120,7 @@ export function StrategyReports({ allowShare = true }: { allowShare?: boolean })
         allowShare={allowShare}
         key={open.id}
         onBack={() => setOpenId(null)}
+        onLaunch={onLaunch}
         onOpen={setOpenId}
         onShared={() => setReload((n) => n + 1)}
         row={open}
@@ -175,7 +183,9 @@ function ReportView({
   onBack,
   onOpen,
   onShared,
+  onLaunch,
 }: {
+  onLaunch?: (reportId: string) => void;
   row: ReportRow;
   rows: ReportRow[];
   allowShare: boolean;
@@ -245,6 +255,11 @@ function ReportView({
         <Chip active={view === "deck"} onClick={() => setView("deck")}>Presentation</Chip>
         <Chip active={view === "text"} onClick={() => setView("text")}>Full text</Chip>
         <span className="text-xs text-[#6b7280]">{`${row.created_at.slice(0, 10)} · ${row.from} → ${row.to} · ${SOURCE_LABEL[row.source]}`}</span>
+        {onLaunch ? (
+          <Button onClick={() => onLaunch(row.id)} tone="primary">
+            Launch texts &amp; pop-ups →
+          </Button>
+        ) : null}
       </div>
       {allowShare ? (
         <div className="flex flex-wrap items-center gap-2 border border-[#d4d4d8] bg-[#fafafa] p-2 text-sm">
