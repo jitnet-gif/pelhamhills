@@ -53,6 +53,8 @@ export type CampaignSend = {
   provider_ref: string | null;
   error: string | null;
   updated_at: string;
+  /** 지금 이 번호가 같은 채널에서 수신거부 상태면(0116). after_send = 캠페인이 시작된 뒤 거부. */
+  optout?: { created_at: string; source: string; after_send: boolean } | null;
 };
 
 export type Campaign = {
@@ -68,6 +70,8 @@ export type Campaign = {
   started_at: string | null;
   finished_at: string | null;
   counts: Partial<Record<SendStatus, number>>;
+  /** 받은 사람 중 캠페인 시작 뒤 수신거부한 번호 수(0116). 0116 전 DB 에는 없다. */
+  opted_out_after?: number;
   sends?: CampaignSend[];
 };
 
@@ -165,6 +169,12 @@ export const REASON_LABEL: Record<SkipReason, string> = {
   no_phone: "No phone",
   opted_out: "Opted out",
   no_consent: "No consent",
+};
+
+export const OPTOUT_SOURCE_LABEL: Record<string, string> = {
+  reply: "Replied STOP",
+  call: "On a call",
+  staff: "Staff",
 };
 
 export const SEND_STATUS_LABEL: Record<SendStatus, string> = {

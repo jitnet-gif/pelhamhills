@@ -3215,5 +3215,8 @@
  "Published — the pop-up is now on the website.": "발행했습니다 — 팝업이 지금 웹사이트에 뜹니다.",
  "Saved as a hidden draft.": "숨긴 초안으로 저장했습니다.",
  "Taken down from the website.": "웹사이트에서 내렸습니다.",
- "Launch tiles switch on once 0115_ai_marketing_launches.sql is run in the Supabase SQL Editor.": "Supabase SQL Editor 에서 0115_ai_marketing_launches.sql 을 실행하면 실행 타일이 켜집니다."
+ "Launch tiles switch on once 0115_ai_marketing_launches.sql is run in the Supabase SQL Editor.": "Supabase SQL Editor 에서 0115_ai_marketing_launches.sql 을 실행하면 실행 타일이 켜집니다.",
+ "Opted out after": "이후 수신 거부",
+ "Opted out after this": "이 발송 뒤 수신 거부",
+ "People who got this campaign and then replied STOP, said no more calls, or were removed by staff": "이 캠페인을 받은 뒤 STOP 회신, 전화 거절, 또는 직원이 수신 거부로 뺀 사람"
 }

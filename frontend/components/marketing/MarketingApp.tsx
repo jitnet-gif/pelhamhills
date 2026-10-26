@@ -19,6 +19,7 @@ import {
   type MarketingStatus,
   type OptOut,
   type Segment,
+  OPTOUT_SOURCE_LABEL,
   REASON_LABEL,
   SEGMENT_LABEL,
   SEND_STATUS_LABEL,
@@ -612,6 +613,11 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                   <span className="mt-0.5 block text-xs text-[#6b7280]">
                     {CHANNEL_LABEL[campaign.channel]} · {total} people · {clubTime(campaign.created_at)}
                   </span>
+                  {campaign.opted_out_after ? (
+                    <span className="mt-0.5 block text-xs font-bold text-[#8c1d1d]">
+                      <span>Opted out after</span>: {campaign.opted_out_after}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             );
@@ -669,6 +675,14 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                   {SEND_STATUS_LABEL[key as keyof typeof SEND_STATUS_LABEL] ?? key}: {value}
                 </span>
               ))}
+              {detail.opted_out_after !== undefined ? (
+                <span
+                  className={`px-2 py-1 font-bold ${detail.opted_out_after ? "bg-[#fdf1f1] text-[#8c1d1d]" : "bg-[#f0f1f3]"}`}
+                  title="People who got this campaign and then replied STOP, said no more calls, or were removed by staff"
+                >
+                  <span>Opted out after</span>: {detail.opted_out_after}
+                </span>
+              ) : null}
             </div>
             {detail.status === "sending" && waiting > 0 && status && !status.window_open ? (
               <p className="mt-2 text-xs text-[#8a5a00]">
@@ -693,7 +707,15 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                       <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(send.phone)}</td>
                       <td className="px-2 py-1.5">{SEND_STATUS_LABEL[send.status]}</td>
                       <td className="max-w-[16rem] truncate px-2 py-1.5 text-[#6b7280]" title={send.error ?? ""}>
-                        {send.error ?? ""}
+                        {send.optout ? (
+                          <span className={`mr-1 font-bold ${send.optout.after_send ? "text-[#8c1d1d]" : ""}`}>
+                            <span>{send.optout.after_send ? "Opted out after this" : "Opted out"}</span>
+                            {" · "}
+                            <span>{OPTOUT_SOURCE_LABEL[send.optout.source] ?? send.optout.source}</span>
+                            {` · ${clubTime(send.optout.created_at)}`}
+                          </span>
+                        ) : null}
+                        {send.error && !(send.optout && send.error === "opted out") ? send.error : ""}
                       </td>
                     </tr>
                   ))}
