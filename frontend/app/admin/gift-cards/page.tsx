@@ -43,6 +43,7 @@ export default function GiftCardsPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [shown, setShown] = useState<number | null>(null);
+  const [issued, setIssued] = useState<GiftCard | null>(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
 
@@ -116,6 +117,7 @@ export default function GiftCardsPage() {
       });
       setForm(EMPTY_FORM);
       setShown(card.id);
+      setIssued(card);
       setNotice(`Issued ${card.code} for ${formatMoney(card.amount)}.`);
       printGiftCard(card);
       if (card.phone) await sendText(card, card.phone);
@@ -187,17 +189,32 @@ export default function GiftCardsPage() {
                   required
                   value={form.amount}
                 />
+                {/* 금액 버튼은 더한다: $50 + $50 + $25 = $125. 잘못 누르면 Clear. */}
                 <span className="flex flex-wrap gap-1 font-normal">
                   {AMOUNTS.map((cents) => (
                     <button
                       className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold"
                       key={cents}
-                      onClick={() => setForm((current) => ({ ...current, amount: (cents / 100).toFixed(2) }))}
+                      onClick={() =>
+                        setForm((current) => ({
+                          ...current,
+                          amount: ((Math.max(0, parseMoney(current.amount)) + cents) / 100).toFixed(2),
+                        }))
+                      }
                       type="button"
                     >
-                      {formatMoney(cents)}
+                      +{formatMoney(cents)}
                     </button>
                   ))}
+                  {form.amount ? (
+                    <button
+                      className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold text-[#5d6673]"
+                      onClick={() => setForm((current) => ({ ...current, amount: "" }))}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
                 </span>
               </label>
               <fieldset className="grid gap-1">
@@ -275,6 +292,25 @@ export default function GiftCardsPage() {
                 <p className="border border-[#9fd9b4] bg-[#eefaf2] p-2 font-normal text-[#087333]" role="status">
                   {notice}
                 </p>
+              ) : null}
+              {/* 방금 만든 카드의 바코드는 여기에. 목록은 좁은 화면에서 폼 아래로 내려가 안 보인다. */}
+              {issued ? (
+                <div className="grid justify-items-center gap-1 border border-[#d4d4d8] bg-[#f7f7f8] p-3 font-normal">
+                  <span className="text-[11px] font-bold uppercase text-[#5d6673]">Just issued · {formatMoney(issued.amount)}</span>
+                  {/* code128Svg 는 막대(rect)만 그린 SVG 다. 사람이 입력한 글자는 들어가지 않는다. */}
+                  <span
+                    className="block h-16 w-64 max-w-full bg-white [&>svg]:h-full [&>svg]:w-full"
+                    dangerouslySetInnerHTML={{ __html: code128Svg(issued.code) }}
+                  />
+                  <span className="font-mono text-[11px]">{issued.code}</span>
+                  <button
+                    className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold"
+                    onClick={() => printGiftCard(issued, { reprint: true })}
+                    type="button"
+                  >
+                    Reprint
+                  </button>
+                </div>
               ) : null}
               {error ? (
                 <p className="border border-[#f0b4b4] bg-[#fdf1f1] p-2 font-normal text-[#8c1d1d]" role="alert">
