@@ -118,6 +118,15 @@ function strategyScenes(strategy: Strategy): Scene[] {
       </div>
     ),
   });
+  if (strategy.break_even) {
+    const breakEven = strategy.break_even;
+    scenes.push({
+      label: "Break-even",
+      title: "Break-even and improvements",
+      say: strategy.narration?.break_even || breakEven.summary,
+      body: <BreakEven breakEven={breakEven} />,
+    });
+  }
   scenes.push({
     label: "Rollout",
     title: "Rollout — next 30, 60 and 90 days",
@@ -152,6 +161,31 @@ function strategyScenes(strategy: Strategy): Scene[] {
     });
   }
   return scenes;
+}
+
+/** 손익분기점 — 숫자 칸과 개선점. 프레젠테이션 장면과 전체 글이 같이 쓴다. */
+function BreakEven({ breakEven }: { breakEven: NonNullable<Strategy["break_even"]> }) {
+  return (
+    <div className="grid gap-3 text-sm">
+      <p>{breakEven.summary}</p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
+        {breakEven.figures.map((figure, index) => (
+          <div className="border border-[#d4d4d8] bg-white p-2" key={index}>
+            <p className="text-[11px] font-bold tracking-wide text-[#6b7280] uppercase">{figure.label}</p>
+            <p className="font-mono text-base font-bold tabular-nums">{figure.value}</p>
+          </div>
+        ))}
+      </div>
+      <ol className="grid list-decimal gap-2 pl-5">
+        {breakEven.improvements.map((item, index) => (
+          <li key={index}>
+            <b>{item.title}</b> <span className="text-[#1a7f4b]">— {item.impact}</span>
+            <span className="block text-xs text-[#4e5560]">{item.how}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 const SPEEDS = [0.75, 0.85, 1, 1.1, 1.2, 1.3, 1.5];
@@ -526,6 +560,13 @@ export function StrategyBody({ strategy }: { strategy: Strategy }) {
           </table>
         </div>
       </section>
+
+      {strategy.break_even ? (
+        <section className="grid gap-1">
+          <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Break-even and improvements</h3>
+          <BreakEven breakEven={strategy.break_even} />
+        </section>
+      ) : null}
 
       <section className="grid gap-1">
         <h3 className="text-xs font-bold tracking-wide text-[#6b7280] uppercase">Rollout</h3>

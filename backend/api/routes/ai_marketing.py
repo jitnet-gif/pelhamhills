@@ -2,6 +2,7 @@
 
 POST /ai-marketing/strategy   기간 요약(0094) + 골프장 주변 상권(아래 `REGION`) → 전략·전개 방법(JSON)
 POST /ai-marketing/narrate    전략 프레젠테이션 한 장면의 나레이션 → mp3 (ElevenLabs, Hope 목소리)
+POST /ai-marketing/inputs     Claude 가 받을 것을 그대로(전략은 쓰지 않는다) — "Analysis facts" 탭이 보여 준다
 
 ## 순서
 1. `pelham_staff_ai_marketing_summary` 를 **직원의 토큰으로** 부른다 — 명단(0094) 밖 계정은 SQL 이 PT403.
@@ -11,6 +12,8 @@ POST /ai-marketing/narrate    전략 프레젠테이션 한 장면의 나레이�
    콜백·문제 신고·예약 경로)와 ElevenLabs 통화 목록 집계(`_call_stats`). 어느 하나가 안 되면 그것만 빼고 쓴다.
 3. Claude 가 JSON 으로 돌려준다 — 사실(숫자 근거), 전략, 상권별 니치, 30·60·90일 실행표, 주의할 점.
    보내는 것은 화면이 정한다(문자·전화는 /marketing). 이 경로는 제안만 한다.
+   인건비는 pelham-shift `/api/labor`(합계만, 이름 없음, `PELHAM_SHIFT_LABOR_KEY`)에서, 매니저가 적은 팩트(고정비·목표·
+   행사)는 0117 에서 붙인다 — Claude 가 손익분기점과 개선점을 계산한다.
 4. 받은 결과는 보관함(0113 `pelham_staff_ai_marketing_report_save`)에 바로 저장한다. 지우지 않는다.
 
 ## 프레젠테이션
@@ -103,6 +106,12 @@ complaints by category), `bookings_by_source` (bookings created by the phone ass
 - `calls` (if present) = the AI phone assistant (ElevenLabs): calls in the period, average length, outcomes \
 (booked, modified, cancelled, food_order, transferred, info…), calls by weekday/weekend and hour, and short call \
 topics. Use it to see what callers want, when they call, and what the assistant could not finish.
+- `labor` (if present) = staff cost from the club's scheduling and payroll app for the same period, in dollars: \
+hourly staff pay (with overtime and holiday premiums), management salaries prorated to the period, `total_labor`, \
+and hours and pay by weekday/weekend, by job area and by day (day and area figures are hours × wage, without premiums).
+- `manager_facts` (if present) = facts the managers typed in: costs (amount in cents and whether it is per month, \
+season, year or once), revenue they know about, goals, events and notes. Treat them as true; they fill gaps the \
+systems do not cover (rent, course upkeep, equipment, utilities, targets).
 - `web_sources` = where website bookings came from; `promo` = promo codes used; `reach` = how many customers \
 we can contact and with what consent (texts/AI calls need consent; never suggest contacting opted-out people).
 
@@ -125,6 +134,15 @@ For each give the approximate population, the drive time, why they would come, a
 season (season passes for next year, gift cards, early-bird memberships, winter simulator or events if any), \
 spring is opening.
 - cautions: data gaps and risks (for example low linked-rounds share, small sample, CASL consent for email and texts).
+- break_even: compare money in with money out for the period. Money in = `net_sales` (dollars = cents / 100). \
+Money out = `labor.total_labor` plus any manager_facts costs prorated to the period's days (month = 30.4 days, \
+season = April to October, about 214 days, year = 365 days; skip 'once' costs unless they fall in the period). \
+Work out labor as a share of sales, the gap, sales per round, and the rounds per day needed to break even \
+(costs per day ÷ sales per round). Put the key numbers in `figures` (label + value as text). Then list 3–5 \
+`improvements`: staffing that does not match demand (labor by day or area vs rounds by day and time slot), \
+quiet slots to fill, prices or spend per golfer, costs to watch. Give each an estimated monthly impact in dollars \
+and say how it was estimated. If labor or costs are missing, say so in `summary` and work with what you have. \
+If no cost facts were entered, say that only labor is counted, so the real break-even is higher.
 - launch: for each strategy, ready-to-use copy the club can launch from the page (staff review it first):
   `sms` = one marketing text, at most 280 characters, naming Pelham Hills, the offer, how to claim it (promo \
 code or "book at pelhamhills.com") and when it ends; no "Reply STOP" (the system adds it). `call` = what the \
@@ -135,7 +153,7 @@ long the pop-up and offer run. Leave `sms` or `call` empty when that channel doe
 Customers read this copy, so always write `launch` in English, even when the rest of the report is in Korean.
 - narration: the managers watch this as a narrated presentation, one scene per part. Write what the narrator \
 says for each scene: `narration.intro` (headline and the key facts), each strategy's own `narration`, \
-`narration.niches`, `narration.plan` and `narration.close` (cautions and the first thing to do). Two to four \
+`narration.niches`, `narration.break_even`, `narration.plan` and `narration.close` (cautions and the first thing to do). Two to four \
 spoken sentences each, plain words, no lists, symbols or abbreviations; say amounts and percentages the way a \
 speaker reads them aloud.
 
@@ -227,19 +245,50 @@ OUTPUT_SCHEMA: dict[str, Any] = {
             },
         },
         "cautions": {"type": "array", "items": {"type": "string"}},
+        "break_even": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "figures": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"label": {"type": "string"}, "value": {"type": "string"}},
+                        "required": ["label", "value"],
+                        "additionalProperties": False,
+                    },
+                },
+                "improvements": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "impact": {"type": "string"},
+                            "how": {"type": "string"},
+                        },
+                        "required": ["title", "impact", "how"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["summary", "figures", "improvements"],
+            "additionalProperties": False,
+        },
         "narration": {
             "type": "object",
             "properties": {
                 "intro": {"type": "string"},
                 "niches": {"type": "string"},
+                "break_even": {"type": "string"},
                 "plan": {"type": "string"},
                 "close": {"type": "string"},
             },
-            "required": ["intro", "niches", "plan", "close"],
+            "required": ["intro", "niches", "break_even", "plan", "close"],
             "additionalProperties": False,
         },
     },
-    "required": ["headline", "facts", "strategies", "niche_markets", "plan", "cautions", "narration"],
+    "required": ["headline", "facts", "strategies", "niche_markets", "break_even", "plan", "cautions", "narration"],
     "additionalProperties": False,
 }
 
@@ -419,20 +468,75 @@ def _save(request: Request, body: StrategyIn, answer: dict[str, Any]) -> str | N
     return str(saved.get("id")) if isinstance(saved, dict) and saved.get("id") else None
 
 
+SHIFT_URL = (os.getenv("PELHAM_SHIFT_URL") or "https://pelham-shift.vercel.app").strip().rstrip("/")
+
+
+async def _labor(body: StrategyIn) -> dict[str, Any] | None:
+    """pelham-shift 인건비 합계(이름 없음). 키가 없거나 실패하면 None — 전략은 인건비 없이 쓴다."""
+    key = os.getenv("PELHAM_SHIFT_LABOR_KEY", "").strip()
+    if not key:
+        return None
+    params = {"from": body.from_date, "to": body.to_date}
+    team = os.getenv("PELHAM_SHIFT_TEAM", "").strip()
+    if team:
+        params["team"] = team
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.get(f"{SHIFT_URL}/api/labor", params=params, headers={"x-labor-key": key})
+    except Exception as exc:
+        logger.info("인건비 없음: %s", type(exc).__name__)
+        return None
+    if not res.is_success:
+        logger.info("인건비 없음: pelham-shift HTTP %s", res.status_code)
+        return None
+    data = res.json()
+    return data if isinstance(data, dict) else None
+
+
+def _facts(request: Request) -> list[Any] | None:
+    """매니저가 적은 켜진 팩트(0117). 0117 을 안 돌렸으면 None."""
+    try:
+        data = supabase_rest.rpc_as(_token(request), "pelham_staff_ai_marketing_facts_active", {})
+    except (supabase_rest.RpcRefused, supabase_rest.SupabaseUnavailable) as exc:
+        logger.info("매니저 팩트 없음: %s", type(exc).__name__)
+        return None
+    return data if isinstance(data, list) else None
+
+
+async def _inputs(request: Request, body: StrategyIn) -> tuple[dict[str, Any], dict[str, bool]]:
+    """Claude 에 보낼 것 전부와, 어느 것이 들어왔는지. "Analysis facts" 탭도 이것을 그대로 보여 준다."""
+    summary = await asyncio.to_thread(_summary, request, body)
+    channels, calls, labor, facts = await asyncio.gather(
+        asyncio.to_thread(_channels, request, body), _call_stats(body), _labor(body),
+        asyncio.to_thread(_facts, request))
+    if channels:
+        summary = {**summary, "channels": channels}
+    if calls:
+        summary = {**summary, "calls": calls}
+    if labor:
+        summary = {**summary, "labor": labor}
+    if facts:
+        summary = {**summary, "manager_facts": facts}
+    found = {"sales_and_tee_sheet": True, "texts_and_phone": bool(channels), "phone_assistant_calls": bool(calls),
+             "labor": bool(labor), "manager_facts": bool(facts)}
+    return summary, found
+
+
+@router.post("/inputs")
+async def inputs(body: StrategyIn, request: Request) -> dict[str, Any]:
+    summary, found = await _inputs(request, body)
+    return {"period": {"from": body.from_date, "to": body.to_date}, "found": found, "data": summary, "region": REGION}
+
+
 @router.post("/strategy")
 async def strategy(body: StrategyIn, request: Request) -> dict[str, Any]:
-    summary = await asyncio.to_thread(_summary, request, body)
+    summary, found = await _inputs(request, body)
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="Claude is not set up on the server yet.")
     if int(summary.get("rounds") or 0) == 0 and int(summary.get("paid_bills") or 0) == 0:
         raise HTTPException(status_code=422, detail="No rounds or sales in this period — pick a longer period.")
 
     today = datetime.now(ZoneInfo("America/Toronto")).date().isoformat()
-    channels, calls = await asyncio.gather(asyncio.to_thread(_channels, request, body), _call_stats(body))
-    if channels:
-        summary = {**summary, "channels": channels}
-    if calls:
-        summary = {**summary, "calls": calls}
     try:
         answer = await _ask(summary, body, today)
     except HTTPException:
@@ -441,7 +545,7 @@ async def strategy(body: StrategyIn, request: Request) -> dict[str, Any]:
         logger.warning("마케팅 전략 실패: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail=UNAVAILABLE) from None
     answer = {**answer, "model": MODEL, "period": {"from": body.from_date, "to": body.to_date},
-              "inputs": {"texts_and_phone": bool(channels), "phone_assistant_calls": (calls or {}).get("calls")}}
+              "inputs": found}
     report_id = await asyncio.to_thread(_save, request, body, answer)
     return {**answer, "report_id": report_id}
 
@@ -473,6 +577,7 @@ def _scene_texts(doc: dict[str, Any]) -> set[str]:
     texts = {
         narration.get("intro") or " ".join([str(doc.get("headline", "")), *facts[:3]]),
         narration.get("niches") or " ".join(f"{n.get('area', '')}: {n.get('hook', '')}" for n in doc.get("niche_markets") or []),
+        narration.get("break_even") or str((doc.get("break_even") or {}).get("summary", "")),
         narration.get("plan") or " ".join(str((step.get("actions") or [""])[0]) for step in plan),
         narration.get("close") or " ".join(str(c) for c in doc.get("cautions") or []),
     }

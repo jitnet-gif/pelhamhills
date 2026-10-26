@@ -14,6 +14,7 @@
  *     Claude 는 문자(Twilio)·전화 비서(ElevenLabs) 숫자도 본다(0114 + Fly). 결과는 보관함(0113)에 저장된다.
  *   - "Strategy reports" 탭: 보관함(0113) — 지금까지의 전략 보고서 모두, 공유 링크. 주소 끝 #reports 로 바로 연다.
  *   - "Texts & website" 탭: 기획안 → 실행 타일(0115) — 전략마다 문자·AI 전화 캠페인과 웹사이트 팝업. #launch.
+ *   - "Analysis facts" 탭: Claude 가 받는 것 그대로(인건비 pelham-shift 포함)와 매니저 팩트(0117, 고정비·목표). #facts.
  *
  * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, 마케팅 믹스 보드)는 이 화면에 붙는다.
  * 데모 숫자로 내려가지 않는다 — 서버가 안 되면 오류를 보여 준다(옛 Business Intelligence 화면이 고치려던 문제).
@@ -39,6 +40,7 @@ import { ApiError } from "@/lib/teeSheet/api";
 import { addDays } from "@/lib/teeSheet/dates";
 
 import { StrategyBody, StrategyDeck } from "./StrategyDeck";
+import { StrategyFacts } from "./StrategyFacts";
 import { StrategyLaunch } from "./StrategyLaunch";
 import { StrategyReports } from "./StrategyReports";
 
@@ -104,7 +106,7 @@ function describe(cause: unknown): string {
 export default function AiMarketingView() {
   const [tab, setTab] = useState<Tab>(() => {
     const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
-    return hash === "reports" || hash === "launch" ? hash : "analysis";
+    return hash === "reports" || hash === "launch" || hash === "facts" ? hash : "analysis";
   });
   // 실행 타일에서 처음 고를 보고서(전략 패널·보관함의 "Launch" 버튼이 정한다).
   const [launchReport, setLaunchReport] = useState<string | null>(null);
@@ -126,9 +128,18 @@ export default function AiMarketingView() {
         <Chip active={tab === "analysis"} onClick={() => pickTab("analysis")}>Customer analysis</Chip>
         <Chip active={tab === "reports"} onClick={() => pickTab("reports")}>Strategy reports</Chip>
         <Chip active={tab === "launch"} onClick={() => pickTab("launch")}>Texts &amp; website</Chip>
+        <Chip active={tab === "facts"} onClick={() => pickTab("facts")}>Analysis facts</Chip>
       </div>
       {tab === "analysis" ? (
         <AnalysisTab onLaunch={openLaunch} />
+      ) : tab === "facts" ? (
+        <div className="grid min-w-0 gap-3 p-4">
+          <p className="text-sm text-[#4e5560]">
+            What Claude reads for the break-even and the strategy — sales, tee sheet, texts and calls, staff cost from
+            pelham-shift, the trade area — and facts you add yourself.
+          </p>
+          <StrategyFacts />
+        </div>
       ) : tab === "launch" ? (
         <div className="grid min-w-0 gap-3 p-4">
           <p className="text-sm text-[#4e5560]">
@@ -150,7 +161,7 @@ export default function AiMarketingView() {
   );
 }
 
-type Tab = "analysis" | "reports" | "launch";
+type Tab = "analysis" | "reports" | "launch" | "facts";
 
 function AnalysisTab({ onLaunch }: { onLaunch: (reportId: string) => void }) {
   const today = localBusinessDate();

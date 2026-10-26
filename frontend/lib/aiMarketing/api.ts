@@ -82,6 +82,8 @@ export const aiMarketingApi = {
     }),
   share: (id: string, on: boolean) =>
     staffRpc<{ id: string; share_token: string | null }>("pelham_staff_ai_marketing_report_share", { p_id: id, p_on: on }),
+  facts: () => staffRpc<Fact[]>("pelham_staff_ai_marketing_facts"),
+  saveFact: (fact: Partial<Fact>) => staffRpc<Fact>("pelham_staff_ai_marketing_fact_save", { p: fact }),
   launches: (reportId: string) => staffRpc<LaunchRow[]>("pelham_staff_ai_marketing_launches", { p_report: reportId }),
   recordLaunch: (reportId: string, strategy: number, channel: LaunchRow["channel"], ref: string) =>
     staffRpc<{ ok: boolean }>("pelham_staff_ai_marketing_launch_record", {
@@ -121,7 +123,13 @@ export type Strategy = {
   niche_markets: { area: string; population: string; drive: string; why: string; hook: string }[];
   plan: { window: "30" | "60" | "90"; actions: string[] }[];
   cautions: string[];
-  narration?: { intro: string; niches: string; plan: string; close: string };
+  /** 손익분기점(인건비 pelham-shift + 매니저 팩트의 비용). 이 기능 전에 받은 결과에는 없다. */
+  break_even?: {
+    summary: string;
+    figures: { label: string; value: string }[];
+    improvements: { title: string; impact: string; how: string }[];
+  };
+  narration?: { intro: string; niches: string; break_even?: string; plan: string; close: string };
   model: string;
   period: { from: string; to: string };
   /** 보관함(0113)에 저장된 번호. 0113 을 안 돌렸으면 없다. */
@@ -148,6 +156,43 @@ export type LaunchRow = {
   created_by: string;
   campaign: { status: "ready" | "sending" | "sent" | "cancelled"; name: string; recipients: number; sent: number; failed: number } | null;
   popup: { title: string; active: boolean; starts_at: string | null; ends_at: string | null; live: boolean } | null;
+};
+
+/** 매니저가 적는 팩트(0117). amount_cents 는 per(월·시즌·연·한 번) 기준 금액. */
+export type Fact = {
+  id: string;
+  kind: "cost" | "revenue" | "goal" | "event" | "note";
+  label: string;
+  detail: string;
+  amount_cents: number | null;
+  per: "month" | "season" | "year" | "once" | null;
+  active: boolean;
+  created_at: string;
+  created_by: string;
+  updated_at: string;
+  updated_by: string;
+};
+
+/** Claude 가 받을 것 그대로(Fly `/ai-marketing/inputs`). data 는 0094 요약 + channels · calls · labor · manager_facts. */
+export type StrategyInputs = {
+  period: { from: string; to: string };
+  found: Record<"sales_and_tee_sheet" | "texts_and_phone" | "phone_assistant_calls" | "labor" | "manager_facts", boolean>;
+  data: MarketingSummary & {
+    channels?: Record<string, unknown>;
+    calls?: Record<string, unknown>;
+    labor?: {
+      period: { from: string; to: string; days: number };
+      currency: string;
+      hourly: { staff: number; hours: number; regular_hours: number; ot_hours: number; holiday_hours: number; pay: number };
+      management: { people: number; biweekly_total: number; pay: number };
+      total_labor: number;
+      by_daytype: Record<"weekday" | "weekend", { days: number; hours: number; pay: number }>;
+      by_area: { area: string; hours: number; pay: number }[];
+      by_day: { date: string; hours: number; pay: number; staff: number }[];
+    };
+    manager_facts?: Partial<Fact>[];
+  };
+  region: string;
 };
 
 /** 보관함 목록 한 줄(0113). */
@@ -226,4 +271,22 @@ export function narrationUrl(text: string, share = ""): Promise<string> {
   // 실패한 것은 기억하지 않는다 — 다시 누르면 다시 받는다.
   pending.catch(() => narrationUrls.delete(text));
   return pending;
+}
+
+/** Claude 가 받을 것을 그대로 받아 본다(전략은 쓰지 않는다 — Claude 요금 없음). */
+export async function strategyInputs(from: string, to: string): Promise<StrategyInputs> {
+  const token = await accessToken();
+  if (!token) throw new ApiError(401, "Sign in again.");
+  let response: Response;
+  try {
+    response = await fetch(`${paymentsApiBase()}/ai-marketing/inputs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ from, to }),
+    });
+  } catch {
+    throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
+  }
+  if (!response.ok) throw await failure(response, "This view is not on the server yet. Deploy the API (Fly) first.");
+  return (await response.json()) as StrategyInputs;
 }
