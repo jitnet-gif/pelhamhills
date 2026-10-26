@@ -20,6 +20,9 @@ COPY backend/requirements-api.txt ./backend/requirements-api.txt
 RUN pip install --no-cache-dir -r backend/requirements-api.txt
 
 COPY backend/ ./backend/
+# 에이전트 동기화 스크립트(.dockerignore 참고). 서버는 쓰지 않는다.
+COPY scripts/attach_voice_tools.py scripts/elevenlabs_sync_agent.py ./scripts/
+COPY ops/elevenlabs/agent.json ./ops/elevenlabs/agent.json
 
 # 윈도우에서 편집된 스크립트가 CRLF 로 들어오면 `exec: sh\r: not found` 로 죽는다.
 # 한 줄로 막아 둔다 - .gitattributes 설정에 기대지 않기 위해서다.

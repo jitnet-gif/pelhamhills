@@ -13,7 +13,9 @@
   3. 프롬프트 끝에 도구 사용 규칙 블록을 넣는다 (경계 표시가 있어 다시 돌려도
      덧붙지 않고 교체된다).
 
-프롬프트의 나머지, 첫 인사, 목소리, 지식베이스, 내장 도구는 손대지 않는다. 그러기
+프롬프트의 나머지, 지식베이스, 내장 도구는 손대지 않는다. 첫 인사는 `{{greeting}}` 로 바꾸되 원래
+인사를 전화용 기본값으로 남기고(웹 Charlie 버튼이 자기 인사를 넘긴다), 목소리는 agent.json 의 voice_id 로
+맞춘다(2026-10-26, ElevenLabs Hope · Natural). 그러기
 위해 기존 `conversation_config` 를 **통째로 읽어 와서** 프롬프트만 고쳐 되돌려 보낸다.
 PATCH 가 중첩 객체를 얕게 덮어써도 잃는 것이 없게 하기 위해서다.
 
@@ -39,6 +41,13 @@ START = "<!-- pelham-tools: start -->"
 END = "<!-- pelham-tools: end -->"
 
 RULES = """# Using the booking tools
+
+Website: this conversation is on the {{channel}} channel. If it is website, your name is Charlie and
+every reply is one short sentence. There is no calling number: always ask for a phone number, read it
+back digit by digit, and pass it as digits only, e.g. '2498050556'. Never call transfer_to_number or
+send_info_sms; where you would transfer, say the pro shop number, two four nine, eight oh five, oh five
+five six, or take a callback with request_callback. To finish, say only "You're all set. Goodbye!" and
+call end_call. This step is important.
 
 These are the tools you actually have, and this section wins over anything earlier that contradicts it.
 Earlier notes mention `check_availability`, `find_booking` and `take_message`: those do not exist. Use
@@ -230,7 +239,20 @@ def main() -> int:
     print(f"  프롬프트 {len(before)}자 -> {len(after)}자 (규칙 블록 {'교체' if START in before else '추가'})")
     print(f"  기존 tool_ids: {prompt.get('tool_ids') or '없음'}")
     print(f"  지식베이스: {[d.get('name') for d in (prompt.get('knowledge_base') or [])] or '없음'}")
-    print(f"  목소리: {config.get('tts', {}).get('voice_id')}  (건드리지 않는다)")
+    agent_cfg = config["agent"]
+    first = agent_cfg.get("first_message") or ""
+    placeholders = agent_cfg.setdefault("dynamic_variables", {}).setdefault("dynamic_variable_placeholders", {})
+    if first != "{{greeting}}":
+        placeholders.setdefault("greeting", first)
+        agent_cfg["first_message"] = "{{greeting}}"
+    placeholders.setdefault("channel", "phone")
+    print(f"  첫 인사: {{{{greeting}}}}, 전화 기본값: {placeholders.get('greeting', '')[:60]}")
+    voice = load_config().get("conversation_config", {}).get("tts", {}).get("voice_id")
+    tts = config.setdefault("tts", {})
+    kept = {k: v for k, v in tts.items() if k != "voice_id"}
+    print(f"  목소리: {tts.get('voice_id')} -> {voice}  (나머지 설정 {kept} 그대로)")
+    if voice:
+        tts["voice_id"] = voice
     workflow = agent.get("workflow") or {}
     new_workflow, touched = patched_workflow(workflow) if workflow.get("nodes") else (workflow, [])
     print(f"  워크플로 노드 규칙: {touched or '맞는 노드 없음'}")
@@ -302,6 +324,7 @@ def main() -> int:
     print("  프롬프트 길이:", len(got.get("prompt") or ""))
     print("  지식베이스:", [d.get("name") for d in (got.get("knowledge_base") or [])] or "없음")
     print("  첫 인사:", (check.get("conversation_config", {}).get("agent", {}).get("first_message") or "")[:60])
+    print("  목소리:", check.get("conversation_config", {}).get("tts", {}).get("voice_id"))
     for node in ((check.get("workflow") or {}).get("nodes") or {}).values():
         if NODE_START in (node.get("additional_prompt") or ""):
             print("  노드 규칙 들어감:", node.get("label"))
