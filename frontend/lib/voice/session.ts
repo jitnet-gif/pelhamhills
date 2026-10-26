@@ -12,7 +12,7 @@
  * 이 앱에서 비밀을 다룰 수 있는 유일한 서버는 백엔드다.
  */
 
-import { apiBaseUrl } from "@/lib/apiHost";
+import { paymentsApiBase } from "@/lib/booking/payments";
 
 export type VoiceSession = {
   signedUrl: string;
@@ -31,11 +31,9 @@ export const VOICE_UNAVAILABLE_MESSAGE =
   "The voice assistant is not available right now. You can book with the form below, or call the pro shop.";
 
 export async function requestVoiceSession(): Promise<VoiceSession> {
-  const base = apiBaseUrl();
-  if (!base) {
-    // 예약 서버 자체가 없는 배포다. 폼과 같은 이유로 실패하므로 같은 문구를 쓴다.
-    throw new VoiceUnavailableError(VOICE_UNAVAILABLE_MESSAGE);
-  }
+  // Vercel 에 NEXT_PUBLIC_API_URL 이 없어 apiBaseUrl() 이 비면 요청조차 안 나갔다(2026-10-26).
+  // 결제와 같은 운영 Fly 주소를 쓴다.
+  const base = paymentsApiBase();
 
   let response: Response;
   try {
