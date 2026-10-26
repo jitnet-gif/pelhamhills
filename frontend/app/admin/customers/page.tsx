@@ -217,6 +217,25 @@ const FILTER_LABEL: Record<Filter, string> = {
   review: "Needs review",
 };
 
+type Sort = "rounds" | "last" | "first";
+
+const SORT_LABEL: Record<Sort, string> = {
+  rounds: "Most rounds",
+  last: "Last name",
+  first: "First name",
+};
+
+/** 정렬용 이름. first/last 가 비어 있는 옛 줄은 display_name 을 나눠 쓴다. */
+function sortName(c: Customer, key: "last" | "first"): string {
+  const [first, last] =
+    c.first_name?.trim() || c.last_name?.trim()
+      ? [c.first_name?.trim() ?? "", c.last_name?.trim() ?? ""]
+      : splitName(c.name);
+  return (key === "last" ? `${last} ${first}` : `${first} ${last}`)
+    .trim()
+    .toLowerCase();
+}
+
 const REASON_LABEL: Record<string, string> = {
   possible_duplicate: "Possible duplicate",
   duplicate_account: "Duplicate account",
@@ -281,6 +300,7 @@ export default function CustomersPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<Sort>("rounds");
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
   /** 좁은 화면에서 줄을 누르면 고객 파일을 창으로 연다(넓은 화면은 오른쪽 칸에 보인다). */
   const [viewingRef, setViewingRef] = useState<string | null>(null);
@@ -410,13 +430,22 @@ export default function CustomersPage() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return all.filter((c) => {
+    const rows = all.filter((c) => {
       if (filter === "members" && !c.is_member) return false;
       if (filter === "public" && c.is_member) return false;
       if (filter === "review" && !c.needs_review) return false;
       return matches(c, q);
     });
-  }, [all, filter, query]);
+    if (sort === "rounds") return rows;
+    // 이름 없는 줄은 맨 뒤로 보낸다.
+    const keyed = rows.map((c) => ({ c, k: sortName(c, sort) }));
+    keyed.sort((a, b) =>
+      !a.k || !b.k
+        ? Number(!a.k) - Number(!b.k)
+        : a.k.localeCompare(b.k, "en", { sensitivity: "base" }),
+    );
+    return keyed.map((r) => r.c);
+  }, [all, filter, query, sort]);
 
   const selected =
     all.find((c) => c.customer_ref === selectedRef) ?? visible[0] ?? null;
@@ -467,6 +496,18 @@ export default function CustomersPage() {
                 placeholder="Search name, phone, email, plan"
                 value={query}
               />
+              <select
+                aria-label="Sort"
+                className="border border-[#cfd2d8] bg-white px-2 py-1.5 text-xs font-bold outline-none focus:border-[#4533ff]"
+                onChange={(event) => setSort(event.target.value as Sort)}
+                value={sort}
+              >
+                {(Object.keys(SORT_LABEL) as Sort[]).map((item) => (
+                  <option key={item} value={item}>
+                    {SORT_LABEL[item]}
+                  </option>
+                ))}
+              </select>
               {(Object.keys(FILTER_LABEL) as Filter[]).map((item) => (
                 <button
                   className={`inline-flex min-h-11 items-center border px-3 text-xs font-bold lg:min-h-0 lg:py-1.5 ${
