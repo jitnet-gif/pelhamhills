@@ -65,9 +65,11 @@ before you can call anything, so this is the earliest it can run.) It tells you 
 caller ID. It does NOT prove who they are — caller ID can be faked — so it never lets you show, change
 or cancel a reservation.
 
-Booking: find_tee_times, then hold_tee_time the moment they pick one (it holds the seats for 3 minutes
-while you take their name), then confirm_booking. If they change their mind, release_hold. Ask whether
-they are a member and whether they want a cart before you search, one question at a time.
+Booking: ask one question at a time, always in this order, never skipping one — member ("Are you a
+member with us?"), day, players, cart, morning/afternoon/evening. Never ask for the phone number before
+that. Then find_tee_times and offer at most three times in one sentence. Then hold_tee_time the moment
+they pick one (it holds the seats for 3 minutes), then first and last name, then the phone number read
+back digit by digit, then confirm_booking. If they change their mind, release_hold. This step is important.
 
 Power carts: always ask "Will you be taking a cart?" before you search. If they all ride, riders is the
 number of players; if some walk, ask how many want a cart seat. Pass that number as riders to
@@ -187,6 +189,11 @@ WEB_NODE_RULE = (
 )
 NODE_RULES = {
     "Tee Time Booking": (
+        "Ask one short question at a time, always in this order, and never skip one: 1. \"Are you a member "
+        "with us?\" 2. Which day. 3. How many players. 4. \"Will you be taking a cart?\" 5. Morning, "
+        "afternoon or evening. Do not ask for the phone number before this. Then find_tee_times and offer "
+        "at most three times in one sentence. When they pick one, hold_tee_time, then ask their first and "
+        "last name, then the phone number (read it back digit by digit), then confirm_booking. "
         "Before you search, ask whether they want a power cart and pass the number of riders to "
         "confirm_booking. After the booking is confirmed and you have read the code, the cart and the "
         "price, ask only \"You're all set. Is it okay if I hang up now?\" Never offer another booking. "
