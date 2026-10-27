@@ -219,9 +219,6 @@ export const MEMBERSHIP_TYPES: {
   },
 ];
 
-/** 골프 회원권만. 고객 폼의 회원권 칸처럼 연습장 회원권을 받지 않는 곳이 쓴다. */
-export const GOLF_MEMBERSHIP_TYPES = MEMBERSHIP_TYPES.filter((t) => !t.rangeOnly);
-
 export const CART_PACKAGES: { key: CartPackage; label: string; price: number }[] = [
   { key: "unlimited_7day", label: "Unlimited 7-Day cart", price: 1850 },
   { key: "unlimited_weekday", label: "Unlimited Weekday cart", price: 1350 },

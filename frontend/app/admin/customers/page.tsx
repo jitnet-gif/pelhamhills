@@ -8,7 +8,6 @@ import AdminShell from "@/components/admin/AdminShell";
 import {
   CART_PACKAGES,
   CREDIT_CARD_SURCHARGE,
-  GOLF_MEMBERSHIP_TYPES,
   MEMBERSHIP_TYPES,
   PAYMENT_METHODS,
   STATUS_LABEL,
@@ -943,24 +942,6 @@ function MembershipFields({
   const sameRow =
     current && current.season === value.season && current.id !== undefined;
 
-  // 연습장 회원권(0125)은 골프 회원권이 아니라 이 칸(고객 저장, 0072)이 받지 않는다. Memberships 화면에서 고친다.
-  if (type?.rangeOnly) {
-    return (
-      <fieldset className="mt-4 border-t border-[#e2e4e8] pt-4">
-        <legend className="sr-only">Membership</legend>
-        <p className="mb-2 text-xs font-bold text-[#111315]">Membership</p>
-        <p className="text-xs text-[#5d6673]">
-          {value.season} Driving Range membership (non-member) — not a golf membership, so public green fees apply.
-          Change it on{" "}
-          <Link className="text-[#4533ff] underline" href="/admin/memberships">
-            Memberships
-          </Link>
-          .
-        </p>
-      </fieldset>
-    );
-  }
-
   return (
     <fieldset className="mt-4 border-t border-[#e2e4e8] pt-4">
       <legend className="sr-only">Membership</legend>
@@ -976,12 +957,14 @@ function MembershipFields({
               onChange({
                 membership_type: next,
                 ...(info && !info.spousal ? { plan: "single" as const } : {}),
+                // 연습장 회원권(0126)에는 카트 패키지(회원 전용)가 없다.
+                ...(info?.rangeOnly ? { cart_package: "" as const } : {}),
               });
             }}
             value={value.membership_type}
           >
             <option value="">Not a member (public)</option>
-            {GOLF_MEMBERSHIP_TYPES.map((t) => (
+            {MEMBERSHIP_TYPES.map((t) => (
               <option key={t.key} value={t.key}>
                 {t.label} — {t.access}
               </option>
@@ -1024,6 +1007,7 @@ function MembershipFields({
               Cart package
               <select
                 className={SELECT_CLASS}
+                disabled={type?.rangeOnly}
                 onChange={(event) =>
                   onChange({
                     cart_package: event.target.value as CartPackage | "",
@@ -1031,7 +1015,7 @@ function MembershipFields({
                 }
                 value={value.cart_package}
               >
-                <option value="">No cart package</option>
+                <option value="">{type?.rangeOnly ? "Members only" : "No cart package"}</option>
                 {CART_PACKAGES.map((c) => (
                   <option key={c.key} value={c.key}>
                     {c.label}
@@ -1050,7 +1034,7 @@ function MembershipFields({
                 }
                 value={value.status}
               >
-                <option value="active">Active — member rates</option>
+                <option value="active">{type?.rangeOnly ? "Active — paid" : "Active — member rates"}</option>
                 <option value="pending">Pending — not paid yet</option>
               </select>
             </label>
@@ -1119,7 +1103,9 @@ function MembershipFields({
           value.expires_on < today &&
           "This date has passed — the tee sheet charges public rates. "}
         {value.membership_type &&
-          "The tee sheet uses this to charge member rates. Record payments on "}
+          (type?.rangeOnly
+            ? "Driving range only — not a golf membership, so the tee sheet charges public rates. Record payments on "
+            : "The tee sheet uses this to charge member rates. Record payments on ")}
         {value.membership_type && (
           <Link className="font-bold text-[#4533ff]" href="/admin/memberships">
             Memberships
