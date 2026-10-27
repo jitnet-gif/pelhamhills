@@ -12,7 +12,8 @@ import { bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
-export type MembershipType = "full" | "weekday" | "intermediate" | "nine_hole" | "twilight" | "junior";
+/** range = 비회원 연습장 회원권(0125). 골프 회원권이 아니다 — 회원 요금·회원 검색에 잡히지 않는다. */
+export type MembershipType = "full" | "weekday" | "intermediate" | "nine_hole" | "twilight" | "junior" | "range";
 export type MembershipPlan = "single" | "spousal";
 export type CartPackage = "unlimited_7day" | "unlimited_weekday";
 export type MembershipStatus = "pending" | "active" | "cancelled";
@@ -197,6 +198,8 @@ export const MEMBERSHIP_TYPES: {
   simHours: number;
   /** 연습장 이용이 회원권에 들어 있다(Full). 연습장 이용권을 따로 팔지 않는다. */
   rangeIncluded?: boolean;
+  /** 골프 회원권이 아니다(연습장 회원권). 카트 패키지(회원 전용)를 붙이지 않는다. */
+  rangeOnly?: boolean;
 }[] = [
   { key: "full", label: "Full", access: "Anytime · driving range included", single: 3051, spousal: 5152.8, simHours: 10, rangeIncluded: true },
   { key: "weekday", label: "Weekday", access: "Weekdays, excl. holidays", single: 2316.5, spousal: 3955, simHours: 8 },
@@ -204,13 +207,27 @@ export const MEMBERSHIP_TYPES: {
   { key: "nine_hole", label: "9-Hole", access: "Weekdays after 10 AM", single: 1638.5, spousal: 2881.5, simHours: 6 },
   { key: "twilight", label: "Twilight", access: "After 3 PM incl. weekends", single: 1638.5, spousal: 2881.5, simHours: 6 },
   { key: "junior", label: "Junior", access: "17 & under", single: 565, simHours: 0 },
+  // 요금표 1쪽 ADDITIONAL GOLF SERVICES — DRIVING RANGE MEMBERSHIP, NON MEMBERS $450 + HST.
+  {
+    key: "range",
+    label: "Driving Range",
+    access: "Non-members · 2 large buckets a day",
+    single: 508.5,
+    simHours: 0,
+    rangeIncluded: true,
+    rangeOnly: true,
+  },
 ];
+
+/** 골프 회원권만. 고객 폼의 회원권 칸처럼 연습장 회원권을 받지 않는 곳이 쓴다. */
+export const GOLF_MEMBERSHIP_TYPES = MEMBERSHIP_TYPES.filter((t) => !t.rangeOnly);
 
 export const CART_PACKAGES: { key: CartPackage; label: string; price: number }[] = [
   { key: "unlimited_7day", label: "Unlimited 7-Day cart", price: 1850 },
   { key: "unlimited_weekday", label: "Unlimited Weekday cart", price: 1350 },
 ];
 
+/** 회원 연습장 이용권(요금표 DRIVING RANGE MEMBERSHIP — MEMBERS $350 + HST). 비회원은 `range` 회원권. */
 export const RANGE_PASS_PRICE = 395.5;
 
 /** 신청서 2쪽: "Additional 3% charge for Credit Card Payment". */
@@ -258,7 +275,7 @@ export function listPrice(m: {
 }): number {
   const type = typeInfo(m.membership_type);
   const base = m.plan === "spousal" && type.spousal ? type.spousal : type.single;
-  const cart = CART_PACKAGES.find((c) => c.key === m.cart_package)?.price ?? 0;
+  const cart = type.rangeOnly ? 0 : (CART_PACKAGES.find((c) => c.key === m.cart_package)?.price ?? 0);
   const range = m.range_pass && !type.rangeIncluded ? RANGE_PASS_PRICE : 0;
   const subtotal = base + cart + range;
   return round2(m.payment_method === "Credit card" ? subtotal * (1 + CREDIT_CARD_SURCHARGE) : subtotal);

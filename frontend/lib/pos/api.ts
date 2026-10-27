@@ -70,6 +70,8 @@ export type MembershipSaleInput = {
   membership_type: string;
   plan: string;
   cart_package: string | null;
+  /** 회원 연습장 이용권(0125). 0125 전 서버는 이 키를 모른 채 넘긴다. */
+  range_pass: boolean;
   starts_on: string;
   expires_on: string;
   card_fee: boolean;

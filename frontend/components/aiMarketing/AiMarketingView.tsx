@@ -67,6 +67,7 @@ const MEMBERSHIP_LABEL: Record<string, string> = {
   nine_hole: "9 hole",
   twilight: "Twilight",
   junior: "Junior",
+  range: "Driving range",
 };
 
 const PARTS: { key: keyof SalesParts; label: string; color: string }[] = [

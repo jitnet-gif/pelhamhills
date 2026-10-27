@@ -94,6 +94,7 @@ export default function MembershipApplicationForm() {
         const t = typeInfo(value as MembershipType);
         if (!t.spousal) next.plan = "single";
         if (t.rangeIncluded) next.range_pass = false;
+        if (t.rangeOnly) next.cart_package = null;
       }
       return next;
     });
@@ -225,10 +226,11 @@ export default function MembershipApplicationForm() {
           <Label text="Power cart package">
             <select
               className={INPUT}
+              disabled={type.rangeOnly}
               onChange={(e) => set("cart_package", (e.target.value || null) as CartPackage | null)}
               value={form.cart_package ?? ""}
             >
-              <option value="">No cart package</option>
+              <option value="">{type.rangeOnly ? "For golf members only" : "No cart package"}</option>
               {CART_PACKAGES.map((c) => (
                 <option key={c.key} value={c.key}>
                   {c.label} (1/2 cart) — {money(c.price)}
@@ -239,7 +241,7 @@ export default function MembershipApplicationForm() {
           <Label text="Driving range membership">
             {type.rangeIncluded ? (
               <select className={INPUT} disabled value="included">
-                <option value="included">Included with Full</option>
+                <option value="included">{type.rangeOnly ? "This is the range membership" : "Included with Full"}</option>
               </select>
             ) : (
               <select className={INPUT} onChange={(e) => set("range_pass", e.target.value === "yes")} value={form.range_pass ? "yes" : "no"}>

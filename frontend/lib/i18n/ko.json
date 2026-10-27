@@ -3361,5 +3361,13 @@
  "Add gift card {0}": "기프트카드 {0} 추가",
  "Balance {0}": "잔액 {0}",
  "{0} stays on the card for next time.": "{0}은 카드에 남아 다음에 쓸 수 있습니다.",
- "Nothing is left on this card.": "이 카드에는 남은 돈이 없습니다."
+ "Nothing is left on this card.": "이 카드에는 남은 돈이 없습니다.",
+ "Driving Range": "연습장",
+ "Non-members · 2 large buckets a day": "비회원 · 하루 라지 버킷 2개",
+ "Driving Range Membership (Non-member)": "연습장 회원권 (비회원)",
+ "Range only — not a golf member": "연습장 전용 — 골프 회원 아님",
+ "Range membership": "연습장 회원권",
+ "Members only": "회원 전용",
+ "For golf members only": "골프 회원 전용",
+ "This is the range membership": "연습장 회원권 자체입니다"
 }

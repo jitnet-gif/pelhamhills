@@ -8,6 +8,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import {
   CART_PACKAGES,
   CREDIT_CARD_SURCHARGE,
+  GOLF_MEMBERSHIP_TYPES,
   MEMBERSHIP_TYPES,
   PAYMENT_METHODS,
   STATUS_LABEL,
@@ -60,6 +61,8 @@ type Customer = {
     status: MembershipStatus;
     id?: string;
     cart_package?: CartPackage | null;
+    /** 0072 의 고객 목록 JSON 에는 아직 없다 — 없으면 false 로 본다. */
+    range_pass?: boolean;
     member_name?: string | null;
     member_number?: string | null;
     phone?: string | null;
@@ -940,6 +943,24 @@ function MembershipFields({
   const sameRow =
     current && current.season === value.season && current.id !== undefined;
 
+  // 연습장 회원권(0125)은 골프 회원권이 아니라 이 칸(고객 저장, 0072)이 받지 않는다. Memberships 화면에서 고친다.
+  if (type?.rangeOnly) {
+    return (
+      <fieldset className="mt-4 border-t border-[#e2e4e8] pt-4">
+        <legend className="sr-only">Membership</legend>
+        <p className="mb-2 text-xs font-bold text-[#111315]">Membership</p>
+        <p className="text-xs text-[#5d6673]">
+          {value.season} Driving Range membership (non-member) — not a golf membership, so public green fees apply.
+          Change it on{" "}
+          <Link className="text-[#4533ff] underline" href="/admin/memberships">
+            Memberships
+          </Link>
+          .
+        </p>
+      </fieldset>
+    );
+  }
+
   return (
     <fieldset className="mt-4 border-t border-[#e2e4e8] pt-4">
       <legend className="sr-only">Membership</legend>
@@ -960,7 +981,7 @@ function MembershipFields({
             value={value.membership_type}
           >
             <option value="">Not a member (public)</option>
-            {MEMBERSHIP_TYPES.map((t) => (
+            {GOLF_MEMBERSHIP_TYPES.map((t) => (
               <option key={t.key} value={t.key}>
                 {t.label} — {t.access}
               </option>
@@ -1112,32 +1133,48 @@ function MembershipFields({
 
 // ===== Sell membership (0072) ==========================================
 
-/** Lightspeed 의 회원권 상품 목록처럼 종류 × 플랜 × 카트를 한 줄씩 편다. */
+/**
+ * Lightspeed 의 회원권 상품 목록처럼 종류 × 플랜 × 카트 × 연습장 이용권을 한 줄씩 편다.
+ * 요금표 ADDITIONAL GOLF SERVICES(2026-10-27): 카트 패키지, 회원 연습장 이용권(Full 은 포함이라 없음),
+ * 비회원 연습장 회원권(`range`, 카트·이용권 없음).
+ */
 type MembershipProduct = {
   key: string;
   label: string;
   membership_type: MembershipType;
   plan: MembershipPlan;
   cart_package: CartPackage | null;
+  range_pass: boolean;
   /** 요금표 금액(HST 포함). */
   price: number;
 };
 
-const MEMBERSHIP_PRODUCTS: MembershipProduct[] = MEMBERSHIP_TYPES.flatMap((t) =>
-  (t.spousal ? (["single", "spousal"] as const) : (["single"] as const)).flatMap((plan) =>
-    [null, ...CART_PACKAGES.map((c) => c.key)].map((cart) => {
-      const cartName = CART_PACKAGES.find((c) => c.key === cart)?.label;
-      return {
-        key: `${t.key}:${plan}:${cart ?? ""}`,
-        label: `${t.label} ${plan === "spousal" ? "Spousal" : "Single"} Membership${cartName ? ` with ${cartName}` : ""}`,
-        membership_type: t.key,
-        plan,
-        cart_package: cart,
-        price: listPrice({ membership_type: t.key, plan, cart_package: cart, range_pass: false }),
-      };
-    }),
-  ),
-);
+function productKey(m: { membership_type: string; plan: string; cart_package?: string | null; range_pass?: boolean }) {
+  return `${m.membership_type}:${m.plan}:${m.cart_package ?? ""}:${m.range_pass ? "range" : ""}`;
+}
+
+const MEMBERSHIP_PRODUCTS: MembershipProduct[] = MEMBERSHIP_TYPES.flatMap((t) => {
+  if (t.rangeOnly) {
+    const only = { membership_type: t.key, plan: "single" as const, cart_package: null, range_pass: false };
+    return [{ ...only, key: productKey(only), label: "Driving Range Membership (Non-member)", price: t.single }];
+  }
+  return (t.spousal ? (["single", "spousal"] as const) : (["single"] as const)).flatMap((plan) =>
+    [null, ...CART_PACKAGES.map((c) => c.key)].flatMap((cart) =>
+      (t.rangeIncluded ? [false] : [false, true]).map((range) => {
+        const cartName = CART_PACKAGES.find((c) => c.key === cart)?.label;
+        const fields = { membership_type: t.key, plan, cart_package: cart, range_pass: range };
+        return {
+          ...fields,
+          key: productKey(fields),
+          label: `${t.label} ${plan === "spousal" ? "Spousal" : "Single"} Membership${cartName ? ` with ${cartName}` : ""}${
+            range ? " + Range Pass" : ""
+          }`,
+          price: listPrice(fields),
+        };
+      }),
+    ),
+  );
+});
 
 /** HST 포함 금액(달러) → 세전 센트. 서버(0072)와 같은 ÷1.13. */
 function preTaxCents(inclusive: number): number {
@@ -1165,9 +1202,7 @@ function SellMembershipDialog({
   const [season, setSeason] = useState(current?.season ?? year);
   const [query, setQuery] = useState("");
   const [pick, setPick] = useState<string>(
-    current
-      ? `${current.membership_type}:${current.plan}:${current.cart_package ?? ""}`
-      : "",
+    current ? productKey(current) : "",
   );
   const [startsOn, setStartsOn] = useState(
     current?.season === season && current.starts_on ? current.starts_on : today,
@@ -1194,7 +1229,8 @@ function SellMembershipDialog({
     current.status !== "cancelled" &&
     current.membership_type === product.membership_type &&
     current.plan === product.plan &&
-    (current.cart_package ?? null) === product.cart_package
+    (current.cart_package ?? null) === product.cart_package &&
+    Boolean(current.range_pass) === product.range_pass
       ? Number(current.amount_paid)
       : 0;
   const balanceDue = product ? Math.max(0, Number(product.price) - samePaid) : 0;
@@ -1214,6 +1250,7 @@ function SellMembershipDialog({
       membership_type: product.membership_type,
       plan: product.plan,
       cart_package: product.cart_package,
+      range_pass: product.range_pass,
       starts_on: startsOn,
       expires_on: endsOn,
       card_fee: byCard,

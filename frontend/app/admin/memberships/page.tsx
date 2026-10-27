@@ -344,7 +344,7 @@ function MemberCard({ row, onOpen }: { row: Membership; onOpen: () => void }) {
   const owing = balance(row);
   const extras = [
     cartLabel(row.cart_package),
-    type.rangeIncluded ? "Range included" : row.range_pass ? "Range pass" : null,
+    type.rangeOnly ? "Range only — not a golf member" : type.rangeIncluded ? "Range included" : row.range_pass ? "Range pass" : null,
   ].filter(Boolean);
 
   return (
@@ -471,6 +471,8 @@ function MembershipModal({
       if (key === "membership_type" && !typeInfo(value as MembershipType).spousal) next.plan = "single";
       // Full 은 연습장 포함이라 이용권을 따로 달지 않는다.
       if (key === "membership_type" && typeInfo(value as MembershipType).rangeIncluded) next.range_pass = false;
+      // 연습장 회원권(비회원)에는 카트 패키지(회원 전용)가 없다.
+      if (key === "membership_type" && typeInfo(value as MembershipType).rangeOnly) next.cart_package = null;
       if (!dueTouched && ["membership_type", "plan", "cart_package", "range_pass", "payment_method"].includes(key)) {
         next.amount_due = listPrice(priceKeys(next));
       }
@@ -552,10 +554,11 @@ function MembershipModal({
         <div className="grid grid-cols-2 gap-2">
           <Field label="Cart package">
             <Select
+              disabled={type.rangeOnly}
               onChange={(event) => set("cart_package", (event.target.value || null) as MembershipInput["cart_package"])}
               value={form.cart_package ?? ""}
             >
-              <option value="">None</option>
+              <option value="">{type.rangeOnly ? "Members only" : "None"}</option>
               {CART_PACKAGES.map((c) => (
                 <option key={c.key} value={c.key}>
                   {c.label} {money(c.price)}
@@ -566,7 +569,7 @@ function MembershipModal({
           <Field label="Driving range">
             {type.rangeIncluded ? (
               <Select disabled value="included">
-                <option value="included">Included with Full</option>
+                <option value="included">{type.rangeOnly ? "Range membership" : "Included with Full"}</option>
               </Select>
             ) : (
               <Select onChange={(event) => set("range_pass", event.target.value === "yes")} value={form.range_pass ? "yes" : "no"}>
