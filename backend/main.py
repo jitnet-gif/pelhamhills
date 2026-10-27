@@ -86,6 +86,8 @@ include_route_module("backend.api.routes.product_photo", f"{settings.API_V1_STR}
 include_route_module("backend.api.routes.cashier_code", f"{settings.API_V1_STR}", ["Retail"])
 # 손님 개인 QR(0084)을 문자로. QR 그림 주소는 Twilio 가 받아 가는 공개 경로다.
 include_route_module("backend.api.routes.customer_qr", f"{settings.API_V1_STR}", ["Retail"])
+# 결제 끝 화면의 영수증 문자·이메일(현금·카드 모두). 직원 확인은 단말기와 같다(`pelham_staff_bill`).
+include_route_module("backend.api.routes.receipts", f"{settings.API_V1_STR}", ["Retail"])
 # proshop@ 이 화면을 열거나 내려받으면 analysis@ 등에 메일. 이메일은 토큰으로 Supabase Auth 에 묻는다.
 include_route_module("backend.api.routes.activity_alert", f"{settings.API_V1_STR}", ["Staff"])
 # AI Manager Marketing Strategies — 기간 요약(0094)으로 Claude 가 전략을 쓴다. 명단 확인은 SQL 이 한다.

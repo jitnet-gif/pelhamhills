@@ -68,6 +68,7 @@ import {
   takeRainCheckCode,
   type RainCheck,
 } from "@/lib/pos/rainCheck";
+import { receiptContact, sendReceipt, type ReceiptContact } from "@/lib/pos/receiptSend";
 import { printReceipt } from "@/lib/retail/printReceipt";
 import { PAYMENT_LABELS, usDate } from "@/lib/retail/receipt";
 import retailApi from "@/lib/retail/api";
@@ -2167,9 +2168,68 @@ function CashierPrompt({
 
 // ===== 결제 끝 ==========================================================
 
-/** 결제가 끝나면 "결제 완료" 와 영수증을 뽑을지만 묻는다. 어느 쪽을 골라도 새 계산서로 간다. */
+/**
+ * 결제가 끝나면 "결제 완료" 와 영수증을 어떻게 줄지 묻는다 — 종이(Print), 문자, 이메일. 어느 쪽을 골라도 새 계산서로 간다.
+ * 문자·이메일 칸은 예약에 적힌 값으로 미리 채운다(2026-10-26). 단말기 카드로만 낸 계산서는 승인 문자(0028)가 이미 가서
+ * 번호를 채우지 않는다 — 직원이 적으면 영수증 전체가 한 번 더 간다. 칸이 비면 보내지 않는다.
+ */
 function PaidReceipt({ sale, onDone }: { sale: Sale; onDone: () => void }) {
   const card = (sale.payments ?? []).find((payment) => payment.card_last4);
+  const cardTexted =
+    (sale.payments ?? []).length > 0 && (sale.payments ?? []).every((payment) => payment.entry === "integrated");
+  const [contact, setContact] = useState<ReceiptContact | null>(null);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const touched = useRef({ phone: false, email: false });
+  const printed = useRef(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    receiptContact(sale.id)
+      .then((found) => {
+        if (cancelled) return;
+        setContact(found);
+        if (!touched.current.phone && !cardTexted) setPhone(found.phone);
+        if (!touched.current.email) setEmail(found.email);
+      })
+      .catch(() => {
+        // 서버가 옛 배포이거나 닿지 않는다. 종이 영수증만 묻던 예전 화면과 같아진다.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sale.id, cardTexted]);
+
+  const to = {
+    phone: contact?.can_text ? phone.trim() : "",
+    email: contact?.can_email ? email.trim() : "",
+  };
+  const sends = Boolean(to.phone || to.email);
+
+  async function finish(print: boolean) {
+    if (sending) return;
+    // 보내기가 실패해 다시 누를 때 종이가 두 장 나오지 않게.
+    if (print && !printed.current) {
+      printed.current = true;
+      printReceipt(sale);
+    }
+    if (sends) {
+      setSending(true);
+      setSendError("");
+      try {
+        await sendReceipt(sale.id, to);
+      } catch (error) {
+        setSending(false);
+        setSendError(error instanceof Error ? error.message : "The receipt didn't go out.");
+        return;
+      }
+      setSending(false);
+    }
+    onDone();
+  }
+
   return (
     <div className="grid gap-4 p-3 text-center">
       <div className="grid gap-1 py-4">
@@ -2183,23 +2243,64 @@ function PaidReceipt({ sale, onDone }: { sale: Sale; onDone: () => void }) {
           {card ? ` · ${PAYMENT_LABELS[card.method]} ••••${card.card_last4}` : ""}
         </p>
       </div>
-      <p className="text-base font-bold">Print a receipt?</p>
+      {contact?.can_text || contact?.can_email ? (
+        <div className="grid gap-2 text-left">
+          {contact.can_text ? (
+            <Field
+              hint={cardTexted ? "The card approval was already texted. Enter a number to text the full receipt." : undefined}
+              label="Text receipt to"
+            >
+              <TextInput
+                autoComplete="off"
+                inputMode="tel"
+                onChange={(event) => {
+                  touched.current.phone = true;
+                  setPhone(event.target.value);
+                }}
+                placeholder="905-555-0101"
+                value={phone}
+              />
+            </Field>
+          ) : null}
+          {contact.can_email ? (
+            <Field label="Email receipt to">
+              <TextInput
+                autoComplete="off"
+                inputMode="email"
+                onChange={(event) => {
+                  touched.current.email = true;
+                  setEmail(event.target.value);
+                }}
+                placeholder="name@example.com"
+                type="email"
+                value={email}
+              />
+            </Field>
+          ) : null}
+          <p className="text-xs text-[#6b7280]">Leave a box blank to skip it.</p>
+        </div>
+      ) : null}
+      {sendError ? <ErrorNote>{sendError}</ErrorNote> : null}
+      <p className="text-base font-bold">{sends ? "Send the receipt" : "Print a receipt?"}</p>
       <div className="grid grid-cols-2 gap-2">
-        <Button className="min-h-14 text-base" full onClick={onDone}>
-          No
+        <Button className="min-h-14 text-base" disabled={sending} full onClick={() => void finish(false)}>
+          {sending ? "Sending…" : sends ? "Send" : "No"}
         </Button>
         <Button
           className="min-h-14 text-base"
+          disabled={sending}
           full
-          onClick={() => {
-            printReceipt(sale);
-            onDone();
-          }}
+          onClick={() => void finish(true)}
           tone="primary"
         >
-          Print
+          {sends ? "Print & send" : "Print"}
         </Button>
       </div>
+      {sendError ? (
+        <button className="justify-self-center text-xs text-[#4533ff] underline" onClick={onDone} type="button">
+          Skip — don&apos;t send
+        </button>
+      ) : null}
     </div>
   );
 }
