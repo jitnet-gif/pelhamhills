@@ -263,7 +263,7 @@ function AdminFrame({
   const accountsAllowed = useAccountsAccess(email) === true;
   // Data Backup 은 매니저와 계정 관리자에게만(0100, `lib/backup.ts`).
   const backupAllowed = useBackupAccess(email) === true;
-  // Gift Cards 도 매니저와 계정 관리자에게만(0120, proshop@ 제외).
+  // Gift Cards 는 Account Setup 의 Gift Cards 체크(0127). 0127 전에는 매니저와 계정 관리자(0120, proshop@ 제외).
   const giftCardsAllowed = useGiftCardAccess(email) === true;
   // Marketing 도 마케팅 명단(0047) 계정에만 보인다(`lib/marketing/access.ts`).
   const marketingAllowed = useMarketingAccess(email) === true;

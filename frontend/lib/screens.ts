@@ -1,5 +1,6 @@
 /**
  * 화면 권한(0098) — Account Setup 의 체크로 계정마다 준다: Dynamic Pricing, Events, Promotions, Calls & SMS.
+ * Gift Cards(0127)도 같은 체크지만 메뉴는 `pelham_gift_card_access`(0120)를 읽는다 — 서버 판정이 이 체크를 본다.
  * Marketing 체크도 같은 화면에 있지만 메뉴는 0047 명단을 그대로 읽는다(`lib/marketing/access.ts`).
  *
  * 메뉴를 가리는 것은 여기, 주소로 들어온 계정을 막는 것은 `components/admin/ScreenGate.tsx` 다.
@@ -13,7 +14,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
-export type Screen = "dynamic_pricing" | "events" | "promotions" | "calls" | "marketing";
+export type Screen = "dynamic_pricing" | "events" | "promotions" | "calls" | "marketing" | "gift_cards";
 
 /** Account Setup 체크 순서 = 메뉴 순서. */
 export const SCREENS: { key: Screen; label: string; hint: string }[] = [
@@ -22,6 +23,7 @@ export const SCREENS: { key: Screen; label: string; hint: string }[] = [
   { key: "promotions", label: "Promotions", hint: "makes promo codes (any cashier can still scan one)" },
   { key: "calls", label: "Calls & SMS", hint: "phone assistant calls, texts and STOP numbers" },
   { key: "marketing", label: "Marketing", hint: "the customer text campaign site" },
+  { key: "gift_cards", label: "Gift Cards", hint: "issues and voids gift cards (any cashier can still take one)" },
 ];
 
 export type ScreenAccess = Screen[] | "legacy";
@@ -40,7 +42,7 @@ export async function fetchScreenAccess(): Promise<ScreenAccess> {
 /** 0098 전이면 legacy 규칙. reportsAllowed 는 Dynamic Pricing 의 예전 규칙에만 쓴다. */
 export function canOpen(access: ScreenAccess | null, screen: Screen, reportsAllowed: boolean): boolean | null {
   if (access === null) return null;
-  if (access === "legacy") return screen === "dynamic_pricing" ? reportsAllowed : screen !== "marketing";
+  if (access === "legacy") return screen === "dynamic_pricing" ? reportsAllowed : screen !== "marketing" && screen !== "gift_cards";
   return access.includes(screen);
 }
 
