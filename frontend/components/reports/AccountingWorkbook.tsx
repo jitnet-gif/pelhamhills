@@ -251,7 +251,6 @@ function SheetView({
         <div className="shrink-0 border-r border-[#c8c8c8] px-2 py-1 italic text-[#6b7280]">fx</div>
         <div className="min-w-0 flex-1 truncate px-2 py-1 font-mono">{bar}</div>
       </div>
-      {selected ? <BankLine fees={fees} row={selected.row} col={selected.col} sheet={sheet} /> : null}
 
       <div className="max-h-[70vh] overflow-auto">
         <table className="border-separate border-spacing-0" style={{ width, tableLayout: "fixed" }}>
@@ -319,17 +318,19 @@ function SheetView({
                     const cell = row.cells[col] ?? null;
                     const value = cellValue(cell);
                     const negative = typeof value === "number" && value < 0 && column.format === "money";
+                    const bank = isSel(n, col) ? bankBreakdown(sheet, rowIndex, col, fees) : null;
                     return (
                       <td
                         className={`${tdBase} ${align(column.format, value)} ${cellClass(row.style)} ${
                           negative ? "text-[#c00000]" : ""
                         } ${row.style === "section" && col === 0 ? "overflow-visible" : ""} ${
                           isSel(n, col) ? sel : ""
-                        }`}
+                        } ${bank ? "relative overflow-visible" : ""}`}
                         key={col}
                         onClick={() => onSelect({ row: n, col })}
                       >
                         {formatCell(value, column.format)}
+                        {bank ? <BankPopover bank={bank} above={rowIndex === sheet.rows.length - 1} /> : null}
                       </td>
                     );
                   })}
@@ -382,43 +383,56 @@ function cellAt(sheet: Sheet, row: number, col: number): Cell | undefined {
 }
 
 /**
- * For Bookkeeper 의 Gross Sales 칸을 누르면: Gross Sales − Stripe fee = 은행에 남는 돈. 화면에만 —
- * 시트 모델에 없으니 .xlsx 로 나가지 않는다(2026-10-28 클럽 요청). Grand Total 줄은 기간 전체 수수료.
+ * For Bookkeeper 의 Gross Sales 칸을 누르면 그 칸 바로 옆에: 총매출 − Stripe 수수료 = 은행에 남는 돈.
+ * 화면에만 — 시트 모델에 없으니 .xlsx 로 나가지 않는다(2026-10-28 클럽 요청). Grand Total 줄은 기간 전체.
  */
-function BankLine({
-  sheet,
-  row,
-  col,
-  fees,
-}: {
-  sheet: Sheet;
-  row: number;
-  col: number;
-  fees: Record<string, number> | null;
-}) {
-  if (sheet.name !== BOOKKEEPER_SHEET || col !== BOOKKEEPER_GROSS_COL || row < FIRST_DATA_ROW) return null;
-  const cells = sheet.rows[row - FIRST_DATA_ROW]?.cells;
+type Bank = { label: string; gross: number; fee: number | null };
+
+function bankBreakdown(sheet: Sheet, rowIndex: number, col: number, fees: Record<string, number> | null): Bank | null {
+  if (sheet.name !== BOOKKEEPER_SHEET || col !== BOOKKEEPER_GROSS_COL) return null;
+  const cells = sheet.rows[rowIndex]?.cells;
   const gross = cells ? cellValue(cells[BOOKKEEPER_GROSS_COL]) : null;
-  if (typeof gross !== "number") return null;
   const date = cells?.[0];
+  if (typeof gross !== "number" || typeof date !== "string") return null;
+  const total = date === "Grand Total";
+  const dates = total
+    ? sheet.rows.map((r) => r.cells[0]).filter((d): d is string => typeof d === "string" && d !== "Grand Total")
+    : [date];
+  return {
+    label: total ? "Whole period" : date,
+    gross,
+    fee: fees ? dates.reduce((sum, d) => sum + (fees[d] ?? 0), 0) / 100 : null,
+  };
+}
+
+function BankPopover({ bank, above }: { bank: Bank; above: boolean }) {
   const money = (value: number) =>
     value.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  let body: string;
-  if (!fees) {
-    body = "Stripe fees could not be read.";
-  } else {
-    const dates = date === "Grand Total"
-      ? sheet.rows.map((r) => r.cells[0]).filter((d): d is string => typeof d === "string" && d !== "Grand Total")
-      : typeof date === "string"
-        ? [date]
-        : [];
-    const fee = dates.reduce((sum, d) => sum + (fees[d] ?? 0), 0) / 100;
-    body = `Gross Sales ${money(gross)} − Stripe fees ${money(fee)} = ${money(Math.round((gross - fee) * 100) / 100)}`;
-  }
   return (
-    <div className="border-b border-[#c8c8c8] bg-[#f0fdf4] px-2 py-1 text-[12px] tabular-nums text-[#14532d]">
-      {date === "Grand Total" ? "Period: " : `${String(date)}: `}
-      {body}
+    <div
+      className={`absolute right-0 z-40 grid min-w-[230px] gap-0.5 border border-[#107c41] bg-white px-3 py-2 text-left text-[12px] font-normal text-[#111827] shadow-lg ${
+        above ? "bottom-full mb-1" : "top-full mt-1"
+      }`}
+    >
+      <p className="font-bold text-[#107c41]">{bank.label}</p>
+      {bank.fee === null ? (
+        <p className="text-[#c00000]">Stripe fees could not be read.</p>
+      ) : (
+        <>
+          <p className="flex justify-between gap-4 tabular-nums">
+            <span>Total sales</span>
+            <span>{money(bank.gross)}</span>
+          </p>
+          <p className="flex justify-between gap-4 tabular-nums text-[#c00000]">
+            <span>− Stripe fees</span>
+            <span>{money(bank.fee)}</span>
+          </p>
+          <p className="flex justify-between gap-4 border-t border-[#111827] pt-0.5 font-bold tabular-nums">
+            <span>= After fees</span>
+            <span>{money(Math.round((bank.gross - bank.fee) * 100) / 100)}</span>
+          </p>
+        </>
+      )}
     </div>
   );
 }
