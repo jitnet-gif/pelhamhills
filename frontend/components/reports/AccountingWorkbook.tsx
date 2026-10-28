@@ -29,6 +29,7 @@ import {
   type Sheet,
 } from "@/lib/reports/accountingWorkbook";
 import { downloadBlob, workbookToXlsx } from "@/lib/reports/exportXlsx";
+import { fetchStripeFees } from "@/lib/reports/stripeReconcile";
 
 import { Button, ErrorNote, Field, SkeletonRows, TextInput } from "@/components/retail/ui";
 
@@ -66,6 +67,8 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
   const [from, setFrom] = useState(() => monthStart(today));
   const [to, setTo] = useState(today);
   const [days, setDays] = useState<DayData[] | null>(null);
+  // For Bookkeeper 의 은행 수수료. null = 못 읽음(시트에 경고, 칸은 빈다).
+  const [fees, setFees] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [active, setActive] = useState(0);
@@ -85,11 +88,21 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
     let cancelled = false;
     setLoading(true);
     setError("");
-    loadDays(dates)
-      .then(({ days: loaded, failed }) => {
+    // 수수료는 Stripe(Fly 서버)에서 따로. 실패해도 나머지 시트는 그대로 만든다.
+    const feesRequest = fetchStripeFees(dates[0], dates[dates.length - 1]).then(
+      (result) => ({ fees: result.fees, error: result.truncated ? "Stripe fees: too many transactions, fees may be short — pick fewer days." : "" }),
+      (cause) => ({ fees: null, error: `Stripe fees could not be read (${cause instanceof Error ? cause.message : "error"}).` }),
+    );
+    Promise.all([loadDays(dates), feesRequest])
+      .then(([{ days: loaded, failed }, feeResult]) => {
         if (cancelled) return;
         setDays(loaded);
-        if (failed > 0) setError(`${failed} day(s) could not be loaded — they are marked “Not loaded”.`);
+        setFees(feeResult.fees);
+        const notes = [
+          failed > 0 ? `${failed} day(s) could not be loaded — they are marked “Not loaded”.` : "",
+          feeResult.error,
+        ].filter(Boolean);
+        if (notes.length) setError(notes.join(" "));
       })
       .catch((cause) => {
         if (!cancelled) setError(toRetailError(cause).message);
@@ -103,8 +116,8 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
   }, [dates, rangeError]);
 
   const workbook = useMemo(
-    () => (days && !rangeError ? buildAccountingWorkbook(from, to, days, { cash }) : null),
-    [days, from, to, rangeError, cash],
+    () => (days && !rangeError ? buildAccountingWorkbook(from, to, days, { cash, fees }) : null),
+    [days, fees, from, to, rangeError, cash],
   );
   const sheet = workbook?.sheets[active] ?? null;
 

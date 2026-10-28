@@ -10,6 +10,9 @@ GET /payments/reconcile?from=YYYY-MM-DD&to=YYYY-MM-DD (영업일, America/Toront
 6. `stripe_reconcile.reconcile` 이 짝을 맞추고 문제를 적는다.
 
 읽기만 한다. 고치는 일은 상세 창(`ReconcileDetail.tsx`)이 SQL·단말기 환불로 한다.
+
+GET /payments/stripe-fees?from=…&to=… (최대 92일) — 영업일별 Stripe 수수료. Daily close 의 Total in Bank
+(카드 매출 − 수수료)와 회계 통합 문서의 For Bookkeeper 시트가 쓴다(2026-10-28).
 """
 
 from __future__ import annotations
@@ -136,4 +139,36 @@ def reconcile(
         # 다 읽지 못했다(2,000 건 넘음 또는 하나씩 묻는 한도). 화면이 기간을 줄이라고 알린다.
         "truncated": bool(more_intents or more_refunds or unchecked),
         "unchecked": unchecked,
+    }
+
+
+FEES_MAX_DAYS = 92
+
+
+@router.get("/stripe-fees")
+def stripe_fees(
+    request: Request,
+    date_from: str = Query(alias="from"),
+    date_to: str = Query(alias="to"),
+) -> dict[str, Any]:
+    start, end = _day(date_from, "from"), _day(date_to, "to")
+    if end < start:
+        raise HTTPException(status_code=422, detail="'to' is before 'from'.")
+    if (end - start).days + 1 > FEES_MAX_DAYS:
+        raise HTTPException(status_code=422, detail=f"Pick {FEES_MAX_DAYS} days or fewer.")
+    terminal._require_stripe()
+    terminal._require_staff(request)
+
+    lo, hi = _window(start, end)
+    try:
+        txns, more = sg.balance_transactions_created(int(lo.timestamp()), int(hi.timestamp()))
+    except sg.StripeError as exc:
+        raise HTTPException(status_code=502, detail=f"Stripe: {exc.message}") from None
+    return {
+        "environment": sg.environment(),
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+        "fees": stripe_reconcile.fees_by_day(txns, CLUB_TZ),
+        # 2,000 건을 넘어 다 읽지 못했다 — 수수료가 모자라게 나온다. 화면이 알린다.
+        "truncated": more,
     }

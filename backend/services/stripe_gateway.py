@@ -316,6 +316,11 @@ def refunds_created(start: int, end: int) -> tuple[list[dict[str, Any]], bool]:
     return list_all("/refunds", {"created": {"gte": start, "lt": end}})
 
 
+def balance_transactions_created(start: int, end: int) -> tuple[list[dict[str, Any]], bool]:
+    """[start, end) 의 잔액 거래 — 결제·환불마다 Stripe 가 뗀 수수료(`fee`)와 은행에 갈 몫(`net`)."""
+    return list_all("/balance_transactions", {"created": {"gte": start, "lt": end}})
+
+
 def payment_intent_raw(pi_id: str) -> dict[str, Any]:
     return _request("GET", f"/payment_intents/{pi_id}", {"expand": ["latest_charge"]})
 

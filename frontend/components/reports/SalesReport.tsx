@@ -18,6 +18,7 @@ import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
 import { computeTax, formatMoney, type Cents, type RetailDailyReport, type Sale } from "@/lib/retail/types";
+import { fetchStripeFees } from "@/lib/reports/stripeReconcile";
 
 import Cancellations from "@/components/reports/Cancellations";
 import CardSales from "@/components/reports/CardSales";
@@ -86,7 +87,32 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
     };
   }, [date]);
 
+  // Total in Bank 의 Stripe 수수료(Fly 서버가 Stripe 잔액 거래에서 읽는다). 마감 숫자와 따로 읽어 늦거나 실패해도
+  // 위 숫자는 그대로 보인다. key 가 지금 날짜와 다르면 읽는 중이다.
+  const [fees, setFees] = useState<{ key: string; fee: Cents | null; error: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchStripeFees(date, date)
+      .then((result) => {
+        if (!cancelled) setFees({ key: date, fee: result.fees[date] ?? 0, error: "" });
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setFees({ key: date, fee: null, error: cause instanceof Error ? cause.message : "Could not reach Stripe." });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
+  const feesLoading = fees?.key !== date;
+
   const divisions = useMemo(() => (report ? divisionTotals(report) : []), [report]);
+  const cardSales = report
+    ? report.by_payment
+        .filter((row) => row.method === "card" || row.method === "debit")
+        .reduce((sum, row) => sum + row.total, 0)
+    : 0;
   const payments = useMemo(
     () => (report ? report.by_payment.filter((row) => cash || row.method !== "cash") : []),
     [report, cash],
@@ -179,6 +205,14 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
               onClick={() => setDrill({ kind: "net" })}
               strong
               value={formatMoney(report.net)}
+              footer={
+                // 카드 아래 칸(Stripe Fees)과 같은 값. 읽는 중이거나 못 읽으면 줄을 비운다.
+                !feesLoading && typeof fees?.fee === "number" ? (
+                  <p className="mt-1 border-t border-[#ececf0] pt-1 text-xs font-semibold tabular-nums text-[#dc2626]">
+                    − Stripe fee {formatMoney(fees.fee)}
+                  </p>
+                ) : null
+              }
             />
           </div>
 
@@ -217,11 +251,29 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
               hint="credit & debit · tax incl. · tips excl."
               label="Card Sales"
               onClick={() => setDrill({ kind: "cards" })}
-              value={formatMoney(
-                report.by_payment
-                  .filter((row) => row.method === "card" || row.method === "debit")
-                  .reduce((sum, row) => sum + row.total, 0),
-              )}
+              value={formatMoney(cardSales)}
+            />
+          </div>
+
+          {/* 은행에 들어올 돈(2026-10-28, 클럽 요청): Card Sales − Stripe 수수료. 수수료는 Stripe 가 그 날 결제마다
+              뗀 것(잔액 거래의 fee) — 환불해도 돌려주지 않는다. 손으로 친 전표·온라인 결제도 Card Sales 에 들어 있다. */}
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+            <StatCard
+              hint="credit & debit · tips excl."
+              label="Card Sales"
+              onClick={() => setDrill({ kind: "cards" })}
+              value={formatMoney(cardSales)}
+            />
+            <StatCard
+              hint={feesLoading ? "reading Stripe…" : fees?.error ? fees.error : "processing fees Stripe kept"}
+              label="Stripe Fees"
+              value={feesLoading ? "…" : fees?.fee === null || fees?.fee === undefined ? "—" : `−${formatMoney(fees.fee)}`}
+            />
+            <StatCard
+              hint="card sales − Stripe fees"
+              label="Total in Bank"
+              strong
+              value={feesLoading || fees?.fee === null || fees?.fee === undefined ? "—" : formatMoney(cardSales - fees.fee)}
             />
           </div>
 

@@ -340,3 +340,19 @@ def _row(stripe: Optional[dict[str, Any]], ours: Optional[dict[str, Any]],
         "decision": decision,
         "reviewed": reviewed,
     }
+
+
+# ===== 수수료 (Daily close 의 Total in Bank, 회계 For Bookkeeper) ==============
+
+def fees_by_day(txns: list[dict[str, Any]], tz: Any) -> dict[str, int]:
+    """잔액 거래 → 영업일(클럽 시간대)별 Stripe 수수료 합계(센트). 정산(payout)은 돈이 옮겨 갈 뿐이라 뺀다."""
+    out: dict[str, int] = {}
+    for txn in txns:
+        if txn.get("type") == "payout":
+            continue
+        fee = int(txn.get("fee") or 0)
+        if not fee:
+            continue
+        day = datetime.fromtimestamp(int(txn.get("created") or 0), tz=timezone.utc).astimezone(tz).date().isoformat()
+        out[day] = out.get(day, 0) + fee
+    return out

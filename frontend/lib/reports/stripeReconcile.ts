@@ -137,13 +137,12 @@ export type ReconcileReport = {
 
 export const MAX_DAYS = 31;
 
-export async function fetchReconcile(from: string, to: string): Promise<ReconcileReport> {
+async function paymentsGet<T>(path: string, query: URLSearchParams): Promise<T> {
   const token = await accessToken();
   if (!token) throw new ApiError(401, "Sign in with a pro shop account.");
-  const query = new URLSearchParams({ from, to });
   let response: Response;
   try {
-    response = await fetch(`${paymentsApiBase()}/payments/reconcile?${query}`, {
+    response = await fetch(`${paymentsApiBase()}/payments/${path}?${query}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch {
@@ -159,7 +158,23 @@ export async function fetchReconcile(from: string, to: string): Promise<Reconcil
     }
     throw new ApiError(response.status, message);
   }
-  return (await response.json()) as ReconcileReport;
+  return (await response.json()) as T;
+}
+
+export function fetchReconcile(from: string, to: string): Promise<ReconcileReport> {
+  return paymentsGet<ReconcileReport>("reconcile", new URLSearchParams({ from, to }));
+}
+
+/**
+ * 영업일별 Stripe 수수료(센트, Stripe 잔액 거래의 `fee` 합). 수수료가 없는 날은 키가 없다.
+ * Daily close 의 Total in Bank(카드 매출 − 수수료)와 회계 For Bookkeeper 시트가 쓴다(2026-10-28).
+ */
+export type StripeFees = { fees: Record<string, number>; truncated: boolean };
+
+export const FEES_MAX_DAYS = 92;
+
+export function fetchStripeFees(from: string, to: string): Promise<StripeFees> {
+  return paymentsGet<StripeFees>("stripe-fees", new URLSearchParams({ from, to }));
 }
 
 // ===== 정하기 (0089) ===================================================

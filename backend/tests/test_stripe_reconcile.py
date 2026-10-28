@@ -311,3 +311,35 @@ def test_route_works_before_0089(client):
     mp.setattr(supabase_rest, "rpc_as", as_user)
     res = c.get("/api/v1/payments/reconcile?from=2026-10-14&to=2026-10-14", headers=AUTH)
     assert res.status_code == 200 and res.json()["rows"][0]["level"] == "ok"
+
+
+def test_fees_by_day_toronto_and_skips_payouts():
+    from zoneinfo import ZoneInfo
+    txns = [
+        {"type": "charge", "created": T0, "fee": 63},
+        {"type": "charge", "created": T0 + 60, "fee": 37},
+        # 10월 15일 03:30 UTC = 토론토 14일 23:30 — 14일로 센다.
+        {"type": "charge", "created": 1_792_035_000, "fee": 10},
+        {"type": "charge", "created": T0 + 86400, "fee": 50},
+        {"type": "payout", "created": T0, "fee": 25},
+        {"type": "refund", "created": T0, "fee": 0},
+    ]
+    assert rc.fees_by_day(txns, ZoneInfo("America/Toronto")) == {"2026-10-14": 110, "2026-10-15": 50}
+
+
+def test_fees_route(client):
+    c, _, _, mp = client
+    seen: list[dict[str, str]] = []
+
+    def stripe(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/balance_transactions"
+        seen.append(dict(parse_qsl(request.url.query.decode())))
+        return httpx.Response(200, json={"data": [{"id": "txn_1", "type": "charge", "created": T0, "fee": 63}],
+                                         "has_more": False})
+
+    mp.setattr(sg, "_transport", httpx.MockTransport(stripe))
+    assert c.get("/api/v1/payments/stripe-fees?from=2026-10-14&to=2026-10-14").status_code == 401
+    assert c.get("/api/v1/payments/stripe-fees?from=2026-07-01&to=2026-10-14", headers=AUTH).status_code == 422
+    body = c.get("/api/v1/payments/stripe-fees?from=2026-10-14&to=2026-10-14", headers=AUTH).json()
+    assert body["fees"] == {"2026-10-14": 63} and body["truncated"] is False
+    assert seen[0]["created[gte]"] == "1791950400"
