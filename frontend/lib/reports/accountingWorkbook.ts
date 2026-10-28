@@ -1,6 +1,6 @@
 /**
  * 회계 보고서 통합 문서 — 기간(From–To)의 매출을 엑셀 시트 다섯 장으로. 맨 앞 For Bookkeeper 는 회계사에게
- * 넘기는 한 장(날짜·순번·세전 매출·HST·세금 포함 매출·은행 수수료, Grand Total — 2026-10-28 클럽 요청).
+ * 넘기는 한 장(날짜·순번·세전 매출·HST·세금 포함 매출, Grand Total — 2026-10-28 클럽 요청).
  *
  * 화면(`components/reports/AccountingWorkbook.tsx`)과 .xlsx 파일(`exportXlsx.ts`)이 **이 모델
  * 하나**를 그린다. 그래서 화면에서 본 칸·서식·합계가 파일에서도 같은 자리에 같은 값으로 나온다.
@@ -11,7 +11,6 @@
  * - 일별 매출·할인·세금·Total collected(서버의 `net`, 세금 포함)·결제 수단·사업부: 서버 마감 리포트(`pelham_staff_pos_report_daily`).
  *   여기서 계산서를 다시 더하지 않는다 — 마감 숫자는 서버가 정답이다.
  * - 영수증·품목: 그 날의 계산서 목록(`pelham_staff_bills`, paid + refunded).
- * - 은행 수수료: Stripe 잔액 거래의 fee 를 영업일별로(Fly `GET /payments/stripe-fees`). 못 읽으면 빈 칸.
  *
  * 맞아야 하는 것(0005 SQL 기준)
  * - Daily 의 Cash+Card+Debit+Member+Gift = Total collected. 결제 금액은 팁을 빼고 계산서 합계와 같아야
@@ -156,19 +155,12 @@ export function buildAccountingWorkbook(
   from: string,
   to: string,
   days: DayData[],
-  {
-    cash = false,
-    fees = null,
-  }: {
-    cash?: boolean;
-    /** 영업일 → Stripe 수수료(센트). null = 못 읽음(For Bookkeeper 의 수수료 칸이 빈다). */
-    fees?: Record<string, Cents> | null;
-  } = {},
+  { cash = false }: { cash?: boolean } = {},
 ): Workbook {
   const period = from === to ? from : `${from} to ${to}`;
   const methods = cash ? [...PAYMENT_METHODS] : PAYMENT_METHODS.filter((method) => method !== "cash");
   const sheets = [
-    buildBookkeeper(period, days, fees),
+    buildBookkeeper(period, days),
     buildSummary(period, days, methods, cash),
     buildDaily(period, days, methods, cash),
     buildReceipts(period, days),
@@ -185,10 +177,11 @@ export function buildAccountingWorkbook(
 // ----- For Bookkeeper: 하루 한 줄, 회계사용 ---------------------------------
 
 /**
- * Date / Seq # / Net Sales / HST / Gross Sales / Bank fees / Gross less bank fees, 아래 Grand Total.
+ * Date / Seq # / Net Sales / HST / Gross Sales, 아래 Grand Total.
  * - Seq # = 기간 안의 순번(1, 2, 3…). 회계 장부의 일련번호 칸.
  * - Net Sales = 할인 뒤 세전(Summary 의 Net sales), Gross Sales = Net + HST(= Daily 의 Total collected).
- * - Bank fees = 그 날 Stripe 가 뗀 수수료. 마지막 칸 = Gross Sales − Bank fees.
+ * Stripe 수수료는 시트·파일에 넣지 않는다(2026-10-28 클럽 요청) — 화면에서 Gross Sales 칸을 누를 때만
+ * `AccountingWorkbook.tsx` 가 "Gross − Stripe fee" 를 보여 준다.
  */
 const BOOKKEEPER_COLUMNS: Column[] = [
   { header: "Date", width: 12, format: "date" },
@@ -196,30 +189,21 @@ const BOOKKEEPER_COLUMNS: Column[] = [
   { header: "Net Sales", width: 14, format: "money" },
   { header: "HST", width: 12, format: "money" },
   { header: "Gross Sales", width: 14, format: "money" },
-  { header: "Less: Bank fees (Stripe)", width: 22, format: "money" },
-  { header: "Gross less bank fees", width: 20, format: "money" },
 ];
 
-function buildBookkeeper(period: string, days: DayData[], fees: Record<string, Cents> | null): Sheet {
+export const BOOKKEEPER_SHEET = "For Bookkeeper";
+export const BOOKKEEPER_GROSS_COL = 4;
+
+function buildBookkeeper(period: string, days: DayData[]): Sheet {
   const rows: Row[] = days.map(({ date, report }, index) => {
     const n = FIRST_DATA_ROW + index;
     if (!report) {
-      return { cells: [date, index + 1, "Not loaded", null, null, null, null], style: "muted" };
+      return { cells: [date, index + 1, "Not loaded", null, null], style: "muted" };
     }
     const net = round2(dollars(report.gross) - dollars(report.discount));
     const tax = dollars(report.tax);
-    const gross = round2(net + tax);
-    const fee = fees ? dollars(fees[date] ?? 0) : null;
     return {
-      cells: [
-        date,
-        index + 1,
-        net,
-        tax,
-        { formula: `C${n}+D${n}`, value: gross },
-        fee,
-        fee === null ? null : { formula: `E${n}-F${n}`, value: round2(gross - fee) },
-      ],
+      cells: [date, index + 1, net, tax, { formula: `C${n}+D${n}`, value: round2(net + tax) }],
     };
   });
 
@@ -228,7 +212,6 @@ function buildBookkeeper(period: string, days: DayData[], fees: Record<string, C
   const totals: Cell[] = BOOKKEEPER_COLUMNS.map((column, col) => {
     if (col === 0) return "Grand Total";
     if (column.noTotal) return null;
-    if (col >= 5 && !fees) return null;
     const sum = rows.reduce((acc, row) => {
       const value = cellValue(row.cells[col]);
       return acc + (typeof value === "number" ? value : 0);
@@ -237,11 +220,9 @@ function buildBookkeeper(period: string, days: DayData[], fees: Record<string, C
   });
 
   return {
-    name: "For Bookkeeper",
+    name: BOOKKEEPER_SHEET,
     title: "Sales for the bookkeeper — Pelham Hills",
-    subtitle: fees
-      ? `${period} · Net Sales after discounts, tax excl. · Gross Sales tax incl. · bank fees = Stripe processing fees`
-      : `${period} · Net Sales after discounts, tax excl. · Gross Sales tax incl. · WARNING: Stripe fees could not be read`,
+    subtitle: `${period} · Net Sales after discounts, tax excl. · Gross Sales tax incl.`,
     columns: BOOKKEEPER_COLUMNS,
     rows: [...rows, { cells: totals, style: "total" }],
   };

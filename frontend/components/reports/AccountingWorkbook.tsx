@@ -13,6 +13,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import {
+  BOOKKEEPER_GROSS_COL,
+  BOOKKEEPER_SHEET,
   buildAccountingWorkbook,
   cellValue,
   columnLetter,
@@ -67,7 +69,7 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
   const [from, setFrom] = useState(() => monthStart(today));
   const [to, setTo] = useState(today);
   const [days, setDays] = useState<DayData[] | null>(null);
-  // For Bookkeeper 의 은행 수수료. null = 못 읽음(시트에 경고, 칸은 빈다).
+  // For Bookkeeper 의 Gross Sales 칸을 누를 때만 보이는 Stripe 수수료. 시트·파일에는 넣지 않는다. null = 못 읽음.
   const [fees, setFees] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -116,8 +118,8 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
   }, [dates, rangeError]);
 
   const workbook = useMemo(
-    () => (days && !rangeError ? buildAccountingWorkbook(from, to, days, { cash, fees }) : null),
-    [days, fees, from, to, rangeError, cash],
+    () => (days && !rangeError ? buildAccountingWorkbook(from, to, days, { cash }) : null),
+    [days, from, to, rangeError, cash],
   );
   const sheet = workbook?.sheets[active] ?? null;
 
@@ -159,6 +161,7 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
         <SkeletonRows count={8} />
       ) : sheet ? (
         <SheetView
+          fees={fees}
           onSelect={setSelected}
           selected={selected}
           sheet={sheet}
@@ -211,7 +214,9 @@ function SheetView({
   onTab,
   selected,
   onSelect,
+  fees,
 }: {
+  fees: Record<string, number> | null;
   sheet: Sheet;
   tabs: string[];
   active: number;
@@ -246,6 +251,7 @@ function SheetView({
         <div className="shrink-0 border-r border-[#c8c8c8] px-2 py-1 italic text-[#6b7280]">fx</div>
         <div className="min-w-0 flex-1 truncate px-2 py-1 font-mono">{bar}</div>
       </div>
+      {selected ? <BankLine fees={fees} row={selected.row} col={selected.col} sheet={sheet} /> : null}
 
       <div className="max-h-[70vh] overflow-auto">
         <table className="border-separate border-spacing-0" style={{ width, tableLayout: "fixed" }}>
@@ -373,4 +379,46 @@ function cellAt(sheet: Sheet, row: number, col: number): Cell | undefined {
   if (row === 3) return null;
   if (row === HEADER_ROW) return sheet.columns[col]?.header ?? null;
   return sheet.rows[row - FIRST_DATA_ROW]?.cells[col] ?? null;
+}
+
+/**
+ * For Bookkeeper 의 Gross Sales 칸을 누르면: Gross Sales − Stripe fee = 은행에 남는 돈. 화면에만 —
+ * 시트 모델에 없으니 .xlsx 로 나가지 않는다(2026-10-28 클럽 요청). Grand Total 줄은 기간 전체 수수료.
+ */
+function BankLine({
+  sheet,
+  row,
+  col,
+  fees,
+}: {
+  sheet: Sheet;
+  row: number;
+  col: number;
+  fees: Record<string, number> | null;
+}) {
+  if (sheet.name !== BOOKKEEPER_SHEET || col !== BOOKKEEPER_GROSS_COL || row < FIRST_DATA_ROW) return null;
+  const cells = sheet.rows[row - FIRST_DATA_ROW]?.cells;
+  const gross = cells ? cellValue(cells[BOOKKEEPER_GROSS_COL]) : null;
+  if (typeof gross !== "number") return null;
+  const date = cells?.[0];
+  const money = (value: number) =>
+    value.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let body: string;
+  if (!fees) {
+    body = "Stripe fees could not be read.";
+  } else {
+    const dates = date === "Grand Total"
+      ? sheet.rows.map((r) => r.cells[0]).filter((d): d is string => typeof d === "string" && d !== "Grand Total")
+      : typeof date === "string"
+        ? [date]
+        : [];
+    const fee = dates.reduce((sum, d) => sum + (fees[d] ?? 0), 0) / 100;
+    body = `Gross Sales ${money(gross)} − Stripe fees ${money(fee)} = ${money(Math.round((gross - fee) * 100) / 100)}`;
+  }
+  return (
+    <div className="border-b border-[#c8c8c8] bg-[#f0fdf4] px-2 py-1 text-[12px] tabular-nums text-[#14532d]">
+      {date === "Grand Total" ? "Period: " : `${String(date)}: `}
+      {body}
+    </div>
+  );
 }
