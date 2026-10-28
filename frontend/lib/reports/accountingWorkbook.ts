@@ -221,7 +221,7 @@ function buildBookkeeper(period: string, days: DayData[]): Sheet {
 
   return {
     name: BOOKKEEPER_SHEET,
-    title: "Pelham Hills Sales",
+    title: "Pelham Hills Golf Sales",
     subtitle: `${period} · Net Sales after discounts, tax excl. · Gross Sales tax incl.`,
     columns: BOOKKEEPER_COLUMNS,
     rows: [...rows, { cells: totals, style: "total" }],
