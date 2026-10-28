@@ -140,6 +140,7 @@ export function StatCard({
   onClick,
   strong,
   className = "",
+  footer,
 }: {
   label: string;
   value: string;
@@ -150,6 +151,8 @@ export function StatCard({
   onClick?: () => void;
   /** 한 줄에서 먼저 읽어야 할 숫자. 값을 크게, 테두리를 진하게. */
   strong?: boolean;
+  /** 힌트 아래에 붙는 줄(예: Total Collected 아래 Stripe 수수료). */
+  footer?: ReactNode;
 }) {
   const body = (
     <>
@@ -159,6 +162,7 @@ export function StatCard({
       <p className={`mt-0.5 font-bold tabular-nums ${strong ? "text-2xl" : "text-lg"}`}>{value}</p>
       {/* 좁은 화면(두 칸 그리드)에서 잘리지 않게 줄을 넘긴다. */}
       {hint ? <p className="mt-0.5 text-xs leading-snug text-[#6b7280]">{hint}</p> : null}
+      {footer}
     </>
   );
   if (onClick) {
