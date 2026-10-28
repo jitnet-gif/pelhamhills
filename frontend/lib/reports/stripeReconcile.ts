@@ -169,7 +169,7 @@ export function fetchReconcile(from: string, to: string): Promise<ReconcileRepor
  * 영업일별 Stripe 수수료(센트, Stripe 잔액 거래의 `fee` 합). 수수료가 없는 날은 키가 없다.
  * Daily close 의 Total in Bank(카드 매출 − 수수료)와 회계 For Bookkeeper 시트가 쓴다(2026-10-28).
  */
-export type StripeFees = { fees: Record<string, number>; truncated: boolean };
+export type StripeFees = { environment: "test" | "live"; fees: Record<string, number>; truncated: boolean };
 
 export const FEES_MAX_DAYS = 92;
 
@@ -229,6 +229,11 @@ export const SOURCE_LABEL: Record<ReconcileRow["source"], string> = {
 
 export function stripeUrl(environment: "test" | "live", paymentIntent: string): string {
   return `https://dashboard.stripe.com/${environment === "test" ? "test/" : ""}payments/${paymentIntent}`;
+}
+
+/** Stripe 의 Balance summary 리포트(수수료가 기간별로 모인 곳). Daily close 의 Stripe 수수료 줄을 누르면 연다. */
+export function stripeSummaryUrl(environment: "test" | "live"): string {
+  return `https://dashboard.stripe.com/${environment === "test" ? "test/" : ""}reports/balance`;
 }
 
 export function clubTime(iso: string | null): string {

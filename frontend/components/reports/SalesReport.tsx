@@ -18,7 +18,7 @@ import retailApi, { localBusinessDate, toRetailError } from "@/lib/retail/api";
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import { divisionTotals } from "@/lib/retail/divisions";
 import { computeTax, formatMoney, type Cents, type RetailDailyReport, type Sale } from "@/lib/retail/types";
-import { fetchStripeFees } from "@/lib/reports/stripeReconcile";
+import { fetchStripeFees, stripeSummaryUrl } from "@/lib/reports/stripeReconcile";
 
 import Cancellations from "@/components/reports/Cancellations";
 import CardSales from "@/components/reports/CardSales";
@@ -89,12 +89,14 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
 
   // Total in Bank 의 Stripe 수수료(Fly 서버가 Stripe 잔액 거래에서 읽는다). 마감 숫자와 따로 읽어 늦거나 실패해도
   // 위 숫자는 그대로 보인다. key 가 지금 날짜와 다르면 읽는 중이다.
-  const [fees, setFees] = useState<{ key: string; fee: Cents | null; error: string } | null>(null);
+  const [fees, setFees] = useState<{ key: string; fee: Cents | null; error: string; url?: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchStripeFees(date, date)
       .then((result) => {
-        if (!cancelled) setFees({ key: date, fee: result.fees[date] ?? 0, error: "" });
+        if (!cancelled) {
+          setFees({ key: date, fee: result.fees[date] ?? 0, error: "", url: stripeSummaryUrl(result.environment) });
+        }
       })
       .catch((cause) => {
         if (!cancelled) {
@@ -205,14 +207,6 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
               onClick={() => setDrill({ kind: "net" })}
               strong
               value={formatMoney(report.net)}
-              footer={
-                // 카드 아래 칸(Stripe Fees)과 같은 값. 읽는 중이거나 못 읽으면 줄을 비운다.
-                !feesLoading && typeof fees?.fee === "number" ? (
-                  <p className="mt-1 border-t border-[#ececf0] pt-1 text-xs font-semibold tabular-nums text-[#dc2626]">
-                    − Stripe fee {formatMoney(fees.fee)}
-                  </p>
-                ) : null
-              }
             />
           </div>
 
@@ -252,6 +246,23 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
               label="Card Sales"
               onClick={() => setDrill({ kind: "cards" })}
               value={formatMoney(cardSales)}
+              footer={
+                // 카드 아래 칸(Stripe Fees)과 같은 값. 읽는 중이거나 못 읽으면 줄을 비운다.
+                // 누르면 Stripe 의 Balance summary 리포트를 새 탭으로. 카드 전체가 버튼이라 <a> 를 못 넣어 span 으로 연다.
+                !feesLoading && typeof fees?.fee === "number" ? (
+                  <span
+                    className="mt-1 block border-t border-[#ececf0] pt-1 text-xs font-semibold tabular-nums text-[#dc2626] hover:underline"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (fees.url) window.open(fees.url, "_blank", "noopener,noreferrer");
+                    }}
+                    role="link"
+                    title="Open the Balance summary report in Stripe"
+                  >
+                    − Stripe fee {formatMoney(fees.fee)} ↗
+                  </span>
+                ) : null
+              }
             />
           </div>
 

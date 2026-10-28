@@ -316,9 +316,11 @@ function SheetView({
                   <RowHead n={n} active={selected?.row === n} />
                   {cols.map((column, col) => {
                     const cell = row.cells[col] ?? null;
-                    const value = cellValue(cell);
+                    // For Bookkeeper 의 Gross Sales 는 화면에서 수수료를 뺀 값(After fees)으로 보인다. 파일은 그대로 총매출.
+                    const breakdown = bankBreakdown(sheet, rowIndex, col, fees);
+                    const value = breakdown && breakdown.fee !== null ? afterFees(breakdown) : cellValue(cell);
                     const negative = typeof value === "number" && value < 0 && column.format === "money";
-                    const bank = isSel(n, col) ? bankBreakdown(sheet, rowIndex, col, fees) : null;
+                    const bank = isSel(n, col) ? breakdown : null;
                     return (
                       <td
                         className={`${tdBase} ${align(column.format, value)} ${cellClass(row.style)} ${
@@ -405,6 +407,10 @@ function bankBreakdown(sheet: Sheet, rowIndex: number, col: number, fees: Record
   };
 }
 
+function afterFees(bank: Bank): number {
+  return Math.round((bank.gross - (bank.fee ?? 0)) * 100) / 100;
+}
+
 function BankPopover({ bank, above }: { bank: Bank; above: boolean }) {
   const money = (value: number) =>
     value.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -429,7 +435,7 @@ function BankPopover({ bank, above }: { bank: Bank; above: boolean }) {
           </p>
           <p className="flex justify-between gap-4 border-t border-[#111827] pt-0.5 font-bold tabular-nums">
             <span>= After fees</span>
-            <span>{money(Math.round((bank.gross - bank.fee) * 100) / 100)}</span>
+            <span>{money(afterFees(bank))}</span>
           </p>
         </>
       )}
