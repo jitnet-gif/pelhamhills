@@ -36,6 +36,7 @@ import { fetchStripeFees } from "@/lib/reports/stripeReconcile";
 import { Button, ErrorNote, Field, SkeletonRows, TextInput } from "@/components/retail/ui";
 
 const CONCURRENCY = 6;
+const SKIPPED_KEY = "pelham.accounting.skippedSheets";
 
 async function loadDays(dates: string[]): Promise<{ days: DayData[]; failed: number }> {
   const days: DayData[] = new Array(dates.length);
@@ -76,6 +77,28 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
   const [active, setActive] = useState(0);
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null);
   const [exporting, setExporting] = useState(false);
+  // 내려받을 시트(이름). 체크를 푼 시트는 파일에서 빠진다 — 화면 탭은 그대로. 이 기기에만 기억한다.
+  // 체크박스는 시트를 다 읽은 뒤에만 그려지므로(서버 렌더에는 없다) 처음 값에서 바로 읽어도 된다.
+  const [skipped, setSkipped] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(SKIPPED_KEY) ?? "[]");
+      return Array.isArray(saved) ? saved.filter((name): name is string => typeof name === "string") : [];
+    } catch {
+      return []; // 못 읽으면(서버 렌더 포함) 전부 내려받는다.
+    }
+  });
+
+  function toggleSheet(name: string) {
+    setSkipped((current) => {
+      const next = current.includes(name) ? current.filter((n) => n !== name) : [...current, name];
+      try {
+        window.localStorage.setItem(SKIPPED_KEY, JSON.stringify(next));
+      } catch {
+        // 저장 못 해도 이번 화면에서는 그대로 쓴다.
+      }
+      return next;
+    });
+  }
 
   const dates = useMemo(() => datesBetween(from, to), [from, to]);
   const rangeError =
@@ -122,12 +145,14 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
     [days, from, to, rangeError, cash],
   );
   const sheet = workbook?.sheets[active] ?? null;
+  // 시트끼리 서로 참조하는 수식이 없으니 골라 빼도 남은 시트의 수식은 그대로 맞다.
+  const exportSheets = workbook?.sheets.filter((s) => !skipped.includes(s.name)) ?? [];
 
   async function exportXlsx() {
-    if (!workbook) return;
+    if (!workbook || exportSheets.length === 0) return;
     setExporting(true);
     try {
-      const blob = await workbookToXlsx(workbook);
+      const blob = await workbookToXlsx({ ...workbook, sheets: exportSheets });
       downloadBlob(blob, `PelhamHills_Accounting_${workbook.from}_to_${workbook.to}.xlsx`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not build the Excel file.");
@@ -146,13 +171,32 @@ export default function AccountingWorkbook({ cash = false }: { cash?: boolean })
           <TextInput min={from} onChange={(event) => setTo(event.target.value)} type="date" value={to} />
         </Field>
         <Button
-          disabled={!workbook || loading || exporting}
+          disabled={!workbook || loading || exporting || exportSheets.length === 0}
           onClick={exportXlsx}
           tone="primary"
         >
           {exporting ? "Building…" : "Download Excel (.xlsx)"}
         </Button>
       </div>
+
+      {workbook ? (
+        <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <legend className="sr-only">Sheets in the Excel file</legend>
+          <span className="font-semibold text-[#444]">Sheets in the file:</span>
+          {workbook.sheets.map((s) => (
+            <label className="inline-flex cursor-pointer items-center gap-1.5" key={s.name}>
+              <input
+                checked={!skipped.includes(s.name)}
+                className="h-4 w-4 accent-[#107c41]"
+                onChange={() => toggleSheet(s.name)}
+                type="checkbox"
+              />
+              {s.name}
+            </label>
+          ))}
+          {exportSheets.length === 0 ? <span className="text-[#c00000]">Pick at least one sheet.</span> : null}
+        </fieldset>
+      ) : null}
 
       {rangeError ? <ErrorNote>{rangeError}</ErrorNote> : null}
       {error ? <ErrorNote>{error}</ErrorNote> : null}
