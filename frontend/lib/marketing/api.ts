@@ -84,6 +84,9 @@ export type Campaign = {
     kind?: "weather";
     date?: string;
     tee_times?: number;
+    /** 0132 — 손으로 친 번호 수 · 그 번호에만 보냈는지. */
+    typed?: number;
+    phones_only?: boolean;
   };
   status: "ready" | "sending" | "sent" | "cancelled";
   created_by: string | null;
@@ -164,6 +167,9 @@ export const marketingApi = {
     message: string;
     audience: AudienceFilter & { barcode?: string };
     customer_refs?: string[];
+    /** 0132 — 손으로 친 번호(문자만). phones_only 면 그룹·필터 없이 이 번호에만. */
+    phones?: string[];
+    phones_only?: boolean;
   }) => staffRpc<Campaign>("pelham_marketing_campaign_create", { p: fields }),
   campaigns: () => staffRpc<Campaign[]>("pelham_marketing_campaigns"),
   campaign: (id: number) => staffRpc<Campaign>("pelham_marketing_campaign", { p_id: id }),

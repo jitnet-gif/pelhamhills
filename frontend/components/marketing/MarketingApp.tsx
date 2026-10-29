@@ -190,6 +190,9 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   const [search, setSearch] = useState("");
   const [cities, setCities] = useState<string[]>([]);
   const [areaCodes, setAreaCodes] = useState<string[]>([]);
+  // 손으로 친 번호(문자만, 0132). phonesOnly 면 그룹·필터는 빼고 이 번호에만 보낸다.
+  const [typed, setTyped] = useState("");
+  const [phonesOnly, setPhonesOnly] = useState(true);
   // null = 그룹 전체(모두 체크). 한 명이라도 체크를 풀면 고른 사람 목록(Set)으로 바뀐다.
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -214,10 +217,16 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
     () => (picked ? eligible.filter((c) => picked.has(c.customer_ref)).map((c) => c.customer_ref) : []),
     [eligible, picked],
   );
+  const typedPhones = useMemo(() => parseTypedPhones(typed), [typed]);
+  const useTyped = channel === "sms" && typedPhones.valid.length > 0;
+  const typedOnly = useTyped && phonesOnly;
   const recipients = useMemo(() => {
-    if (!picked) return audience?.phones ?? 0;
-    return new Set(eligible.filter((c) => picked.has(c.customer_ref)).map((c) => c.phone)).size;
-  }, [audience, eligible, picked]);
+    if (typedOnly) return typedPhones.valid.length;
+    const phones = new Set(eligible.filter((c) => !picked || picked.has(c.customer_ref)).map((c) => c.phone));
+    if (!useTyped) return picked ? phones.size : (audience?.phones ?? 0);
+    for (const phone of typedPhones.valid) phones.add(phone);
+    return phones.size;
+  }, [audience, eligible, picked, typedOnly, typedPhones, useTyped]);
 
   const sender = status?.sms_sender ?? "Pelham Hills Golf";
   const footer = status?.sms_footer ?? "Reply STOP to opt out.";
@@ -248,7 +257,9 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
           ...filter,
           ...(channel === "sms" && barcode ? { barcode } : {}),
         },
-        customer_refs: pickMode ? pickedRefs : undefined,
+        // 친 번호만일 때 없는 고객 번호 하나를 보낸다 — 0132 전 DB 는 그룹 전체가 아니라 "아무도 없음"으로 막는다.
+        customer_refs: typedOnly ? ["typed-only"] : pickMode ? pickedRefs : undefined,
+        ...(useTyped ? { phones: typedPhones.valid, phones_only: phonesOnly } : {}),
       });
       if (sendNow) {
         try {
@@ -465,6 +476,44 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
           </p>
         ) : null}
 
+        {channel === "sms" ? (
+          <div className="mt-3 border border-[#ececf0] bg-[#fafafa] p-3">
+            <label className="block text-xs font-bold" htmlFor="campaign-phones">
+              Or type phone numbers
+            </label>
+            <textarea
+              className="mt-1 min-h-16 w-full border border-[#d4d4d8] bg-white p-2 text-sm"
+              id="campaign-phones"
+              onChange={(event) => setTyped(event.target.value)}
+              placeholder={"647-618-4410\n905-555-1234"}
+              value={typed}
+            />
+            <p className="mt-1 text-xs text-[#6b7280]">
+              One per line or separated by commas. 10-digit numbers only; numbers on the opt-out list are skipped.
+            </p>
+            {typedPhones.valid.length || typedPhones.bad.length ? (
+              <p className="mt-1 text-xs">
+                <b>{typedPhones.valid.length}</b> number{typedPhones.valid.length === 1 ? "" : "s"} ready
+                {typedPhones.bad.length ? (
+                  <span className="text-[#a12a2a]"> · not a phone number: {typedPhones.bad.join(", ")}</span>
+                ) : null}
+              </p>
+            ) : null}
+            {useTyped ? (
+              <div className="mt-2 grid gap-1 text-xs">
+                <label className="flex items-center gap-2">
+                  <input checked={phonesOnly} name="typed-mode" onChange={() => setPhonesOnly(true)} type="radio" />
+                  Only these numbers (ignore the group and filters above)
+                </label>
+                <label className="flex items-center gap-2">
+                  <input checked={!phonesOnly} name="typed-mode" onChange={() => setPhonesOnly(false)} type="radio" />
+                  These numbers plus the group above
+                </label>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {audienceError ? (
           <p className="mt-3 text-xs text-[#8c1d1d]" role="alert">
             {audienceError}
@@ -472,7 +521,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
         ) : null}
         {audience ? (
           <div className={`mt-3 grid grid-cols-4 gap-2 text-center ${loading ? "opacity-60" : ""}`}>
-            <Stat label="Will receive" value={pickMode ? recipients : audience.phones} strong />
+            <Stat label="Will receive" value={pickMode || useTyped ? recipients : audience.phones} strong />
             <Stat label="No consent" value={audience.no_consent} />
             <Stat label="Opted out" value={audience.opted_out} />
             <Stat label="No phone" value={audience.no_phone} />
@@ -577,6 +626,21 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
       </section>
     </div>
   );
+}
+
+// 손으로 친 번호 → 10자리. 줄바꿈·쉼표·세미콜론으로 나눈다. 앞의 1 은 뗀다(0047 pelham_marketing_phone 과 같다).
+function parseTypedPhones(text: string): { valid: string[]; bad: string[] } {
+  const valid = new Set<string>();
+  const bad: string[] = [];
+  for (const raw of text.split(/[\n,;]+/)) {
+    const item = raw.trim();
+    if (!item) continue;
+    const digits = item.replace(/\D/g, "");
+    if (/^\d{10}$/.test(digits)) valid.add(digits);
+    else if (/^1\d{10}$/.test(digits)) valid.add(digits.slice(1));
+    else bad.push(item);
+  }
+  return { valid: [...valid], bad };
 }
 
 function Stat({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
