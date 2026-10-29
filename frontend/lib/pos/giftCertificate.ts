@@ -1,5 +1,6 @@
 /**
- * 종이 상품권(Gift Certificate) — 클럽이 쓰던 인쇄 양식을 그대로 옮겨, 기프트카드 한 장을 일반 프린터(Letter 가로)로 찍는다.
+ * 종이 상품권(Gift Certificate) — 클럽이 쓰던 인쇄 양식을 그대로 옮겨, 기프트카드 한 장을 #10 봉투(9.5 × 4.125in)에 찍는다.
+ * 종이 = 봉투 크기, 여백 0, 상품권은 그 한가운데. 초록 제목·로고 색은 print-color-adjust 로 인쇄에도 그대로 나간다.
  * 원본 스캔은 세로로 누워 있어 돌려 세웠고, 왼쪽 로고(공·월계수)만 잘라 `public/pelham-hills/gift-certificate-logo.png` 에 두었다.
  *
  * 빈 줄에 들어가는 것: 금액(entitles), 받는 사람(To — 없으면 손으로 쓰게 비운다), 만료(No expiry — 온타리오법),
@@ -17,18 +18,20 @@ function escapeHtml(text: string) {
 }
 
 const CSS = `
-  @page{size:letter landscape;margin:0.5in}
-  *{box-sizing:border-box}
-  body{margin:0;color:#111;font-family:"Times New Roman",Times,Georgia,serif}
-  .cert{position:relative;width:9.5in;height:3.95in;margin:0 auto;padding:0.12in 0.25in 0.18in;border:1px dashed #9a9a9a;
+  @page{size:9.5in 4.125in;margin:0}
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html,body{margin:0}
+  body{color:#111;font-family:"Times New Roman",Times,Georgia,serif}
+  .sheet{width:9.5in;height:4.125in;margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .cert{position:relative;width:9.1in;height:3.8in;padding:0.1in 0.22in 0.14in;
     display:grid;grid-template-columns:2.35in 1fr;grid-template-rows:auto 1fr;column-gap:0.15in}
   .no{position:absolute;top:0.14in;right:0.22in;font:700 11pt "Times New Roman",serif;letter-spacing:0.5px}
   .mark{position:absolute;top:0.38in;right:0.22in;font:700 10pt system-ui,sans-serif;color:#b00020}
-  h1{grid-column:1/-1;margin:0;text-align:center;font-weight:700;font-size:60pt;line-height:1.05;letter-spacing:2px;color:#7c9a6b}
+  h1{grid-column:1/-1;margin:0;text-align:center;font-weight:700;font-size:56pt;line-height:1.05;letter-spacing:2px;color:#7c9a6b}
   .club{align-self:end;text-align:center;font-size:12.5pt;line-height:1.15}
   .club img{display:block;width:2.2in;margin:0 auto 0.04in}
   .club b{display:block;font-size:14pt;margin-top:0.02in}
-  .lines{display:flex;flex-direction:column;gap:0.2in;padding-top:0.05in;font-size:15pt}
+  .lines{display:flex;flex-direction:column;gap:0.18in;padding-top:0.05in;font-size:15pt}
   .row{display:flex;align-items:flex-end;gap:0.08in}
   .row.in{padding-left:0.4in}
   .fill{flex:1;min-width:0;border-bottom:1px solid #111;padding:0 0.08in 1px;font-size:17pt;font-weight:700;
@@ -44,7 +47,7 @@ const CSS = `
   .bars p{margin:1px 0 0;text-align:center;font:9pt ui-monospace,Menlo,monospace;letter-spacing:1px}
   .web{font-size:17pt;letter-spacing:0.5px}
   .note{font:13px system-ui,sans-serif;background:#fff8e1;border:1px solid #f0c36d;padding:8px 10px;margin:12px auto;width:9.5in}
-  @media screen{body{background:#e5e5e5;padding:12px}.cert{background:#fff;border-style:solid;box-shadow:0 0 4px #999}}
+  @media screen{body{background:#e5e5e5;padding:12px}.sheet{background:#fff;box-shadow:0 0 4px #999}}
   @media print{.note{display:none}}
 `;
 
@@ -57,7 +60,7 @@ export function giftCertificateHtml(
   const mark =
     card.status === "void" ? "VOID" : options.reprint ? "REPRINT" : "";
   return (
-    `<div class="cert">` +
+    `<div class="sheet"><div class="cert">` +
     `<span class="no">${escapeHtml(card.code)}</span>` +
     (mark ? `<span class="mark">*** ${mark} ***</span>` : "") +
     `<h1>Gift Certificate</h1>` +
@@ -72,7 +75,7 @@ export function giftCertificateHtml(
     ` Expires on <span class="fill exp">No expiry</span></div>` +
     `<div class="foot"><div class="bars"><span>${code128Svg(card.code)}</span><p>${escapeHtml(card.code)}</p></div>` +
     `<span class="web">www.pelhamhills.ca</span></div>` +
-    `</div></div>`
+    `</div></div></div>`
   );
 }
 
@@ -86,7 +89,7 @@ export function printGiftCertificate(
   win.document.write(
     `<!doctype html><html><head><meta charset="utf-8"><title>Gift Certificate ${escapeHtml(card.code)}</title>` +
       `<style>${CSS}</style></head><body>` +
-      `<p class="note">Print on <b>Letter, Landscape</b> at <b>100% / Actual size</b>. Cut along the dashed line.</p>` +
+      `<p class="note">Print on a <b>#10 envelope (9.5 × 4.125 in)</b>, <b>Landscape</b>, <b>100% / Actual size</b>, <b>Color</b>. Feed the envelope centered in the tray.</p>` +
       giftCertificateHtml(card, {
         origin: window.location.origin,
         reprint: options.reprint,
