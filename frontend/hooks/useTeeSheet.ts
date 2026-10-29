@@ -56,8 +56,17 @@ const MIN_PLAYERS_PER_BOOKING = 1;
 const TOAST_TTL_MS = 5000;
 // 오프라인이면 쓰기를 막으므로 복구를 오래 기다리게 하지 않는다.
 const RETRY_INTERVAL_MS = 5000;
-/** 온라인일 때 예약을 다시 읽는 간격. */
+/**
+ * 온라인일 때 바뀌었는지 묻는 간격. 묻는 건 32자 도장(0134)이고, 다를 때만 일주일치를 받는다.
+ * 일주일치를 5초마다 통째로 받던 것이 Supabase 전송량 한도를 넘겼다(2026-10-28).
+ */
 const POLL_INTERVAL_MS = 5000;
+/** 2분 동안 마우스·키보드·터치가 없으면 이 간격으로 늦춘다. 다시 손대면 바로 한 번 묻는다. */
+const POLL_IDLE_MS = 30_000;
+const IDLE_AFTER_MS = 120_000;
+/** 0134 SQL 전이라 도장 함수가 없을 때: 일주일치를 통째로 받으니 훨씬 드물게. */
+const POLL_NO_STAMP_MS = 30_000;
+const POLL_NO_STAMP_IDLE_MS = 60_000;
 /** 폴링이 연달아 이만큼 네트워크 오류를 내면 오프라인으로 본다(한 번 끊겼다고 넘어가지 않는다). */
 const POLL_OFFLINE_AFTER_FAILURES = 2;
 
@@ -726,13 +735,22 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
     };
   }, [commitConnection, pushToast]);
 
-  // 온라인이면 5초마다 이번 주 예약을 Supabase 에서 다시 읽는다.
+  // 온라인이면 5초마다(손 안 대면 30초) 이번 주 예약이 바뀌었는지 묻고, 바뀌었을 때만 다시 읽는다.
   // setInterval 이 아니라 setTimeout 사슬이다 — 응답이 느려도 요청이 겹치지 않는다.
   useEffect(() => {
     if (!live) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let running = false;
     let disposed = false;
+    /** 화면에 깔린 목록의 도장 — `주 시작|md5`. 주가 바뀌면 키가 달라서 한 번 통째로 읽는다. */
+    let lastStamp: string | null = null;
+    /** 도장 함수가 없으면(404, 0134 전) 이 탭에서는 다시 묻지 않는다. */
+    let stampMissing = false;
+    let lastActivity = Date.now();
+
+    const idle = () => Date.now() - lastActivity > IDLE_AFTER_MS;
+    const pollDelay = () =>
+      stampMissing ? (idle() ? POLL_NO_STAMP_IDLE_MS : POLL_NO_STAMP_MS) : idle() ? POLL_IDLE_MS : POLL_INTERVAL_MS;
 
     const schedule = (delay: number) => {
       if (disposed) return;
@@ -752,7 +770,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
         pollHaltedRef.current ||
         inflightRef.current > 0
       ) {
-        schedule(POLL_INTERVAL_MS);
+        schedule(pollDelay());
         return;
       }
 
@@ -760,13 +778,34 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
       const anchor = weekStartRef.current;
       const generation = weekLoadRef.current;
       const epoch = writeEpochRef.current;
-      try {
-        const data = await teeSheetApi.listBookings({ from: anchor, to: addDays(anchor, 6) });
-        if (disposed || !mountedRef.current) return;
+      const markHealthy = () => {
         const hadError = pollErrorRef.current !== null;
         pollFailuresRef.current = 0;
         pollErrorRef.current = null;
         if (hadError) pushToast("success", "Live updates resumed.");
+      };
+      try {
+        const range = { from: anchor, to: addDays(anchor, 6) };
+        // 도장은 목록보다 먼저 받는다 — 그래서 적어 두는 도장은 늘 목록보다 같거나 오래됐고,
+        // 그 사이 바뀐 것은 다음 틱에서 도장이 달라 다시 읽힌다(놓치지 않는다).
+        let stamp: string | null = null;
+        if (!stampMissing) {
+          try {
+            stamp = `${anchor}|${await teeSheetApi.bookingsStamp(range)}`;
+          } catch (error) {
+            if (!(error instanceof ApiError && error.status === 404)) throw error;
+            stampMissing = true;
+          }
+          if (disposed || !mountedRef.current) return;
+          if (stamp !== null && stamp === lastStamp) {
+            markHealthy();
+            return;
+          }
+        }
+
+        const data = await teeSheetApi.listBookings(range);
+        if (disposed || !mountedRef.current) return;
+        markHealthy();
 
         // 보낸 뒤에 무슨 일이 있었는지 모르는 응답은 버린다 — 다음 틱이 새로 읽는다.
         const stale =
@@ -777,6 +816,7 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
           connectionRef.current !== "online";
         if (stale) return;
 
+        lastStamp = stamp;
         lastGoodRef.current = data;
         const next = sortBookings(data);
         if (JSON.stringify(next) === JSON.stringify(bookingsRef.current)) return;
@@ -813,22 +853,34 @@ export function useTeeSheet({ live = false }: { live?: boolean } = {}): TeeSheet
         }
       } finally {
         running = false;
-        schedule(POLL_INTERVAL_MS);
+        schedule(pollDelay());
       }
     };
 
     const onVisible = () => {
       if (!document.hidden) schedule(0);
     };
+    // 늦춰져 있다가 다시 손대면 30초를 기다리지 않고 바로 묻는다.
+    const onActivity = () => {
+      const wasIdle = idle();
+      lastActivity = Date.now();
+      if (wasIdle && !document.hidden) schedule(0);
+    };
+    const activityEvents = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
 
-    pollNowRef.current = () => schedule(0);
+    pollNowRef.current = () => {
+      lastStamp = null; // 결과를 모르는 쓰기 뒤 — 도장과 상관없이 목록을 받는다.
+      schedule(0);
+    };
     document.addEventListener("visibilitychange", onVisible);
-    schedule(POLL_INTERVAL_MS);
+    for (const name of activityEvents) window.addEventListener(name, onActivity, { capture: true, passive: true });
+    schedule(pollDelay());
     return () => {
       disposed = true;
       if (timer !== null) clearTimeout(timer);
       pollNowRef.current = () => {};
       document.removeEventListener("visibilitychange", onVisible);
+      for (const name of activityEvents) window.removeEventListener(name, onActivity, { capture: true });
     };
   }, [live, commitBookings, enterOffline, pushToast, reconcileSelection]);
 

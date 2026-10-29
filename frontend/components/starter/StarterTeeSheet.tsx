@@ -28,6 +28,10 @@ import type { Player, TeeBooking, TeeExtraItem, TeeSlot } from "@/lib/teeSheet/t
 
 const SEATS = 4;
 const POLL_MS = 15_000;
+/** 슬롯(첫 티·칸 잠금)은 도장에 안 들어가므로 이만큼마다 한 번은 통째로 읽는다. */
+const FULL_EVERY_MS = 5 * 60_000;
+/** 0134 SQL 전이라 도장 함수가 없을 때 통째로 읽는 간격. */
+const NO_STAMP_EVERY_MS = 60_000;
 /** 티 시트 영수증 바코드: `ABCD-1234`, 뒤에 `-플레이어4자` 또는 `-ALL`(데스크톱 티 시트와 같다). */
 const TEE_TICKET = /^([A-Z0-9]{4}-[A-Z0-9]{4})(?:-([A-Z0-9]{4}|ALL))?$/;
 
@@ -136,19 +140,47 @@ export default function StarterTeeSheet() {
     [date],
   );
 
+  // 15초마다 그날 예약의 도장(0134, 32자)만 묻고, 바뀌었을 때만 슬롯·예약을 다시 읽는다.
+  // 하루치를 15초마다 통째로 받던 것이 Supabase 전송량을 키웠다(2026-10-28).
   useEffect(() => {
     let alive = true;
-    const guard = (quiet: boolean) => (alive ? load(quiet) : Promise.resolve());
+    let stamp: string | null = null;
+    let stampMissing = false;
+    let lastFull = Date.now();
+    const full = () => {
+      lastFull = Date.now();
+      return alive ? load(true) : Promise.resolve();
+    };
+    const poll = async () => {
+      const since = Date.now() - lastFull;
+      if (stampMissing) {
+        if (since >= NO_STAMP_EVERY_MS) await full();
+        return;
+      }
+      if (since >= FULL_EVERY_MS) {
+        await full();
+        return;
+      }
+      try {
+        const next = await teeSheetApi.bookingsStamp({ date });
+        if (!alive || next === stamp) return;
+        stamp = next; // 목록보다 먼저 받은 도장 — 그 사이 바뀐 것은 다음 번에 다시 읽힌다.
+        await full();
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 404) stampMissing = true;
+        // 다른 오류는 조용히 넘긴다 — 예전 폴링도 quiet 였다. 다음 틱에 다시 묻는다.
+      }
+    };
     load().catch(() => undefined);
     const timer = window.setInterval(() => {
       setNow(minutesNow());
-      if (document.visibilityState === "visible") void guard(true);
+      if (document.visibilityState === "visible") void poll();
     }, POLL_MS);
     return () => {
       alive = false;
       window.clearInterval(timer);
     };
-  }, [load]);
+  }, [date, load]);
 
   useEffect(() => {
     if (!toast) return;

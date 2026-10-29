@@ -33,6 +33,7 @@ import {
   staffBookingDelete,
   staffBookingPatch,
   staffBookings,
+  staffBookingsStamp,
   staffPlayerAdd,
   staffPlayerExtras,
   staffPlayerGreenFee,
@@ -86,6 +87,13 @@ export const teeSheetApi = {
     const from = range?.date || range?.from || range?.to || todayIso();
     const to = range?.date || range?.to || range?.from || from;
     return staffBookings(from, to);
+  },
+
+  /** listBookings 와 같은 구간 규칙. 결과의 md5 — 지난번과 같으면 목록을 다시 받지 않는다(0134). */
+  bookingsStamp: (range?: { from?: string; to?: string; date?: string }): Promise<string> => {
+    const from = range?.date || range?.from || range?.to || todayIso();
+    const to = range?.date || range?.to || range?.from || from;
+    return staffBookingsStamp(from, to);
   },
 
   getBooking: (id: string): Promise<TeeBooking> => staffBooking(id),

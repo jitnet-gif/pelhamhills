@@ -142,6 +142,10 @@ export const staffSlots = (date: string) =>
 export const staffBookings = (from: string, to: string) =>
   staffRpc<TeeBooking[]>("pelham_staff_bookings", { p_from: from, p_to: to });
 
+/** 0134: 같은 구간 `pelham_staff_bookings` 결과의 md5(32자). 다를 때만 목록을 다시 받는다. */
+export const staffBookingsStamp = (from: string, to: string) =>
+  staffRpc<string>("pelham_staff_bookings_stamp", { p_from: from, p_to: to });
+
 /** 0067: 웹 예약의 유입 경로(Google search·Google Ads·Direct …). 플레이 날짜 기간. */
 export type BookingAttribution = {
   kind: "tee" | "bay";
