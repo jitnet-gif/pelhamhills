@@ -72,3 +72,4 @@ claude.ai 에 올렸던 나레이션 프레젠테이션(장면별 재생 + Eleve
 | 2026-10-26 | 웹 Charlie 예약 확정 오류·프로샵 연결 삭제 | 7 | [2026-10-26-web-charlie-booking-fix/](./2026-10-26-web-charlie-booking-fix/index.html) | [claude.ai](https://claude.ai/artifact/VS9pZkPPWuWdtXMoV1Dqxy) |
 | 2026-10-28 | Supabase 전송량(Egress) 폭증 줄이는 전략 | 8 | [2026-10-28-supabase-egress/](./2026-10-28-supabase-egress/index.html) | [claude.ai](https://claude.ai/artifact/FXSWyQQciz9hxXJ3LYx1g8) |
 | 2026-10-29 | 전화가 걸자마자 끊긴 이유 ({{greeting}} 첫 인사) | 7 | [2026-10-29-phone-hangup-greeting/](./2026-10-29-phone-hangup-greeting/index.html) | [claude.ai](https://claude.ai/artifact/YKDif6E4NYTxQVR1MdRk9D) |
+| 2026-10-29 | 변경 도장 폴링 적용(전송량 줄이기) | 7 | [2026-10-29-egress-stamp-built/](./2026-10-29-egress-stamp-built/index.html) | [claude.ai](https://claude.ai/artifact/37HeJAMc4aowcGKPjDENmj) |

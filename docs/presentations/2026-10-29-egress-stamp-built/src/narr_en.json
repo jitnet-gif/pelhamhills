@@ -1,0 +1,9 @@
+[
+  "The egress cut is in. In a minute with no changes, one tee sheet screen used to download about 1.2 megabytes. Now it's about 200 kilobytes, and once SQL 0134 is pasted it drops to around 2 kilobytes. Two screens changed, the tee sheet and the starter screen, and it's deployed on Vercel.",
+  "Here's what happens every 5 seconds. First it asks for a 32-character change stamp for this week's bookings. If it matches last time, that's it, nothing is downloaded, and most ticks end there. Only when the stamp differs does it fetch the week and redraw the screen.",
+  "Here's why nothing gets missed. The stamp is a digest of the exact booking list the screen would receive, so any change to a booking, player or payment changes it, and so does a hold expiring on its own. And because the stamp is fetched before the list, anything that changes in between is picked up on the next tick.",
+  "When nobody touches the screen, it asks less often. Every 5 seconds while in use, every 30 seconds after two idle minutes. A click or touch triggers one check right away. A hidden tab still pauses, as before.",
+  "The starter screen works the same way. Every 15 seconds it asks for that day's stamp and re-reads slots and bookings only on change. The first tee time and locked slots aren't in the stamp, so it does a full read every 5 minutes.",
+  "SQL 0134 hasn't been run yet. Without the stamp function, screens fall back safely: the tee sheet reads everything every 30 seconds, the starter every 60. That alone cuts about 80 percent. Once the SQL is pasted, stamps turn on and the cut reaches about 98 percent.",
+  "What's left is pasting SQL 0134 into the Supabase SQL editor once. Then check that a booking changed on another PC shows up within 5 seconds, and that a day later the usage page shows about 0.05 gigabytes of egress a day."
+]

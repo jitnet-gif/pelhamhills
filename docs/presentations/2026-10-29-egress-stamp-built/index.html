@@ -1,0 +1,370 @@
+<title>Change Stamp Polling</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one presenter column — header, scene chips, two-lane stage (picture · key points), dark narration band, player bar */
+:root{
+  --bg:#f3f5f1; --panel:#ffffff; --ink:#1c2420; --muted:#5d6a62; --line:#d6ddd6;
+  --green:#1a7f4b; --green-soft:#dcefe3; --gold:#b7791f; --gold-soft:#f8ecd6; --red:#b4412f;
+  --band:#14201a; --band-ink:#e9f2ec; --band-muted:#9fb5a8;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-size:24px;line-height:1.25;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+.seg{display:inline-flex;border:1px solid var(--line);background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);font:600 13px var(--sans);padding:7px 12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg svg{width:20px;height:20px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 13px var(--sans);padding:6px 10px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip b{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.chip[aria-current="true"]{border-color:var(--green);background:var(--green-soft)}
+.chip[aria-current="true"] b{color:var(--green)}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;min-height:400px}
+@media (max-width:820px){.stage{grid-template-columns:minmax(0,1fr)}}
+.lane{background:var(--panel);border:1px solid var(--line);padding:16px;min-width:0;display:grid;align-content:start;gap:12px}
+.lane h2{margin:0;font-size:19px;line-height:1.3;text-wrap:balance}
+.lane .lt{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pts{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.pts li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start}
+.pts li i{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--green);padding-top:2px}
+.band{background:var(--band);color:var(--band-ink);padding:14px 16px;min-height:96px;display:grid;gap:4px}
+.band .who{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--band-muted)}
+.band p{margin:0;font-size:16px;line-height:1.6}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 14px var(--sans);min-height:44px;min-width:44px;padding:0 14px;cursor:pointer}
+.pbtn.main{background:var(--green);border-color:var(--green);color:#fff;min-width:120px}
+.bar{flex:1 1 160px;height:6px;background:var(--line);position:relative}
+.bar span{position:absolute;inset:0 auto 0 0;background:var(--green);width:0}
+.speed{font:500 13px var(--sans);color:var(--muted)}
+.note{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 6px;background:var(--gold-soft);color:var(--gold)}
+.tag.ok{background:var(--green-soft);color:var(--green)}
+/* scene visuals */
+.mock{border:1px solid var(--line);display:grid}
+.mock .mh{padding:8px 10px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px}
+.mock .mb{padding:10px;display:grid;gap:8px}
+.mta{border:1px solid var(--line);padding:8px;color:var(--muted);font-size:13px;min-height:52px}
+.mbtn{justify-self:start;background:var(--green);color:#fff;font-weight:700;font-size:13px;padding:8px 12px}
+.msec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.msec div{border:1px dashed var(--line);padding:8px;font-size:12px;color:var(--muted)}
+.msec div b{display:block;color:var(--ink);font-size:13px}
+.tw{overflow-x:auto}
+table.hm{border-collapse:separate;border-spacing:3px;width:100%;min-width:460px;font-size:13px;font-variant-numeric:tabular-nums}
+table.hm th{font-size:11px;color:var(--muted);font-weight:700;text-align:center}
+table.hm th.r{text-align:left;color:var(--ink);font-size:13px;white-space:nowrap}
+table.hm td{text-align:center;padding:6px 2px;font-weight:600}
+table.hm td.empty{outline:2px dashed var(--gold);outline-offset:-2px}
+.chart{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:118px minmax(0,1fr) 62px;gap:8px;align-items:center;font-size:13px}
+.row .t{height:16px;background:var(--line)}
+.row .t span{display:block;height:100%;background:var(--green)}
+.row.hl .t span{background:var(--gold)}
+.row .v{text-align:right;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.stack{display:flex;height:34px}
+.stack span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;overflow:hidden;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+.offer{border:1px solid var(--green);background:var(--green-soft);padding:10px;display:grid;gap:4px;font-size:13px}
+.offer b{font-size:14px}
+.code{font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid var(--line);padding:1px 6px}
+.ladder{position:relative;height:210px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);margin:4px 4px 22px 4px}
+.ladder .zone{position:absolute;top:0;bottom:0;background:var(--gold-soft)}
+.ladder .zone em{position:absolute;top:4px;left:6px;font-style:normal;font-size:11px;font-weight:700;color:var(--gold)}
+.ladder .pin{position:absolute;transform:translateX(-50%);display:grid;justify-items:center;gap:2px;font-size:11px;white-space:nowrap}
+.ladder .pin s{display:block;width:10px;height:10px;border-radius:50%;background:var(--green);text-decoration:none}
+.ladder .pin.h s{background:var(--gold)}
+.ladder .tick{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-family:var(--mono)}
+.plan{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.plan{grid-template-columns:minmax(0,1fr)}}
+.plan div{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px}
+.plan h3{margin:0;font-size:14px}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.check{display:grid;gap:8px}
+.check div{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;border:1px solid var(--line);padding:10px;font-size:14px}
+/* gift card barcode · amount mocks — admin screen is white paper, so barcodes always sit on white */
+.gc-bc{background:#fff;padding:6px 10px;border:1px solid var(--line)}
+.gc-bc svg{display:block;width:100%;height:44px;fill:#000}
+.gc-bc.sm svg{height:26px}
+.gc-bc.lg svg{height:72px}
+.gc-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.gc-three{grid-template-columns:minmax(0,1fr)}}
+.gc-tile{border:1px solid var(--line);padding:10px;display:grid;gap:8px;align-content:start;font-size:13px}
+.gc-tile.no{border:2px dashed var(--red)}
+.gc-empty{height:40px;display:grid;place-items:center;border:1px dashed var(--line);color:var(--red);font:700 20px var(--mono)}
+.gc-two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px;align-items:start}
+@media (max-width:560px){.gc-two{grid-template-columns:minmax(0,1fr)}}
+.tag.no{background:color-mix(in srgb,var(--red) 14%,var(--panel));color:var(--red)}
+select:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+/* supabase egress deck — bars, meters, lever cards */
+.eg-big{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
+.eg-big b{font:700 40px var(--mono);color:var(--red);font-variant-numeric:tabular-nums}
+.eg-big span{font-size:14px;color:var(--muted)}
+.eg-meter{position:relative;height:22px;border:1px solid var(--line);background:var(--panel)}
+.eg-meter i{position:absolute;inset:0 auto 0 0;background:var(--red)}
+.eg-meter em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.eg-meter small{position:absolute;top:26px;font-size:11px;color:var(--muted);transform:translateX(-50%)}
+.eg-bars{display:grid;gap:6px;margin-top:22px}
+.eg-row{display:grid;grid-template-columns:118px minmax(0,1fr) 72px;gap:8px;align-items:center;font-size:12.5px}
+@media (max-width:560px){.eg-row{grid-template-columns:84px minmax(0,1fr) 60px;font-size:11.5px}}
+.eg-row code{font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eg-track{height:16px;background:var(--bg);border:1px solid var(--line)}
+.eg-track i{display:block;height:100%;background:var(--muted)}
+.eg-row.hot .eg-track i{background:var(--red)}
+.eg-row.good .eg-track i{background:var(--green)}
+.eg-row b{font:700 12px var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.eg-cap{font-size:11px;color:var(--muted)}
+.eg-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.eg-two{grid-template-columns:minmax(0,1fr)}}
+.eg-card{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px;background:var(--panel)}
+.eg-card.no{border:2px solid var(--red)}
+.eg-card.ok{border:2px solid var(--green)}
+.eg-card h4{margin:0;font-size:13px}
+.eg-card pre{margin:0;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:6px;border:1px solid var(--line)}
+.eg-tick{display:flex;gap:3px;flex-wrap:wrap}
+.eg-tick i{width:9px;height:18px;background:var(--red)}
+.eg-tick.ok i{background:var(--green)}
+.eg-tick i.off{background:var(--line)}
+.eg-math{font:700 14px var(--mono);border:1px dashed var(--line);padding:8px;text-align:center}
+.eg-levers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.eg-levers{grid-template-columns:minmax(0,1fr)}}
+.eg-lv{border:1px solid var(--line);background:var(--panel);padding:10px;display:grid;gap:4px;font-size:13px}
+.eg-lv b{font-size:15px}
+.eg-lv small{color:var(--muted)}
+.eg-lv .tag{justify-self:start}
+.eg-lv.pick{border:2px solid var(--green)}
+.eg-check{display:grid;gap:8px}
+.eg-check div{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;border:1px solid var(--line);padding:10px;font-size:14px}
+/* change-stamp deck — flow steps */
+.st-flow{display:grid;gap:6px}
+.st-step{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);background:var(--panel);padding:8px;font-size:13px}
+.st-step i{font-style:normal;font:700 13px var(--mono);color:var(--muted);text-align:center}
+.st-step code{font-family:var(--mono);font-size:11.5px}
+.st-step.ok{border:2px solid var(--green)}
+.st-step.hot{border:2px solid var(--red)}
+.st-fork{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.st-fork{grid-template-columns:minmax(0,1fr)}}
+.st-time{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;font-size:12px;text-align:center}
+@media (max-width:560px){.st-time{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.st-time div{border:1px solid var(--line);background:var(--panel);padding:8px;display:grid;gap:4px}
+.st-time b{font:700 18px var(--mono)}
+.st-time div.on{border:2px solid var(--green)}
+.st-time div.off{opacity:.55}
+@media (prefers-reduced-motion:no-preference){.lane{animation:in .35s ease both}@keyframes in{from{transform:translateY(6px)}to{transform:none}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="title"></h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Language">
+      <button id="lang-ko" type="button" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">가</text></svg>한국어</button>
+      <button id="lang-en" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">Aa</text></svg>English</button>
+    </div>
+  </header>
+  <nav class="chips" id="chips" aria-label="Scenes"></nav>
+  <section class="stage" id="stage"></section>
+  <section class="band" aria-live="polite"><div class="who" id="who"></div><p id="narr"></p></section>
+  <div class="player">
+    <button class="pbtn" id="prev" type="button" aria-label="Previous">◀</button>
+    <button class="pbtn main" id="play" type="button"></button>
+    <button class="pbtn" id="next" type="button" aria-label="Next">▶</button>
+    <div class="bar" aria-hidden="true"><span id="prog"></span></div>
+    <label class="speed"><span id="speedL"></span>
+      <select id="speed"><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.2">1.2×</option><option value="1.4">1.4×</option></select>
+    </label>
+  </div>
+  <p class="note" id="foot"></p>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script>
+const NARR = {"ko": ["전송량 줄이기를 적용했습니다. 티 시트 화면 하나가 아무것도 안 바뀐 1분 동안 예전에는 약 1.2메가를 받았습니다. 지금은 약 200킬로바이트이고, SQL 0134 를 붙이면 2킬로바이트 정도로 줄어듭니다. 티 시트와 스타터 화면 두 곳을 바꿨고, Vercel 배포까지 끝났습니다.", "5초마다 하는 일은 이렇습니다. 먼저 이번 주 예약이 바뀌었는지, 32자짜리 변경 도장을 묻습니다. 지난번과 같으면 거기서 끝이고 아무것도 받지 않습니다. 대부분의 5초가 여기서 끝납니다. 도장이 다를 때만 일주일치 목록을 받아 화면을 새로 그립니다.", "하나도 놓치지 않는 이유가 있습니다. 도장은 화면이 받을 예약 목록 그 자체를 요약한 값이라서, 예약이든 선수든 결제든 무엇이 바뀌어도 달라집니다. 홀드가 시간이 지나 저절로 사라질 때도 바뀝니다. 그리고 도장을 목록보다 먼저 받기 때문에, 그 사이에 바뀐 것은 다음 5초에 다시 받습니다.", "아무도 화면을 만지지 않으면 천천히 묻습니다. 사용 중에는 5초, 2분 동안 손을 안 대면 30초 간격입니다. 다시 클릭하거나 터치하면 기다리지 않고 바로 한 번 확인합니다. 탭이 숨겨져 있으면 예전처럼 멈춥니다.", "스타터 화면도 같은 방식입니다. 15초마다 그날 예약의 도장만 묻고, 바뀌었을 때만 슬롯과 예약을 다시 읽습니다. 첫 티 시각이나 잠긴 칸은 도장에 들어가지 않아서, 5분마다 한 번은 통째로 읽습니다.", "SQL 0134 는 아직 실행 전입니다. 지금은 도장 함수가 없어서 화면이 안전하게 물러나, 티 시트는 30초마다, 스타터는 60초마다 통째로 읽습니다. 그것만으로도 약 80퍼센트가 줄었습니다. SQL 을 붙이면 도장 방식이 켜지고 약 98퍼센트까지 줄어듭니다.", "남은 일은 SQL 0134 를 Supabase SQL editor 에 붙여 한 번 실행하는 것입니다. 그다음 다른 PC 에서 예약을 바꿨을 때 5초 안에 보이는지, 하루 뒤 사용량 화면의 전송량이 하루 0.05기가 정도로 내려갔는지 확인해 주세요."], "en": ["The egress cut is in. In a minute with no changes, one tee sheet screen used to download about 1.2 megabytes. Now it's about 200 kilobytes, and once SQL 0134 is pasted it drops to around 2 kilobytes. Two screens changed, the tee sheet and the starter screen, and it's deployed on Vercel.", "Here's what happens every 5 seconds. First it asks for a 32-character change stamp for this week's bookings. If it matches last time, that's it, nothing is downloaded, and most ticks end there. Only when the stamp differs does it fetch the week and redraw the screen.", "Here's why nothing gets missed. The stamp is a digest of the exact booking list the screen would receive, so any change to a booking, player or payment changes it, and so does a hold expiring on its own. And because the stamp is fetched before the list, anything that changes in between is picked up on the next tick.", "When nobody touches the screen, it asks less often. Every 5 seconds while in use, every 30 seconds after two idle minutes. A click or touch triggers one check right away. A hidden tab still pauses, as before.", "The starter screen works the same way. Every 15 seconds it asks for that day's stamp and re-reads slots and bookings only on change. The first tee time and locked slots aren't in the stamp, so it does a full read every 5 minutes.", "SQL 0134 hasn't been run yet. Without the stamp function, screens fall back safely: the tee sheet reads everything every 30 seconds, the starter every 60. That alone cuts about 80 percent. Once the SQL is pasted, stamps turn on and the cut reaches about 98 percent.", "What's left is pasting SQL 0134 into the Supabase SQL editor once. Then check that a booking changed on another PC shows up within 5 seconds, and that a day later the usage page shows about 0.05 gigabytes of egress a day."]};
+const DUR = {"ko": [19.67, 17.58, 20.24, 16.33, 13.74, 19.46, 17.97], "en": [19.49, 15.78, 17.58, 13.37, 13.61, 17.27, 15.49]};
+let LANG = "ko";
+try { const s = localStorage.getItem("pelham-deck-lang"); if (s === "en" || s === "ko") LANG = s; } catch (e) {}
+const T = (o) => (typeof o === "string" ? o : o[LANG]);
+
+const UI = {
+  eyebrow: { ko: "Supabase · 전송량 줄이기 · 적용 완료", en: "Supabase · cutting egress · built" },
+  title: { ko: "변경 도장 폴링 — 바뀌었을 때만 받는다", en: "Change-stamp polling — fetch only when something changed" },
+  sub: { ko: "2026-10-29 · 커밋 2bbf387 · Vercel 배포됨 · SQL 0134 붙여 넣기 남음", en: "2026-10-29 · commit 2bbf387 · deployed on Vercel · SQL 0134 still to paste" },
+  play: { ko: "▶ 재생", en: "▶ Play" }, pause: { ko: "❚❚ 멈춤", en: "❚❚ Pause" },
+  speed: { ko: "속도", en: "Speed" }, pitch: { ko: "피치", en: "Pitch" },
+  who: { ko: "나레이션 · Hope (ElevenLabs)", en: "Narration · Hope (ElevenLabs)" },
+  pic: { ko: "화면", en: "Picture" }, keys: { ko: "핵심", en: "Key points" },
+  keyhint: { ko: "한/영 키 또는 L: 언어 · ←/→: 장면 · 스페이스: 재생", en: "Han/Eng key or L: language · ←/→: scene · Space: play" },
+  nopitch: { ko: "이 브라우저에서는 피치를 바꿀 수 없습니다", en: "Pitch can't be changed in this browser" },
+  foot: { ko: "효과 수치는 10/23 API 로그와 Egress 로 낸 추정입니다. 실제 티 시트 화면 시험과 SQL 실행은 아직입니다.",
+          en: "Savings are estimates from the Oct 23 API logs and egress. Not yet tested on the live tee sheet; the SQL hasn't been run." },
+};
+
+const row = (label, val, max, txt, cls) =>
+  `<div class="eg-row ${cls || ""}"><code>${label}</code><div class="eg-track"><i style="width:${Math.max(1, Math.round((val / max) * 100))}%"></i></div><b>${txt}</b></div>`;
+const st = (n, body, tail, cls) => `<div class="st-step ${cls || ""}"><i>${n}</i><span>${body}</span><span>${tail || ""}</span></div>`;
+
+const S = [
+  { n: { ko: "요약", en: "Summary" },
+    h: { ko: "1분 동안 내려받는 양", en: "What one screen downloads per minute" },
+    pic: () => `<div class="eg-bars" style="margin-top:0">
+        <div class="eg-cap">${T({ ko: "티 시트 화면 1개, 아무것도 안 바뀐 1분", en: "One tee sheet screen, a minute with no changes" })}</div>
+        ${row(T({ ko: "예전", en: "Before" }), 1200, 1200, "≈1,200 KB", "hot")}
+        ${row(T({ ko: "SQL 전", en: "Before SQL" }), 200, 1200, "≈200 KB")}
+        ${row(T({ ko: "SQL 후", en: "After SQL" }), 2, 1200, "≈2 KB", "good")}
+      </div>
+      <div class="eg-two" style="margin-top:12px">
+        <div class="eg-card no"><h4>${T({ ko: "예전", en: "Before" })}</h4><span>${T({ ko: "5초마다 일주일치 100 KB × 12번", en: "A week, 100 KB, every 5 s × 12" })}</span></div>
+        <div class="eg-card ok"><h4>${T({ ko: "이제", en: "Now" })}</h4><span>${T({ ko: "5초마다 32자 도장 × 12번, 바뀐 때만 100 KB", en: "A 32-char stamp every 5 s × 12; 100 KB only on change" })}</span></div>
+      </div>`,
+    pts: [
+      { ko: "티 시트·스타터 화면 두 곳을 바꿈", en: "Changed two screens: tee sheet and starter" },
+      { ko: "커밋 <span class=\"code\">2bbf387</span> · Vercel 배포 완료", en: "Commit <span class=\"code\">2bbf387</span> · deployed on Vercel" },
+      { ko: "SQL 0134 를 붙이면 끝까지 줄어듦", en: "Pasting SQL 0134 gets the full cut" },
+    ] },
+  { n: { ko: "흐름", en: "Flow" },
+    h: { ko: "5초마다 묻는 순서", en: "What happens every 5 seconds" },
+    pic: () => `<div class="st-flow">
+        ${st("1", T({ ko: "\"이번 주 예약 바뀌었어?\" — 도장 묻기", en: "\"Did this week change?\" — ask for the stamp" }), "<code>bookings_stamp</code>")}
+        ${st("2", T({ ko: "Supabase 가 32자 돌려줌", en: "Supabase returns 32 characters" }), "<code>9f3c…a1</code>")}
+      </div>
+      <div class="st-fork" style="margin-top:8px">
+        <div class="eg-card ok"><h4>${T({ ko: "지난번과 같음", en: "Same as last time" })}</h4><span>${T({ ko: "끝. 아무것도 안 받음", en: "Done. Nothing downloaded" })}</span><span class="eg-cap">${T({ ko: "대부분의 5초가 여기", en: "Most 5-second ticks end here" })}</span></div>
+        <div class="eg-card no"><h4>${T({ ko: "다름", en: "Different" })}</h4><span>${T({ ko: "일주일치 목록을 받아 화면 갱신, 새 도장 기억", en: "Fetch the week, refresh the screen, remember the new stamp" })}</span></div>
+      </div>`,
+    pts: [
+      { ko: "반응 속도는 그대로 5초", en: "Still reacts within 5 seconds" },
+      { ko: "목록 받기는 예약이 실제로 바뀐 때만", en: "The list is fetched only when bookings really changed" },
+    ] },
+  { n: { ko: "정확성", en: "Accuracy" },
+    h: { ko: "왜 하나도 놓치지 않나", en: "Why nothing gets missed" },
+    pic: () => `<div class="eg-two">
+      <div class="eg-card ok"><h4>${T({ ko: "도장 = 받을 목록 그 자체의 요약", en: "Stamp = a digest of the exact list" })}</h4><pre>md5( pelham_staff_bookings(from, to) )</pre>
+        <span>${T({ ko: "예약·선수·결제 무엇이 바뀌어도 도장이 바뀜", en: "Any booking, player or payment change changes it" })}</span>
+        <span>${T({ ko: "홀드가 시간이 지나 사라져도 바뀜", en: "Changes when a hold expires on its own, too" })}</span></div>
+      <div class="eg-card"><h4>${T({ ko: "순서: 도장 먼저, 목록 나중", en: "Order: stamp first, list second" })}</h4>
+        <span>${T({ ko: "기억하는 도장은 늘 목록보다 같거나 오래됨", en: "The saved stamp is never newer than the list" })}</span>
+        <span>${T({ ko: "그 사이 바뀐 건 다음 5초에 다시 받음", en: "Anything changed in between is fetched on the next tick" })}</span>
+        <span>${T({ ko: "응답 없는 저장 뒤엔 도장 무시하고 바로 받음", en: "After an unconfirmed save it fetches right away, stamp or not" })}</span></div>
+    </div>`,
+    pts: [
+      { ko: "<span class=\"code\">updated_at</span> 같은 칸에 기대지 않음", en: "Doesn't rely on a column like <span class=\"code\">updated_at</span>" },
+      { ko: "서버 계산은 예전과 같고, 밖으로 나가는 것만 32자", en: "Server work is the same; only 32 chars go out" },
+    ] },
+  { n: { ko: "손 안 댐", en: "Idle" },
+    h: { ko: "아무도 안 만지면 천천히", en: "Slower when nobody is using it" },
+    pic: () => `<div class="st-time">
+        <div class="on"><small>${T({ ko: "사용 중", en: "In use" })}</small><b>5${T({ ko: "초", en: " s" })}</b><span>${T({ ko: "도장 묻기", en: "stamp check" })}</span></div>
+        <div><small>${T({ ko: "2분 손 안 댐", en: "2 min idle" })}</small><b>30${T({ ko: "초", en: " s" })}</b><span>${T({ ko: "도장 묻기", en: "stamp check" })}</span></div>
+        <div class="on"><small>${T({ ko: "다시 터치", en: "Touch again" })}</small><b>${T({ ko: "즉시", en: "now" })}</b><span>${T({ ko: "바로 한 번", en: "one check" })}</span></div>
+        <div class="off"><small>${T({ ko: "탭 숨김", en: "Tab hidden" })}</small><b>${T({ ko: "멈춤", en: "paused" })}</b><span>${T({ ko: "예전과 같음", en: "as before" })}</span></div>
+      </div>`,
+    pts: [
+      { ko: "마우스 클릭·키보드·휠·터치를 \"사용\"으로 봄", en: "Clicks, keys, wheel and touch count as use" },
+      { ko: "점심·밤 시간에 켜 둔 PC가 덜 묻게 됨", en: "PCs left on over lunch or overnight ask far less" },
+    ] },
+  { n: { ko: "스타터", en: "Starter" },
+    h: { ko: "스타터 화면도 같은 방식", en: "Starter screen works the same way" },
+    pic: () => `<div class="st-flow">
+        ${st("15s", T({ ko: "그날 예약의 도장 묻기", en: "Ask for that day's stamp" }), "<code>{ date }</code>", "ok")}
+        ${st("Δ", T({ ko: "바뀌었을 때만 슬롯 + 예약 다시 읽기", en: "Re-read slots + bookings only on change" }), "")}
+        ${st("5m", T({ ko: "5분마다 한 번은 통째로 — 첫 티·잠긴 칸은 도장에 안 들어가서", en: "Full read every 5 min — first tee and locked slots aren't in the stamp" }), "")}
+      </div>`,
+    pts: [
+      { ko: "예전: 15초마다 슬롯 + 하루치 예약 통째로", en: "Before: slots + the whole day every 15 s" },
+      { ko: "<span class=\"code\">StarterTeeSheet.tsx</span>", en: "<span class=\"code\">StarterTeeSheet.tsx</span>" },
+    ] },
+  { n: { ko: "SQL", en: "SQL" },
+    h: { ko: "SQL 0134 전과 후", en: "Before and after SQL 0134" },
+    pic: () => `<div class="eg-two">
+      <div class="eg-card"><h4>${T({ ko: "지금 (SQL 전)", en: "Now (before SQL)" })}</h4><span>${T({ ko: "도장 함수가 없어 404 → 안전하게 물러남", en: "Stamp function missing → 404 → safe fallback" })}</span><span>${T({ ko: "티 시트: 30초마다 통째로 (손 안 대면 60초)", en: "Tee sheet: full read every 30 s (60 s idle)" })}</span><span>${T({ ko: "스타터: 60초마다 통째로", en: "Starter: full read every 60 s" })}</span><b>${T({ ko: "약 −80%", en: "about −80%" })}</b></div>
+      <div class="eg-card ok"><h4>${T({ ko: "SQL 붙인 뒤", en: "After pasting SQL" })}</h4><pre>pelham_staff_bookings_stamp(from, to)
+→ md5 · 32${T({ ko: "자", en: " chars" })}</pre><span>${T({ ko: "화면 새로고침 필요 없음 — 다음 탭 열기부터 도장 사용", en: "Screens pick it up the next time the page loads" })}</span><b>${T({ ko: "약 −98%", en: "about −98%" })}</b></div>
+    </div>`,
+    pts: [
+      { ko: "SQL editor 에 파일 전체 붙여 한 번 · 다시 실행해도 안전", en: "Paste the whole file once in the SQL editor · safe to re-run" },
+      { ko: "확인 줄: <span class=\"code\">staff_can_call = true</span>", en: "Check row: <span class=\"code\">staff_can_call = true</span>" },
+    ] },
+  { n: { ko: "상태", en: "Status" },
+    h: { ko: "남은 일과 확인 방법", en: "What's left and how to check" },
+    pic: () => `<div class="eg-check">
+      <div><span class="tag ok">${T({ ko: "완료", en: "Done" })}</span><span>${T({ ko: "티 시트·스타터 변경 · 린트 통과 · push · Vercel 배포", en: "Tee sheet + starter change · lint passed · pushed · Vercel deployed" })}</span></div>
+      <div><span class="tag">${T({ ko: "할 일", en: "To do" })}</span><span>${T({ ko: "SQL 0134 붙여 넣기 (Supabase SQL editor)", en: "Paste SQL 0134 (Supabase SQL editor)" })}</span></div>
+      <div><span class="tag">${T({ ko: "확인", en: "Check" })}</span><span>${T({ ko: "다른 PC에서 예약을 바꾸면 5초 안에 보이는지", en: "A booking changed on another PC shows within 5 s" })}</span></div>
+      <div><span class="tag">${T({ ko: "확인", en: "Check" })}</span><span>${T({ ko: "하루 뒤 Usage 의 Egress 가 하루 약 0.05 GB 인지", en: "A day later, Usage → Egress is about 0.05 GB/day" })}</span></div>
+    </div>`,
+    pts: [
+      { ko: "실제 티 시트 화면 시험은 아직 — SQL 뒤에 함께", en: "Not yet tested on the live tee sheet — do it after the SQL" },
+      { ko: "이상하면 알려 주세요: 화면이 늦게 바뀌는 등", en: "Tell me if anything's off, like slow updates" },
+    ] },
+];
+
+const $ = (id) => document.getElementById(id);
+const audio = $("audio");
+let cur = 0, playing = false, timer = null, startAt = 0;
+
+function renderUI() {
+  $("eyebrow").textContent = T(UI.eyebrow); $("title").textContent = T(UI.title); $("sub").textContent = T(UI.sub);
+  $("who").textContent = T(UI.who); $("speedL").textContent = T(UI.speed); $("foot").textContent = T(UI.foot);
+  $("play").textContent = playing ? T(UI.pause) : T(UI.play);
+  $("lang-ko").setAttribute("aria-pressed", LANG === "ko"); $("lang-en").setAttribute("aria-pressed", LANG === "en");
+  document.documentElement.lang = LANG;
+  $("chips").innerHTML = S.map((s, i) => `<button class="chip" type="button" data-i="${i}" aria-current="${i === cur}"><b>${i + 1}</b>${T(s.n)}</button>`).join("");
+}
+
+function show(i) {
+  cur = Math.max(0, Math.min(S.length - 1, i));
+  const s = S[cur];
+  $("stage").innerHTML = `<div class="lane"><div class="lt">${T(UI.pic)}</div><h2>${T(s.h)}</h2>${s.pic()}</div>
+    <div class="lane"><div class="lt">${T(UI.keys)}</div><ul class="pts">${s.pts.map((p, k) => `<li><i>${k + 1}</i><span>${T(p)}</span></li>`).join("")}</ul></div>`;
+  $("narr").textContent = NARR[LANG][cur];
+  $("prog").style.width = "0";
+  renderUI();
+}
+
+function stopAudio() { audio.pause(); clearInterval(timer); }
+function playScene() {
+  stopAudio();
+  audio.src = `audio/${LANG}/s${cur + 1}.mp3`;
+  audio.playbackRate = Number($("speed").value);
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => { playing = false; renderUI(); });
+  timer = setInterval(() => {
+    const d = audio.duration || DUR[LANG][cur] || 1;
+    $("prog").style.width = `${Math.min(100, (audio.currentTime / d) * 100)}%`;
+  }, 200);
+}
+audio.addEventListener("ended", () => {
+  clearInterval(timer); $("prog").style.width = "100%";
+  if (playing && cur < S.length - 1) setTimeout(() => { if (playing) { show(cur + 1); playScene(); } }, 700);
+  else { playing = false; renderUI(); }
+});
+$("play").onclick = () => { playing = !playing; if (playing) playScene(); else stopAudio(); renderUI(); };
+$("prev").onclick = () => { show(cur - 1); if (playing) playScene(); };
+$("next").onclick = () => { show(cur + 1); if (playing) playScene(); };
+$("chips").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (!b) return; show(Number(b.dataset.i)); if (playing) playScene(); };
+$("speed").onchange = () => { audio.playbackRate = Number($("speed").value); };
+function setLang(l) { LANG = l; try { localStorage.setItem("pelham-deck-lang", l); } catch (e) {} show(cur); if (playing) playScene(); }
+$("lang-ko").onclick = () => setLang("ko");
+$("lang-en").onclick = () => setLang("en");
+document.addEventListener("keydown", (e) => { if (e.key === "ArrowRight") $("next").click(); if (e.key === "ArrowLeft") $("prev").click(); });
+show(0);
+</script>
