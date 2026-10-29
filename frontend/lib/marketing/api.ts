@@ -117,6 +117,17 @@ export type Campaign = {
   replies?: CampaignReplies;
 };
 
+/** 보낸 캠페인 비용. 문자 = Twilio 요금(unit = USD 등), 전화 = ElevenLabs 크레딧. pending = 요금이 아직 안 붙은 통 수. */
+export type CampaignCost = {
+  channel: Channel;
+  unit: string;
+  total: number;
+  priced: number;
+  pending: number;
+  /** 문자 조각 수(긴 문자는 여러 조각으로 요금이 붙는다). 전화는 null. */
+  segments: number | null;
+};
+
 export type OptOut = { phone: string; channel: Channel; source: string; created_at: string; name: string | null };
 
 export type MarketingStatus = {
@@ -202,6 +213,7 @@ export const marketingApi = {
   createWeatherAlert: (fields: { date: string; name: string; message: string; booking_ids: string[] }) =>
     staffRpc<Campaign>("pelham_marketing_weather_create", { p: fields }),
   status: () => backend<MarketingStatus>("GET", "/marketing/status"),
+  cost: (id: number) => backend<CampaignCost>("GET", `/marketing/campaigns/${id}/cost`),
   send: (id: number) => backend<{ ok: boolean; already_running: boolean }>("POST", `/marketing/campaigns/${id}/send`),
 };
 

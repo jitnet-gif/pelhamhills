@@ -4,6 +4,7 @@
  * Calls & SMS — AI 전화 예약 통화 기록(ElevenLabs), 전화로 받은 현장 문제·컴플레인(0099,
  * `components/admin/PhoneRequests.tsx`. 음식 주문은 GPS 앱의 주문 탭으로 간다), 문자 기록(0058), 수신 거부(STOP) 번호.
  * 통화 원본은 ElevenLabs(`lib/calls/api.ts`), 문자 탭은 `components/admin/SmsLog.tsx`.
+ * Usage 탭(`components/admin/ServiceUsage.tsx`)은 ElevenLabs·Twilio·Fly 사용량·잔액.
  *
  * 줄을 누르면:
  *   - 티타임을 잡거나 바꾼 통화 → 티 시트에서 그 예약을 연다 (`/teesheet?date=…&booking=…`).
@@ -16,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
 import { PhoneReports } from "@/components/admin/PhoneRequests";
+import { ServiceUsage } from "@/components/admin/ServiceUsage";
 import { SmsLog, SmsOptOuts } from "@/components/admin/SmsLog";
 import {
   type CallDetail,
@@ -45,7 +47,7 @@ const OUTCOME_TONE: Record<CallRow["outcome"], string> = {
   info: "bg-[#f0f1f3] text-[#4e5560]",
 };
 
-type Tab = "calls" | "problems" | "complaints" | "sms" | "optouts";
+type Tab = "calls" | "problems" | "complaints" | "sms" | "optouts" | "usage";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "calls", label: "Calls" },
@@ -53,6 +55,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "complaints", label: "Complaints" },
   { id: "sms", label: "Texts" },
   { id: "optouts", label: "Opt-outs" },
+  { id: "usage", label: "Usage" },
 ];
 
 /** 줄을 누르면 티 시트로 가는 결과. */
@@ -182,7 +185,7 @@ export default function CallsPage() {
         <p className="max-w-4xl text-sm leading-6 text-[#4e5560]">
           AI phone booking calls (ElevenLabs). Click a call that made a booking to open it on the tee sheet;
           other calls show the summary, transcript and recording. Problems and Complaints are what the assistant took
-          down on calls; phone food orders go to the Orders screen of the GPS app, with the app orders. The Texts tab keeps every text sent to and received from guests.
+          down on calls; phone food orders go to the Orders screen of the GPS app, with the app orders. The Texts tab keeps every text sent to and received from guests. Usage shows ElevenLabs credits, the Twilio balance and the Fly server.
         </p>
         <div className="mt-3 flex gap-1" role="tablist">
           {TABS.map((t) => (
@@ -210,6 +213,11 @@ export default function CallsPage() {
       {tab === "sms" ? (
         <section className="grid gap-4 p-4">
           <SmsLog refreshKey={smsRefresh} />
+        </section>
+      ) : null}
+      {tab === "usage" ? (
+        <section className="grid gap-4 p-4">
+          <ServiceUsage refreshKey={smsRefresh} />
         </section>
       ) : null}
       {tab === "optouts" ? (

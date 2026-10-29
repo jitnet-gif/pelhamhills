@@ -2,6 +2,7 @@
 
 GET  /marketing/status                  문자·전화가 켜져 있나, 지금 보낼 수 있는 시각인가
 POST /marketing/campaigns/{id}/send     캠페인 보내기(멈췄던 캠페인은 이어서)
+GET  /marketing/campaigns/{id}/cost     보낸 캠페인 비용(문자 = Twilio 요금, 전화 = ElevenLabs 크레딧)
 POST /marketing/voice/opt-out           (에이전트 도구) 통화 중 "다시 걸지 마라" → 전화 수신거부
 
 받는 사람·동의·수신거부는 전부 SQL(0047)이 정한다. 이 서버는 키를 들고 한 명씩 보낼 뿐이다.
@@ -35,7 +36,7 @@ from pydantic import BaseModel
 from backend.api.routes import terminal
 from backend.api.routes.voice import CLUB_TIMEZONE, require_tool_secret
 from backend.core.config import settings
-from backend.services import supabase_rest, voice_agent
+from backend.services import service_usage, supabase_rest, voice_agent
 from backend.services.barcode_png import barcode_url
 from backend.services.twilio_sms import normalize_phone, send_sms
 
@@ -267,6 +268,50 @@ async def send_campaign(campaign_id: int, request: Request) -> dict[str, Any]:
     _running.add(campaign_id)
     _start(campaign)
     return {"ok": True, "already_running": False}
+
+
+@router.get("/campaigns/{campaign_id}/cost")
+async def campaign_cost(campaign_id: int, request: Request) -> dict[str, Any]:
+    """보낸 캠페인이 실제로 얼마 들었나. 문자는 Twilio 의 한 통당 요금, 전화는 ElevenLabs 크레딧.
+
+    요금은 문자가 나가고 조금 지나야 붙는다 — 그전 문자는 pending 으로 센다.
+    """
+    campaign = await asyncio.to_thread(terminal._as_staff, request, "pelham_marketing_campaign",
+                                       {"p_id": campaign_id})
+    sends = [s for s in campaign.get("sends") or [] if s.get("provider_ref")]
+    refs = [str(s["provider_ref"]) for s in sends]
+    if campaign["channel"] == "call":
+        try:
+            costs = await service_usage.call_costs(refs)
+        except Exception:
+            raise HTTPException(status_code=502, detail="ElevenLabs did not answer. Try again in a moment.") from None
+        return {"channel": "call", "unit": "credits", "total": round(sum(costs.values()), 2),
+                "priced": len(costs), "pending": len(refs) - len(costs), "segments": None}
+    if not settings.TWILIO_ENABLED:
+        raise HTTPException(status_code=503, detail="Text messages are not set up on the server yet (Twilio).")
+    since = _day(campaign.get("started_at") or campaign.get("created_at")) or datetime.now(CLUB_TIMEZONE).date()
+    until = _day(campaign.get("finished_at")) or datetime.now(CLUB_TIMEZONE).date()
+    try:
+        prices = await service_usage.twilio_message_prices(refs, since, until)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Twilio did not answer. Try again in a moment.") from None
+    units = {p["unit"] for p in prices.values()}
+    return {
+        "channel": "sms",
+        "unit": units.pop() if len(units) == 1 else "USD",
+        "total": round(sum(p["price"] for p in prices.values()), 4),
+        "priced": len(prices),
+        "pending": len(refs) - len(prices),
+        "segments": sum(p["segments"] for p in prices.values()),
+    }
+
+
+def _day(value: Any) -> Optional[date]:
+    """타임스탬프의 UTC 날짜. Twilio 의 DateSent 조건도 UTC 날짜다."""
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
 
 
 def _start(campaign: dict[str, Any]) -> None:

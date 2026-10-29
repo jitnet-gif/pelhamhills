@@ -223,3 +223,85 @@ export function isoClubDateTime(iso: string | null): string {
   const t = Date.parse(iso);
   return Number.isNaN(t) ? "" : clubDateTime(t / 1000);
 }
+
+// ===== Usage 탭 — ElevenLabs·Twilio·Fly 사용량과 잔액(`backend/api/routes/usage.py`) =====
+
+type UsageError = { ok: false; error: string; needs_permission?: string };
+
+export type ElevenLabsUsage =
+  | UsageError
+  | {
+      ok: true;
+      tier: string | null;
+      status: string | null;
+      /** 이번 주기에 쓴 크레딧(ElevenLabs 의 character_count). */
+      used: number;
+      limit: number;
+      resets_at: number | null;
+      billing_period: string | null;
+      currency: string;
+      next_invoice_cents: number | null;
+      next_invoice_at: number | null;
+      can_extend: boolean;
+      console: string;
+    };
+
+export type TwilioUsage =
+  | UsageError
+  | {
+      ok: true;
+      /** 계정 잔액. 음수면 갚을 돈. */
+      balance: number | null;
+      currency: string;
+      month_start: string | null;
+      month_total: number;
+      month_unit: string;
+      rows: { category: string; label: string; count: number; usage: number; usage_unit: string; price: number }[];
+      console: string;
+    };
+
+export type FlyUsage =
+  | UsageError
+  | {
+      ok: true;
+      org: string;
+      billing_status: string | null;
+      credit: number;
+      card_saved: boolean;
+      paid_plan: boolean;
+      apps: {
+        name: string;
+        status: string | null;
+        machines: {
+          id: string;
+          state: string;
+          region: string;
+          cpu_kind: string | null;
+          cpus: number | null;
+          memory_mb: number | null;
+        }[];
+      }[];
+      console: string;
+    };
+
+export type ServiceUsage = {
+  elevenlabs: ElevenLabsUsage;
+  twilio: TwilioUsage;
+  fly: FlyUsage;
+  checked_at: number;
+};
+
+export async function fetchUsage(fresh = false): Promise<ServiceUsage> {
+  return (await request(`/usage${fresh ? "?fresh=true" : ""}`)).json();
+}
+
+export function money(amount: number | null | undefined, currency = "USD", digits = 2): string {
+  if (amount === null || amount === undefined) return "–";
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency,
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(amount);
+}

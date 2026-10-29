@@ -259,3 +259,37 @@ def test_weather_alert_refused_outside_alert_hours(env, monkeypatch):
     monkeypatch.setattr(marketing, "alert_window_open", lambda now=None: False)
     res = client.post(f"{API}/marketing/campaigns/7/send", headers={"Authorization": "Bearer t"})
     assert res.status_code == 409
+
+
+def test_sms_campaign_cost_sums_twilio_prices(env, monkeypatch):
+    client, state = env
+    state["campaign"].update(status="sent", started_at="2026-10-28T14:00:00+00:00",
+                             finished_at="2026-10-28T14:05:00+00:00",
+                             sends=[{"id": 1, "provider_ref": "SM1"}, {"id": 2, "provider_ref": "SM2"},
+                                    {"id": 3, "provider_ref": None}])
+    seen = {}
+
+    async def fake_prices(sids, since, until):
+        seen.update(sids=list(sids), since=since.isoformat(), until=until.isoformat())
+        return {"SM1": {"price": 0.0083, "unit": "USD", "segments": 1}}
+
+    from backend.services import service_usage
+    monkeypatch.setattr(service_usage, "twilio_message_prices", fake_prices)
+    res = client.get(f"{API}/marketing/campaigns/7/cost", headers={"Authorization": "Bearer t"})
+    assert res.status_code == 200, res.text
+    assert res.json() == {"channel": "sms", "unit": "USD", "total": 0.0083, "priced": 1, "pending": 1, "segments": 1}
+    assert seen == {"sids": ["SM1", "SM2"], "since": "2026-10-28", "until": "2026-10-28"}
+
+
+def test_call_campaign_cost_is_elevenlabs_credits(env, monkeypatch):
+    client, state = env
+    state["campaign"].update(channel="call", sends=[{"id": 1, "provider_ref": "conv_1"}])
+
+    async def fake_costs(ids):
+        return {"conv_1": 812.0}
+
+    from backend.services import service_usage
+    monkeypatch.setattr(service_usage, "call_costs", fake_costs)
+    res = client.get(f"{API}/marketing/campaigns/7/cost")
+    assert res.json() == {"channel": "call", "unit": "credits", "total": 812.0, "priced": 1, "pending": 0,
+                          "segments": None}

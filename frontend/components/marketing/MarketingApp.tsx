@@ -16,6 +16,7 @@ import {
   type AudienceCustomer,
   type AudienceFilter,
   type Campaign,
+  type CampaignCost,
   type CampaignSend,
   type Channel,
   type MarketingStatus,
@@ -927,6 +928,7 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                 </span>
               ) : null}
             </div>
+            <CostLine campaign={detail} key={detail.id} />
             <RecipientMix sends={detail.sends ?? []} />
             {detail.replies && detail.replies.reached > 0 ? (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -1034,6 +1036,82 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
 }
 
 /** 받은 사람들 구성 한 줄 — 0133 전 DB 에는 customer 가 없어서 아무것도 안 그린다. */
+/**
+ * 이 캠페인이 실제로 얼마 들었나 — 문자는 Twilio 가 한 통마다 매긴 요금 합, 전화는 ElevenLabs 크레딧 합.
+ * 요금은 나가고 조금 뒤에 붙어서, 보내는 중이거나 아직 안 붙은 통이 있으면 30초마다 다시 묻는다.
+ */
+function CostLine({ campaign }: { campaign: Campaign }) {
+  const [cost, setCost] = useState<CampaignCost | null>(null);
+  const [error, setError] = useState("");
+  const [tick, setTick] = useState(0);
+  const reached = (campaign.counts.sent ?? 0) + (campaign.counts.delivered ?? 0) + (campaign.counts.failed ?? 0);
+
+  useEffect(() => {
+    if (reached === 0) return;
+    let live = true;
+    marketingApi
+      .cost(campaign.id)
+      .then((c) => live && setCost(c))
+      .catch((cause) => live && setError(describeMarketingError(cause)));
+    return () => {
+      live = false;
+    };
+  }, [campaign.id, reached, tick]);
+
+  const waiting = campaign.status === "sending" || (cost?.pending ?? 0) > 0;
+  useEffect(() => {
+    if (!waiting || reached === 0) return;
+    const timer = window.setTimeout(() => setTick((n) => n + 1), 30000);
+    return () => window.clearTimeout(timer);
+  }, [waiting, reached, tick]);
+
+  if (reached === 0) return null;
+  const sms = campaign.channel === "sms";
+  const total = cost ? (sms ? money(cost.total, cost.unit, 2, 4) : credits(cost.total)) : "…";
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <span
+        className="bg-[#fff4dc] px-2 py-1 font-bold text-[#8a5a00]"
+        title={sms ? "What Twilio charged for these texts" : "ElevenLabs credits these calls used"}
+      >
+        <span>Cost</span>: {total}
+        {sms && cost?.unit ? ` ${cost.unit}` : ""}
+      </span>
+      {cost && cost.priced > 0 ? (
+        <span className="bg-[#f0f1f3] px-2 py-1 font-bold">
+          <span>Per person</span>:{" "}
+          {sms ? money(cost.total / cost.priced, cost.unit, 4, 4) : credits(cost.total / cost.priced)}
+        </span>
+      ) : null}
+      {sms && cost?.segments ? (
+        <span className="bg-[#f0f1f3] px-2 py-1 font-bold" title="Long texts are charged as several parts">
+          <span>Text parts</span>: {cost.segments}
+        </span>
+      ) : null}
+      {cost && cost.pending > 0 ? (
+        <span className="text-[#6b7280]">
+          {`${cost.pending} not priced yet — the bill updates in a minute`}
+        </span>
+      ) : null}
+      {error ? <span className="text-[#8c1d1d]">{error}</span> : null}
+    </div>
+  );
+}
+
+function money(amount: number, currency: string, min: number, max: number): string {
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: currency || "USD",
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: min,
+    maximumFractionDigits: max,
+  }).format(amount);
+}
+
+function credits(amount: number): string {
+  return `${Math.round(amount).toLocaleString("en-CA")} credits`;
+}
+
 function RecipientMix({ sends }: { sends: CampaignSend[] }) {
   const mix = summarizeRecipients(sends);
   if (mix.known === 0) return null;
