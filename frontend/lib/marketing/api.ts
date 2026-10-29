@@ -68,6 +68,23 @@ export type CampaignSend = {
   tee_time?: string | null;
   /** 지금 이 번호가 같은 채널에서 수신거부 상태면(0116). after_send = 캠페인이 시작된 뒤 거부. */
   optout?: { created_at: string; source: string; after_send: boolean } | null;
+  /** 0133 — 받은 뒤 14일 안에 이 번호로 온 연락(웹 예약·신청 / 전화 / 문자 답장). */
+  replied?: ReplyChannel[];
+  /** 0133 — 받은 사람이 어떤 사람인지(지금 고객 명부 기준). 명부에 없는 번호면 null. new = 최근 12개월 계정. */
+  customer?: { is_member: boolean; rounds: number; city: string | null; new: boolean } | null;
+};
+
+export type ReplyChannel = "web" | "call" | "text";
+
+/** 0133 — 받은 번호(reached) 중 시작 후 `days` 일 안에 연락해 온 사람 수. 상세에만 있다. */
+export type CampaignReplies = {
+  days: number;
+  until: string | null;
+  reached: number;
+  responded: number;
+  web: number;
+  call: number;
+  text: number;
 };
 
 export type Campaign = {
@@ -97,6 +114,7 @@ export type Campaign = {
   /** 받은 사람 중 캠페인 시작 뒤 수신거부한 번호 수(0116). 0116 전 DB 에는 없다. */
   opted_out_after?: number;
   sends?: CampaignSend[];
+  replies?: CampaignReplies;
 };
 
 export type OptOut = { phone: string; channel: Channel; source: string; created_at: string; name: string | null };
@@ -221,6 +239,80 @@ export const SEGMENT_LABEL: Record<Segment, string> = {
   regulars: "Regulars (5+ rounds)",
   new: "New this year",
 };
+
+export const REPLY_LABEL: Record<ReplyChannel, string> = {
+  web: "Website",
+  call: "Phone call",
+  text: "Text reply",
+};
+
+/** 그룹이 어떤 사람들인지(0047 pelham_marketing_candidates 의 segment 조건 그대로). */
+export const SEGMENT_HINT: Record<Segment, string> = {
+  all: "Everyone in the customer list",
+  members: "Club members (member flag in the customer list)",
+  non_members: "Public golfers who are not members",
+  regulars: "Customers with 5 or more rounds booked or played",
+  new: "Customer accounts created in the last 12 months",
+};
+
+/** 받은 사람들 구성 — 회원·일반·단골(5+)·신규·명부 밖 번호, 많은 도시 순. */
+export function summarizeRecipients(sends: CampaignSend[]) {
+  const known = sends.filter((s) => s.customer);
+  const cities = new Map<string, number>();
+  for (const s of known) {
+    if (s.customer?.city) cities.set(s.customer.city, (cities.get(s.customer.city) ?? 0) + 1);
+  }
+  return {
+    known: known.length,
+    members: known.filter((s) => s.customer?.is_member).length,
+    publicGolfers: known.filter((s) => !s.customer?.is_member).length,
+    regulars: known.filter((s) => (s.customer?.rounds ?? 0) >= 5).length,
+    newCustomers: known.filter((s) => s.customer?.new).length,
+    notInList: sends.length - known.length,
+    cities: [...cities.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])),
+  };
+}
+
+export type AudienceFact = { label: string; value: string; hint?: string };
+
+/** 캠페인을 누구에게 보냈는지 — 칸 이름과 값. 예: Group: Members · Rounds: 5+ · City: Fonthill. */
+export function campaignAudienceFacts(audience: Campaign["audience"] | null | undefined): AudienceFact[] {
+  if (!audience) return [];
+  if (audience.kind === "weather") {
+    return [{ label: "Group", value: `Tee sheet guests on ${audience.date ?? ""}`, hint: "Everyone booked that day" }];
+  }
+  const facts: AudienceFact[] = [];
+  if (!audience.phones_only) {
+    const segment = SEGMENT_LABEL[audience.segment] ? audience.segment : "all";
+    facts.push({ label: "Group", value: SEGMENT_LABEL[segment], hint: SEGMENT_HINT[segment] });
+    const min = Number(audience.min_rounds) || 0;
+    const max = Number(audience.max_rounds) || 0;
+    if (min > 0 || max > 0) {
+      facts.push({
+        label: "Rounds",
+        value: min > 0 && max > 0 ? `${min}–${max}` : min > 0 ? `${min} or more` : `${max} or fewer`,
+      });
+    }
+    const list = (v: string[] | string | undefined) => (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
+    const cities = list(audience.city);
+    if (cities.length) facts.push({ label: "City", value: cities.join(", ") });
+    const codes = list(audience.area_code);
+    if (codes.length) facts.push({ label: "Area code", value: codes.join(", ") });
+    if (audience.search) facts.push({ label: "Search", value: `"${audience.search}"` });
+    if (audience.picked) facts.push({ label: "Picked by hand", value: `${audience.picked} people` });
+  }
+  if (audience.typed) {
+    facts.push({ label: audience.phones_only ? "Typed numbers only" : "Typed numbers", value: String(audience.typed) });
+  }
+  return facts;
+}
+
+/** 목록용 한 줄 — "Members · Rounds 5 or more · Fonthill". */
+export function describeCampaignAudience(audience: Campaign["audience"] | null | undefined): string {
+  return campaignAudienceFacts(audience)
+    .map((f) => (f.label === "Group" || f.label === "City" ? f.value : `${f.label} ${f.value}`))
+    .join(" · ");
+}
 
 export const REASON_LABEL: Record<SkipReason, string> = {
   no_phone: "No phone",

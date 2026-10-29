@@ -16,17 +16,22 @@ import {
   type AudienceCustomer,
   type AudienceFilter,
   type Campaign,
+  type CampaignSend,
   type Channel,
   type MarketingStatus,
   type OptOut,
   type Segment,
   OPTOUT_SOURCE_LABEL,
   REASON_LABEL,
+  REPLY_LABEL,
   SEGMENT_LABEL,
   SEND_STATUS_LABEL,
+  campaignAudienceFacts,
+  describeCampaignAudience,
   describeMarketingError,
   formatPhone,
   marketingApi,
+  summarizeRecipients,
 } from "@/lib/marketing/api";
 
 import { AiCampaignPicker } from "./AiCampaignPicker";
@@ -829,6 +834,11 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                     {campaign.audience?.kind === "weather" ? "Weather alert" : CHANNEL_LABEL[campaign.channel]} · {total}{" "}
                     people · {clubTime(campaign.created_at)}
                   </span>
+                  {campaign.audience?.kind !== "weather" && describeCampaignAudience(campaign.audience) ? (
+                    <span className="mt-0.5 block truncate text-xs font-bold text-[#4533ff]">
+                      {describeCampaignAudience(campaign.audience)}
+                    </span>
+                  ) : null}
                   {campaign.opted_out_after ? (
                     <span className="mt-0.5 block text-xs font-bold text-[#8c1d1d]">
                       <span>Opted out after</span>: {campaign.opted_out_after}
@@ -861,6 +871,20 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                   · created {clubTime(detail.created_at)}
                   {detail.created_by ? ` by ${detail.created_by}` : ""}
                 </p>
+                {campaignAudienceFacts(detail.audience).length ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="font-bold">Sent to</span>
+                    {campaignAudienceFacts(detail.audience).map((fact) => (
+                      <span className="bg-[#f0eeff] px-2 py-1 text-[#4533ff]" key={fact.label} title={fact.hint}>
+                        <span className="text-[#6b7280]">{fact.label}</span>:{" "}
+                        <span className="font-bold">{fact.value}</span>
+                      </span>
+                    ))}
+                    {campaignAudienceFacts(detail.audience)[0]?.hint ? (
+                      <span className="text-[#6b7280]">{campaignAudienceFacts(detail.audience)[0].hint}</span>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 {detail.status === "ready" || (detail.status === "sending" && waiting > 0) ? (
@@ -903,6 +927,27 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                 </span>
               ) : null}
             </div>
+            <RecipientMix sends={detail.sends ?? []} />
+            {detail.replies && detail.replies.reached > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span
+                  className="bg-[#eaf6ee] px-2 py-1 font-bold text-[#1d6b3a]"
+                  title={`People who got this and then booked or applied on the website, called, or texted back within ${detail.replies.days} days`}
+                >
+                  <span>Contacted us</span>: {detail.replies.responded} / {detail.replies.reached} (
+                  {Math.round((detail.replies.responded / detail.replies.reached) * 100)}%)
+                </span>
+                {(["web", "call", "text"] as const).map((key) => (
+                  <span className="bg-[#f0f1f3] px-2 py-1 font-bold" key={key}>
+                    <span>{REPLY_LABEL[key]}</span>: {detail.replies?.[key] ?? 0}
+                  </span>
+                ))}
+                <span className="text-[#6b7280]">
+                  <span>Counted for {detail.replies.days} days after sending</span>
+                  {detail.replies.until ? ` · until ${clubTime(detail.replies.until)}` : ""}
+                </span>
+              </div>
+            ) : null}
             {detail.status === "sending" && waiting > 0 && status &&
             !(detail.audience?.kind === "weather" ? status.alert_window_open : status.window_open) ? (
               <p className="mt-2 text-xs text-[#8a5a00]">
@@ -918,8 +963,12 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                   <tr className="border-b border-[#d4d4d8]">
                     <th className="px-2 py-1.5">Name</th>
                     <th className="px-2 py-1.5">Phone</th>
+                    <th className="px-2 py-1.5">Type</th>
+                    <th className="px-2 py-1.5 text-right">Rounds</th>
+                    <th className="px-2 py-1.5">City</th>
                     {detail.audience?.kind === "weather" ? <th className="px-2 py-1.5">Tee time</th> : null}
                     <th className="px-2 py-1.5">Status</th>
+                    {detail.replies ? <th className="px-2 py-1.5">Contacted us</th> : null}
                     <th className="px-2 py-1.5">Note</th>
                   </tr>
                 </thead>
@@ -928,10 +977,34 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                     <tr className="border-b border-[#f0f0f2]" key={send.id}>
                       <td className="px-2 py-1.5 font-bold">{send.name}</td>
                       <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(send.phone)}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        {send.customer ? (
+                          <>
+                            <span className={send.customer.is_member ? "font-bold text-[#4533ff]" : ""}>
+                              {send.customer.is_member ? "Member" : "Public"}
+                            </span>
+                            {send.customer.rounds >= 5 ? (
+                              <span className="ml-1 bg-[#f0f1f3] px-1 text-[10px] font-bold">Regular</span>
+                            ) : null}
+                            {send.customer.new ? (
+                              <span className="ml-1 bg-[#eaf6ee] px-1 text-[10px] font-bold text-[#1d6b3a]">New</span>
+                            ) : null}
+                          </>
+                        ) : detail.sends?.some((x) => x.customer) ? (
+                          <span className="text-[#6b7280]">Not in customer list</span>
+                        ) : null}
+                      </td>
+                      <td className="px-2 py-1.5 text-right">{send.customer?.rounds ?? ""}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{send.customer?.city ?? ""}</td>
                       {detail.audience?.kind === "weather" ? (
                         <td className="px-2 py-1.5 whitespace-nowrap">{send.tee_time ?? ""}</td>
                       ) : null}
                       <td className="px-2 py-1.5">{SEND_STATUS_LABEL[send.status]}</td>
+                      {detail.replies ? (
+                        <td className="px-2 py-1.5 font-bold whitespace-nowrap text-[#1d6b3a]">
+                          {(send.replied ?? []).map((key) => REPLY_LABEL[key]).join(" · ")}
+                        </td>
+                      ) : null}
                       <td className="max-w-[16rem] truncate px-2 py-1.5 text-[#6b7280]" title={send.error ?? ""}>
                         {send.optout ? (
                           <span className={`mr-1 font-bold ${send.optout.after_send ? "text-[#8c1d1d]" : ""}`}>
@@ -956,6 +1029,40 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
           </>
         )}
       </section>
+    </div>
+  );
+}
+
+/** 받은 사람들 구성 한 줄 — 0133 전 DB 에는 customer 가 없어서 아무것도 안 그린다. */
+function RecipientMix({ sends }: { sends: CampaignSend[] }) {
+  const mix = summarizeRecipients(sends);
+  if (mix.known === 0) return null;
+  const chips: [string, number][] = [
+    ["Members", mix.members],
+    ["Public", mix.publicGolfers],
+    ["Regulars (5+ rounds)", mix.regulars],
+    ["New this year", mix.newCustomers],
+    ["Not in customer list", mix.notInList],
+  ];
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <span className="font-bold">Who got it</span>
+      {chips
+        .filter(([, n]) => n > 0)
+        .map(([label, n]) => (
+          <span className="bg-[#f0eeff] px-2 py-1 font-bold text-[#4533ff]" key={label}>
+            <span>{label}</span>: {n}
+          </span>
+        ))}
+      {mix.cities.length ? (
+        <span className="text-[#6b7280]">
+          {mix.cities
+            .slice(0, 5)
+            .map(([city, n]) => `${city} ${n}`)
+            .join(" · ")}
+          {mix.cities.length > 5 ? ` · +${mix.cities.length - 5}` : ""}
+        </span>
+      ) : null}
     </div>
   );
 }
