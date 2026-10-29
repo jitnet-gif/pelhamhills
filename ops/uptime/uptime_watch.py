@@ -15,7 +15,7 @@
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — 메인 서버와 같은 값.
 - `UPTIME_SMS_TO` — 문자 받을 번호, 쉼표로(+1905…). 메인 서버의 STAFF_ALERT_NUMBERS 를 옮긴다.
 - `UPTIME_SMTP_USER`, `UPTIME_SMTP_PASSWORD` — 보내는 Gmail 과 앱 비밀번호(영수증 메일과 같은 계정).
-- `UPTIME_EMAIL_TO` — 받는 메일, 쉼표로. 기본 analysis@pelhamhills.ca, jitnet57@gmail.com.
+- `UPTIME_EMAIL_TO` — 받는 메일, 쉼표로. 기본 ai@smeagschool.com, proshop@pelhamhills.ca, jitnet57@gmail.com.
 
     python ops/uptime/uptime_watch.py              # 한 번 확인하고 필요하면 알린다
     python ops/uptime/uptime_watch.py --loop 120   # 2분마다 계속(감시 앱이 이렇게 돈다)
@@ -161,7 +161,7 @@ def send_sms(text: str) -> bool:
 def send_email(subject: str, text: str) -> bool:
     user = os.getenv("UPTIME_SMTP_USER", "").strip()
     password = os.getenv("UPTIME_SMTP_PASSWORD", "").replace(" ", "")
-    to = _list("UPTIME_EMAIL_TO", "analysis@pelhamhills.ca,jitnet57@gmail.com")
+    to = _list("UPTIME_EMAIL_TO", "ai@smeagschool.com,proshop@pelhamhills.ca,jitnet57@gmail.com")
     if not (user and password and to):
         print("email skipped: UPTIME_SMTP_USER/PASSWORD missing", file=sys.stderr)
         return False
