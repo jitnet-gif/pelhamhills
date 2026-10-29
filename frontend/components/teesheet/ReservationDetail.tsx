@@ -1619,7 +1619,7 @@ export default function ReservationDetail({ controller }: ReservationDetailProps
               <Glyph className="h-5 w-5 text-[#4e5560]" name="register" />
               <h2 className="text-[17px] font-normal">Sales</h2>
             </div>
-            <div className="min-h-0 flex-1">
+            <div className="flex min-h-0 flex-1 flex-col">
               <BillPanel
                 customer={billState.bill?.label ?? undefined}
                 describeLine={(line) => describeTeeLine(line, booking)}

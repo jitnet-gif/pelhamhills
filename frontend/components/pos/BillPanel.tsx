@@ -331,8 +331,10 @@ export default function BillPanel({
       onDone?.();
     };
     return layout === "sales" ? (
-      <div className="mx-auto w-full max-w-md py-6">
-        <PaidReceipt onDone={done} sale={receipt} />
+      <div className="h-full min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto w-full max-w-md py-6 pb-[calc(env(safe-area-inset-bottom)+5rem)]">
+          <PaidReceipt onDone={done} sale={receipt} />
+        </div>
       </div>
     ) : (
       <PaidReceipt onDone={done} sale={receipt} />
@@ -540,8 +542,10 @@ function SalesLayout({
   const who = (customer ?? bill?.label ?? "").trim();
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white text-[13px] text-[#1f2328] md:flex-row">
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+    // 아이패드: 오른쪽 결제 칸이 화면보다 길면(카드 전송 · Charge 단추) 그 칸만 스크롤한다. 좁은 화면(세로 칸)은
+    // 화면 전체가 스크롤한다. 아래 여백은 Safari 아래 막대 · 홈 막대에 마지막 단추가 가리지 않게.
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-white text-[13px] text-[#1f2328] md:flex-row md:overflow-hidden">
+      <section className="flex min-h-[60dvh] min-w-0 flex-1 flex-col md:min-h-0">
         {/* 손님 · 계산서 일 */}
         <div className="flex flex-wrap items-center gap-1.5 border-b border-[#d4d4d8] bg-[#e9edf2] px-3 py-2">
           <span className="border border-[#c7c7cc] bg-white px-3 py-1.5 text-[11px] font-bold tracking-wide uppercase">
@@ -645,7 +649,7 @@ function SalesLayout({
       </section>
 
       {/* 합계 · 결제 */}
-      <aside className="grid w-full shrink-0 content-start gap-3 overflow-y-auto border-t border-[#d4d4d8] bg-white p-3 md:w-[320px] md:border-t-0 md:border-l">
+      <aside className="grid w-full shrink-0 content-start gap-3 border-t border-[#d4d4d8] bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+5rem)] md:min-h-0 md:w-[320px] md:overflow-y-auto md:overscroll-contain md:border-t-0 md:border-l">
         <dl className="grid gap-1.5 text-[12px]">
           <Row label="Subtotal" value={formatMoney(bill?.subtotal ?? 0)} />
           <Row label="Discounts" value={formatMoney(bill?.discount ?? 0)} />
