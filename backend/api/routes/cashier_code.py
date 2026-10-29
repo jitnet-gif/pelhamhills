@@ -23,12 +23,22 @@
 환불·가격 변경 같은 막힌 일(0024)도 매니저 PIN 대신 그 직원의 ID 로 승인한다 — `POST /pos/approve`.
 번호 확인은 여기서만 할 수 있어서, 승인 줄은 service_role 로 `pelham_shift_approve` 가 남긴다
 (브라우저는 그 함수를 부를 수 없다). 틀린 번호도 적어 10분에 5번이면 막는다.
+
+## 번호로 들어오기 (2026-10-28)
+어드민 첫 화면은 숫자판이다 — `POST /pos/pin-login`. 맞는 Shift ID 면 이 서버가 공용 직원 계정
+(`STAFF_PIN_EMAIL`, 기본 staff@pelhamhills.ca)으로 Supabase 에 로그인해 그 세션을 돌려준다. 매니저 이상은
+첫 화면의 "Manager sign in" 으로 자기 이메일·비밀번호를 친다.
+그 계정의 비밀번호는 Fly secret `STAFF_PIN_PASSWORD` 에만 있다 — 저장소가 공개라 코드·브라우저에 두지 않는다.
+로그인 전에 열린 창구라 틀린 번호는 주소마다 10분에 10번이면 막는다(기계 메모리 — 재시작하면 풀린다).
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
+from collections import defaultdict, deque
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -149,3 +159,87 @@ def approve(body: ApproveIn, request: Request) -> dict:
         raise HTTPException(status_code=503, detail="Can't save the approval right now. Try again.") from None
     _record_check(name)
     return result if isinstance(result, dict) else {"approved": False, "message": "Try again."}
+
+
+# ===== 번호로 들어오기 =====================================================
+
+PIN_EMAIL = (os.getenv("STAFF_PIN_EMAIL") or "staff@pelhamhills.ca").strip().lower()
+PIN_WINDOW_S = 600
+PIN_MAX_MISSES = 10
+
+_misses: dict[str, deque[float]] = defaultdict(deque)
+_misses_lock = threading.Lock()
+
+
+class PinLoginIn(BaseModel):
+    code: str = Field(pattern=r"^\d{4,8}$")
+
+
+def _client_ip(request: Request) -> str:
+    # Fly 앞단이 붙이는 진짜 주소. 없으면 연결 주소.
+    ip = (request.headers.get("fly-client-ip") or "").strip()
+    return ip or (request.client.host if request.client else "")
+
+
+def _recent_misses(ip: str, now: float) -> deque[float]:
+    misses = _misses[ip]
+    while misses and now - misses[0] > PIN_WINDOW_S:
+        misses.popleft()
+    return misses
+
+
+def _password_grant(email: str, password: str) -> dict:
+    """공용 직원 계정으로 Supabase Auth 에 로그인한다. GoTrue 의 토큰 응답을 그대로 돌려준다."""
+    url, _ = supabase_rest._config()
+    key = (os.getenv("SUPABASE_PUBLISHABLE_KEY") or "").strip() or supabase_rest._DEFAULT_PUBLISHABLE_KEY
+    if not url:
+        raise HTTPException(status_code=503, detail="Sign-in is not set up on the server.")
+    try:
+        response = httpx.post(
+            f"{url}/auth/v1/token",
+            params={"grant_type": "password"},
+            json={"email": email, "password": password},
+            headers={"apikey": key},
+            timeout=10.0,
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("staff pin sign-in failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Can't reach the sign-in server. Try again.") from None
+    if not response.is_success:
+        logger.warning("staff pin sign-in refused: HTTP %s", response.status_code)
+        raise HTTPException(status_code=503, detail="The staff account can't sign in. Ask a manager.")
+    body = response.json()
+    return body if isinstance(body, dict) else {}
+
+
+@router.post("/pin-login")
+def pin_login(body: PinLoginIn, request: Request) -> dict:
+    password = os.getenv("STAFF_PIN_PASSWORD") or ""
+    if not password:
+        raise HTTPException(status_code=503, detail="Staff ID sign-in is not set up yet. Use Manager sign in.")
+    ip = _client_ip(request)
+    with _misses_lock:
+        if len(_recent_misses(ip, time.time())) >= PIN_MAX_MISSES:
+            raise HTTPException(status_code=429, detail="Too many wrong IDs. Wait 10 minutes.")
+
+    found = _lookup(body.code)
+    if found.get("ambiguous"):
+        raise HTTPException(
+            status_code=409,
+            detail="More than one Pelham Shift team uses this ID. Ask a manager to set PELHAM_SHIFT_TEAM.",
+        )
+    name = " ".join(str(found.get("name") or "").split())[:80]
+    if not name:
+        with _misses_lock:
+            _recent_misses(ip, time.time()).append(time.time())
+        raise HTTPException(status_code=404, detail="No staff member has that ID.")
+
+    token = _password_grant(PIN_EMAIL, password)
+    _record_check(name)
+    return {
+        "access_token": token.get("access_token"),
+        "refresh_token": token.get("refresh_token"),
+        "expires_in": token.get("expires_in"),
+        "user": {"id": (token.get("user") or {}).get("id"), "email": PIN_EMAIL},
+        "name": name,
+    }

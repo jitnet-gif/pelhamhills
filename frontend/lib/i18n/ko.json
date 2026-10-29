@@ -3372,5 +3372,15 @@
  "Range membership": "연습장 회원권",
  "Members only": "회원 전용",
  "For golf members only": "골프 회원 전용",
- "This is the range membership": "연습장 회원권 자체입니다"
+ "This is the range membership": "연습장 회원권 자체입니다",
+ "Staff ID": "직원 ID",
+ "Enter your Pelham Shift staff ID.": "Pelham Shift 직원 ID 를 누르세요.",
+ "Manager sign in": "매니저 로그인",
+ "Managers sign in with their own email and password.": "매니저는 자기 이메일과 비밀번호로 들어옵니다.",
+ "Locked after 1 minute. Enter your staff ID to open.": "1분 동안 쓰지 않아 잠겼습니다. 직원 ID 를 누르면 열립니다.",
+ "Staff ID sign in": "직원 ID 로 들어오기",
+ "That staff ID is not right.": "직원 ID 가 맞지 않습니다.",
+ "Couldn't check the ID. Try again.": "ID 를 확인하지 못했습니다. 다시 해 주세요.",
+ "Too many wrong IDs. Wait 10 minutes.": "틀린 ID 가 너무 많습니다. 10분 뒤에 다시 해 주세요.",
+ "Staff ID sign-in is not set up yet. Use Manager sign in.": "직원 ID 로그인이 아직 설정되지 않았습니다. 매니저 로그인을 쓰세요."
 }

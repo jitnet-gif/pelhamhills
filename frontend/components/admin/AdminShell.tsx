@@ -30,6 +30,12 @@
  *
  * 세션은 브라우저에만 있다 — 정적 export 라 쿠키를 심어 줄 서버가 없다.
  * 자세한 내용은 `lib/teeSheet/session.ts`.
+ *
+ * ## 숫자판과 1분 잠금(2026-10-28)
+ *
+ * 첫 화면은 Pelham Shift 직원 ID 숫자판이다 — 맞으면 공용 직원 계정(staff@pelhamhills.ca)으로 들어온다.
+ * 매니저 이상은 "Manager sign in" 으로 자기 이메일·비밀번호를 친다. 어드민 화면은 1분 동안 손대지 않으면
+ * 잠기고, 직원 ID 를 누르면 다시 열린다(매니저 계정도 같다). 자세한 내용은 `lib/staffPin.ts`.
  */
 
 import Link from "next/link";
@@ -58,6 +64,7 @@ import {
   type AdminDivision,
 } from "@/lib/nav";
 import AutoBackupNotice from "@/components/admin/AutoBackupNotice";
+import PinPad from "@/components/admin/PinPad";
 import InstallAppHint from "@/components/admin/InstallAppHint";
 import LangToggle from "@/lib/i18n/LangToggle";
 import { useAccountsAccess } from "@/lib/accounts";
@@ -71,6 +78,15 @@ import { SCREENS, canOpen, useScreenAccess, type Screen } from "@/lib/screens";
 import { ApiError } from "@/lib/teeSheet/api";
 import { todayIso } from "@/lib/teeSheet/dates";
 import { accessToken, getSession, signIn, signOut, subscribe } from "@/lib/teeSheet/session";
+import {
+  IDLE_LOCK_MS,
+  isLockedStored,
+  lastActive,
+  markActive,
+  pinSignIn,
+  pinUnlock,
+  setLocked,
+} from "@/lib/staffPin";
 import { isStaffDenied, staffSlots } from "@/lib/teeSheet/staffRpc";
 
 type Props = {
@@ -124,6 +140,7 @@ export default function AdminShell(props: Props) {
       ) : (
         <AdminFrame {...props} email={gate.email} onSignOut={gate.signOut} />
       )}
+      {props.variant === "pos" ? null : <IdleLock onSignOut={gate.signOut} />}
       <AutoBackupNotice email={gate.email} />
       <ActivityWatch email={gate.email} />
     </>
@@ -960,6 +977,141 @@ function GateSplash() {
  * iOS 사파리가 그보다 작은 입력에 초점이 가면 화면을 확대해 버린다.
  */
 function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
+  const [mode, setMode] = useState<"pin" | "manager">("pin");
+  if (mode === "pin") return <PinSignInScreen onManager={() => setMode("manager")} onSignedIn={onSignedIn} />;
+  return <ManagerSignInScreen onPin={() => setMode("pin")} onSignedIn={onSignedIn} />;
+}
+
+/** 들어온 직후 잠금 시계를 새로 시작한다 — 어제 마지막으로 손댄 시각 때문에 들어오자마자 잠기지 않게. */
+function startFresh() {
+  markActive();
+  setLocked(false);
+}
+
+function PinSignInScreen({ onSignedIn, onManager }: { onSignedIn: () => void; onManager: () => void }) {
+  const submit = useCallback(
+    async (code: string) => {
+      await pinSignIn(code);
+      startFresh();
+      onSignedIn();
+    },
+    [onSignedIn],
+  );
+
+  return (
+    <main className="grid min-h-[100dvh] place-items-center bg-[#f2f2f4] px-4 py-10 text-[#1f2328]">
+      <div className="w-full max-w-[320px]">
+        <div className="mb-4 flex items-center gap-2 text-sm font-bold">
+          <span aria-hidden className="text-base leading-none text-[#4533ff]">
+            &#9670;
+          </span>
+          {CLUB.shortName} 프로 샵
+          <LangToggle className="ml-auto border border-[#d4d4d8] bg-white px-2 py-1 text-[11px]" />
+        </div>
+
+        <div className="bg-white p-5 shadow-sm">
+          <h1 className="text-base font-bold">Staff ID</h1>
+          <p className="mt-1 text-xs leading-5 text-[#6b7280]">Enter your Pelham Shift staff ID.</p>
+          <div className="mt-3">
+            <PinPad onSubmit={submit} />
+          </div>
+        </div>
+
+        <button
+          className="mt-3 h-11 w-full border border-[#d4d4d8] bg-white text-sm font-bold text-[#1f2328]"
+          onClick={onManager}
+          type="button"
+        >
+          Manager sign in
+        </button>
+        <p className="mt-3 text-[11px] leading-5 text-[#6b7280]">
+          Managers sign in with their own email and password.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * 1분 잠금. 어드민 화면 위를 덮을 뿐 화면은 그대로 살아 있다 — 계산 중이던 계산서·단말 결제가 끊기지 않는다.
+ * 덮개는 불투명하다. 손님 이름이 비치지 않게.
+ */
+function IdleLock({ onSignOut }: { onSignOut: () => void }) {
+  const [locked, setLockedState] = useState(false);
+
+  useEffect(() => {
+    const expired = () => Date.now() - lastActive() > IDLE_LOCK_MS;
+    const lock = () => {
+      setLocked(true);
+      setLockedState(true);
+    };
+    // 새로고침으로 빠져나가지 못하게 — 잠긴 채였거나 그사이 1분이 지났으면 잠긴 채로 연다.
+    if (isLockedStored() || expired()) lock();
+
+    let lastMark = 0;
+    const onActivity = () => {
+      if (isLockedStored()) return;
+      const now = Date.now();
+      if (now - lastMark < 2000) return; // 마우스가 움직일 때마다 쓰지 않게.
+      lastMark = now;
+      markActive(now);
+    };
+    const events = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart", "scroll"] as const;
+    for (const name of events) window.addEventListener(name, onActivity, { capture: true, passive: true });
+
+    const timer = window.setInterval(() => {
+      if (!isLockedStored() && expired()) lock();
+    }, 5000);
+    // 다른 탭에서 잠기거나 열리면 따라간다.
+    const onStorage = () => setLockedState(isLockedStored());
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      for (const name of events) window.removeEventListener(name, onActivity, { capture: true });
+      window.clearInterval(timer);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  const unlock = useCallback(async (code: string) => {
+    await pinUnlock(code);
+    startFresh();
+    setLockedState(false);
+  }, []);
+
+  if (!locked) return null;
+  return (
+    <div
+      aria-label="Screen locked"
+      aria-modal
+      className="fixed inset-0 z-[10000] grid place-items-center bg-[#111315] px-4 py-10"
+      role="dialog"
+    >
+      <div className="w-full max-w-[320px]">
+        <p className="mb-4 text-sm font-bold text-white">{CLUB.shortName} · Locked</p>
+        <div className="bg-white p-5 shadow-sm">
+          <h1 className="text-base font-bold">Staff ID</h1>
+          <p className="mt-1 text-xs leading-5 text-[#6b7280]">Locked after 1 minute. Enter your staff ID to open.</p>
+          <div className="mt-3">
+            <PinPad captureKeys onSubmit={unlock} />
+          </div>
+        </div>
+        <button
+          className="mt-3 h-11 w-full border border-[#3a3f45] text-sm font-bold text-white"
+          onClick={() => {
+            setLocked(false);
+            onSignOut();
+          }}
+          type="button"
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ManagerSignInScreen({ onSignedIn, onPin }: { onSignedIn: () => void; onPin: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -972,6 +1124,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
     setError("");
     try {
       await signIn(email, password);
+      startFresh();
       // 문을 다시 판정하고 페이지를 새로 연다 — 이유는 `useStaffGate` 의 `reloadPage`.
       // busy 는 풀지 않는다. 새 문서가 뜰 때까지 버튼이 잠겨 있어야 두 번 눌리지 않는다.
       onSignedIn();
@@ -997,7 +1150,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
         </div>
 
         <form className="bg-white p-5 shadow-sm" onSubmit={submit}>
-          <h1 className="text-base font-bold">직원 로그인</h1>
+          <h1 className="text-base font-bold">Manager sign in</h1>
           <p className="mt-1 text-xs leading-5 text-[#6b7280]">
             직원 아이디와 비밀번호로 들어옵니다. 예약 화면을 찾으시나요?{" "}
             <Link className="font-semibold text-[#4533ff] underline" href={SITE_HOME}>
@@ -1052,6 +1205,13 @@ function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
           </button>
         </form>
 
+        <button
+          className="mt-3 h-11 w-full border border-[#d4d4d8] bg-white text-sm font-bold text-[#1f2328]"
+          onClick={onPin}
+          type="button"
+        >
+          Staff ID sign in
+        </button>
         <p className="mt-3 text-[11px] leading-5 text-[#6b7280]">
           계정이 없거나 비밀번호를 잊으셨으면 프로 샵(249-805-0556)으로 연락해 주세요.
         </p>

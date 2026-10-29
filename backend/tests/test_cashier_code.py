@@ -134,3 +134,57 @@ def test_approve_needs_staff(approve_env):
     body = {"code": "1001", "action": "refund", "ref": "77"}
     assert client.post(f"{API}/pos/approve", json=body).status_code == 401
     assert state["saved"] == []
+
+
+# ===== 번호로 들어오기 =====================================================
+
+
+@pytest.fixture()
+def pin(env, monkeypatch):
+    client, state = env
+    state["grants"] = []
+
+    def fake_grant(email, password):
+        state["grants"].append((email, password))
+        return {"access_token": "a", "refresh_token": "r", "expires_in": 3600, "user": {"id": "u1"}}
+
+    monkeypatch.setattr(cashier_code, "_password_grant", fake_grant)
+    monkeypatch.setattr(cashier_code, "_record_check", lambda name: None)
+    monkeypatch.setenv("STAFF_PIN_PASSWORD", "secret")
+    cashier_code._misses.clear()
+    return client, state
+
+
+def test_pin_signs_in_as_staff_account(pin):
+    client, state = pin
+    state["answer"] = {"name": "Josh Kim"}
+    response = client.post(f"{API}/pos/pin-login", json={"code": "1001"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["access_token"] == "a" and body["name"] == "Josh Kim"
+    assert body["user"] == {"id": "u1", "email": "staff@pelhamhills.ca"}
+    assert state["grants"] == [("staff@pelhamhills.ca", "secret")]
+
+
+def test_pin_unknown_id_does_not_sign_in(pin):
+    client, state = pin
+    state["answer"] = {}
+    response = client.post(f"{API}/pos/pin-login", json={"code": "9999"})
+    assert response.status_code == 404
+    assert state["grants"] == []
+
+
+def test_pin_blocks_after_ten_misses(pin):
+    client, state = pin
+    state["answer"] = {}
+    for _ in range(10):
+        assert client.post(f"{API}/pos/pin-login", json={"code": "9999"}).status_code == 404
+    state["answer"] = {"name": "Josh Kim"}
+    assert client.post(f"{API}/pos/pin-login", json={"code": "1001"}).status_code == 429
+
+
+def test_pin_needs_server_password(pin, monkeypatch):
+    client, state = pin
+    monkeypatch.delenv("STAFF_PIN_PASSWORD")
+    state["answer"] = {"name": "Josh Kim"}
+    assert client.post(f"{API}/pos/pin-login", json={"code": "1001"}).status_code == 503

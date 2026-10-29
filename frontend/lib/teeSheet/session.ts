@@ -257,13 +257,25 @@ export async function signIn(login: string, password: string): Promise<StaffSess
   return session;
 }
 
+/**
+ * 서버가 대신 받아 온 토큰 응답(GoTrue 모양)을 이 브라우저의 세션으로 삼는다 — 어드민 숫자판 로그인
+ * (`lib/staffPin.ts`). 모양이 틀리면 false.
+ */
+export function adoptSession(payload: unknown, fallbackEmail: string): boolean {
+  const session = toSession((payload ?? {}) as TokenResponse, fallbackEmail);
+  if (!session) return false;
+  setSession(session);
+  return true;
+}
+
 /** 저장된 세션을 버린다. GoTrue 쪽 무효화는 실패해도 로그아웃은 성립시킨다. */
 export async function signOut(): Promise<void> {
   const current = getSession();
   setSession(null);
   if (!current) return;
   try {
-    await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+    // scope=local — 이 기기 세션만 끝낸다. 기본값(global)이면 공용 계정 staff@ 로 들어온 다른 기기도 모두 튕긴다.
+    await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
       method: "POST",
       headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${current.accessToken}` },
     });
