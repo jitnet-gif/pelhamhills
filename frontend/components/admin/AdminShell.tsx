@@ -34,8 +34,8 @@
  * ## 숫자판과 1분 잠금(2026-10-28)
  *
  * 첫 화면은 Pelham Shift 직원 ID 숫자판이다 — 맞으면 공용 직원 계정(staff@pelhamhills.ca)으로 들어온다.
- * 매니저 이상은 "Manager sign in" 으로 자기 이메일·비밀번호를 친다. 어드민 화면은 1분 동안 손대지 않으면
- * 잠기고, 직원 ID 를 누르면 다시 열린다(매니저 계정도 같다). 자세한 내용은 `lib/staffPin.ts`.
+ * 매니저 이상은 "Manager sign in" 으로 자기 이메일·비밀번호를 친다. 어드민 화면은 1분(0128 표에서 바꾼다) 동안
+ * 손대지 않으면 잠기고, 직원 ID 를 누르면 다시 열린다(매니저 계정도 같다). 자세한 내용은 `lib/staffPin.ts`.
  */
 
 import Link from "next/link";
@@ -79,7 +79,8 @@ import { ApiError } from "@/lib/teeSheet/api";
 import { todayIso } from "@/lib/teeSheet/dates";
 import { accessToken, getSession, signIn, signOut, subscribe } from "@/lib/teeSheet/session";
 import {
-  IDLE_LOCK_MS,
+  cachedIdleLockMs,
+  idleLockMs,
   isLockedStored,
   lastActive,
   markActive,
@@ -1040,13 +1041,18 @@ function IdleLock({ onSignOut }: { onSignOut: () => void }) {
   const [locked, setLockedState] = useState(false);
 
   useEffect(() => {
-    const expired = () => Date.now() - lastActive() > IDLE_LOCK_MS;
+    // 잠금 시간은 0128 표에서 온다(0 = 잠그지 않음). 묻는 동안은 지난번 값으로.
+    let limit = cachedIdleLockMs();
+    const expired = () => limit > 0 && Date.now() - lastActive() > limit;
     const lock = () => {
       setLocked(true);
       setLockedState(true);
     };
-    // 새로고침으로 빠져나가지 못하게 — 잠긴 채였거나 그사이 1분이 지났으면 잠긴 채로 연다.
+    // 새로고침으로 빠져나가지 못하게 — 잠긴 채였거나 그사이 시간이 지났으면 잠긴 채로 연다.
     if (isLockedStored() || expired()) lock();
+    void idleLockMs().then((ms) => {
+      limit = ms;
+    });
 
     let lastMark = 0;
     const onActivity = () => {
@@ -1091,7 +1097,7 @@ function IdleLock({ onSignOut }: { onSignOut: () => void }) {
         <p className="mb-4 text-sm font-bold text-white">{CLUB.shortName} · Locked</p>
         <div className="bg-white p-5 shadow-sm">
           <h1 className="text-base font-bold">Staff ID</h1>
-          <p className="mt-1 text-xs leading-5 text-[#6b7280]">Locked after 1 minute. Enter your staff ID to open.</p>
+          <p className="mt-1 text-xs leading-5 text-[#6b7280]">Screen locked. Enter your staff ID to open.</p>
           <div className="mt-3">
             <PinPad captureKeys onSubmit={unlock} />
           </div>

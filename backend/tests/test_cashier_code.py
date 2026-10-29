@@ -144,13 +144,13 @@ def pin(env, monkeypatch):
     client, state = env
     state["grants"] = []
 
-    def fake_grant(email, password):
-        state["grants"].append((email, password))
+    def fake_mint(email):
+        state["grants"].append(email)
         return {"access_token": "a", "refresh_token": "r", "expires_in": 3600, "user": {"id": "u1"}}
 
-    monkeypatch.setattr(cashier_code, "_password_grant", fake_grant)
+    monkeypatch.setattr(cashier_code, "_mint_session", fake_mint)
+    monkeypatch.setattr(cashier_code, "_pin_email", lambda: "staff@pelhamhills.ca")
     monkeypatch.setattr(cashier_code, "_record_check", lambda name: None)
-    monkeypatch.setenv("STAFF_PIN_PASSWORD", "secret")
     cashier_code._misses.clear()
     return client, state
 
@@ -163,7 +163,7 @@ def test_pin_signs_in_as_staff_account(pin):
     body = response.json()
     assert body["access_token"] == "a" and body["name"] == "Josh Kim"
     assert body["user"] == {"id": "u1", "email": "staff@pelhamhills.ca"}
-    assert state["grants"] == [("staff@pelhamhills.ca", "secret")]
+    assert state["grants"] == ["staff@pelhamhills.ca"]
 
 
 def test_pin_unknown_id_does_not_sign_in(pin):
@@ -182,9 +182,3 @@ def test_pin_blocks_after_ten_misses(pin):
     state["answer"] = {"name": "Josh Kim"}
     assert client.post(f"{API}/pos/pin-login", json={"code": "1001"}).status_code == 429
 
-
-def test_pin_needs_server_password(pin, monkeypatch):
-    client, state = pin
-    monkeypatch.delenv("STAFF_PIN_PASSWORD")
-    state["answer"] = {"name": "Josh Kim"}
-    assert client.post(f"{API}/pos/pin-login", json={"code": "1001"}).status_code == 503

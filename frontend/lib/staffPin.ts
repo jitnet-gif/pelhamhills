@@ -1,8 +1,9 @@
 /**
  * 어드민 숫자판 — Pelham Shift 직원 ID(4~8자리)로 들어오고, 1분 동안 손대지 않으면 잠긴 화면을 연다(2026-10-28 클럽 요청).
  *
- * - 들어오기: FastAPI `POST /pos/pin-login` 이 번호를 pelham-shift 에 확인하고 공용 직원 계정(staff@pelhamhills.ca)으로
- *   로그인해 세션을 돌려준다. 그 계정의 비밀번호는 Fly secret 에만 있다 — 저장소가 공개라서.
+ * - 들어오기: FastAPI `POST /pos/pin-login` 이 번호를 pelham-shift 에 확인하고 공용 직원 계정(0128, 기본
+ *   staff@pelhamhills.ca)의 세션을 비밀번호 없이 받아 돌려준다.
+ * - 잠금 시간·공용 계정은 0128 표 한 줄이라 배포 없이 바뀐다.
  * - 잠금 풀기: 이미 로그인한 상태라 계산대 담당자 코드와 같은 `cashierForCode` 로 번호만 확인한다.
  *   매니저 계정 화면도 같은 번호판으로 연다.
  *
@@ -13,11 +14,43 @@ import { paymentsApiBase } from "@/lib/booking/payments";
 import { cashierForCode } from "@/lib/pos/cashierCode";
 import { ApiError } from "@/lib/teeSheet/api";
 import { adoptSession } from "@/lib/teeSheet/session";
+import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
 export const PIN_STAFF_EMAIL = "staff@pelhamhills.ca";
 
-/** 손대지 않고 이만큼 지나면 잠근다. */
+/** 손대지 않고 이만큼 지나면 잠근다 — 기본값. 실제 값은 0128 표(`idleLockMs`)가 정한다. 0 이면 잠그지 않는다. */
 export const IDLE_LOCK_MS = 60_000;
+
+const IDLE_LOCK_KEY = "pelham.staff.idleLockMs";
+
+/** 지난번에 받아 둔 잠금 시간. 서버에 묻는 동안에도 그 값으로 판단한다. */
+export function cachedIdleLockMs(): number {
+  try {
+    const raw = window.localStorage.getItem(IDLE_LOCK_KEY);
+    const value = raw === null ? NaN : Number(raw);
+    return Number.isFinite(value) && value >= 0 ? value : IDLE_LOCK_MS;
+  } catch {
+    return IDLE_LOCK_MS;
+  }
+}
+
+/** 0128 의 잠금 시간. 표가 아직 없거나 못 읽으면 받아 둔 값 그대로. */
+export async function idleLockMs(): Promise<number> {
+  try {
+    const body = await staffRpc<{ idle_lock_seconds?: unknown }>("pelham_staff_lock_settings");
+    const seconds = Number(body?.idle_lock_seconds);
+    if (!Number.isFinite(seconds) || seconds < 0) return cachedIdleLockMs();
+    const ms = seconds * 1000;
+    try {
+      window.localStorage.setItem(IDLE_LOCK_KEY, String(ms));
+    } catch {
+      // 이번 탭에서만 쓴다.
+    }
+    return ms;
+  } catch {
+    return cachedIdleLockMs();
+  }
+}
 
 /** 직원 ID 로 들어온다. 성공하면 세션이 저장되고 그 직원 이름을 돌려준다. */
 export async function pinSignIn(code: string): Promise<string> {
