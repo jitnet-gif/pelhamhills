@@ -163,6 +163,9 @@ function readDraft() {
     channel: (query.get("channel") === "call" ? "call" : "sms") as Channel,
     name: query.get("name") ?? "",
     message: query.get("message") ?? "",
+    segment: (["all", "members", "non_members", "regulars", "new"].includes(query.get("segment") ?? "")
+      ? query.get("segment")
+      : "all") as Segment,
     barcode: /^PROMO-[A-Z0-9]{3,16}$/i.test(query.get("barcode") ?? "") ? query.get("barcode")!.toUpperCase() : "",
   };
 }
@@ -177,7 +180,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   useEffect(() => {
     if (draft) window.history.replaceState(null, "", window.location.pathname);
   }, [draft]);
-  const [segment, setSegment] = useState<Segment>("all");
+  const [segment, setSegment] = useState<Segment>(draft?.segment ?? "all");
   const [minRounds, setMinRounds] = useState(0);
   const [search, setSearch] = useState("");
   // null = 그룹 전체(모두 체크). 한 명이라도 체크를 풀면 고른 사람 목록(Set)으로 바뀐다.

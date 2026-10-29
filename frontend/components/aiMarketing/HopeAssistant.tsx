@@ -33,7 +33,7 @@ import {
 } from "@/lib/aiMarketing/api";
 import { type HopeVoice, onVoiceChange, saveVoice, SPEEDS, storedVoice, TONES, type Tone, voiceParts } from "@/lib/aiMarketing/voice";
 import { getLang, type Lang, onLangChange, setLang } from "@/lib/i18n/engine";
-import { marketingApi, SEGMENT_LABEL } from "@/lib/marketing/api";
+import { marketingApi, SEGMENT_LABEL, type Segment } from "@/lib/marketing/api";
 import { siteNoticesApi } from "@/lib/siteNotices";
 import { ApiError } from "@/lib/teeSheet/api";
 
@@ -577,6 +577,7 @@ export function HopeAssistant({
             >
               <span className="text-[11px] tracking-wide text-[#9fb5a8] uppercase">{turn.role === "user" ? "You" : "Hope"}</span>
               <span translate="no">{turn.text}</span>
+              {turn.role === "assistant" ? <ToMarketing message={turn.text} /> : null}
               {turn.lookups?.length ? (
                 <span className="flex flex-wrap gap-1">
                   {turn.lookups.map((row, rowIndex) => (
@@ -647,6 +648,33 @@ export function HopeAssistant({
   );
 }
 
+/** 이 글을 Marketing 새 캠페인 초안으로 연다(새 탭 — Hope 대화는 그대로). 보내기는 Marketing 에서 사람이 한다. */
+function ToMarketing({ message, segment, light }: { message: string; segment?: Segment; light?: boolean }) {
+  const query = new URLSearchParams({
+    channel: "sms",
+    name: `Hope · ${new Date().toISOString().slice(0, 10)}`,
+    message: message.slice(0, 1000),
+    ...(segment ? { segment } : {}),
+  });
+  return (
+    <a
+      className={`inline-flex items-center gap-1 justify-self-end border px-2 py-1 text-xs font-bold ${
+        light ? "border-[#1a7f4b] text-[#1a7f4b] hover:bg-[#e8f5ee]" : "border-[#3c5a49] text-[#cfe3d6] hover:bg-[#24342b]"
+      }`}
+      href={`/marketing?${query.toString()}`}
+      rel="noopener"
+      target="_blank"
+      title="Open this as a new Marketing text message"
+    >
+      <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path d="M4 5h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+        <path d="M15 19h5m0 0-2-2m2 2-2 2" />
+      </svg>
+      To Marketing
+    </a>
+  );
+}
+
 function ProposalCard({ proposal, onConfirm, onCancel }: { proposal: Proposal; onConfirm: () => void; onCancel: () => void }) {
   const { action } = proposal;
   return (
@@ -668,7 +696,10 @@ function ProposalCard({ proposal, onConfirm, onCancel }: { proposal: Proposal; o
           <p className="border border-[#d4d4d8] bg-white p-2" translate="no">
             {action.sms}
           </p>
-          <span className="text-[11px] text-[#6b7280]">The sender name and the opt-out line are added automatically.</span>
+          <span className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#6b7280]">
+            The sender name and the opt-out line are added automatically.
+            <ToMarketing light message={action.sms} segment={action.segment} />
+          </span>
         </div>
       ) : null}
       {action.popup ? (
