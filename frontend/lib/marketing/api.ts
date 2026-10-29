@@ -166,24 +166,28 @@ export type WeatherAudience = {
   tee_times: WeatherTeeTime[];
 };
 
-async function backend<T>(method: "GET" | "POST", path: string): Promise<T> {
+async function backend<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
   const token = await accessToken();
   if (!token) throw new ApiError(401, "Sign in again.");
   let response: Response;
   try {
     response = await fetch(`${paymentsApiBase()}${path}`, {
       method,
-      headers: { Authorization: `Bearer ${token}` },
+      headers:
+        body === undefined
+          ? { Authorization: `Bearer ${token}` }
+          : { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, "Could not reach the server.");
   }
-  const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
+  const payload = (await response.json().catch(() => null)) as { detail?: unknown } | null;
   if (!response.ok) {
-    const detail = typeof body?.detail === "string" && body.detail ? body.detail : `${response.status}`;
+    const detail = typeof payload?.detail === "string" && payload.detail ? payload.detail : `${response.status}`;
     throw new ApiError(response.status, detail);
   }
-  return body as T;
+  return payload as T;
 }
 
 export const marketingApi = {
@@ -215,6 +219,13 @@ export const marketingApi = {
   status: () => backend<MarketingStatus>("GET", "/marketing/status"),
   cost: (id: number) => backend<CampaignCost>("GET", `/marketing/campaigns/${id}/cost`),
   send: (id: number) => backend<{ ok: boolean; already_running: boolean }>("POST", `/marketing/campaigns/${id}/send`),
+  /** 0136 — 실패한 사람만 다시 보낸다. sendIds 를 주면 그 줄만. */
+  retry: (id: number, sendIds?: number[]) =>
+    backend<{ ok: boolean; already_running: boolean; retried: number }>(
+      "POST",
+      `/marketing/campaigns/${id}/retry`,
+      sendIds?.length ? { send_ids: sendIds } : {},
+    ),
 };
 
 /** 0047 이 아직 이 프로젝트에 없다(PostgREST `PGRST202`). */

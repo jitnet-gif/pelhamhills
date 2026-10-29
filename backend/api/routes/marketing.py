@@ -2,6 +2,7 @@
 
 GET  /marketing/status                  문자·전화가 켜져 있나, 지금 보낼 수 있는 시각인가
 POST /marketing/campaigns/{id}/send     캠페인 보내기(멈췄던 캠페인은 이어서)
+POST /marketing/campaigns/{id}/retry    실패한 사람만 다시 보내기(0136, send_ids 를 주면 그 줄만)
 GET  /marketing/campaigns/{id}/cost     보낸 캠페인 비용(문자 = Twilio 요금, 전화 = ElevenLabs 크레딧)
 POST /marketing/voice/opt-out           (에이전트 도구) 통화 중 "다시 걸지 마라" → 전화 수신거부
 
@@ -247,6 +248,34 @@ async def send_campaign(campaign_id: int, request: Request) -> dict[str, Any]:
                                        {"p_id": campaign_id})
     if campaign.get("status") in ("sent", "cancelled"):
         raise HTTPException(status_code=409, detail=f"This campaign is already {campaign.get('status')}.")
+    _check_can_send(campaign)
+    return _run(campaign)
+
+
+class RetryRequest(BaseModel):
+    #: 이 줄만 다시. 비우면 그 캠페인의 실패한 사람 모두.
+    send_ids: Optional[list[int]] = None
+
+
+@router.post("/campaigns/{campaign_id}/retry")
+async def retry_failed(campaign_id: int, request: Request, body: RetryRequest | None = None) -> dict[str, Any]:
+    """실패한 사람을 다시 줄 세우고 보낸다(0136). 이미 받은 사람에게는 다시 가지 않는다."""
+    campaign = await asyncio.to_thread(terminal._as_staff, request, "pelham_marketing_campaign",
+                                       {"p_id": campaign_id})
+    if campaign.get("status") == "cancelled":
+        raise HTTPException(status_code=409, detail="This campaign was stopped. Make a new one to send again.")
+    # 보낼 수 없는 때 되돌리면 줄에 걸린 채 멈춘다 — 먼저 본다.
+    _check_can_send(campaign)
+    ids = body.send_ids if body and body.send_ids else None
+    campaign = await asyncio.to_thread(terminal._as_staff, request, "pelham_marketing_retry_failed",
+                                       {"p_id": campaign_id, "p_send_ids": ids})
+    retried = int(campaign.get("retried") or 0)
+    if not retried:
+        return {"ok": True, "retried": 0, "already_running": campaign_id in _running}
+    return {**_run(campaign), "retried": retried}
+
+
+def _check_can_send(campaign: dict[str, Any]) -> None:
     if campaign["channel"] == "sms" and not settings.TWILIO_ENABLED:
         raise HTTPException(status_code=503, detail="Text messages are not set up on the server yet (Twilio).")
     if campaign["channel"] == "call" and not calls_ready():
@@ -263,6 +292,11 @@ async def send_campaign(campaign_id: int, request: Request) -> dict[str, Any]:
                                 detail=f"Weather alerts can only go out {ALERT_WINDOW_TEXT} (club time).")
     elif not window_open():
         raise HTTPException(status_code=409, detail=f"Promotions can only go out {WINDOW_TEXT} (club time).")
+
+
+def _run(campaign: dict[str, Any]) -> dict[str, Any]:
+    """같은 캠페인은 한 줄만 돈다. 이미 돌고 있으면 그 줄이 되돌린 사람까지 집는다."""
+    campaign_id = int(campaign["id"])
     if campaign_id in _running:
         return {"ok": True, "already_running": True}
     _running.add(campaign_id)

@@ -3496,5 +3496,8 @@
  "Failed / skipped": "실패 / 건너뜀",
  "No contact yet": "아직 연락 없음",
  "Everyone": "전체",
- "Showing {0} of {1}": "{1}명 중 {0}명 표시"
+ "Showing {0} of {1}": "{1}명 중 {0}명 표시",
+ "Resend failed ({0})": "실패한 {0}명 다시 보내기",
+ "Resend": "다시 보내기",
+ "Send again only to the people it failed for": "실패한 사람에게만 다시 보냅니다"
 }

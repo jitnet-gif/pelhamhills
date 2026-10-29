@@ -174,6 +174,51 @@ def test_finished_campaign_not_resent(env):
     assert res.status_code == 409
 
 
+def test_retry_requeues_failed_and_starts(env, monkeypatch):
+    client, state = env
+    state["campaign"]["status"] = "sent"
+    calls = []
+
+    def fake_staff(request, function, args):
+        calls.append((function, args))
+        if function == "pelham_marketing_retry_failed":
+            return {**state["campaign"], "status": "sending", "retried": 2}
+        return state["campaign"]
+
+    monkeypatch.setattr(terminal, "_as_staff", fake_staff)
+    res = client.post(f"{API}/marketing/campaigns/7/retry", headers={"Authorization": "Bearer t"})
+    assert res.status_code == 200, res.text
+    assert res.json() == {"ok": True, "already_running": False, "retried": 2}
+    assert calls[1] == ("pelham_marketing_retry_failed", {"p_id": 7, "p_send_ids": None})
+    assert state["started"] == [7]
+
+    calls.clear()
+    client.post(f"{API}/marketing/campaigns/7/retry", json={"send_ids": [3]})
+    assert calls[1] == ("pelham_marketing_retry_failed", {"p_id": 7, "p_send_ids": [3]})
+
+
+def test_retry_with_nothing_failed_does_not_start(env, monkeypatch):
+    client, state = env
+    monkeypatch.setattr(terminal, "_as_staff", lambda request, function, args: {**state["campaign"], "retried": 0})
+    res = client.post(f"{API}/marketing/campaigns/7/retry")
+    assert res.json()["retried"] == 0
+    assert "started" not in state
+
+
+def test_retry_outside_hours_leaves_failed_alone(env, monkeypatch):
+    client, state = env
+    monkeypatch.setattr(marketing, "window_open", lambda now=None: False)
+    res = client.post(f"{API}/marketing/campaigns/7/retry")
+    assert res.status_code == 409
+    assert state["staff"] == ["pelham_marketing_campaign"]
+
+
+def test_retry_refused_for_stopped_campaign(env):
+    client, state = env
+    state["campaign"]["status"] = "cancelled"
+    assert client.post(f"{API}/marketing/campaigns/7/retry").status_code == 409
+
+
 def test_window_closing_mid_run_requeues_the_rest(env, monkeypatch):
     _, state = env
     state["queue"] = [{"id": 1, "name": "A", "phone": "4165550001"}, {"id": 2, "name": "B", "phone": "4165550002"}]

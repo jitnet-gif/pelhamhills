@@ -794,13 +794,20 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
     return () => window.clearInterval(timer);
   }, [detail?.status, selected, loadDetail, loadList]);
 
-  const act = async (what: "send" | "cancel") => {
+  const act = async (what: "send" | "cancel" | "retry", sendIds?: number[]) => {
     if (!detail) return;
     if (what === "cancel" && !window.confirm("Stop this campaign? People not reached yet will not get it.")) return;
+    if (
+      what === "retry" &&
+      !sendIds &&
+      !window.confirm(`Send again to the ${detail.counts.failed ?? 0} people it failed for? Others will not get it again.`)
+    )
+      return;
     setBusy(true);
     setError("");
     try {
       if (what === "send") await marketingApi.send(detail.id);
+      else if (what === "retry") await marketingApi.retry(detail.id, sendIds);
       else await marketingApi.cancel(detail.id);
       loadDetail(detail.id);
       loadList();
@@ -911,6 +918,17 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
                     Stop
                   </button>
                 ) : null}
+                {(detail.counts.failed ?? 0) > 0 && detail.status !== "cancelled" ? (
+                  <button
+                    className="h-10 border border-[#8c1d1d] px-4 text-sm font-bold text-[#8c1d1d] disabled:opacity-60"
+                    disabled={busy}
+                    onClick={() => void act("retry")}
+                    title="Send again only to the people it failed for"
+                    type="button"
+                  >
+                    {`Resend failed (${detail.counts.failed})`}
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -962,7 +980,12 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
               </p>
             ) : null}
 
-            <Recipients campaign={detail} key={detail.id} />
+            <Recipients
+              busy={busy}
+              campaign={detail}
+              key={detail.id}
+              onRetry={detail.status === "cancelled" ? undefined : (id) => void act("retry", [id])}
+            />
             {detail.channel === "call" ? (
               <p className="mt-2 text-xs text-[#6b7280]">
                 Call recordings and transcripts are in the admin Calls &amp; SMS page.
@@ -979,7 +1002,16 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
  * 받은 사람 표 — 번호(또는 이름) 찾기와 보기 필터. 필터 목록은 그 캠페인에 해당하는 사람이 있는 것만,
  * 연락 옴(0133)·고객 구분은 그 값이 있을 때만 보인다.
  */
-function Recipients({ campaign }: { campaign: Campaign }) {
+function Recipients({
+  busy,
+  campaign,
+  onRetry,
+}: {
+  busy: boolean;
+  campaign: Campaign;
+  /** 실패한 줄 하나만 다시 보내기(0136). 멈춘 캠페인이면 없다. */
+  onRetry?: (sendId: number) => void;
+}) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<SendView>("all");
   const sends = useMemo(() => campaign.sends ?? [], [campaign.sends]);
@@ -1089,7 +1121,19 @@ function Recipients({ campaign }: { campaign: Campaign }) {
                 {campaign.audience?.kind === "weather" ? (
                   <td className="px-2 py-1.5 whitespace-nowrap">{send.tee_time ?? ""}</td>
                 ) : null}
-                <td className="px-2 py-1.5">{SEND_STATUS_LABEL[send.status]}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap">
+                {SEND_STATUS_LABEL[send.status]}
+                {send.status === "failed" && onRetry ? (
+                  <button
+                    className="ml-2 border border-[#d4d4d8] px-1.5 py-0.5 text-[10px] font-bold disabled:opacity-60"
+                    disabled={busy}
+                    onClick={() => onRetry(send.id)}
+                    type="button"
+                  >
+                    Resend
+                  </button>
+                ) : null}
+              </td>
                 {campaign.replies ? (
                   <td className="px-2 py-1.5 font-bold whitespace-nowrap text-[#1d6b3a]">
                     {(send.replied ?? []).map((key) => REPLY_LABEL[key]).join(" · ")}
