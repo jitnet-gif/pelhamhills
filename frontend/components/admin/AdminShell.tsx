@@ -31,7 +31,7 @@
  * 세션은 브라우저에만 있다 — 정적 export 라 쿠키를 심어 줄 서버가 없다.
  * 자세한 내용은 `lib/teeSheet/session.ts`.
  *
- * ## 숫자판과 1분 잠금(2026-10-28)
+ * ## 숫자판과 2분 잠금(2026-10-28, 10-29 에 1분 → 2분)
  *
  * 첫 화면은 Pelham Shift 직원 ID 숫자판이다 — 맞으면 공용 직원 계정(staff@pelhamhills.ca)으로 들어온다.
  * 매니저 이상은 "Manager sign in" 으로 자기 이메일·비밀번호를 친다. 어드민 화면은 1분(0128 표에서 바꾼다) 동안
@@ -1054,7 +1054,7 @@ function PinSignInScreen({ onSignedIn, onManager }: { onSignedIn: () => void; on
 }
 
 /**
- * 1분 잠금. 어드민 화면 위를 덮을 뿐 화면은 그대로 살아 있다 — 계산 중이던 계산서·단말 결제가 끊기지 않는다.
+ * 2분 잠금(0128 표 값). 어드민 화면 위를 덮을 뿐 화면은 그대로 살아 있다 — 계산 중이던 계산서·단말 결제가 끊기지 않는다.
  * 덮개는 불투명하다. 손님 이름이 비치지 않게.
  */
 function IdleLock({ onSignOut }: { onSignOut: () => void }) {

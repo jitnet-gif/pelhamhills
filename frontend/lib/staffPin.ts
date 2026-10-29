@@ -1,5 +1,5 @@
 /**
- * 어드민 숫자판 — Pelham Shift 직원 ID(4~8자리)로 들어오고, 1분 동안 손대지 않으면 잠긴 화면을 연다(2026-10-28 클럽 요청).
+ * 어드민 숫자판 — Pelham Shift 직원 ID(4~8자리)로 들어오고, 2분 동안 손대지 않으면 잠긴 화면을 연다(2026-10-28 클럽 요청).
  *
  * - 들어오기: FastAPI `POST /pos/pin-login` 이 번호를 pelham-shift 에 확인하고 공용 직원 계정(0128, 기본
  *   staff@pelhamhills.ca)의 세션을 비밀번호 없이 받아 돌려준다.
@@ -18,8 +18,8 @@ import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
 export const PIN_STAFF_EMAIL = "staff@pelhamhills.ca";
 
-/** 손대지 않고 이만큼 지나면 잠근다 — 기본값. 실제 값은 0128 표(`idleLockMs`)가 정한다. 0 이면 잠그지 않는다. */
-export const IDLE_LOCK_MS = 60_000;
+/** 손대지 않고 이만큼 지나면 잠근다 — 기본값(0130 부터 2분). 실제 값은 0128 표(`idleLockMs`)가 정한다. 0 이면 잠그지 않는다. */
+export const IDLE_LOCK_MS = 120_000;
 
 const IDLE_LOCK_KEY = "pelham.staff.idleLockMs";
 
