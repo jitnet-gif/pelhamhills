@@ -37,6 +37,7 @@ import {
 } from "@/lib/pos/api";
 import { cashierForCode, isShiftCode } from "@/lib/pos/cashierCode";
 import { billActions, getBillState, rememberCashier, useCurrentBill } from "@/lib/pos/currentBill";
+import { couponBookApi, type BillCoupon } from "@/lib/pos/couponBook";
 import { promoApi, promoDiscountLabel, type BillPromo } from "@/lib/pos/promo";
 import {
   describeTerminalResult,
@@ -435,6 +436,7 @@ export default function BillPanel({
             onCommit={(cents) => billActions.update({ discount: cents }, station)}
           />
           <PromoRow bill={bill} station={station} />
+          <CouponBookRows bill={bill} station={station} />
 
           <dl className="grid gap-1 border-t border-[#d4d4d8] pt-2 text-sm">
             <Row label="Subtotal" value={formatMoney(bill.subtotal)} />
@@ -618,6 +620,7 @@ function SalesLayout({
             <div className="flex flex-wrap items-start justify-end gap-1.5 border-t border-[#d4d4d8] px-3 py-2">
               <div className="mr-auto w-64">
                 <PromoRow bill={bill} station={station} />
+                <CouponBookRows bill={bill} station={station} />
               </div>
               {discountOpen ? (
                 <div className="w-48">
@@ -1116,6 +1119,84 @@ function PromoRow({ bill, station }: { bill: Bill; station: BillStation }) {
         Apply
       </button>
     </label>
+  );
+}
+
+// ===== 쿠폰북 무료 라운드(0137) ==========================================
+
+/**
+ * 계산서 그린피 선수의 GPS 쿠폰북. 도장 10개로 무료가 생긴 선수는 "Use free round" 로 그 그린피를 0 으로 만든다
+ * (카트·추가 항목은 그대로). 앱에 가입하지 않은 선수는 보이지 않는다.
+ */
+function CouponBookRows({ bill, station }: { bill: Bill; station: BillStation }) {
+  const [coupons, setCoupons] = useState<BillCoupon[]>([]);
+  const tee = bill.lines
+    .filter((line) => line.kind === "tee_player")
+    .map((line) => line.id)
+    .join(",");
+
+  // 그린피 줄·합계가 바뀌면(담기·빼기·무료 쓰기) 다시 읽는다.
+  useEffect(() => {
+    let cancelled = false;
+    // 그린피가 없으면 부르지 않는다. 아래 shown 이 빈 줄을 숨긴다.
+    if (!tee) return;
+    couponBookApi.forBill(bill.id).then(
+      (value) => {
+        if (!cancelled) setCoupons(value ?? []);
+      },
+      () => {
+        // 0137 이 아직 없거나 연결이 끊겼다. 줄을 안 보일 뿐 계산은 그대로 된다.
+        if (!cancelled) setCoupons([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [bill.id, bill.total, tee]);
+
+  // 회원은 도장이 없다(GPS 0026). 회원이 되기 전에 모은 무료가 남았을 때만 보인다.
+  const shown = tee ? coupons.filter((c) => c.applied || c.free_left > 0 || !c.is_member) : [];
+  if (shown.length === 0) return null;
+  return (
+    <ul className="mt-2 grid gap-1">
+      {shown.map((c) =>
+        c.applied ? (
+          <li className="flex items-center justify-between gap-2 bg-[#e8f6ee] px-2 py-1.5 text-xs" key={c.line_id}>
+            <span className="min-w-0">
+              <b className="text-[#0f7a3d]">Free round</b> · {c.name}
+              <span className="block text-[#4e5560]">Coupon book · −{formatMoney(c.amount)}</span>
+            </span>
+            <button
+              className="shrink-0 border border-[#c7c7cc] bg-white px-2 py-1 font-bold"
+              onClick={() => void billActions.undoFreeRound(c.line_id, station)}
+              type="button"
+            >
+              Undo
+            </button>
+          </li>
+        ) : c.free_left > 0 ? (
+          <li className="flex items-center justify-between gap-2 bg-[#fff6dd] px-2 py-1.5 text-xs" key={c.line_id}>
+            <span className="min-w-0">
+              <b>{c.name}</b> · coupon book
+              <span className="block text-[#4e5560]">
+                {c.free_left} free round{c.free_left > 1 ? "s" : ""} ready
+              </span>
+            </span>
+            <button
+              className="min-h-9 shrink-0 border border-[#0f7a3d] bg-[#0f7a3d] px-2 py-1 font-bold text-white"
+              onClick={() => void billActions.useFreeRound(c.line_id, station)}
+              type="button"
+            >
+              Use free round
+            </button>
+          </li>
+        ) : (
+          <li className="px-2 text-xs text-[#6b7280]" key={c.line_id}>
+            {c.name} · coupon book {c.on_card}/10
+          </li>
+        ),
+      )}
+    </ul>
   );
 }
 
