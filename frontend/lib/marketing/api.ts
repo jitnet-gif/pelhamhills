@@ -16,13 +16,21 @@ export type SkipReason = "no_phone" | "opted_out" | "no_consent";
 export type AudienceFilter = {
   segment: Segment;
   min_rounds?: number;
+  /** 0129 — 0 이나 빈 값이면 제한 없음. */
+  max_rounds?: number;
   search?: string;
+  /** 0129 — 주소 도시(여러 개면 그중 하나). 비면 거르지 않는다. */
+  city?: string[];
+  /** 0129 — 전화 지역번호 세 자리(905·289·416 …). */
+  area_code?: string[];
 };
 
 export type AudienceCustomer = {
   customer_ref: string;
   name: string;
   phone: string | null;
+  /** 0129 — 주소 도시. 주소가 없거나 0129 전이면 없다. */
+  city?: string | null;
   is_member: boolean;
   rounds: number;
   sms_ok: boolean | null;
@@ -40,6 +48,9 @@ export type Audience = {
   opted_out: number;
   no_consent: number;
   customers: AudienceCustomer[];
+  /** 0129 — 지금 그룹·라운드·검색 안에서 보낼 수 있는 사람 수(도시·지역번호 조건은 빼고 센다). */
+  cities?: { name: string; count: number }[];
+  area_codes?: { code: string; count: number }[];
 };
 
 export type SendStatus = "queued" | "sending" | "sent" | "delivered" | "failed" | "skipped" | "cancelled";

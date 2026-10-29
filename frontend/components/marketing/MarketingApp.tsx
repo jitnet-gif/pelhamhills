@@ -14,6 +14,7 @@ import { code128Svg } from "@/lib/retail/barcode";
 import {
   type Audience,
   type AudienceCustomer,
+  type AudienceFilter,
   type Campaign,
   type Channel,
   type MarketingStatus,
@@ -117,18 +118,20 @@ function Pill({ ok, label }: { ok: boolean; label: string }) {
 
 // ===== 새 캠페인 ==========================================================
 
-function useAudience(channel: Channel, segment: Segment, minRounds: number, search: string) {
+function useAudience(channel: Channel, filter: AudienceFilter) {
   const [audience, setAudience] = useState<Audience | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [nonce, setNonce] = useState(0);
+  // 배열(city·area_code)이 든 객체라 글자로 바꿔 비교한다 — 그려질 때마다 다시 부르지 않게.
+  const key = JSON.stringify(filter);
 
   useEffect(() => {
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setLoading(true);
       marketingApi
-        .audience(channel, { segment, min_rounds: minRounds, search })
+        .audience(channel, JSON.parse(key) as AudienceFilter)
         .then(
           (value) => {
             if (!cancelled) {
@@ -148,7 +151,7 @@ function useAudience(channel: Channel, segment: Segment, minRounds: number, sear
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [channel, segment, minRounds, search, nonce]);
+  }, [channel, key, nonce]);
 
   return { audience, error, loading, reload: () => setNonce((value) => value + 1) };
 }
@@ -182,14 +185,25 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   }, [draft]);
   const [segment, setSegment] = useState<Segment>(draft?.segment ?? "all");
   const [minRounds, setMinRounds] = useState(0);
+  const [maxRounds, setMaxRounds] = useState(0);
   const [search, setSearch] = useState("");
+  const [cities, setCities] = useState<string[]>([]);
+  const [areaCodes, setAreaCodes] = useState<string[]>([]);
   // null = 그룹 전체(모두 체크). 한 명이라도 체크를 풀면 고른 사람 목록(Set)으로 바뀐다.
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
 
-  const { audience, error: audienceError, loading } = useAudience(channel, segment, minRounds, search);
+  const filter: AudienceFilter = {
+    segment,
+    min_rounds: minRounds,
+    ...(maxRounds > 0 ? { max_rounds: maxRounds } : {}),
+    search: search.trim(),
+    ...(cities.length ? { city: cities } : {}),
+    ...(areaCodes.length ? { area_code: areaCodes } : {}),
+  };
+  const { audience, error: audienceError, loading } = useAudience(channel, filter);
   const eligible = useMemo(() => (audience?.customers ?? []).filter((c) => c.ok), [audience]);
 
   const pickMode = picked !== null;
@@ -228,9 +242,7 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
         name: name.trim(),
         message: message.trim(),
         audience: {
-          segment,
-          min_rounds: minRounds,
-          search: search.trim(),
+          ...filter,
           ...(channel === "sms" && barcode ? { barcode } : {}),
         },
         customer_refs: pickMode ? pickedRefs : undefined,
@@ -355,16 +367,43 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
               ))}
             </select>
           </label>
-          <label className="text-xs font-bold">
-            At least this many rounds
-            <input
-              className="mt-1 h-11 w-full border border-[#d4d4d8] px-2 text-sm font-normal"
-              min={0}
-              onChange={(event) => setMinRounds(Math.max(0, Number(event.target.value) || 0))}
-              type="number"
-              value={minRounds}
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs font-bold">
+              At least this many rounds
+              <input
+                className="mt-1 h-11 w-full border border-[#d4d4d8] px-2 text-sm font-normal"
+                min={0}
+                onChange={(event) => setMinRounds(Math.max(0, Number(event.target.value) || 0))}
+                type="number"
+                value={minRounds}
+              />
+            </label>
+            <label className="text-xs font-bold">
+              At most (blank = any)
+              <input
+                className="mt-1 h-11 w-full border border-[#d4d4d8] px-2 text-sm font-normal"
+                min={0}
+                onChange={(event) => setMaxRounds(Math.max(0, Number(event.target.value) || 0))}
+                placeholder="Any"
+                type="number"
+                value={maxRounds || ""}
+              />
+            </label>
+          </div>
+          <RegionPicker
+            label="Region (city)"
+            onChange={setCities}
+            options={(audience?.cities ?? []).map((item) => ({ value: item.name, count: item.count }))}
+            placeholder="Any city"
+            value={cities}
+          />
+          <RegionPicker
+            label="Phone area code"
+            onChange={setAreaCodes}
+            options={(audience?.area_codes ?? []).map((item) => ({ value: item.code, count: item.count }))}
+            placeholder="Any area code"
+            value={areaCodes}
+          />
         </div>
         <input
           className="mt-2 h-10 w-full border border-[#d4d4d8] px-3 text-sm"
@@ -372,6 +411,24 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
           placeholder="Search name or phone"
           value={search}
         />
+        {cities.length || areaCodes.length || maxRounds > 0 || search.trim() ? (
+          <p className="mt-1 text-xs text-[#6b7280]">
+            Only people matching every filter above get it.{" "}
+            <button
+              className="font-bold text-[#4533ff] underline"
+              onClick={() => {
+                setCities([]);
+                setAreaCodes([]);
+                setMaxRounds(0);
+                setSearch("");
+                setPicked(null);
+              }}
+              type="button"
+            >
+              Clear filters
+            </button>
+          </p>
+        ) : null}
 
         {audienceError ? (
           <p className="mt-3 text-xs text-[#8c1d1d]" role="alert">
@@ -496,6 +553,57 @@ function Stat({ label, value, strong }: { label: string; value: number; strong?:
   );
 }
 
+// 고른 값은 칩으로, 더할 값은 드롭다운으로. 숫자는 보낼 수 있는 사람 수(0129). 0129 전이면 목록이 비어 있다.
+function RegionPicker({
+  label,
+  placeholder,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: { value: string; count: number }[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const left = options.filter((option) => !value.includes(option.value));
+  return (
+    <div className="text-xs font-bold">
+      {label}
+      <select
+        className="mt-1 h-11 w-full border border-[#d4d4d8] px-2 text-sm font-normal disabled:opacity-60"
+        disabled={!left.length}
+        onChange={(event) => {
+          if (event.target.value) onChange([...value, event.target.value]);
+        }}
+        value=""
+      >
+        <option value="">{value.length ? "Add another…" : options.length ? placeholder : "No data yet"}</option>
+        {left.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.value} ({option.count})
+          </option>
+        ))}
+      </select>
+      {value.length ? (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {value.map((item) => (
+            <button
+              className="bg-[#f0eeff] px-2 py-0.5 text-xs font-bold text-[#4533ff]"
+              key={item}
+              onClick={() => onChange(value.filter((other) => other !== item))}
+              type="button"
+            >
+              {item} ×
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AudienceRow({
   customer,
   picked,
@@ -515,6 +623,7 @@ function AudienceRow({
         {customer.is_member ? <span className="ml-1 bg-[#fff4dc] px-1 text-[10px] text-[#8a5a00]">Member</span> : null}
       </td>
       <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(customer.phone)}</td>
+      <td className="hidden px-2 py-1.5 whitespace-nowrap text-[#6b7280] sm:table-cell">{customer.city ?? ""}</td>
       <td className="px-2 py-1.5 text-right whitespace-nowrap">{customer.rounds} rds</td>
       <td className="px-2 py-1.5 text-right whitespace-nowrap">{customer.reason ? REASON_LABEL[customer.reason] : "✓"}</td>
     </tr>
@@ -756,7 +865,7 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
 
 function Consent() {
   const [search, setSearch] = useState("");
-  const { audience, error, loading, reload } = useAudience("sms", "all", 0, search);
+  const { audience, error, loading, reload } = useAudience("sms", { segment: "all", min_rounds: 0, search });
   const [saving, setSaving] = useState<string | null>(null);
   const [saveError, setSaveError] = useState("");
 
