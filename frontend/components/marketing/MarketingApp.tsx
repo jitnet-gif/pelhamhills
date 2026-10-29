@@ -29,6 +29,7 @@ import {
   marketingApi,
 } from "@/lib/marketing/api";
 
+import { AiCampaignPicker } from "./AiCampaignPicker";
 import WeatherAlert from "./WeatherAlert";
 
 type Tab = "compose" | "weather" | "campaigns" | "consent" | "optouts";
@@ -194,6 +195,8 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
+  // "AI Manager" 단추 — AI 매니저 캠페인을 받아 폼을 채운다(AiCampaignPicker).
+  const [aiOpen, setAiOpen] = useState(false);
 
   const filter: AudienceFilter = {
     segment,
@@ -266,7 +269,39 @@ function Compose({ status, onCreated }: { status: MarketingStatus | null; onCrea
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-bold">1. Channel and message</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="flex-1 text-sm font-bold">1. Channel and message</h2>
+          <button
+            aria-expanded={aiOpen}
+            className={`inline-flex min-h-9 items-center gap-1.5 border px-3 text-xs font-bold ${
+              aiOpen ? "border-[#4533ff] bg-[#4533ff] text-white" : "border-[#4533ff] text-[#4533ff] hover:bg-[#f0eeff]"
+            }`}
+            onClick={() => setAiOpen((open) => !open)}
+            title="Get a campaign from the AI Manager"
+            type="button"
+          >
+            <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z" />
+              <path d="M18.5 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" />
+              <path d="M5 16l.6 1.4L7 18l-1.4.6L5 20l-.6-1.4L3 18l1.4-.6z" />
+            </svg>
+            AI Manager
+          </button>
+        </div>
+        {aiOpen ? (
+          <AiCampaignPicker
+            channel={channel}
+            onClose={() => setAiOpen(false)}
+            onUse={(campaign) => {
+              setName(`AI · ${campaign.title}`.slice(0, 80));
+              setMessage((channel === "call" ? campaign.call : campaign.sms).slice(0, limit));
+              setSegment(campaign.segment);
+              setBarcode("");
+              setPicked(null);
+              setAiOpen(false);
+            }}
+          />
+        ) : null}
         <div className="mt-3 grid grid-cols-2 gap-2">
           {(["sms", "call"] as Channel[]).map((value) => (
             <button

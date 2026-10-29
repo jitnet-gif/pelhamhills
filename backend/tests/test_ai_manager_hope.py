@@ -101,12 +101,33 @@ def test_send_text_is_only_proposed(env, monkeypatch):
 
     out = run(ai.chat(body, FakeRequest()))
 
-    assert out["actions"] == [{"type": "launch", **launch}]
+    assert out["actions"] == [{"type": "launch", "call": "", **launch}]
     tool_results = claude.calls[1]["messages"][-1]["content"]
     assert '"can_receive": 512' in tool_results[0]["content"]
     assert "Nothing is sent" in tool_results[1]["content"]
     # 서버는 캠페인도 팝업도 만들지 않았다.
     assert not any(name.startswith("pelham_marketing_campaign") or "site_notice" in name for _, name, _ in env)
+
+
+def test_campaign_question_type_proposes_one_card_per_campaign(env, monkeypatch):
+    def card(number, title):
+        return {"report_id": "r1", "strategy": number, "title": title, "segment": "all",
+                "sms": f"Pelham Hills: {title}. Book at pelhamhills.com", "call": f"Hi, it's Pelham Hills about {title}.",
+                "popup": True, "popup_title": title, "popup_body": "This week only.",
+                "popup_link_label": "Book a tee time", "popup_link": "/book/tee-time", "days": 7}
+    claude = FakeClaude([
+        SimpleNamespace(stop_reason="tool_use", content=[tool_block("propose_launch", card(1, "Twilight"), "a"),
+                                                         tool_block("propose_launch", card(2, "Seniors"), "b")]),
+        SimpleNamespace(stop_reason="end_turn", content=[text_block("Two campaigns are on the screen.")]),
+    ])
+    monkeypatch.setattr(ai, "_client", claude)
+    body = ai.ChatIn(messages=[{"role": "user", "text": "campaigns please"}], topic="launch")
+
+    out = run(ai.chat(body, FakeRequest()))
+
+    assert [action["title"] for action in out["actions"]] == ["Twilight", "Seniors"]
+    assert out["actions"][1]["call"].startswith("Hi, it's Pelham Hills")
+    assert "Question type: Texts & website" in claude.calls[0]["messages"][0]["content"][0]["text"]
 
 
 def test_bad_tool_input_goes_back_to_claude_as_error(env, monkeypatch):

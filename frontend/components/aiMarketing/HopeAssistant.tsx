@@ -14,6 +14,10 @@
  *      "Yes, send" 를 눌러야** 캠페인을 만들어 보내고 팝업을 켠다. 받을 사람·동의·수신거부·발송 시간 규칙은
  *      Marketing 과 같다(`/marketing/campaigns/{id}/send`).
  *   5. 주고받은 것과 실행 결과는 모두 0119(Hope reports)에 남는다 — 지우지 않는다.
+ *   6. 질문 유형 칩 = 아래 네 탭(Customer analysis · Strategy reports · Texts & website · Analysis facts). 고르면 탭도
+ *      바뀌고, 서버는 그 유형으로 답한다. "Texts & website" 에서 캠페인을 만들라고 하면 Hope 는 캠페인마다 카드를
+ *      하나씩 낸다 — 대화 글이 아니라 그 카드(문자·AI 전화·팝업 문구)를 골라 Marketing 초안, AI 전화 초안, 숨긴
+ *      웹 팝업 초안으로 보내거나 확인 카드로 바로 보낸다.
  *
  * 음성 인식이 없는 브라우저(Firefox 등)에서는 글로 묻고, 답은 그대로 소리로 듣는다.
  * 언어는 화면의 EN / 한 을 따른다 — 듣는 말, Hope 의 답, 전략 보고서 모두.
@@ -29,6 +33,7 @@ import {
   type HopeAction,
   type HopeLogRow,
   type HopeLookup,
+  type HopeTopic,
   narrationUrl,
 } from "@/lib/aiMarketing/api";
 import { type HopeVoice, onVoiceChange, saveVoice, SPEEDS, storedVoice, TONES, type Tone, voiceParts } from "@/lib/aiMarketing/voice";
@@ -68,6 +73,24 @@ const YES = /(^|\s)(네|예|응|그래|좋아|보내|실행|진행|올려|yes|ye
 
 const GREETING: Record<Lang, string> = { ko: "네, 부르셨어요?", en: "Yes, you called?" };
 
+/** 질문 유형 — 이름은 아래 탭과 같다. */
+const TOPICS: { value: HopeTopic; label: string; example: string }[] = [
+  { value: "analysis", label: "Customer analysis", example: "Who plays on weekday afternoons, and how much do they spend?" },
+  { value: "reports", label: "Strategy reports", example: "What does the latest strategy say we should do first?" },
+  { value: "launch", label: "Texts & website", example: "Make campaigns from the latest strategy" },
+  { value: "facts", label: "Analysis facts", example: "What facts is the analysis using, and what is missing?" },
+];
+
+/** Hope 가 만든 캠페인 카드 하나. done = 어디로 보냈는지(문구 → 캠페인·팝업 id). */
+type Campaign = {
+  key: number;
+  action: LaunchAction;
+  picked: boolean;
+  busy: boolean;
+  done: { sms?: string; popup?: string };
+  error: string;
+};
+
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-CA", { maximumFractionDigits: 0 })}`;
 
 function describe(cause: unknown): string {
@@ -79,9 +102,14 @@ export function HopeAssistant({
   onStrategy,
   onPresent,
   notice,
+  topic,
+  onTopic,
 }: {
   onStrategy: (action: Extract<HopeAction, { type: "strategy" }>) => void;
   onPresent: () => void;
+  /** 질문 유형 = 화면의 탭. */
+  topic: HopeTopic;
+  onTopic: (topic: HopeTopic) => void;
   /** 화면이 Hope 에게 말하게 할 것(전략이 다 됐다 등). id 가 바뀔 때 한 번 읽는다. */
   notice: { id: number; text: string } | null;
 }) {
@@ -100,6 +128,7 @@ export function HopeAssistant({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [typed, setTyped] = useState("");
   const [proposal, setProposalState] = useState<Proposal | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [error, setError] = useState("");
   const [log, setLog] = useState<HopeLogRow[] | null>(null);
   const [logError, setLogError] = useState("");
@@ -108,13 +137,16 @@ export function HopeAssistant({
   const phaseRef = useRef<Phase>("idle");
   const awakeRef = useRef(false);
   const langRef = useRef(lang);
+  const topicRef = useRef(topic);
   const voiceRef = useRef(voice);
   const turnsRef = useRef<Turn[]>([]);
   const proposalRef = useRef<Proposal | null>(null);
   const recRef = useRef<Rec | null>(null);
+  const campaignKey = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
     langRef.current = lang;
+    topicRef.current = topic;
     voiceRef.current = voice;
     proposalRef.current = proposal;
   });
@@ -285,6 +317,80 @@ export function HopeAssistant({
     await say(text, false);
   };
 
+  // ----- 캠페인 카드: 골라서 Marketing · 웹 팝업으로 -----
+
+  const patchCampaign = (key: number, patch: Partial<Campaign>) =>
+    setCampaigns((list) => list.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+
+  /** 이 캠페인을 확인 카드로 — 거기서 "네" 를 해야 보내고 켠다. */
+  const proposeCampaign = (item: Campaign) => {
+    const { action } = item;
+    setProposal({ action, reach: null, status: "asking" });
+    marketingApi.audience("sms", { segment: action.segment }).then(
+      (audience) => setProposal((now) => (now && now.action === action ? { ...now, reach: audience.phones } : now)),
+      () => undefined,
+    );
+  };
+
+  /** 문자 캠페인(보내지 않은 ready)과 숨긴 팝업 초안을 만든다. 보내기·켜기는 Marketing · Website Pop-ups 에서. */
+  const draftCampaign = async (item: Campaign, what: { sms: boolean; popup: boolean }) => {
+    const { action } = item;
+    patchCampaign(item.key, { busy: true, error: "" });
+    const done = { ...item.done };
+    const failed: string[] = [];
+    const strategyIndex = action.report_id && action.strategy > 0 ? action.strategy - 1 : null;
+    if (what.sms && action.sms && !done.sms) {
+      try {
+        const campaign = await marketingApi.createCampaign({
+          channel: "sms",
+          name: `Hope · ${action.title}`.slice(0, 80),
+          message: action.sms,
+          audience: { segment: action.segment },
+        });
+        done.sms = String(campaign.id);
+        if (strategyIndex !== null) {
+          await aiMarketingApi.recordLaunch(action.report_id, strategyIndex, "sms", done.sms).catch(() => undefined);
+        }
+      } catch (cause) {
+        failed.push(`Text: ${describe(cause)}`);
+      }
+    }
+    if (what.popup && action.popup && !done.popup) {
+      try {
+        const start = new Date();
+        const notice = await siteNoticesApi.save({
+          kind: "promotion",
+          title: action.popup_title,
+          body: action.popup_body,
+          link_url: action.popup_link,
+          link_label: action.popup_link_label || null,
+          surfaces: "all",
+          repeat: "daily",
+          starts_at: start.toISOString(),
+          ends_at: new Date(start.getTime() + action.days * 86_400_000).toISOString(),
+          active: false,
+        });
+        done.popup = notice.id;
+        if (strategyIndex !== null) {
+          await aiMarketingApi.recordLaunch(action.report_id, strategyIndex, "popup", notice.id).catch(() => undefined);
+        }
+      } catch (cause) {
+        failed.push(`Pop-up: ${describe(cause)}`);
+      }
+    }
+    patchCampaign(item.key, { busy: false, done, error: failed.join(" ") });
+    hopeApi
+      .save("launch", langRef.current, `Draft · ${action.title}`, failed.length ? failed.join(" ") : "Drafts made — nothing sent.", {
+        action,
+        drafts: done,
+      })
+      .then(loadLog, () => undefined);
+  };
+
+  const draftPicked = async (what: { sms: boolean; popup: boolean }) => {
+    for (const item of campaigns.filter((row) => row.picked && !row.busy)) await draftCampaign(item, what);
+  };
+
   // ----- 대화 -----
 
   const ask = async (text: string, byVoice: boolean) => {
@@ -306,15 +412,27 @@ export function HopeAssistant({
     record({ role: "user", text: question });
     setPhase("thinking");
     try {
-      const answer = await askHope(turnsRef.current.map(({ role, text: said }) => ({ role, text: said })), langRef.current);
+      const answer = await askHope(
+        turnsRef.current.map(({ role, text: said }) => ({ role, text: said })),
+        langRef.current,
+        topicRef.current,
+      );
       record({ role: "assistant", text: answer.reply, lookups: answer.lookups });
-      let launch: LaunchAction | null = null;
+      const launches: LaunchAction[] = [];
       for (const action of answer.actions) {
         if (action.type === "strategy") onStrategy(action);
         else if (action.type === "present") onPresent();
-        else launch = action;
+        else launches.push(action);
       }
       if (answer.log_id) loadLog();
+      // 캠페인은 모두 카드로 — 새것이 위. 하나뿐이면 예전처럼 확인 카드도 띄워 "네" 로 보낼 수 있다.
+      if (launches.length) {
+        setCampaigns((list) => [
+          ...launches.map((action) => ({ key: ++campaignKey.current, action, picked: launches.length > 1, busy: false, done: {}, error: "" })),
+          ...list,
+        ]);
+      }
+      const launch = launches.length === 1 ? launches[0] : null;
       if (launch) {
         const proposed = launch;
         setProposal({ action: proposed, reach: null, status: "asking" });
@@ -577,7 +695,6 @@ export function HopeAssistant({
             >
               <span className="text-[11px] tracking-wide text-[#9fb5a8] uppercase">{turn.role === "user" ? "You" : "Hope"}</span>
               <span translate="no">{turn.text}</span>
-              {turn.role === "assistant" ? <ToMarketing message={turn.text} /> : null}
               {turn.lookups?.length ? (
                 <span className="flex flex-wrap gap-1">
                   {turn.lookups.map((row, rowIndex) => (
@@ -592,12 +709,39 @@ export function HopeAssistant({
         </ol>
       ) : (
         <p className="text-sm text-[#9fb5a8]">
-          Say “Hope”, then ask — for example “How many bookings today?”, “What were sales yesterday compared with last
-          week?”, “Make a strategy for weekday afternoons”, or “Send a text for strategy one”.
+          {`Pick a question type, then say “Hope” and ask — for example “${TOPICS.find((row) => row.value === topic)?.example}”.`}
         </p>
       )}
 
+      {campaigns.length > 0 ? (
+        <CampaignBoard
+          campaigns={campaigns}
+          onClear={() => setCampaigns([])}
+          onDraft={(item, what) => void draftCampaign(item, what)}
+          onDraftPicked={(what) => void draftPicked(what)}
+          onPick={(key, picked) => patchCampaign(key, { picked })}
+          onSend={proposeCampaign}
+        />
+      ) : null}
+
       {proposal ? <ProposalCard onCancel={cancelLaunch} onConfirm={runLaunch} proposal={proposal} /> : null}
+
+      <div aria-label="Question type" className="flex flex-wrap gap-1.5" role="group">
+        {TOPICS.map((row) => (
+          <button
+            aria-pressed={topic === row.value}
+            className={`min-h-9 border px-3 text-xs font-bold ${
+              topic === row.value ? "border-[#e9f2ec] bg-[#e9f2ec] text-[#14201a]" : "border-[#3c5a49] text-[#e9f2ec] hover:bg-[#24342b]"
+            }`}
+            key={row.value}
+            onClick={() => onTopic(row.value)}
+            title={row.example}
+            type="button"
+          >
+            {row.label}
+          </button>
+        ))}
+      </div>
 
       <form
         className="flex gap-2"
@@ -613,7 +757,7 @@ export function HopeAssistant({
           className="min-w-0 flex-1"
           maxLength={500}
           onChange={(event) => setTyped(event.target.value)}
-          placeholder="Or type a question for Hope"
+          placeholder={`Or type a question for Hope — e.g. ${TOPICS.find((row) => row.value === topic)?.example}`}
           value={typed}
         />
         <Button disabled={!typed.trim() || phase === "thinking"} tone="primary" type="submit">
@@ -649,10 +793,22 @@ export function HopeAssistant({
 }
 
 /** 이 글을 Marketing 새 캠페인 초안으로 연다(새 탭 — Hope 대화는 그대로). 보내기는 Marketing 에서 사람이 한다. */
-function ToMarketing({ message, segment, light }: { message: string; segment?: Segment; light?: boolean }) {
+function ToMarketing({
+  message,
+  segment,
+  light,
+  channel = "sms",
+  name,
+}: {
+  message: string;
+  segment?: Segment;
+  light?: boolean;
+  channel?: "sms" | "call";
+  name?: string;
+}) {
   const query = new URLSearchParams({
-    channel: "sms",
-    name: `Hope · ${new Date().toISOString().slice(0, 10)}`,
+    channel,
+    name: (name ?? `Hope · ${new Date().toISOString().slice(0, 10)}`).slice(0, 80),
     message: message.slice(0, 1000),
     ...(segment ? { segment } : {}),
   });
@@ -664,13 +820,13 @@ function ToMarketing({ message, segment, light }: { message: string; segment?: S
       href={`/marketing?${query.toString()}`}
       rel="noopener"
       target="_blank"
-      title="Open this as a new Marketing text message"
+      title={channel === "call" ? "Open this as a new Marketing AI call" : "Open this as a new Marketing text message"}
     >
       <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
         <path d="M4 5h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
         <path d="M15 19h5m0 0-2-2m2 2-2 2" />
       </svg>
-      To Marketing
+      {channel === "call" ? "AI call → Marketing" : light ? "Text → Marketing" : "To Marketing"}
     </a>
   );
 }
@@ -722,5 +878,122 @@ function ProposalCard({ proposal, onConfirm, onCancel }: { proposal: Proposal; o
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Hope 가 만든 캠페인들. 고른 것을 한 번에 초안으로 만들거나, 하나씩 Marketing · 웹 팝업 · 확인 카드로 보낸다. */
+function CampaignBoard({
+  campaigns,
+  onPick,
+  onDraft,
+  onDraftPicked,
+  onSend,
+  onClear,
+}: {
+  campaigns: Campaign[];
+  onPick: (key: number, picked: boolean) => void;
+  onDraft: (item: Campaign, what: { sms: boolean; popup: boolean }) => void;
+  onDraftPicked: (what: { sms: boolean; popup: boolean }) => void;
+  onSend: (item: Campaign) => void;
+  onClear: () => void;
+}) {
+  const picked = campaigns.filter((item) => item.picked).length;
+  const busy = campaigns.some((item) => item.busy);
+  return (
+    <section className="grid gap-2 border-2 border-[#8fc9a8] bg-[#f4faf6] p-3 text-sm text-[#1f2328]">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="flex-1 font-bold">{`Campaigns from Hope (${campaigns.length})`}</h3>
+        <Button disabled={!picked || busy} onClick={() => onDraftPicked({ sms: true, popup: false })}>
+          {`Selected (${picked}) → Marketing texts`}
+        </Button>
+        <Button disabled={!picked || busy} onClick={() => onDraftPicked({ sms: false, popup: true })}>
+          {`Selected (${picked}) → Web pop-up drafts`}
+        </Button>
+        <button className="px-2 text-xs font-bold text-[#6b7280] underline" onClick={onClear} type="button">
+          Clear
+        </button>
+      </div>
+      <p className="text-[11px] text-[#6b7280]">
+        Drafts are not sent: texts wait in Marketing, pop-ups stay hidden in Website Pop-ups until someone switches them on.
+        “Send now” opens the confirmation card.
+      </p>
+      <ol className="grid gap-2">
+        {campaigns.map((item) => {
+          const { action } = item;
+          return (
+            <li className="grid gap-2 border border-[#d4d4d8] bg-white p-3" key={item.key}>
+              <label className="flex items-start gap-2">
+                <input
+                  checked={item.picked}
+                  className="mt-1 size-4"
+                  onChange={(event) => onPick(item.key, event.target.checked)}
+                  type="checkbox"
+                />
+                <span className="grid gap-0.5">
+                  <span className="font-bold" translate="no">
+                    {action.title}
+                  </span>
+                  <span className="text-xs text-[#6b7280]">
+                    {`${SEGMENT_LABEL[action.segment]}${action.strategy > 0 ? ` · strategy ${action.strategy}` : ""}${
+                      action.popup ? ` · pop-up ${action.days} days` : ""
+                    }`}
+                  </span>
+                </span>
+              </label>
+              {action.sms ? (
+                <p className="border-l-4 border-[#1a7f4b] bg-[#f8faf9] px-2 py-1" translate="no">
+                  <span className="mr-1 text-[11px] font-bold text-[#6b7280]">TEXT</span>
+                  {action.sms}
+                </p>
+              ) : null}
+              {action.call ? (
+                <p className="border-l-4 border-[#2d5e8c] bg-[#f8faf9] px-2 py-1" translate="no">
+                  <span className="mr-1 text-[11px] font-bold text-[#6b7280]">AI CALL</span>
+                  {action.call}
+                </p>
+              ) : null}
+              {action.popup ? (
+                <p className="border-l-4 border-[#b7791f] bg-[#f8faf9] px-2 py-1" translate="no">
+                  <span className="mr-1 text-[11px] font-bold text-[#6b7280]">POP-UP</span>
+                  <b>{action.popup_title}</b> — {action.popup_body} <i>({action.popup_link_label})</i>
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {action.sms ? <ToMarketing light message={action.sms} name={`Hope · ${action.title}`} segment={action.segment} /> : null}
+                {action.call ? (
+                  <ToMarketing channel="call" light message={action.call} name={`Hope · ${action.title}`} segment={action.segment} />
+                ) : null}
+                {action.popup ? (
+                  item.done.popup ? (
+                    <a className="text-xs font-bold text-[#2d5e8c] underline" href="/admin/notices" rel="noopener" target="_blank">
+                      Pop-up draft saved — open Website Pop-ups
+                    </a>
+                  ) : (
+                    <button
+                      className="inline-flex items-center border border-[#b7791f] px-2 py-1 text-xs font-bold text-[#8a5a12] hover:bg-[#fdf5e6] disabled:opacity-50"
+                      disabled={item.busy}
+                      onClick={() => onDraft(item, { sms: false, popup: true })}
+                      type="button"
+                    >
+                      Web pop-up draft
+                    </button>
+                  )
+                ) : null}
+                {item.done.sms ? (
+                  <a className="text-xs font-bold text-[#2d5e8c] underline" href="/marketing" rel="noopener" target="_blank">
+                    Text campaign saved — open Marketing
+                  </a>
+                ) : null}
+                <Button disabled={item.busy} onClick={() => onSend(item)} tone="primary">
+                  Send now…
+                </Button>
+              </div>
+              {item.busy ? <p className="text-xs text-[#6b7280]">Saving…</p> : null}
+              {item.error ? <p className="text-xs text-[#b42318]">{item.error}</p> : null}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

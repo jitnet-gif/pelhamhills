@@ -689,11 +689,16 @@ weekday/weekend and time (am before 12, pm 12–3, twilight 3 PM+); `by_date` = 
 bookings by source (phone assistant, website, staff).
 - `latest_strategy()` = the most recent saved marketing strategy report with each strategy's customer copy.
 - `text_reach(segment)` = how many people may receive a marketing text (consent and opt-outs checked).
+- `manager_facts()` = the facts the managers entered for the analysis (fixed costs, targets, notes).
 
 Doing things — you never send anything yourself; the screen does it:
 - "Make a strategy / analysis": call `make_strategy(from, to, focus)` (default the last 30 days ending today). \
 It takes one to two minutes; say you started it and that the presentation narrator icon will play it.
 - "Play / show the presentation": call `play_presentation()`.
+- "Make campaigns" / "turn the strategies into campaigns": call `latest_strategy()`, then `propose_launch(...)` \
+once per campaign (one per strategy, at most five), each with a text, an AI call script and a pop-up. The screen \
+lists them as campaign cards; the manager picks each one and sends it to Marketing or the website there. Name the \
+campaigns in one sentence and say they are on the screen — do not ask "Shall I send it?" for several at once.
 - "Send a text" / "put it on the website" / "launch strategy 2": first call `latest_strategy()` (unless the manager \
 dictated the offer) and `text_reach(segment)`, then call `propose_launch(...)` with the text **and** a matching \
 website pop-up (popup true) — always both, unless the manager says text only or website only. \
@@ -739,6 +744,11 @@ HOPE_TOOLS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "manager_facts",
+        "description": "Facts the managers entered for the analysis: fixed costs, targets and notes.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "make_strategy",
         "description": "Start Claude's full marketing strategy for a period on the screen (1–2 minutes).",
         "input_schema": {
@@ -763,6 +773,7 @@ HOPE_TOOLS: list[dict[str, Any]] = [
                 "title": {"type": "string", "description": "Short campaign name"},
                 "segment": {"type": "string", "enum": ["all", "members", "non_members", "regulars", "new"]},
                 "sms": {"type": "string", "description": "The text, at most 280 characters; empty for no text"},
+                "call": {"type": "string", "description": "What the AI phone assistant says (at most 600 characters), or empty"},
                 "popup": {"type": "boolean", "description": "Also publish a website pop-up"},
                 "popup_title": {"type": "string"},
                 "popup_body": {"type": "string", "description": "At most 240 characters"},
@@ -782,9 +793,23 @@ class ChatTurn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
 
 
+#: 질문 유형 = 화면의 네 탭. 고른 유형을 마지막 질문 앞에 적어 Hope 가 그 쪽으로 답하게 한다.
+HOPE_TOPICS: dict[str, str] = {
+    "analysis": "Customer analysis — who plays, when, how much they spend and how that is changing. Look up the "
+                "numbers (club_numbers, texts_and_calls) and compare periods when it helps.",
+    "reports": "Strategy reports — the saved strategies (latest_strategy): what they say and what to do first. "
+               "Offer make_strategy when the manager wants a new one.",
+    "launch": "Texts & website — turn strategies into campaigns. Call propose_launch once per campaign so each "
+              "one appears on the screen as a card the manager can send to Marketing or the website.",
+    "facts": "Analysis facts — what the analysis is built on: sales, tee sheet, texts and calls, and the facts the "
+             "managers entered (manager_facts). Say plainly what is missing.",
+}
+
+
 class ChatIn(BaseModel):
     messages: list[ChatTurn] = Field(min_length=1, max_length=30)
     lang: Literal["en", "ko"] = "en"
+    topic: Literal["analysis", "reports", "launch", "facts"] | None = None
 
 
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -837,6 +862,7 @@ def _launch_action(args: dict[str, Any]) -> dict[str, Any]:
         "title": _clip(args.get("title"), 80) or "Hope campaign",
         "segment": segment,
         "sms": _clip(args.get("sms"), 280),
+        "call": _clip(args.get("call"), 600),
         "popup": bool(args.get("popup")) and bool(_clip(args.get("popup_title"), 80)),
         "popup_title": _clip(args.get("popup_title"), 80),
         "popup_body": _clip(args.get("popup_body"), 240),
@@ -876,6 +902,9 @@ async def _hope_tool(token: str, name: str, args: dict[str, Any], actions: list[
                                            {"p": {"channel": "sms", "segment": segment}})
             phones = data.get("phones") if isinstance(data, dict) else None
             return json.dumps({"segment": segment, "can_receive": phones}), False
+        if name == "manager_facts":
+            data = await asyncio.to_thread(supabase_rest.rpc_as, token, "pelham_staff_ai_marketing_facts_active", {})
+            return json.dumps({"facts": data if isinstance(data, list) else []}, ensure_ascii=False), False
         if name == "make_strategy":
             start, end = _range(args)
             actions.append({"type": "strategy", "from": start, "to": end, "focus": _clip(args.get("focus"), 500)})
@@ -896,7 +925,7 @@ async def _hope_tool(token: str, name: str, args: dict[str, Any], actions: list[
         return "That information is not available right now.", True
 
 
-def _chat_messages(turns: list[ChatTurn], today: str) -> list[dict[str, Any]]:
+def _chat_messages(turns: list[ChatTurn], today: str, topic: str | None = None) -> list[dict[str, Any]]:
     """화면이 보낸 대화 → Claude 메시지. 같은 역할이 이어지면 합치고, 첫 줄은 user 여야 한다."""
     messages: list[dict[str, Any]] = []
     for turn in turns:
@@ -908,7 +937,10 @@ def _chat_messages(turns: list[ChatTurn], today: str) -> list[dict[str, Any]]:
     if not messages or messages[-1]["role"] != "user":
         raise HTTPException(status_code=400, detail="Say something to Hope first.")
     last = messages[-1]
-    last["content"] = [{"type": "text", "text": f"(Today is {today} in Toronto.)"}, {"type": "text", "text": last["content"]}]
+    note = f"(Today is {today} in Toronto.)"
+    if topic in HOPE_TOPICS:
+        note += f" (Question type: {HOPE_TOPICS[topic]})"
+    last["content"] = [{"type": "text", "text": note}, {"type": "text", "text": last["content"]}]
     return messages
 
 
@@ -931,7 +963,7 @@ async def chat(body: ChatIn, request: Request) -> dict[str, Any]:
     token = _token(request)
     now = datetime.now(ZoneInfo("America/Toronto"))
     today = f"{now:%A} {now.date().isoformat()}"
-    messages = _chat_messages(body.messages, today)
+    messages = _chat_messages(body.messages, today, body.topic)
     language = "Korean (한국어)" if body.lang == "ko" else "English"
     actions: list[dict[str, Any]] = []
     lookups: list[dict[str, Any]] = []
@@ -975,5 +1007,5 @@ async def chat(body: ChatIn, request: Request) -> dict[str, Any]:
 
     question = body.messages[-1].text.strip()
     log_id = await asyncio.to_thread(_log, token, body.lang, question, reply,
-                                     {"actions": actions, "lookups": lookups, "model": CHAT_MODEL})
+                                     {"actions": actions, "lookups": lookups, "model": CHAT_MODEL, "topic": body.topic})
     return {"reply": reply, "actions": actions, "lookups": lookups, "log_id": log_id}

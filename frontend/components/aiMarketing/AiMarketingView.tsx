@@ -17,6 +17,7 @@
  *   - "Analysis facts" 탭: Claude 가 받는 것 그대로(인건비 pelham-shift 포함)와 매니저 팩트(0117, 고정비·목표). #facts.
  *   - 맨 위 **Hope 타일**(`HopeAssistant`): "Hope" 하고 부르면 듣고 오늘 예약·매출 등을 말로 답한다. "전략 만들어 줘"·
  *     "프레젠테이션 틀어 줘"는 아래 `HopeCommand` 로 고객 분석 탭의 전략 패널에 넘긴다. 문자·팝업은 타일이 확인 후 실행한다.
+ *     질문 유형은 아래 네 탭과 같다(타일의 칩 = 탭). Hope 가 만든 캠페인은 타일 안 카드로 나와 하나씩 Marketing·팝업으로 보낸다.
  *
  * 숫자는 모두 서버가 계산한다. 다음 단계(예상 매출, 마케팅 믹스 보드)는 이 화면에 붙는다.
  * 데모 숫자로 내려가지 않는다 — 서버가 안 되면 오류를 보여 준다(옛 Business Intelligence 화면이 고치려던 문제).
@@ -139,6 +140,8 @@ export default function AiMarketingView() {
       <div className="px-4 pt-4">
         <HopeAssistant
           notice={notice}
+          onTopic={pickTab}
+          topic={tab}
           onPresent={() => {
             pickTab("analysis");
             setCommand({ id: Date.now(), kind: "present" });

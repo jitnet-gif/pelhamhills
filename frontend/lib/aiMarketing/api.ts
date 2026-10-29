@@ -289,6 +289,8 @@ export type HopeAction =
       strategy: number;
       title: string;
       sms: string;
+      /** AI 전화(ElevenLabs)가 할 말. 비어 있을 수 있다. */
+      call: string;
       popup: boolean;
     } & Pick<StrategyLaunchCopy, "segment" | "popup_title" | "popup_body" | "popup_link_label" | "popup_link" | "days">);
 
@@ -330,8 +332,15 @@ export const hopeApi = {
     }),
 };
 
+/** 질문 유형 = AI 매니저 화면의 네 탭. 서버가 마지막 질문 앞에 붙여 Hope 가 그 쪽으로 답한다. */
+export type HopeTopic = "analysis" | "reports" | "launch" | "facts";
+
 /** Hope 와 대화 한 번(Fly `POST /ai-marketing/chat`). 지난 대화를 같이 보내 이어서 말한다. */
-export async function askHope(messages: { role: "user" | "assistant"; text: string }[], lang: "en" | "ko"): Promise<HopeReply> {
+export async function askHope(
+  messages: { role: "user" | "assistant"; text: string }[],
+  lang: "en" | "ko",
+  topic?: HopeTopic,
+): Promise<HopeReply> {
   const token = await accessToken();
   if (!token) throw new ApiError(401, "Sign in again to talk to Hope.");
   let response: Response;
@@ -339,7 +348,7 @@ export async function askHope(messages: { role: "user" | "assistant"; text: stri
     response = await fetch(`${paymentsApiBase()}/ai-marketing/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ messages: messages.slice(-20), lang }),
+      body: JSON.stringify({ messages: messages.slice(-20), lang, topic }),
     });
   } catch {
     throw new ApiError(0, "Can't reach the server. Check the connection and try again.");
