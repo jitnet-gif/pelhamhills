@@ -1,0 +1,58 @@
+# 시스템 멈춤 알림. 5분마다 앱·Fly 서버·Supabase·GPS 앱을 확인하고, 멈추면 문자와 이메일을 보낸다.
+# 설명과 설정은 `scripts/uptime_watch.py` 맨 위. 비밀값은 `scripts/set_uptime_secrets.sh` 로 넣는다.
+# 시험 알림: Actions → Uptime → Run workflow → test 체크.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send one test alert (text + email) instead of checking"
+        type: boolean
+        default: false
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write   # 상태 캐시 저장
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/uptime_watch.py
+          sparse-checkout-cone-mode: false
+
+      # 지난 실행의 상태(어느 대상이 언제부터 멈췄는지). 캐시는 덮어쓸 수 없어 실행마다 새 키로 저장하고
+      # 접두어로 가장 최근 것을 읽는다.
+      - uses: actions/cache/restore@v4
+        with:
+          path: .uptime
+          key: uptime-state-${{ github.run_id }}
+          restore-keys: uptime-state-
+
+      - name: Check and alert
+        env:
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
+          UPTIME_SMS_TO: ${{ secrets.UPTIME_SMS_TO }}
+          UPTIME_SMTP_USER: ${{ secrets.UPTIME_SMTP_USER }}
+          UPTIME_SMTP_PASSWORD: ${{ secrets.UPTIME_SMTP_PASSWORD }}
+          UPTIME_EMAIL_TO: ${{ secrets.UPTIME_EMAIL_TO }}
+          UPTIME_STATE: .uptime/state.json
+        run: python3 scripts/uptime_watch.py ${{ inputs.test && '--test' || '' }}
+
+      - uses: actions/cache/save@v4
+        if: always() && !inputs.test
+        with:
+          path: .uptime
+          key: uptime-state-${{ github.run_id }}
