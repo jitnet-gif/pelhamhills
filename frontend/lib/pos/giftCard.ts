@@ -61,22 +61,28 @@ export const giftCardApi = {
   issue: (fields: GiftCardIssue) => staffRpc<GiftCard>("pelham_staff_gift_card_issue", { p: fields }),
   void: (code: string, reason: string) =>
     staffRpc<GiftCard>("pelham_staff_gift_card_void", { p_code: code, p_reason: reason }),
-  text: textGiftCard,
+  text: (code: string, phone: string) => sendGiftCard(code, "text", { phone }),
+  email: (code: string, email: string) => sendGiftCard(code, "email", { email }),
 };
 
 /**
- * 카드를 손님 휴대폰으로 — 바코드 그림을 붙인 문자. Twilio 키는 FastAPI(Fly) 에만 있어서
- * 그쪽 `/gift-cards/{code}/text` 를 직원 토큰으로 부른다(`backend/api/routes/gift_cards.py`).
+ * 카드를 손님에게 — `text` 는 바코드 그림을 붙인 문자, `email` 은 종이 상품권(Gift Certificate) 양식의 메일.
+ * Twilio·SMTP 키는 FastAPI(Fly) 에만 있어서 그쪽 `/gift-cards/{code}/text|email` 을 직원 토큰으로 부른다
+ * (`backend/api/routes/gift_cards.py`).
  */
-async function textGiftCard(code: string, phone: string): Promise<{ to: string }> {
+async function sendGiftCard(
+  code: string,
+  how: "text" | "email",
+  payload: { phone: string } | { email: string },
+): Promise<{ to: string }> {
   const token = await accessToken();
   if (!token) throw new ApiError(401, "Sign in with a staff account.");
   let response: Response;
   try {
-    response = await fetch(`${paymentsApiBase()}/gift-cards/${encodeURIComponent(code)}/text`, {
+    response = await fetch(`${paymentsApiBase()}/gift-cards/${encodeURIComponent(code)}/${how}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify(payload),
     });
   } catch {
     throw new ApiError(0, "Could not reach the server.");
@@ -86,7 +92,7 @@ async function textGiftCard(code: string, phone: string): Promise<{ to: string }
     const detail = typeof body?.detail === "string" && body.detail ? body.detail : `${response.status}`;
     throw new ApiError(response.status, detail);
   }
-  return { to: body?.to ?? phone };
+  return { to: body?.to ?? Object.values(payload)[0] };
 }
 
 /** 메뉴에 Gift Cards 를 띄울 계정인가(매니저·계정 관리자, proshop@ 제외). 막는 것은 서버다. */

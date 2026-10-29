@@ -57,6 +57,16 @@ export function code128Values(text: string): number[] {
 }
 
 /**
+ * 화면에 띄울 바코드의 CSS 폭(px): 모듈 한 칸이 정확히 `modulePx` 픽셀이 되게 한다.
+ * 2026-10-28: 기프트카드(GIFT- 15자 = 220 모듈)를 256px 에 맞추니 막대가 1.16px 로 뭉개져 스캐너가 못 읽었다.
+ * 정수 배가 아니면 crispEdges 가 막대마다 1px·2px 로 다르게 반올림해 폭 비율이 깨진다.
+ */
+export function code128ScreenWidth(text: string, modulePx = 2): number {
+  const modules = code128Values(text).reduce((sum, value) => sum + [...CODE128_PATTERNS[value]].reduce((s, w) => s + Number(w), 0), 0);
+  return (modules + QUIET_ZONE * 2) * modulePx;
+}
+
+/**
  * 막대만 그린 SVG 문자열. 좌표 단위는 모듈이고, 인쇄 폭과 높이는 CSS 가 정한다
  * (`preserveAspectRatio="none"`). 사람이 읽는 번호는 호출하는 쪽이 아래에 따로 적는다.
  */

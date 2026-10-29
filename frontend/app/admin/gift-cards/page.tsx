@@ -2,7 +2,7 @@
 
 /**
  * 기프트카드(0120). 매니저가 여기서 발행하면 서버가 코드(`GIFT-` + 무작위 10자)를 매기고, 이 화면이 카드를
- * 감열 프린터로 찍거나 손님 휴대폰으로 문자(바코드 그림 MMS)를 보낸다.
+ * 감열 프린터로 찍고, 손님 휴대폰으로 문자(바코드 그림 MMS)를, 이메일로 종이 상품권(Gift Certificate) 양식을 보낸다.
  * 손님은 티 시트·계산대·스낵바 어느 계산서에서든 결제 수단 "Gift card" 로 잔액만큼 쓴다(`BillPanel`).
  *
  * 매니저와 계정 관리자만(proshop@ 제외). 메뉴를 가리는 것은 AdminShell, 막는 것은 서버다.
@@ -13,7 +13,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import { describeGiftCardError, giftCardApi, type GiftCard } from "@/lib/pos/giftCard";
 import { printGiftCertificate } from "@/lib/pos/giftCertificate";
-import { code128Svg } from "@/lib/retail/barcode";
+import { code128ScreenWidth, code128Svg } from "@/lib/retail/barcode";
 import { printGiftCard } from "@/lib/retail/printReceipt";
 import { formatMoney, parseMoney } from "@/lib/retail/types";
 
@@ -88,13 +88,30 @@ export default function GiftCardsPage() {
     );
   }, [cards, search]);
 
-  async function sendText(card: GiftCard, phone: string): Promise<void> {
+  /** 성공하면 안내 한 줄, 실패하면 오류 한 줄을 돌려준다 — 발행 때 문자·메일 둘의 결과를 함께 띄우려고. */
+  async function sendText(card: GiftCard, phone: string): Promise<{ ok: string } | { failed: string }> {
     try {
       const sent = await giftCardApi.text(card.code, phone);
-      setNotice(`Texted ${card.code} to ${sent.to}.`);
+      return { ok: `Texted the barcode to ${sent.to}.` };
     } catch (cause) {
-      setError(`The card was saved, but the text did not go out: ${describeGiftCardError(cause)}`);
+      return { failed: `The text did not go out: ${describeGiftCardError(cause)}` };
     }
+  }
+
+  async function sendEmail(card: GiftCard, email: string): Promise<{ ok: string } | { failed: string }> {
+    try {
+      const sent = await giftCardApi.email(card.code, email);
+      return { ok: `Emailed the certificate to ${sent.to}.` };
+    } catch (cause) {
+      return { failed: `The email did not go out: ${describeGiftCardError(cause)}` };
+    }
+  }
+
+  function show(results: ({ ok: string } | { failed: string })[], lead = "") {
+    const ok = results.flatMap((result) => ("ok" in result ? [result.ok] : []));
+    const failed = results.flatMap((result) => ("failed" in result ? [result.failed] : []));
+    setNotice([lead, ...ok].filter(Boolean).join(" "));
+    setError(failed.join(" "));
   }
 
   async function issue(event: FormEvent<HTMLFormElement>) {
@@ -121,7 +138,13 @@ export default function GiftCardsPage() {
       setIssued(card);
       setNotice(`Issued ${card.code} for ${formatMoney(card.amount)}.`);
       printGiftCard(card);
-      if (card.phone) await sendText(card, card.phone);
+      // 문자에는 바코드, 메일에는 상품권. 카드는 이미 저장됐으니 하나가 실패해도 다시 보내면 된다.
+      const sends = await Promise.all([
+        card.phone ? sendText(card, card.phone) : null,
+        card.email ? sendEmail(card, card.email) : null,
+      ]);
+      const results = sends.filter((result) => result !== null);
+      if (results.length) show(results, `Issued ${card.code} for ${formatMoney(card.amount)}.`);
       load();
     } catch (cause) {
       setError(describeGiftCardError(cause));
@@ -131,13 +154,49 @@ export default function GiftCardsPage() {
   }
 
   async function textAgain(card: GiftCard) {
-    const phone = window.prompt(`Text ${card.code} to which phone number?`, card.phone ?? "");
+    const phone = window.prompt(`Text the ${card.code} barcode to which phone number?`, card.phone ?? "");
     if (!phone?.trim()) return;
     setError("");
     setNotice("");
     setBusy(card.id);
-    await sendText(card, phone.trim());
+    show([await sendText(card, phone.trim())]);
     setBusy(null);
+  }
+
+  async function emailAgain(card: GiftCard) {
+    const email = window.prompt(`Email the ${card.code} gift certificate to which address?`, card.email ?? "");
+    if (!email?.trim()) return;
+    setError("");
+    setNotice("");
+    setBusy(card.id);
+    show([await sendEmail(card, email.trim())]);
+    setBusy(null);
+  }
+
+  function sendButtons(card: GiftCard) {
+    const disabled = busy === card.id || card.status !== "active" || card.balance <= 0;
+    return (
+      <>
+        <button
+          className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold disabled:opacity-50"
+          disabled={disabled}
+          onClick={() => void textAgain(card)}
+          title="Text the barcode to the guest's phone"
+          type="button"
+        >
+          Send message
+        </button>
+        <button
+          className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold disabled:opacity-50"
+          disabled={disabled}
+          onClick={() => void emailAgain(card)}
+          title="Email the gift certificate"
+          type="button"
+        >
+          Send email
+        </button>
+      </>
+    );
   }
 
   /** 클럽 종이 상품권 양식(Letter 가로)으로. */
@@ -180,7 +239,7 @@ export default function GiftCardsPage() {
           </div>
         </section>
 
-        <section className="grid min-h-0 gap-4 p-4 xl:grid-cols-[360px_1fr]">
+        <section className="grid min-h-0 gap-4 p-4 xl:grid-cols-[520px_1fr]">
           <form className="self-start border border-[#d4d4d8] bg-white p-4" onSubmit={issue}>
             <div className="mb-4">
               <p className="text-[11px] font-bold uppercase text-[#5d6673]">Issue</p>
@@ -255,7 +314,7 @@ export default function GiftCardsPage() {
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="grid gap-1 font-bold">
-                  Text it to (optional)
+                  Text barcode to (optional)
                   <input
                     className={INPUT}
                     inputMode="tel"
@@ -265,7 +324,7 @@ export default function GiftCardsPage() {
                   />
                 </label>
                 <label className="grid gap-1 font-bold">
-                  Email (optional)
+                  Email certificate to (optional)
                   <input
                     className={INPUT}
                     inputMode="email"
@@ -294,7 +353,9 @@ export default function GiftCardsPage() {
                 disabled={saving}
                 type="submit"
               >
-                {saving ? "Issuing…" : form.phone.trim() ? "Issue, print & text" : "Issue & print"}
+                {saving
+                  ? "Issuing…"
+                  : `Issue & print${form.phone.trim() ? " · text" : ""}${form.email.trim() ? " · email" : ""}`}
               </button>
               {notice ? (
                 <p className="border border-[#9fd9b4] bg-[#eefaf2] p-2 font-normal text-[#087333]" role="status">
@@ -307,11 +368,12 @@ export default function GiftCardsPage() {
                   <span className="text-[11px] font-bold uppercase text-[#5d6673]">Just issued · {formatMoney(issued.amount)}</span>
                   {/* code128Svg 는 막대(rect)만 그린 SVG 다. 사람이 입력한 글자는 들어가지 않는다. */}
                   <span
-                    className="block h-16 w-64 max-w-full bg-white [&>svg]:h-full [&>svg]:w-full"
+                    className="block h-20 shrink-0 bg-white [&>svg]:h-full [&>svg]:w-full"
                     dangerouslySetInnerHTML={{ __html: code128Svg(issued.code) }}
+                    style={{ width: code128ScreenWidth(issued.code) }}
                   />
                   <span className="font-mono text-[11px]">{issued.code}</span>
-                  <span className="flex gap-1">
+                  <span className="flex flex-wrap justify-center gap-1">
                     <button
                       className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold"
                       onClick={() => printGiftCard(issued, { reprint: true })}
@@ -326,6 +388,7 @@ export default function GiftCardsPage() {
                     >
                       Print certificate
                     </button>
+                    {sendButtons(issued)}
                   </span>
                 </div>
               ) : null}
@@ -416,14 +479,7 @@ export default function GiftCardsPage() {
                               >
                                 Certificate
                               </button>
-                              <button
-                                className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold disabled:opacity-50"
-                                disabled={busy === card.id || card.balance <= 0}
-                                onClick={() => void textAgain(card)}
-                                type="button"
-                              >
-                                Text
-                              </button>
+                              {sendButtons(card)}
                               <button
                                 className="border border-[#f0b4b4] bg-white px-2 py-1 text-[11px] font-bold text-[#8c1d1d] disabled:opacity-50"
                                 disabled={busy === card.id}
@@ -440,8 +496,9 @@ export default function GiftCardsPage() {
                             <div className="text-center">
                               {/* code128Svg 는 막대(rect)만 그린 SVG 다. 사람이 입력한 글자는 들어가지 않는다. */}
                               <span
-                                className="block h-16 w-64 bg-white [&>svg]:h-full [&>svg]:w-full"
+                                className="block h-20 bg-white [&>svg]:h-full [&>svg]:w-full"
                                 dangerouslySetInnerHTML={{ __html: code128Svg(card.code) }}
+                                style={{ width: code128ScreenWidth(card.code) }}
                               />
                               <span className="mt-1 block font-mono text-[11px]">{card.code}</span>
                             </div>

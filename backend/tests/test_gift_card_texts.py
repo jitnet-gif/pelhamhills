@@ -85,3 +85,50 @@ def test_bad_phone_or_code(env):
     assert client.post(f"{API}/gift-cards/{CODE}/text", json={"phone": "555"}).status_code == 422
     assert client.post(f"{API}/gift-cards/RC-0A1B2C3D4E/text", json={"phone": "9055550101"}).status_code == 404
     assert state["calls"] == [] and state["sent"] == []
+
+
+# ===== 이메일 상품권 =====================================================
+
+@pytest.fixture()
+def mail(env, monkeypatch):
+    client, state = env
+    monkeypatch.setenv("RECEIPT_SMTP_USER", "club@example.com")
+    monkeypatch.setenv("RECEIPT_SMTP_PASSWORD", "app pass")
+    state["mail"] = []
+    monkeypatch.setattr(gift_cards, "_send_certificate", lambda to, card: state["mail"].append((to, card)))
+    return client, state
+
+
+def test_emails_certificate(mail):
+    client, state = mail
+    res = client.post(f"{API}/gift-cards/{CODE.lower()}/email", json={"email": " jane@example.com "})
+    assert res.status_code == 200, res.text
+    assert res.json()["to"] == "jane@example.com"
+    assert state["mail"][0][0] == "jane@example.com" and state["sent"] == []
+
+
+def test_certificate_email_shows_value_name_and_inline_barcode():
+    card = {**CARD, "used": 2450}
+    page = gift_cards.certificate_email_html(card)
+    assert "$75.50" in page and "Jane Smith" in page and CODE in page
+    assert 'src="cid:barcode"' in page and 'src="cid:logo"' in page
+    # 쓰지 않은 카드는 발행 금액.
+    assert "$100.00" in gift_cards.certificate_email_text({**CARD, "used": 0})
+    assert gift_cards.LOGO_PNG.read_bytes().startswith(b"\x89PNG")
+
+
+@pytest.mark.parametrize("change", [{"status": "void"}, {"balance": 0}])
+def test_email_refuses_unusable_card(mail, change):
+    client, state = mail
+    state["card"].update(change)
+    assert client.post(f"{API}/gift-cards/{CODE}/email", json={"email": "jane@example.com"}).status_code == 409
+    assert state["mail"] == []
+
+
+def test_email_bad_address_or_not_set_up(mail, monkeypatch):
+    client, state = mail
+    assert client.post(f"{API}/gift-cards/{CODE}/email", json={"email": "jane"}).status_code == 422
+    for name in ("RECEIPT_SMTP_USER", "ACTIVITY_SMTP_USER"):
+        monkeypatch.delenv(name, raising=False)
+    assert client.post(f"{API}/gift-cards/{CODE}/email", json={"email": "jane@example.com"}).status_code == 503
+    assert state["mail"] == []
