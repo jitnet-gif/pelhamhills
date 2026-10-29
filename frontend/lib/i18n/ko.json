@@ -3490,5 +3490,11 @@
  "Paid up": "정상 결제",
  "Card on file": "등록된 카드",
  "No machines": "머신 없음",
- "Monthly dollar usage is only on the Fly dashboard (Open billing).": "월 사용 금액은 Fly 대시보드에서만 볼 수 있습니다 (결제 화면 열기)."
+ "Monthly dollar usage is only on the Fly dashboard (Open billing).": "월 사용 금액은 Fly 대시보드에서만 볼 수 있습니다 (결제 화면 열기).",
+ "Find a number or name": "번호 또는 이름 찾기",
+ "Sent / delivered": "보냄 / 전달됨",
+ "Failed / skipped": "실패 / 건너뜀",
+ "No contact yet": "아직 연락 없음",
+ "Everyone": "전체",
+ "Showing {0} of {1}": "{1}명 중 {0}명 표시"
 }

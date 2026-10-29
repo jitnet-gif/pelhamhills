@@ -22,6 +22,7 @@ import {
   type MarketingStatus,
   type OptOut,
   type Segment,
+  type SendView,
   OPTOUT_SOURCE_LABEL,
   REASON_LABEL,
   REPLY_LABEL,
@@ -32,6 +33,8 @@ import {
   describeMarketingError,
   formatPhone,
   marketingApi,
+  sendInView,
+  sendMatches,
   summarizeRecipients,
 } from "@/lib/marketing/api";
 
@@ -959,70 +962,7 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
               </p>
             ) : null}
 
-            <div className="mt-3 max-h-[60vh] overflow-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b border-[#d4d4d8]">
-                    <th className="px-2 py-1.5">Name</th>
-                    <th className="px-2 py-1.5">Phone</th>
-                    <th className="px-2 py-1.5">Type</th>
-                    <th className="px-2 py-1.5 text-right">Rounds</th>
-                    <th className="px-2 py-1.5">City</th>
-                    {detail.audience?.kind === "weather" ? <th className="px-2 py-1.5">Tee time</th> : null}
-                    <th className="px-2 py-1.5">Status</th>
-                    {detail.replies ? <th className="px-2 py-1.5">Contacted us</th> : null}
-                    <th className="px-2 py-1.5">Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(detail.sends ?? []).map((send) => (
-                    <tr className="border-b border-[#f0f0f2]" key={send.id}>
-                      <td className="px-2 py-1.5 font-bold">{send.name}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(send.phone)}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">
-                        {send.customer ? (
-                          <>
-                            <span className={send.customer.is_member ? "font-bold text-[#4533ff]" : ""}>
-                              {send.customer.is_member ? "Member" : "Public"}
-                            </span>
-                            {send.customer.rounds >= 5 ? (
-                              <span className="ml-1 bg-[#f0f1f3] px-1 text-[10px] font-bold">Regular</span>
-                            ) : null}
-                            {send.customer.new ? (
-                              <span className="ml-1 bg-[#eaf6ee] px-1 text-[10px] font-bold text-[#1d6b3a]">New</span>
-                            ) : null}
-                          </>
-                        ) : detail.sends?.some((x) => x.customer) ? (
-                          <span className="text-[#6b7280]">Not in customer list</span>
-                        ) : null}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">{send.customer?.rounds ?? ""}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{send.customer?.city ?? ""}</td>
-                      {detail.audience?.kind === "weather" ? (
-                        <td className="px-2 py-1.5 whitespace-nowrap">{send.tee_time ?? ""}</td>
-                      ) : null}
-                      <td className="px-2 py-1.5">{SEND_STATUS_LABEL[send.status]}</td>
-                      {detail.replies ? (
-                        <td className="px-2 py-1.5 font-bold whitespace-nowrap text-[#1d6b3a]">
-                          {(send.replied ?? []).map((key) => REPLY_LABEL[key]).join(" · ")}
-                        </td>
-                      ) : null}
-                      <td className="max-w-[16rem] truncate px-2 py-1.5 text-[#6b7280]" title={send.error ?? ""}>
-                        {send.optout ? (
-                          <span className={`mr-1 font-bold ${send.optout.after_send ? "text-[#8c1d1d]" : ""}`}>
-                            <span>{send.optout.after_send ? "Opted out after this" : "Opted out"}</span>
-                            {" · "}
-                            <span>{OPTOUT_SOURCE_LABEL[send.optout.source] ?? send.optout.source}</span>
-                            {` · ${clubTime(send.optout.created_at)}`}
-                          </span>
-                        ) : null}
-                        {send.error && !(send.optout && send.error === "opted out") ? send.error : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Recipients campaign={detail} key={detail.id} />
             {detail.channel === "call" ? (
               <p className="mt-2 text-xs text-[#6b7280]">
                 Call recordings and transcripts are in the admin Calls &amp; SMS page.
@@ -1032,6 +972,149 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * 받은 사람 표 — 번호(또는 이름) 찾기와 보기 필터. 필터 목록은 그 캠페인에 해당하는 사람이 있는 것만,
+ * 연락 옴(0133)·고객 구분은 그 값이 있을 때만 보인다.
+ */
+function Recipients({ campaign }: { campaign: Campaign }) {
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState<SendView>("all");
+  const sends = useMemo(() => campaign.sends ?? [], [campaign.sends]);
+  const views = useMemo(() => {
+    const options: [SendView, string][] = [
+      ["all", "Everyone"],
+      ["reached", "Sent / delivered"],
+      ["not_reached", "Failed / skipped"],
+      ["waiting", "Waiting"],
+    ];
+    if (campaign.replies) options.push(["contacted", "Contacted us"], ["no_contact", "No contact yet"]);
+    options.push(["opted_out", "Opted out"]);
+    if (sends.some((s) => s.customer)) {
+      options.push(["member", "Members"], ["public", "Public"], ["not_in_list", "Not in customer list"]);
+    }
+    return options
+      .map(([id, label]) => ({ id, label, count: sends.filter((s) => sendInView(s, id)).length }))
+      .filter((o) => o.id === "all" || o.id === view || o.count > 0);
+  }, [campaign.replies, sends, view]);
+  const shown = useMemo(
+    () => sends.filter((s) => sendInView(s, view) && sendMatches(s, query)),
+    [sends, view, query],
+  );
+  const filtered = view !== "all" || query.trim() !== "";
+
+  return (
+    <>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <input
+          aria-label="Find a number or name"
+          className="h-9 w-full max-w-xs border border-[#d4d4d8] px-3 text-sm"
+          inputMode="search"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find a number or name"
+          type="search"
+          value={query}
+        />
+        <label className="flex items-center gap-1">
+          <span className="font-bold">Show</span>
+          <select
+            className="h-9 border border-[#d4d4d8] bg-white px-2 text-sm"
+            onChange={(event) => setView(event.target.value as SendView)}
+            value={view}
+          >
+            {views.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label} ({o.count})
+              </option>
+            ))}
+          </select>
+        </label>
+        {filtered ? (
+          <>
+            <span className="text-[#6b7280]">{`Showing ${shown.length} of ${sends.length}`}</span>
+            <button
+              className="border border-[#cfd2d8] bg-white px-2 py-1 font-bold"
+              onClick={() => {
+                setQuery("");
+                setView("all");
+              }}
+              type="button"
+            >
+              Clear
+            </button>
+          </>
+        ) : null}
+      </div>
+      <div className="mt-3 max-h-[60vh] overflow-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="sticky top-0 bg-white">
+            <tr className="border-b border-[#d4d4d8]">
+              <th className="px-2 py-1.5">Name</th>
+              <th className="px-2 py-1.5">Phone</th>
+              <th className="px-2 py-1.5">Type</th>
+              <th className="px-2 py-1.5 text-right">Rounds</th>
+              <th className="px-2 py-1.5">City</th>
+              {campaign.audience?.kind === "weather" ? <th className="px-2 py-1.5">Tee time</th> : null}
+              <th className="px-2 py-1.5">Status</th>
+              {campaign.replies ? <th className="px-2 py-1.5">Contacted us</th> : null}
+              <th className="px-2 py-1.5">Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((send) => (
+              <tr className="border-b border-[#f0f0f2]" key={send.id}>
+                <td className="px-2 py-1.5 font-bold">{send.name}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(send.phone)}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap">
+                  {send.customer ? (
+                    <>
+                      <span className={send.customer.is_member ? "font-bold text-[#4533ff]" : ""}>
+                        {send.customer.is_member ? "Member" : "Public"}
+                      </span>
+                      {send.customer.rounds >= 5 ? (
+                        <span className="ml-1 bg-[#f0f1f3] px-1 text-[10px] font-bold">Regular</span>
+                      ) : null}
+                      {send.customer.new ? (
+                        <span className="ml-1 bg-[#eaf6ee] px-1 text-[10px] font-bold text-[#1d6b3a]">New</span>
+                      ) : null}
+                    </>
+                  ) : campaign.sends?.some((x) => x.customer) ? (
+                    <span className="text-[#6b7280]">Not in customer list</span>
+                  ) : null}
+                </td>
+                <td className="px-2 py-1.5 text-right">{send.customer?.rounds ?? ""}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap">{send.customer?.city ?? ""}</td>
+                {campaign.audience?.kind === "weather" ? (
+                  <td className="px-2 py-1.5 whitespace-nowrap">{send.tee_time ?? ""}</td>
+                ) : null}
+                <td className="px-2 py-1.5">{SEND_STATUS_LABEL[send.status]}</td>
+                {campaign.replies ? (
+                  <td className="px-2 py-1.5 font-bold whitespace-nowrap text-[#1d6b3a]">
+                    {(send.replied ?? []).map((key) => REPLY_LABEL[key]).join(" · ")}
+                  </td>
+                ) : null}
+                <td className="max-w-[16rem] truncate px-2 py-1.5 text-[#6b7280]" title={send.error ?? ""}>
+                  {send.optout ? (
+                    <span className={`mr-1 font-bold ${send.optout.after_send ? "text-[#8c1d1d]" : ""}`}>
+                      <span>{send.optout.after_send ? "Opted out after this" : "Opted out"}</span>
+                      {" · "}
+                      <span>{OPTOUT_SOURCE_LABEL[send.optout.source] ?? send.optout.source}</span>
+                      {` · ${clubTime(send.optout.created_at)}`}
+                    </span>
+                  ) : null}
+                  {send.error && !(send.optout && send.error === "opted out") ? send.error : ""}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {filtered && !shown.length ? (
+        <p className="px-2 py-4 text-center text-xs text-[#6b7280]">No one matches.</p>
+      ) : null}
+    </>
   );
 }
 

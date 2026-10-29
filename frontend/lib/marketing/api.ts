@@ -285,6 +285,59 @@ export function summarizeRecipients(sends: CampaignSend[]) {
   };
 }
 
+/** 캠페인 상세 받은 사람 표의 보기 필터. */
+export type SendView =
+  | "all"
+  | "reached"
+  | "not_reached"
+  | "waiting"
+  | "contacted"
+  | "no_contact"
+  | "opted_out"
+  | "member"
+  | "public"
+  | "not_in_list";
+
+const REACHED = new Set<SendStatus>(["sent", "delivered"]);
+const NOT_REACHED = new Set<SendStatus>(["failed", "skipped", "cancelled"]);
+
+export function sendInView(send: CampaignSend, view: SendView): boolean {
+  switch (view) {
+    case "all":
+      return true;
+    case "reached":
+      return REACHED.has(send.status);
+    case "not_reached":
+      return NOT_REACHED.has(send.status);
+    case "waiting":
+      return send.status === "queued" || send.status === "sending";
+    case "contacted":
+      return (send.replied ?? []).length > 0;
+    case "no_contact":
+      return REACHED.has(send.status) && !(send.replied ?? []).length;
+    case "opted_out":
+      return Boolean(send.optout);
+    case "member":
+      return Boolean(send.customer?.is_member);
+    case "public":
+      return Boolean(send.customer && !send.customer.is_member);
+    case "not_in_list":
+      return !send.customer;
+  }
+}
+
+/**
+ * 번호 찾기 — 숫자가 있으면 전화번호 숫자에서(앞의 1 은 없어도 찾는다), 아니면 이름에서 찾는다.
+ * "905 555" 처럼 띄어 써도 숫자만 이어 본다.
+ */
+export function sendMatches(send: CampaignSend, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const digits = q.replace(/\D/g, "");
+  if (digits && send.phone.replace(/\D/g, "").includes(digits)) return true;
+  return (send.name ?? "").toLowerCase().includes(q);
+}
+
 export type AudienceFact = { label: string; value: string; hint?: string };
 
 /** 캠페인을 누구에게 보냈는지 — 칸 이름과 값. 예: Group: Members · Rounds: 5+ · City: Fonthill. */
