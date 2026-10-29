@@ -37,7 +37,7 @@ import {
 } from "@/lib/pos/api";
 import { cashierForCode, isShiftCode } from "@/lib/pos/cashierCode";
 import { billActions, getBillState, rememberCashier, useCurrentBill } from "@/lib/pos/currentBill";
-import { couponBookApi, type BillCoupon } from "@/lib/pos/couponBook";
+import { couponBookApi, ROUNDS_PER_GIFT, type BillCoupon } from "@/lib/pos/couponBook";
 import { promoApi, promoDiscountLabel, type BillPromo } from "@/lib/pos/promo";
 import {
   describeTerminalResult,
@@ -1127,9 +1127,11 @@ function PromoRow({ bill, station }: { bill: Bill; station: BillStation }) {
 /**
  * 계산서 그린피 선수의 GPS 쿠폰북. 도장 10개로 무료가 생긴 선수는 "Use free round" 로 그 그린피를 0 으로 만든다
  * (카트·추가 항목은 그대로). 앱에 가입하지 않은 선수는 보이지 않는다.
+ * 라운드 100번마다 기념품(0138): "Souvenir due" 줄에서 건네고 "Gave souvenir" — 계산서 금액은 그대로다.
  */
 function CouponBookRows({ bill, station }: { bill: Bill; station: BillStation }) {
   const [coupons, setCoupons] = useState<BillCoupon[]>([]);
+  const [giftError, setGiftError] = useState("");
   const tee = bill.lines
     .filter((line) => line.kind === "tee_player")
     .map((line) => line.id)
@@ -1154,11 +1156,59 @@ function CouponBookRows({ bill, station }: { bill: Bill; station: BillStation })
     };
   }, [bill.id, bill.total, tee]);
 
-  // 회원은 도장이 없다(GPS 0026). 회원이 되기 전에 모은 무료가 남았을 때만 보인다.
-  const shown = tee ? coupons.filter((c) => c.applied || c.free_left > 0 || !c.is_member) : [];
+  // 기념품은 계산서를 바꾸지 않으므로 billActions 를 거치지 않고, 서버가 돌려준 쿠폰 목록을 그대로 쓴다.
+  const gift = async (line: number, give: boolean) => {
+    setGiftError("");
+    try {
+      setCoupons((await (give ? couponBookApi.giveGift : couponBookApi.undoGift)(bill.id, line)) ?? []);
+    } catch (error) {
+      setGiftError(error instanceof Error ? error.message : "Could not save the souvenir.");
+    }
+  };
+
+  // 회원은 도장이 없다(GPS 0026). 회원이 되기 전에 모은 무료·기념품이 남았을 때만 보인다.
+  const shown = tee
+    ? coupons.filter((c) => c.applied || c.free_left > 0 || !c.is_member || (c.gift_due ?? 0) > 0 || c.gift_given)
+    : [];
+  const gifts = shown.filter((c) => (c.gift_due ?? 0) > 0 || c.gift_given);
   if (shown.length === 0) return null;
   return (
     <ul className="mt-2 grid gap-1">
+      {gifts.map((c) =>
+        c.gift_given && !(c.gift_due ?? 0) ? (
+          <li className="flex items-center justify-between gap-2 bg-[#f0eeff] px-2 py-1.5 text-xs" key={`gift-${c.line_id}`}>
+            <span className="min-w-0">
+              <b className="text-[#4533ff]">Souvenir given</b> · {c.name}
+              <span className="block text-[#4e5560]">{c.rounds} rounds · coupon book</span>
+            </span>
+            <button
+              className="shrink-0 border border-[#c7c7cc] bg-white px-2 py-1 font-bold"
+              onClick={() => void gift(c.line_id, false)}
+              type="button"
+            >
+              Undo
+            </button>
+          </li>
+        ) : (
+          <li className="flex items-center justify-between gap-2 bg-[#fde8f0] px-2 py-1.5 text-xs" key={`gift-${c.line_id}`}>
+            <span className="min-w-0">
+              <b className="text-[#b0124f]">🎁 Souvenir due</b> · {c.name}
+              <span className="block text-[#4e5560]">
+                {c.rounds} rounds — hand over a {ROUNDS_PER_GIFT}-round souvenir
+                {(c.gift_due ?? 0) > 1 ? ` (${c.gift_due} due)` : ""}
+              </span>
+            </span>
+            <button
+              className="min-h-9 shrink-0 border border-[#b0124f] bg-[#b0124f] px-2 py-1 font-bold text-white"
+              onClick={() => void gift(c.line_id, true)}
+              type="button"
+            >
+              Gave souvenir
+            </button>
+          </li>
+        ),
+      )}
+      {giftError && <li className="px-2 text-xs text-[#b42318]">{giftError}</li>}
       {shown.map((c) =>
         c.applied ? (
           <li className="flex items-center justify-between gap-2 bg-[#e8f6ee] px-2 py-1.5 text-xs" key={c.line_id}>
@@ -1193,6 +1243,7 @@ function CouponBookRows({ bill, station }: { bill: Bill; station: BillStation })
         ) : (
           <li className="px-2 text-xs text-[#6b7280]" key={c.line_id}>
             {c.name} · coupon book {c.on_card}/10
+            {c.rounds !== undefined && !c.is_member ? ` · ${c.rounds % ROUNDS_PER_GIFT}/${ROUNDS_PER_GIFT} to souvenir` : ""}
           </li>
         ),
       )}
