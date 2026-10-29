@@ -1,4 +1,4 @@
-"""시스템 멈춤 알림(`scripts/uptime_watch.py`)의 판정: 처음 멈춤, 반복, 복구."""
+"""시스템 멈춤 알림(`ops/uptime/uptime_watch.py`)의 판정: 처음 멈춤, 반복, 복구."""
 from __future__ import annotations
 
 import importlib.util
@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
-    "uptime_watch", Path(__file__).resolve().parents[2] / "scripts" / "uptime_watch.py")
+    "uptime_watch", Path(__file__).resolve().parents[2] / "ops" / "uptime" / "uptime_watch.py")
 uw = importlib.util.module_from_spec(_spec)
 sys.modules["uptime_watch"] = uw  # dataclass 가 모듈을 찾는다
 _spec.loader.exec_module(uw)

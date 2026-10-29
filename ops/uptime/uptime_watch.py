@@ -1,24 +1,26 @@
 """**시스템 멈춤 알림** — 앱·서버·DB 가 응답하지 않으면 문자와 이메일을 보낸다.
 
 왜(2026-10-28): 클럽이 시스템이 멈추면 문자와 이메일로 알기를 원했다. 감시하는 쪽이 감시받는
-쪽 안에 있으면 같이 멈추므로, 이 스크립트는 Fly·Vercel·Supabase 어디에도 없이 GitHub Actions
-(`.github/workflows/uptime.yml`)에서 5분마다 돈다. 문자는 Fly 서버를 거치지 않고 Twilio 로 바로,
-이메일은 Gmail SMTP 로 바로 보낸다.
+쪽 안에 있으면 같이 멈추므로, 이 스크립트는 따로 된 Fly 앱 `pelham-hills-uptime`(뉴저지 ewr,
+메인 서버는 토론토 yyz)에서 2분마다 돈다. 문자는 메인 서버를 거치지 않고 Twilio 로 바로,
+이메일은 Gmail SMTP 로 바로 보낸다. (GitHub Actions 로 먼저 만들었으나 계정이 결제 문제로 잠겨
+작업이 시작되지 않았다.)
 
 ## 판정
 - 대상마다 3번 묻는다(15초 간격). 3번 다 실패해야 멈춤이다 — 한 번 끊긴 것으로 깨우지 않는다.
 - 멈춤이 처음 보이면 알림, 계속 멈춰 있으면 `UPTIME_REPEAT_MIN`(기본 60)분마다 다시, 돌아오면 복구 알림.
-- 지난 상태는 `UPTIME_STATE` 파일(JSON)에 둔다. 워크플로가 실행 사이에 캐시로 이어 준다.
+- 지난 상태는 `UPTIME_STATE` 파일(JSON)에 둔다. 감시 앱이 재시작하면 비므로, 그때 멈춰 있던 것은 한 번 더 알린다.
 
-## 설정 (GitHub Actions secrets — `scripts/set_uptime_secrets.sh` 가 Fly 에서 옮겨 준다)
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — Fly 와 같은 값.
-- `UPTIME_SMS_TO` — 문자 받을 번호, 쉼표로(+1905…).
+## 설정 (감시 앱의 Fly secrets — `ops/uptime/set_secrets.sh` 가 메인 서버에서 옮겨 준다)
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — 메인 서버와 같은 값.
+- `UPTIME_SMS_TO` — 문자 받을 번호, 쉼표로(+1905…). 메인 서버의 STAFF_ALERT_NUMBERS 를 옮긴다.
 - `UPTIME_SMTP_USER`, `UPTIME_SMTP_PASSWORD` — 보내는 Gmail 과 앱 비밀번호(영수증 메일과 같은 계정).
 - `UPTIME_EMAIL_TO` — 받는 메일, 쉼표로. 기본 analysis@pelhamhills.ca, jitnet57@gmail.com.
 
-    python scripts/uptime_watch.py           # 한 번 확인하고 필요하면 알린다
-    python scripts/uptime_watch.py --test    # 확인 없이 시험 알림 하나를 보낸다
-    UPTIME_DRY_RUN=1 python scripts/uptime_watch.py   # 보내지 않고 화면에만
+    python ops/uptime/uptime_watch.py              # 한 번 확인하고 필요하면 알린다
+    python ops/uptime/uptime_watch.py --loop 120   # 2분마다 계속(감시 앱이 이렇게 돈다)
+    python ops/uptime/uptime_watch.py --test       # 확인 없이 시험 알림 하나를 보낸다
+    UPTIME_DRY_RUN=1 python ops/uptime/uptime_watch.py   # 보내지 않고 화면에만
 """
 from __future__ import annotations
 
@@ -186,7 +188,7 @@ def notify(lines: list[str]) -> bool:
     else:
         subject = "[Pelham] System back up"
     sms = "Pelham Hills: " + " ".join(lines)
-    email = "\n".join(lines) + "\n\nChecked from GitHub Actions every 5 minutes."
+    email = "\n".join(lines) + "\n\nChecked every 2 minutes by the pelham-hills-uptime watcher."
     if os.getenv("UPTIME_DRY_RUN"):
         print(f"[dry run] {subject}\n{sms}")
         return True
@@ -199,19 +201,31 @@ def notify(lines: list[str]) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--test", action="store_true", help="send one test alert and exit")
+    ap.add_argument("--loop", type=int, metavar="SECONDS", help="keep checking every SECONDS")
     args = ap.parse_args()
     if args.test:
         ok = notify([f"TEST: system alerts are set up ({_clock(datetime.now(timezone.utc))}). No action needed."])
         return 0 if ok else 1
+    if not args.loop:
+        return run_once()
+    while True:
+        started = time.monotonic()
+        try:
+            run_once()
+        except Exception as exc:  # 감시가 죽으면 아무도 모른다. 기록만 하고 계속 돈다.
+            print(f"check failed: {exc!r}", file=sys.stderr)
+        sys.stdout.flush()
+        time.sleep(max(10, args.loop - (time.monotonic() - started)))
 
+
+def run_once() -> int:
     path = Path(os.getenv("UPTIME_STATE", ".uptime/state.json"))
     try:
         state = json.loads(path.read_text())
     except (OSError, ValueError):
         state = {}
     results = {t.key: check(t) for t in TARGETS}
-    for t in TARGETS:
-        print(f"{t.key:4} {results[t.key] or 'ok'}")
+    print(_clock(datetime.now(timezone.utc)), " ".join(f"{k}={v or 'ok'}" for k, v in results.items()))
     lines = decide(state, results, datetime.now(timezone.utc), int(os.getenv("UPTIME_REPEAT_MIN") or 60))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state))

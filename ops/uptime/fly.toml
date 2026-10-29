@@ -1,0 +1,13 @@
+# 시스템 멈춤 감시 앱(`uptime_watch.py`). 메인 서버 pelham-hills-api 와 따로 돈다 — 같이 멈추지 않게
+# 지역도 다르다(메인은 yyz). 공개 포트가 없다. 배포: 저장소 루트에서
+#   fly deploy ops/uptime --remote-only
+# 비밀값은 `sh ops/uptime/set_secrets.sh`.
+app = "pelham-hills-uptime"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
