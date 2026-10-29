@@ -182,3 +182,11 @@ def test_pin_blocks_after_ten_misses(pin):
     state["answer"] = {"name": "Josh Kim"}
     assert client.post(f"{API}/pos/pin-login", json={"code": "1001"}).status_code == 429
 
+
+
+def test_pin_manager_goes_to_email_sign_in(pin):
+    client, state = pin
+    state["answer"] = {"name": "Hwang", "manager": True}
+    response = client.post(f"{API}/pos/pin-login", json={"code": "1001"})
+    assert response.status_code == 403
+    assert state["grants"] == []

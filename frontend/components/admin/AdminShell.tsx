@@ -979,8 +979,20 @@ function GateSplash() {
  */
 function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
   const [mode, setMode] = useState<"pin" | "manager">("pin");
-  if (mode === "pin") return <PinSignInScreen onManager={() => setMode("manager")} onSignedIn={onSignedIn} />;
-  return <ManagerSignInScreen onPin={() => setMode("pin")} onSignedIn={onSignedIn} />;
+  // 숫자판에 친 번호가 pelham-shift 에서 매니저 이상이면 이메일 로그인으로 넘긴다.
+  const [managerNotice, setManagerNotice] = useState("");
+  if (mode === "pin") {
+    return (
+      <PinSignInScreen
+        onManager={(notice) => {
+          setManagerNotice(notice);
+          setMode("manager");
+        }}
+        onSignedIn={onSignedIn}
+      />
+    );
+  }
+  return <ManagerSignInScreen notice={managerNotice} onPin={() => setMode("pin")} onSignedIn={onSignedIn} />;
 }
 
 /** 들어온 직후 잠금 시계를 새로 시작한다 — 어제 마지막으로 손댄 시각 때문에 들어오자마자 잠기지 않게. */
@@ -989,14 +1001,22 @@ function startFresh() {
   setLocked(false);
 }
 
-function PinSignInScreen({ onSignedIn, onManager }: { onSignedIn: () => void; onManager: () => void }) {
+function PinSignInScreen({ onSignedIn, onManager }: { onSignedIn: () => void; onManager: (notice: string) => void }) {
   const submit = useCallback(
     async (code: string) => {
-      await pinSignIn(code);
+      try {
+        await pinSignIn(code);
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 403) {
+          onManager(cause.message);
+          return;
+        }
+        throw cause;
+      }
       startFresh();
       onSignedIn();
     },
-    [onSignedIn],
+    [onSignedIn, onManager],
   );
 
   return (
@@ -1020,7 +1040,7 @@ function PinSignInScreen({ onSignedIn, onManager }: { onSignedIn: () => void; on
 
         <button
           className="mt-3 h-11 w-full border border-[#d4d4d8] bg-white text-sm font-bold text-[#1f2328]"
-          onClick={onManager}
+          onClick={() => onManager("")}
           type="button"
         >
           Manager sign in
@@ -1117,7 +1137,15 @@ function IdleLock({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
-function ManagerSignInScreen({ onSignedIn, onPin }: { onSignedIn: () => void; onPin: () => void }) {
+function ManagerSignInScreen({
+  onSignedIn,
+  onPin,
+  notice,
+}: {
+  onSignedIn: () => void;
+  onPin: () => void;
+  notice: string;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1157,6 +1185,11 @@ function ManagerSignInScreen({ onSignedIn, onPin }: { onSignedIn: () => void; on
 
         <form className="bg-white p-5 shadow-sm" onSubmit={submit}>
           <h1 className="text-base font-bold">Manager sign in</h1>
+          {notice ? (
+            <p className="mt-2 border border-[#c7c2ff] bg-[#f1f0ff] p-2 text-xs leading-5 text-[#2a1fa8]" role="status">
+              {notice}
+            </p>
+          ) : null}
           <p className="mt-1 text-xs leading-5 text-[#6b7280]">
             직원 아이디와 비밀번호로 들어옵니다. 예약 화면을 찾으시나요?{" "}
             <Link className="font-semibold text-[#4533ff] underline" href={SITE_HOME}>

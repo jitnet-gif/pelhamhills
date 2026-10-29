@@ -30,6 +30,8 @@
 첫 화면의 "Manager sign in" 으로 자기 이메일·비밀번호를 친다.
 세션은 비밀번호 없이 service_role 로 받는다(로그인 링크를 만들어 바로 확인) — 그래서 그 계정의 비밀번호는
 Supabase 에만 있고, Supabase 에서 바꿔도 이 서버는 손댈 것이 없다. 계정 주소도 0128 표 한 칸이라 배포 없이 바뀐다.
+매니저 이상인지는 pelham-shift 가 정한다 — 번호 확인 답에 `manager: true`(그쪽 직원 정보의 관리자 표시·관리자 명단)가
+오면 공용 계정 세션을 주지 않고 403 으로 돌려보낸다. 화면이 이메일·비밀번호 로그인으로 넘긴다.
 로그인 전에 열린 창구라 틀린 번호는 주소마다 10분에 10번이면 막는다(기계 메모리 — 재시작하면 풀린다).
 """
 
@@ -255,6 +257,9 @@ def pin_login(body: PinLoginIn, request: Request) -> dict:
         with _misses_lock:
             _recent_misses(ip, time.time()).append(time.time())
         raise HTTPException(status_code=404, detail="No staff member has that ID.")
+
+    if found.get("manager") is True:
+        raise HTTPException(status_code=403, detail="Managers sign in with their email and password.")
 
     email = _pin_email()
     token = _mint_session(email)
