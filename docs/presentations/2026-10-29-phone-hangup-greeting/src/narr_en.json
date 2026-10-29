@@ -1,0 +1,9 @@
+[
+"Today, calls to the club hung up after zero seconds, before the caller heard anything. Twilio error 31921 means the audio link was closed by the other side, which is ElevenLabs.",
+"A call goes through Twilio to the ElevenLabs agent. Twilio had a balance and handed the call over normally. The Fly server is fine too. The problem is that the ElevenLabs agent closed the call within one second.",
+"The cause is the first message. It was a blank called greeting. The website Charlie button sends a value for that blank, but a phone call sends nothing. The agent can't fill the blank, can't greet, and closes the call.",
+"Why did this happen? On October 26, web Charlie and the phone started sharing one agent. To greet differently, the first message became a blank. The phone sentence went into the placeholder default, but placeholders are only for dashboard testing, not real calls. Only the web was tested, so the phone gap was missed. That was my setup mistake.",
+"I connected to the same agent twice. With the greeting value, it greets normally. Without it, it drops right away with the same error ElevenLabs logged. Credits, Fly and Twilio are not the cause.",
+"The fix is simple. Put the phone greeting sentence in the dashboard's first message and publish, and calls work right away. The code now lets the web override it with Charlie's greeting. Order matters: allow the override on the agent first, then deploy the web.",
+"The missing booking text is most likely because the call dropped, so no booking was ever made. The confirmation text only goes out after a booking is confirmed. After the fix, we'll call and book again, and if no text arrives, check the error in the SQL result."
+]

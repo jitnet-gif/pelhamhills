@@ -1,0 +1,53 @@
+/* gift card barcode · amount mocks — admin screen is white paper, so barcodes always sit on white */
+.gc-bc{background:#fff;padding:6px 10px;border:1px solid var(--line)}
+.gc-bc svg{display:block;width:100%;height:44px;fill:#000}
+.gc-bc.sm svg{height:26px}
+.gc-bc.lg svg{height:72px}
+.gc-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.gc-three{grid-template-columns:minmax(0,1fr)}}
+.gc-tile{border:1px solid var(--line);padding:10px;display:grid;gap:8px;align-content:start;font-size:13px}
+.gc-tile.no{border:2px dashed var(--red)}
+.gc-empty{height:40px;display:grid;place-items:center;border:1px dashed var(--line);color:var(--red);font:700 20px var(--mono)}
+.gc-two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px;align-items:start}
+@media (max-width:560px){.gc-two{grid-template-columns:minmax(0,1fr)}}
+.tag.no{background:color-mix(in srgb,var(--red) 14%,var(--panel));color:var(--red)}
+select:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+/* supabase egress deck — bars, meters, lever cards */
+.eg-big{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
+.eg-big b{font:700 40px var(--mono);color:var(--red);font-variant-numeric:tabular-nums}
+.eg-big span{font-size:14px;color:var(--muted)}
+.eg-meter{position:relative;height:22px;border:1px solid var(--line);background:var(--panel)}
+.eg-meter i{position:absolute;inset:0 auto 0 0;background:var(--red)}
+.eg-meter em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.eg-meter small{position:absolute;top:26px;font-size:11px;color:var(--muted);transform:translateX(-50%)}
+.eg-bars{display:grid;gap:6px;margin-top:22px}
+.eg-row{display:grid;grid-template-columns:118px minmax(0,1fr) 72px;gap:8px;align-items:center;font-size:12.5px}
+@media (max-width:560px){.eg-row{grid-template-columns:84px minmax(0,1fr) 60px;font-size:11.5px}}
+.eg-row code{font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eg-track{height:16px;background:var(--bg);border:1px solid var(--line)}
+.eg-track i{display:block;height:100%;background:var(--muted)}
+.eg-row.hot .eg-track i{background:var(--red)}
+.eg-row.good .eg-track i{background:var(--green)}
+.eg-row b{font:700 12px var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.eg-cap{font-size:11px;color:var(--muted)}
+.eg-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.eg-two{grid-template-columns:minmax(0,1fr)}}
+.eg-card{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px;background:var(--panel)}
+.eg-card.no{border:2px solid var(--red)}
+.eg-card.ok{border:2px solid var(--green)}
+.eg-card h4{margin:0;font-size:13px}
+.eg-card pre{margin:0;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:6px;border:1px solid var(--line)}
+.eg-tick{display:flex;gap:3px;flex-wrap:wrap}
+.eg-tick i{width:9px;height:18px;background:var(--red)}
+.eg-tick.ok i{background:var(--green)}
+.eg-tick i.off{background:var(--line)}
+.eg-math{font:700 14px var(--mono);border:1px dashed var(--line);padding:8px;text-align:center}
+.eg-levers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.eg-levers{grid-template-columns:minmax(0,1fr)}}
+.eg-lv{border:1px solid var(--line);background:var(--panel);padding:10px;display:grid;gap:4px;font-size:13px}
+.eg-lv b{font-size:15px}
+.eg-lv small{color:var(--muted)}
+.eg-lv .tag{justify-self:start}
+.eg-lv.pick{border:2px solid var(--green)}
+.eg-check{display:grid;gap:8px}
+.eg-check div{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;border:1px solid var(--line);padding:10px;font-size:14px}

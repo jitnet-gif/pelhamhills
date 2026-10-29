@@ -16,8 +16,8 @@
   "conversation_config": {
     "agent": {
       "language": "en",
-      "_greeting_comment": "웹사이트 Charlie 버튼(CharlieBot.tsx)이 greeting·channel 을 넘긴다. 전화는 아래 기본값을 쓴다.",
-      "first_message": "{{greeting}}",
+      "_greeting_comment": "첫 인사는 전화 문장 그대로. {{greeting}} 으로 두면 전화가 변수 없음으로 바로 끊긴다(2026-10-29). 웹 Charlie 는 first_message override 로 덮는다.",
+      "first_message": "Thanks for calling Pelham Hills Golf Club. I can book a tee time or a simulator bay, take a food order, or help with a cart or course problem. What can I do for you?",
       "dynamic_variables": {
         "dynamic_variable_placeholders": {
           "greeting": "Thanks for calling Pelham Hills Golf Club. I can book a tee time or a simulator bay, take a food order, or help with a cart or course problem. What can I do for you?",

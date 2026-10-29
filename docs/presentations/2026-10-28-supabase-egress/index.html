@@ -1,0 +1,387 @@
+<title>Supabase Egress Cut</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one presenter column — header, scene chips, two-lane stage (picture · key points), dark narration band, player bar */
+:root{
+  --bg:#f3f5f1; --panel:#ffffff; --ink:#1c2420; --muted:#5d6a62; --line:#d6ddd6;
+  --green:#1a7f4b; --green-soft:#dcefe3; --gold:#b7791f; --gold-soft:#f8ecd6; --red:#b4412f;
+  --band:#14201a; --band-ink:#e9f2ec; --band-muted:#9fb5a8;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-size:24px;line-height:1.25;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+.seg{display:inline-flex;border:1px solid var(--line);background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);font:600 13px var(--sans);padding:7px 12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg svg{width:20px;height:20px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 13px var(--sans);padding:6px 10px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip b{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.chip[aria-current="true"]{border-color:var(--green);background:var(--green-soft)}
+.chip[aria-current="true"] b{color:var(--green)}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;min-height:400px}
+@media (max-width:820px){.stage{grid-template-columns:minmax(0,1fr)}}
+.lane{background:var(--panel);border:1px solid var(--line);padding:16px;min-width:0;display:grid;align-content:start;gap:12px}
+.lane h2{margin:0;font-size:19px;line-height:1.3;text-wrap:balance}
+.lane .lt{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pts{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.pts li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start}
+.pts li i{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--green);padding-top:2px}
+.band{background:var(--band);color:var(--band-ink);padding:14px 16px;min-height:96px;display:grid;gap:4px}
+.band .who{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--band-muted)}
+.band p{margin:0;font-size:16px;line-height:1.6}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 14px var(--sans);min-height:44px;min-width:44px;padding:0 14px;cursor:pointer}
+.pbtn.main{background:var(--green);border-color:var(--green);color:#fff;min-width:120px}
+.bar{flex:1 1 160px;height:6px;background:var(--line);position:relative}
+.bar span{position:absolute;inset:0 auto 0 0;background:var(--green);width:0}
+.speed{font:500 13px var(--sans);color:var(--muted)}
+.note{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 6px;background:var(--gold-soft);color:var(--gold)}
+.tag.ok{background:var(--green-soft);color:var(--green)}
+/* scene visuals */
+.mock{border:1px solid var(--line);display:grid}
+.mock .mh{padding:8px 10px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px}
+.mock .mb{padding:10px;display:grid;gap:8px}
+.mta{border:1px solid var(--line);padding:8px;color:var(--muted);font-size:13px;min-height:52px}
+.mbtn{justify-self:start;background:var(--green);color:#fff;font-weight:700;font-size:13px;padding:8px 12px}
+.msec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.msec div{border:1px dashed var(--line);padding:8px;font-size:12px;color:var(--muted)}
+.msec div b{display:block;color:var(--ink);font-size:13px}
+.tw{overflow-x:auto}
+table.hm{border-collapse:separate;border-spacing:3px;width:100%;min-width:460px;font-size:13px;font-variant-numeric:tabular-nums}
+table.hm th{font-size:11px;color:var(--muted);font-weight:700;text-align:center}
+table.hm th.r{text-align:left;color:var(--ink);font-size:13px;white-space:nowrap}
+table.hm td{text-align:center;padding:6px 2px;font-weight:600}
+table.hm td.empty{outline:2px dashed var(--gold);outline-offset:-2px}
+.chart{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:118px minmax(0,1fr) 62px;gap:8px;align-items:center;font-size:13px}
+.row .t{height:16px;background:var(--line)}
+.row .t span{display:block;height:100%;background:var(--green)}
+.row.hl .t span{background:var(--gold)}
+.row .v{text-align:right;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.stack{display:flex;height:34px}
+.stack span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;overflow:hidden;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+.offer{border:1px solid var(--green);background:var(--green-soft);padding:10px;display:grid;gap:4px;font-size:13px}
+.offer b{font-size:14px}
+.code{font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid var(--line);padding:1px 6px}
+.ladder{position:relative;height:210px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);margin:4px 4px 22px 4px}
+.ladder .zone{position:absolute;top:0;bottom:0;background:var(--gold-soft)}
+.ladder .zone em{position:absolute;top:4px;left:6px;font-style:normal;font-size:11px;font-weight:700;color:var(--gold)}
+.ladder .pin{position:absolute;transform:translateX(-50%);display:grid;justify-items:center;gap:2px;font-size:11px;white-space:nowrap}
+.ladder .pin s{display:block;width:10px;height:10px;border-radius:50%;background:var(--green);text-decoration:none}
+.ladder .pin.h s{background:var(--gold)}
+.ladder .tick{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-family:var(--mono)}
+.plan{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.plan{grid-template-columns:minmax(0,1fr)}}
+.plan div{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px}
+.plan h3{margin:0;font-size:14px}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.check{display:grid;gap:8px}
+.check div{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;border:1px solid var(--line);padding:10px;font-size:14px}
+/* gift card barcode · amount mocks — admin screen is white paper, so barcodes always sit on white */
+.gc-bc{background:#fff;padding:6px 10px;border:1px solid var(--line)}
+.gc-bc svg{display:block;width:100%;height:44px;fill:#000}
+.gc-bc.sm svg{height:26px}
+.gc-bc.lg svg{height:72px}
+.gc-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.gc-three{grid-template-columns:minmax(0,1fr)}}
+.gc-tile{border:1px solid var(--line);padding:10px;display:grid;gap:8px;align-content:start;font-size:13px}
+.gc-tile.no{border:2px dashed var(--red)}
+.gc-empty{height:40px;display:grid;place-items:center;border:1px dashed var(--line);color:var(--red);font:700 20px var(--mono)}
+.gc-two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px;align-items:start}
+@media (max-width:560px){.gc-two{grid-template-columns:minmax(0,1fr)}}
+.tag.no{background:color-mix(in srgb,var(--red) 14%,var(--panel));color:var(--red)}
+select:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+/* supabase egress deck — bars, meters, lever cards */
+.eg-big{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
+.eg-big b{font:700 40px var(--mono);color:var(--red);font-variant-numeric:tabular-nums}
+.eg-big span{font-size:14px;color:var(--muted)}
+.eg-meter{position:relative;height:22px;border:1px solid var(--line);background:var(--panel)}
+.eg-meter i{position:absolute;inset:0 auto 0 0;background:var(--red)}
+.eg-meter em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.eg-meter small{position:absolute;top:26px;font-size:11px;color:var(--muted);transform:translateX(-50%)}
+.eg-bars{display:grid;gap:6px;margin-top:22px}
+.eg-row{display:grid;grid-template-columns:118px minmax(0,1fr) 72px;gap:8px;align-items:center;font-size:12.5px}
+@media (max-width:560px){.eg-row{grid-template-columns:84px minmax(0,1fr) 60px;font-size:11.5px}}
+.eg-row code{font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eg-track{height:16px;background:var(--bg);border:1px solid var(--line)}
+.eg-track i{display:block;height:100%;background:var(--muted)}
+.eg-row.hot .eg-track i{background:var(--red)}
+.eg-row.good .eg-track i{background:var(--green)}
+.eg-row b{font:700 12px var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.eg-cap{font-size:11px;color:var(--muted)}
+.eg-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:560px){.eg-two{grid-template-columns:minmax(0,1fr)}}
+.eg-card{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px;background:var(--panel)}
+.eg-card.no{border:2px solid var(--red)}
+.eg-card.ok{border:2px solid var(--green)}
+.eg-card h4{margin:0;font-size:13px}
+.eg-card pre{margin:0;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:6px;border:1px solid var(--line)}
+.eg-tick{display:flex;gap:3px;flex-wrap:wrap}
+.eg-tick i{width:9px;height:18px;background:var(--red)}
+.eg-tick.ok i{background:var(--green)}
+.eg-tick i.off{background:var(--line)}
+.eg-math{font:700 14px var(--mono);border:1px dashed var(--line);padding:8px;text-align:center}
+.eg-levers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.eg-levers{grid-template-columns:minmax(0,1fr)}}
+.eg-lv{border:1px solid var(--line);background:var(--panel);padding:10px;display:grid;gap:4px;font-size:13px}
+.eg-lv b{font-size:15px}
+.eg-lv small{color:var(--muted)}
+.eg-lv .tag{justify-self:start}
+.eg-lv.pick{border:2px solid var(--green)}
+.eg-check{display:grid;gap:8px}
+.eg-check div{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;border:1px solid var(--line);padding:10px;font-size:14px}
+@media (prefers-reduced-motion:no-preference){.lane{animation:in .35s ease both}@keyframes in{from{transform:translateY(6px)}to{transform:none}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="title"></h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Language">
+      <button id="lang-ko" type="button" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">가</text></svg>한국어</button>
+      <button id="lang-en" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">Aa</text></svg>English</button>
+    </div>
+  </header>
+  <nav class="chips" id="chips" aria-label="Scenes"></nav>
+  <section class="stage" id="stage"></section>
+  <section class="band" aria-live="polite"><div class="who" id="who"></div><p id="narr"></p></section>
+  <div class="player">
+    <button class="pbtn" id="prev" type="button" aria-label="Previous">◀</button>
+    <button class="pbtn main" id="play" type="button"></button>
+    <button class="pbtn" id="next" type="button" aria-label="Next">▶</button>
+    <div class="bar" aria-hidden="true"><span id="prog"></span></div>
+    <label class="speed"><span id="speedL"></span>
+      <select id="speed"><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.2">1.2×</option><option value="1.4">1.4×</option></select>
+    </label>
+  </div>
+  <p class="note" id="foot"></p>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script>
+const NARR = {"ko": ["먼저 현황입니다. 이번 달 한도를 넘긴 건 저장량이 아니라 전송량, 즉 Egress 입니다. 무료 한도 5기가의 두 배가 넘는 11.45기가가 나갔습니다. 데이터베이스는 112메가로 여유가 있습니다. 10월 18일부터 갑자기 늘어 23일에는 하루 2.27기가까지 나갔고, 오늘 Pro 로 결제해서 차단은 풀렸습니다.", "어디서 나갔는지 API 기록을 보니 하나가 압도적입니다. 직원 티 시트 화면이 예약 목록을 하루 19,186번 읽었습니다. 다른 것들은 수백에서 수천 번이고, 대부분 비어 있는 응답이라 크기가 작습니다. 호출 수와 전송량이 같이 오르내려서, 한 번에 약 100킬로바이트씩 내려받는 것으로 봅니다.", "코드를 열어 보니 이유가 바로 보입니다. 티 시트는 5초마다 이번 주 7일치 예약을 통째로 다시 읽습니다. 바뀐 게 없어도 1분에 열두 번입니다. 10월 21일에 넣은 비교 시트를 열면 두 배가 되고, PC 와 탭마다 따로 돕니다. 화면 하나를 열두 시간 켜 두면 하루 약 0.86기가입니다.", "줄이는 손잡이는 네 가지입니다. 덜 자주 읽기, 바뀐 것만 받기, 덜 많이 받기, 그리고 서버가 밀어주기입니다. 추천은 첫째와 둘째를 함께 하는 것입니다. 하루 안에 끝나는 크기이고 효과가 가장 큽니다. 나머지 둘은 그래도 부족할 때 꺼냅니다.", "1단계는 덜 자주 읽기입니다. 5초를 30초로 늘리고, 2분 동안 손을 안 대면 60초로 늦춥니다. 내가 저장하거나 결제하면 내 화면은 지금처럼 바로 새로 읽습니다. 다른 PC 나 전화, 웹 예약만 최대 30초 늦게 보입니다. 이것만으로 약 83퍼센트가 줄어듭니다.", "2단계는 바뀌었을 때만 통째로 받는 방법입니다. 5초마다 예약 수와 마지막 수정 시각만 담은 아주 작은 변경 도장을 묻고, 도장이 달라졌을 때만 일주일치를 내려받습니다. 홀드는 시간이 지나면 저절로 사라지니 만료 시각도 도장에 넣습니다. 반응 속도는 그대로이고, 1단계와 합치면 98퍼센트 이상 줄어듭니다.", "함께 손볼 곳도 있습니다. 비교 시트가 왼쪽과 같은 주를 보면 결과를 나눠 쓰고, 스타터 화면에도 같은 도장을 씁니다. Fly 서버 워커들은 1분 간격에 응답이 거의 비어 있어서 그대로 둡니다. 지출 상한은 켜 두고, 일주일에 한 번 사용량 화면을 확인합니다.", "정리하면, 최고일 기준 하루 2.27기가가 1단계만으로 0.38기가, 두 단계를 합치면 약 0.04기가로 줄어듭니다. 추정치이지만 무료 한도 안으로도 돌아올 수 있는 수준입니다. 결제와 원인 찾기는 끝났고, 진행을 승인해 주시면 코드와 SQL 한 개를 준비하겠습니다."], "en": ["First, where we stand. What went over the limit this month isn't storage, it's transfer, called egress. 11.45 gigabytes went out, more than twice the free 5 gigabyte limit. The database is only 112 megabytes. It jumped from October 18th, peaked at 2.27 gigabytes on the 23rd, and paying for Pro today lifted the block.", "The API logs show one clear culprit. The staff tee sheet read the booking list 19,186 times in a day. Everything else is hundreds to a few thousand calls, mostly empty replies. Calls and egress rise and fall together, so each read is about 100 kilobytes.", "The code shows why. Every 5 seconds the tee sheet re-reads a whole week of bookings, twelve times a minute, even when nothing changed. Opening the second sheet added on October 21st doubles it, and every PC and tab polls on its own. One screen open for twelve hours is about 0.86 gigabytes a day.", "There are four levers: read less often, fetch only on change, fetch less data, and let the server push. The recommendation is the first two together. It's a one-day job with the biggest effect. The other two are for later, only if needed.", "Step one: read less often. Go from 5 seconds to 30, and slow to 60 when nobody has touched the screen for two minutes. Your own save or payment still refreshes your screen right away. Only other PCs, phone and web bookings show up to 30 seconds later. That alone cuts about 83 percent.", "Step two: full reload only on change. Every 5 seconds, ask for a tiny change stamp with the booking count and the latest edit time, and download the week only when the stamp changes. Holds expire on their own, so the stamp includes the earliest expiry too. It feels just as fast, and with step one it cuts 98 percent or more.", "A few related spots. If the second sheet shows the same week as the left, share the result, and the starter screen gets the same stamp. The Fly server workers poll once a minute with near-empty replies, so leave them. Keep the spend cap on, and check the usage page once a week.", "In short, the peak day's 2.27 gigabytes drops to 0.38 with step one, and to about 0.04 with both. These are estimates, but low enough to fit even the free limit again. Payment and diagnosis are done. With your OK, I'll prepare the code and one SQL file."]};
+const DUR = {"ko": [22.83, 20.66, 21.21, 18.16, 18.76, 21.97, 17.03, 20.56], "en": [21.81, 17.14, 18.1, 14.47, 19.3, 20.92, 15.73, 18.0]};
+let LANG = "ko";
+try { const s = localStorage.getItem("pelham-deck-lang"); if (s === "en" || s === "ko") LANG = s; } catch (e) {}
+const T = (o) => (typeof o === "string" ? o : o[LANG]);
+
+const UI = {
+  eyebrow: { ko: "Supabase · 전송량(Egress)", en: "Supabase · Egress" },
+  title: { ko: "Supabase 전송량 폭증, 줄이는 전략", en: "Supabase egress spike: how to cut it" },
+  sub: { ko: "2026-10-28 · 사용량 화면 + API 로그 + 티 시트 코드로 확인 · 아직 코드는 안 바꿈", en: "2026-10-28 · from the Usage page, API logs and tee sheet code · no code changed yet" },
+  play: { ko: "▶ 재생", en: "▶ Play" }, pause: { ko: "❚❚ 멈춤", en: "❚❚ Pause" },
+  speed: { ko: "속도", en: "Speed" }, pitch: { ko: "피치", en: "Pitch" },
+  who: { ko: "나레이션 · Hope (ElevenLabs)", en: "Narration · Hope (ElevenLabs)" },
+  pic: { ko: "화면", en: "Picture" }, keys: { ko: "핵심", en: "Key points" },
+  keyhint: { ko: "한/영 키 또는 L: 언어 · ←/→: 장면 · 스페이스: 재생", en: "Han/Eng key or L: language · ←/→: scene · Space: play" },
+  nopitch: { ko: "이 브라우저에서는 피치를 바꿀 수 없습니다", en: "Pitch can't be changed in this browser" },
+  foot: { ko: "호출 수는 Supabase API 로그(최근 7일)에서, 1회당 약 100 KB 는 호출 수와 Egress 를 맞대어 낸 추정입니다. 효과 수치도 추정입니다.",
+          en: "Call counts come from Supabase API logs (last 7 days); ~100 KB per call is estimated by matching calls to egress. Savings are estimates too." },
+};
+
+const row = (label, val, max, txt, cls) =>
+  `<div class="eg-row ${cls || ""}"><code>${label}</code><div class="eg-track"><i style="width:${Math.max(1, Math.round((val / max) * 100))}%"></i></div><b>${txt}</b></div>`;
+const ticks = (n, on, ok) => `<div class="eg-tick ${ok ? "ok" : ""}">${Array.from({ length: n }, (_, k) => `<i class="${k < on ? "" : "off"}"></i>`).join("")}</div>`;
+
+const S = [
+  { n: { ko: "현황", en: "Now" },
+    h: { ko: "한도의 2.3배 — 저장량이 아니라 전송량", en: "2.3× the limit — transfer, not storage" },
+    pic: () => `<div class="eg-big"><b>11.45 GB</b><span>${T({ ko: "Egress · 10/7–11/7 · Free 한도 5 GB", en: "Egress · Oct 7–Nov 7 · Free limit 5 GB" })}</span></div>
+      <div class="eg-meter"><i style="width:100%"></i><em style="left:43.7%"></em><small style="left:43.7%">5 GB</small></div>
+      <div class="eg-bars">
+        <div class="eg-cap">${T({ ko: "하루 Egress (사용량 그래프에서 읽은 날)", en: "Daily egress (days read off the usage graph)" })}</div>
+        ${row("10/17", 0.01, 2.27, "≈0")}
+        ${row("10/20", 0.72, 2.27, "0.72 GB")}
+        ${row("10/23", 2.27, 2.27, "2.27 GB", "hot")}
+        ${row("10/27", 0.48, 2.27, "0.48 GB")}
+      </div>`,
+    pts: [
+      { ko: "DB 크기 112 MB(22%) · 저장소 0 — <b>저장은 문제 아님</b>", en: "DB 112 MB (22%) · storage 0 — <b>storage is fine</b>" },
+      { ko: "10/18부터 급증, 최고 10/23 하루 2.27 GB", en: "Jumped from Oct 18, peak 2.27 GB on Oct 23" },
+      { ko: "10/28 Pro 결제($28.25) → 차단 풀림, 월 250 GB", en: "Paid Pro on Oct 28 ($28.25) → unblocked, 250 GB/month" },
+    ] },
+  { n: { ko: "범인", en: "Culprit" },
+    h: { ko: "직원 티 시트가 예약을 하루 19,186번 읽었다", en: "The staff tee sheet read bookings 19,186 times a day" },
+    pic: () => `<div class="eg-bars" style="margin-top:0">
+        <div class="eg-cap">${T({ ko: "10/23 API 호출 수 (최고일)", en: "API calls on Oct 23 (peak day)" })}</div>
+        ${row("staff_bookings", 19186, 19186, "19,186", "hot")}
+        ${row("tee_bookings", 2854, 19186, "2,854")}
+        ${row("payment_texts", 1451, 19186, "1,451")}
+        ${row("tee_waitlist", 1427, 19186, "1,427")}
+        ${row("booking_texts", 1416, 19186, "1,416")}
+        ${row("staff_slots", 805, 19186, "805")}
+        ${row("lost_items", 770, 19186, "770")}
+      </div>`,
+    pts: [
+      { ko: "<span class=\"code\">pelham_staff_bookings</span> · Chrome(직원 화면)", en: "<span class=\"code\">pelham_staff_bookings</span> · Chrome (staff screen)" },
+      { ko: "호출 수와 Egress 가 같이 오르내림 → 1회 약 100 KB", en: "Calls and egress move together → ~100 KB per call" },
+      { ko: "나머지(Fly 서버 1분 폴링)는 응답이 거의 비어 작음", en: "The rest (Fly server, 1-min polls) return almost nothing" },
+    ] },
+  { n: { ko: "이유", en: "Why" },
+    h: { ko: "5초마다 일주일치 예약을 통째로", en: "A whole week of bookings, every 5 seconds" },
+    pic: () => `<div class="eg-two">
+      <div class="eg-card no"><h4>/teesheet · useTeeSheet({ live: true })</h4><pre>POLL_INTERVAL_MS = 5000
+listBookings({ from: anchor,
+  to: addDays(anchor, 6) })   // 7${T({ ko: "일", en: " days" })}</pre>
+        <span>${T({ ko: "1분에 12번 — 바뀐 게 없어도", en: "12 times a minute — even with no change" })}</span>${ticks(12, 12)}</div>
+      <div class="eg-card"><h4>${T({ ko: "곱해지는 것", en: "What multiplies it" })}</h4>
+        <span>➕ ${T({ ko: "비교 시트(10/21 추가)를 열면 폴링 <b>2배</b>", en: "Second sheet (added Oct 21) <b>doubles</b> the polling" })}</span>
+        <span>➕ ${T({ ko: "PC·탭마다 따로", en: "Each PC and tab polls on its own" })}</span>
+        <span>➕ ${T({ ko: "예약이 쌓일수록 한 번 크기↑", en: "More bookings → bigger each time" })}</span>
+        <span>✓ ${T({ ko: "탭을 숨기면 멈춤 — 하지만 프런트 PC는 늘 켜져 있음", en: "Pauses when the tab is hidden — but the front PC is always on it" })}</span></div>
+    </div>
+    <div class="eg-math">${T({ ko: "화면 1개 × 12시간 = 8,640회 × 100 KB ≈ 0.86 GB/일", en: "1 screen × 12 h = 8,640 calls × 100 KB ≈ 0.86 GB/day" })}</div>`,
+    pts: [
+      { ko: "<span class=\"code\">frontend/hooks/useTeeSheet.ts</span> · 9/30부터 5초", en: "<span class=\"code\">frontend/hooks/useTeeSheet.ts</span> · 5 s since Sep 30" },
+      { ko: "19,186회 ≈ 화면 2개가 하루 종일 열린 셈", en: "19,186 calls ≈ two screens open all day" },
+    ] },
+  { n: { ko: "전략", en: "Levers" },
+    h: { ko: "줄이는 손잡이 넷", en: "Four levers" },
+    pic: () => `<div class="eg-levers">
+      <div class="eg-lv pick"><span class="tag ok">${T({ ko: "1단계", en: "Step 1" })}</span><b>${T({ ko: "① 덜 자주", en: "① Less often" })}</b><small>${T({ ko: "5초 → 30초, 손 안 대면 60초", en: "5 s → 30 s, 60 s when idle" })}</small><span>${T({ ko: "효과 큼 · 작업 아주 작음", en: "Big effect · tiny change" })}</span></div>
+      <div class="eg-lv pick"><span class="tag ok">${T({ ko: "2단계", en: "Step 2" })}</span><b>${T({ ko: "② 바뀐 것만", en: "② Only on change" })}</b><small>${T({ ko: "작은 \"변경 도장\"을 먼저 묻기", en: "Ask for a tiny \"change stamp\" first" })}</small><span>${T({ ko: "효과 가장 큼 · SQL 1개 + 화면", en: "Biggest effect · 1 SQL + screen" })}</span></div>
+      <div class="eg-lv"><span class="tag">${T({ ko: "선택", en: "Optional" })}</span><b>${T({ ko: "③ 덜 많이", en: "③ Less data" })}</b><small>${T({ ko: "보이는 날만 · 격자에 쓰는 칸만", en: "Visible day only · only grid fields" })}</small><span>${T({ ko: "효과 중간 · 화면 여러 곳 손봄", en: "Medium effect · touches several screens" })}</span></div>
+      <div class="eg-lv"><span class="tag">${T({ ko: "나중", en: "Later" })}</span><b>${T({ ko: "④ 밀어주기", en: "④ Push" })}</b><small>${T({ ko: "Supabase Realtime 으로 바뀔 때만 알림", en: "Supabase Realtime notifies only on change" })}</small><span>${T({ ko: "폴링 0 · 연결·인증 작업 큼", en: "Zero polling · big connection/auth work" })}</span></div>
+    </div>`,
+    pts: [
+      { ko: "추천: <b>①+②를 함께</b> — 하루 안에 끝나는 크기", en: "Recommended: <b>① + ② together</b> — a one-day job" },
+      { ko: "③④는 ①②로 부족할 때만", en: "③ ④ only if ① ② aren't enough" },
+    ] },
+  { n: { ko: "1단계", en: "Step 1" },
+    h: { ko: "덜 자주 읽기", en: "Read less often" },
+    pic: () => `<div class="eg-two">
+      <div class="eg-card no"><h4>${T({ ko: "지금 · 1분", en: "Now · 1 minute" })}</h4>${ticks(12, 12)}<span>${T({ ko: "12번", en: "12 calls" })}</span></div>
+      <div class="eg-card ok"><h4>${T({ ko: "바꾼 뒤 · 1분", en: "After · 1 minute" })}</h4>${ticks(12, 2, true)}<span>${T({ ko: "2번 (손 안 대면 1번)", en: "2 calls (1 when idle)" })}</span></div>
+    </div>
+    <div class="eg-card"><h4>${T({ ko: "그대로 빠른 것", en: "Still instant" })}</h4>
+      <span>✓ ${T({ ko: "내가 저장·결제하면 내 화면은 바로 다시 읽음(이미 있는 pollNow)", en: "My own save or payment refreshes my screen right away (existing pollNow)" })}</span>
+      <span>✓ ${T({ ko: "탭으로 돌아오면 바로 읽음", en: "Coming back to the tab reads immediately" })}</span>
+      <span>△ ${T({ ko: "다른 PC·전화·웹 예약은 최대 30초 늦게 보임", en: "Other PCs, phone and web bookings show up to 30 s later" })}</span></div>`,
+    pts: [
+      { ko: "숫자 하나 + 손 안 댐 감지 — 화면 1곳", en: "One number + idle detection — one file" },
+      { ko: "예상 <b>약 −83%</b> (2.27 → 0.38 GB/일)", en: "Expected <b>about −83%</b> (2.27 → 0.38 GB/day)" },
+    ] },
+  { n: { ko: "2단계", en: "Step 2" },
+    h: { ko: "바뀌었을 때만 통째로", en: "Full reload only when something changed" },
+    pic: () => `<div class="eg-two">
+      <div class="eg-card"><h4>${T({ ko: "5초마다 — 작은 질문", en: "Every 5 s — a tiny question" })}</h4><pre>pelham_staff_bookings_stamp(from, to)
+→ { "n": 214,
+    "at": "2026-10-28T14:02:11Z" }
+≈ 0.1 KB</pre></div>
+      <div class="eg-card ok"><h4>${T({ ko: "도장이 바뀐 때만", en: "Only when the stamp changes" })}</h4><pre>pelham_staff_bookings(from, to)
+→ [ …${T({ ko: "일주일치", en: "a week" })}… ]
+≈ 100 KB</pre></div>
+    </div>
+    <div class="eg-card"><h4>${T({ ko: "도장에 넣을 것", en: "What goes in the stamp" })}</h4>
+      <span>${T({ ko: "예약 수 · 가장 늦은 updated_at · 가장 이른 홀드 만료 시각", en: "Booking count · latest updated_at · earliest hold expiry" })}</span>
+      <span class="eg-cap">${T({ ko: "홀드는 시간이 지나면 저절로 사라지므로 만료 시각도 넣어야 놓치지 않음", en: "Holds vanish on their own as time passes, so the expiry time must be in it too" })}</span></div>`,
+    pts: [
+      { ko: "5초 반응은 그대로, 내려받는 양만 줄어듦", en: "Keeps the 5-second feel, only the download shrinks" },
+      { ko: "새 SQL 1개(읽기 전용 함수) + useTeeSheet 수정", en: "One new SQL (read-only function) + useTeeSheet change" },
+      { ko: "①과 함께면 예상 <b>−98% 이상</b>", en: "With ①, expected <b>−98% or more</b>" },
+    ] },
+  { n: { ko: "그 밖", en: "Others" },
+    h: { ko: "같이 보면 좋은 곳, 손대지 않을 곳", en: "Worth a look, and what to leave alone" },
+    pic: () => `<div class="eg-check">
+      <div><span class="tag ok">${T({ ko: "같이", en: "With it" })}</span><span>${T({ ko: "비교 시트: 왼쪽과 같은 주면 왼쪽 결과를 나눠 쓰기(두 번 안 읽기)", en: "Second sheet: if it shows the same week as the left, share the left's result (no double read)" })}</span></div>
+      <div><span class="tag ok">${T({ ko: "같이", en: "With it" })}</span><span>${T({ ko: "스타터 화면(15초 폴링)·시작 시 60일치 읽기도 같은 도장 적용", en: "Starter screen (15 s poll) and its 60-day read get the same stamp" })}</span></div>
+      <div><span class="tag">${T({ ko: "그대로", en: "Leave" })}</span><span>${T({ ko: "Fly 서버 워커(문자·대기자·분실물) 1분 폴링 — 응답이 거의 비어 작음", en: "Fly workers (texts, waitlist, lost items) 1-min polls — near-empty responses" })}</span></div>
+      <div><span class="tag">${T({ ko: "감시", en: "Watch" })}</span><span>${T({ ko: "Spend cap 켜 둠 · 주 1회 Usage 의 Egress 확인", en: "Keep spend cap on · check Usage → Egress weekly" })}</span></div>
+    </div>`,
+    pts: [
+      { ko: "가장 큰 한 곳(티 시트)만 고쳐도 대부분 해결", en: "Fixing the one big spot (tee sheet) solves most of it" },
+      { ko: "Pro 250 GB 로도 지금 여유는 있음 — 서두를 일은 아님", en: "Pro's 250 GB already leaves room — not an emergency" },
+    ] },
+  { n: { ko: "효과", en: "Result" },
+    h: { ko: "하루 2.27 GB → 약 0.04 GB (추정)", en: "2.27 GB/day → about 0.04 GB (estimate)" },
+    pic: () => `<div class="eg-bars" style="margin-top:0">
+        <div class="eg-cap">${T({ ko: "최고일(10/23) 기준 하루 Egress", en: "Daily egress based on the peak day (Oct 23)" })}</div>
+        ${row(T({ ko: "지금", en: "Now" }), 2.27, 2.27, "2.27 GB", "hot")}
+        ${row(T({ ko: "①만", en: "① only" }), 0.38, 2.27, "0.38 GB")}
+        ${row("① + ②", 0.04, 2.27, "≈0.04 GB", "good")}
+      </div>
+      <div class="eg-check" style="margin-top:12px">
+        <div><span class="tag ok">${T({ ko: "완료", en: "Done" })}</span><span>${T({ ko: "Pro 결제 · 차단 해제 · 원인 찾기", en: "Pro paid · unblocked · cause found" })}</span></div>
+        <div><span class="tag">${T({ ko: "결정", en: "Decide" })}</span><span>${T({ ko: "①+② 진행할지 — 승인하시면 코드 + SQL 1개 준비", en: "Go ahead with ① + ②? On your OK: code + one SQL" })}</span></div>
+      </div>`,
+    pts: [
+      { ko: "한 달 약 70 GB(최악) → 약 1–2 GB", en: "About 70 GB/month (worst case) → about 1–2 GB" },
+      { ko: "Free 5 GB 안으로도 돌아올 수 있는 수준", en: "Low enough to fit even the Free 5 GB again" },
+    ] },
+];
+
+const $ = (id) => document.getElementById(id);
+const audio = $("audio");
+let cur = 0, playing = false, timer = null, startAt = 0;
+
+function renderUI() {
+  $("eyebrow").textContent = T(UI.eyebrow); $("title").textContent = T(UI.title); $("sub").textContent = T(UI.sub);
+  $("who").textContent = T(UI.who); $("speedL").textContent = T(UI.speed); $("foot").textContent = T(UI.foot);
+  $("play").textContent = playing ? T(UI.pause) : T(UI.play);
+  $("lang-ko").setAttribute("aria-pressed", LANG === "ko"); $("lang-en").setAttribute("aria-pressed", LANG === "en");
+  document.documentElement.lang = LANG;
+  $("chips").innerHTML = S.map((s, i) => `<button class="chip" type="button" data-i="${i}" aria-current="${i === cur}"><b>${i + 1}</b>${T(s.n)}</button>`).join("");
+}
+
+function show(i) {
+  cur = Math.max(0, Math.min(S.length - 1, i));
+  const s = S[cur];
+  $("stage").innerHTML = `<div class="lane"><div class="lt">${T(UI.pic)}</div><h2>${T(s.h)}</h2>${s.pic()}</div>
+    <div class="lane"><div class="lt">${T(UI.keys)}</div><ul class="pts">${s.pts.map((p, k) => `<li><i>${k + 1}</i><span>${T(p)}</span></li>`).join("")}</ul></div>`;
+  $("narr").textContent = NARR[LANG][cur];
+  $("prog").style.width = "0";
+  renderUI();
+}
+
+function stopAudio() { audio.pause(); clearInterval(timer); }
+function playScene() {
+  stopAudio();
+  audio.src = `audio/${LANG}/s${cur + 1}.mp3`;
+  audio.playbackRate = Number($("speed").value);
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => { playing = false; renderUI(); });
+  timer = setInterval(() => {
+    const d = audio.duration || DUR[LANG][cur] || 1;
+    $("prog").style.width = `${Math.min(100, (audio.currentTime / d) * 100)}%`;
+  }, 200);
+}
+audio.addEventListener("ended", () => {
+  clearInterval(timer); $("prog").style.width = "100%";
+  if (playing && cur < S.length - 1) setTimeout(() => { if (playing) { show(cur + 1); playScene(); } }, 700);
+  else { playing = false; renderUI(); }
+});
+$("play").onclick = () => { playing = !playing; if (playing) playScene(); else stopAudio(); renderUI(); };
+$("prev").onclick = () => { show(cur - 1); if (playing) playScene(); };
+$("next").onclick = () => { show(cur + 1); if (playing) playScene(); };
+$("chips").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (!b) return; show(Number(b.dataset.i)); if (playing) playScene(); };
+$("speed").onchange = () => { audio.playbackRate = Number($("speed").value); };
+function setLang(l) { LANG = l; try { localStorage.setItem("pelham-deck-lang", l); } catch (e) {} show(cur); if (playing) playScene(); }
+$("lang-ko").onclick = () => setLang("ko");
+$("lang-en").onclick = () => setLang("en");
+document.addEventListener("keydown", (e) => { if (e.key === "ArrowRight") $("next").click(); if (e.key === "ArrowLeft") $("prev").click(); });
+show(0);
+</script>

@@ -260,13 +260,24 @@ def main() -> int:
     print(f"  기존 tool_ids: {prompt.get('tool_ids') or '없음'}")
     print(f"  지식베이스: {[d.get('name') for d in (prompt.get('knowledge_base') or [])] or '없음'}")
     agent_cfg = config["agent"]
+    # 첫 인사는 전화 인사 문장 그대로 둔다. `{{greeting}}` 으로 두면 값을 안 보내는 전화(Twilio)는
+    # "Missing required dynamic variables in first message" 로 받자마자 끊긴다(2026-10-29) —
+    # placeholder 는 대시보드 시험용일 뿐 실제 통화의 기본값이 아니다. 웹(Charlie)은 첫 인사를
+    # override 로 보낸다(VoiceBooking.tsx), 그래서 그 override 를 허용해 둔다.
     first = agent_cfg.get("first_message") or ""
     placeholders = agent_cfg.setdefault("dynamic_variables", {}).setdefault("dynamic_variable_placeholders", {})
-    if first != "{{greeting}}":
-        placeholders.setdefault("greeting", first)
-        agent_cfg["first_message"] = "{{greeting}}"
+    phone_greeting = (
+        load_config().get("conversation_config", {}).get("agent", {})
+        .get("dynamic_variables", {}).get("dynamic_variable_placeholders", {}).get("greeting")
+    )
+    if "{{" in first:
+        agent_cfg["first_message"] = placeholders.get("greeting") or phone_greeting or ""
     placeholders.setdefault("channel", "phone")
-    print(f"  첫 인사: {{{{greeting}}}}, 전화 기본값: {placeholders.get('greeting', '')[:60]}")
+    print(f"  첫 인사: {agent_cfg['first_message'][:60]}")
+    platform = copy.deepcopy(agent.get("platform_settings") or {})
+    platform.setdefault("overrides", {}).setdefault("conversation_config_override", {}) \
+        .setdefault("agent", {})["first_message"] = True
+    print("  웹 첫 인사 override 허용")
     voice = load_config().get("conversation_config", {}).get("tts", {}).get("voice_id")
     tts = config.setdefault("tts", {})
     kept = {k: v for k, v in tts.items() if k != "voice_id"}
@@ -332,7 +343,7 @@ def main() -> int:
         config.setdefault("turn", {}).update(turn)
         print(f"  턴 설정: {turn}")
 
-    body: dict = {"conversation_config": config}
+    body: dict = {"conversation_config": config, "platform_settings": platform}
     if touched:
         body["workflow"] = new_workflow
     voice_agent.update_agent(args.agent, body)

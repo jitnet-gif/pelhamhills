@@ -114,6 +114,8 @@ export default function VoiceBooking({ onFinished, autoStart }: Props) {
           channel: "website",
           greeting: GREETING,
         },
+        // 에이전트 첫 인사는 전화 인사다(전화는 변수를 못 보낸다). 웹은 Charlie 인사로 덮는다.
+        overrides: { agent: { firstMessage: GREETING } },
         onModeChange: ({ mode }) => {
           if (mounted.current) setSpeaking(mode === "speaking");
         },
