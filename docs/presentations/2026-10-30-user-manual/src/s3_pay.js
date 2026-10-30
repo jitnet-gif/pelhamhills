@@ -1,0 +1,25 @@
+CURCH = 2;
+add("pay-methods", ["결제 수단", "Payment methods"], ["결제 수단 여덟 가지, 나눠 낼 수 있습니다", "Eight methods, and bills can be split"],
+  () => win("Bill", "", `${rw("Green fee · Kim", num("$60.00"))}${rw("HST 13%", num("$7.80"))}${rw("<b>Total</b>", num("$67.80"))}${btns(btn("Cash", "m"), btn("Card"), btn("Debit"), btn("Cheque"), btn("Interac e-Transfer"), btn("Member account"), btn("Gift card"), btn("Rain check"))}${btns(btn("Hold"), btn("Void", "r"), btn("Apply Discount"))}`),
+  [["잔액이 0이 될 때까지 수단을 더해 <b>나눠 결제</b>", "Add methods until nothing remains to <b>split a bill</b>"], ["<b>Hold</b>는 계산서 잠시 보관", "<b>Hold</b> parks a bill"], ["<b>Void</b>는 결제 전 계산서 취소", "<b>Void</b> discards an unpaid bill"], ["팁은 음식이나 음료가 있는 계산서에서만", "Tips are only on bills with food or drinks"]],
+  "결제 수단은 현금, 신용카드, 직불카드, 수표, 이 트랜스퍼, 회원 계정, 기프트카드, 레인체크 여덟 가지입니다. 금액을 나눠서 받을 수도 있어요. 남은 금액이 없어질 때까지 수단을 더하면 됩니다. 잠시 미룰 때는 홀드, 결제 전에 취소할 때는 보이드를 누르세요.",
+  "There are eight payment methods: cash, credit, debit, cheque, Interac e-Transfer, member account, gift card and rain check. You can split a bill by adding methods until nothing remains. Hold parks a bill for later, and Void discards it before payment.");
+add("pay-card", ["카드 리더기", "Card reader"], ["카드는 S700 리더기로", "Cards go to the S700 reader"],
+  () => cols(
+    [["Linked", "Linked"], ["금액이 리더기로 바로 갑니다. 손님이 카드를 댑니다", "The amount goes to the reader, and the guest taps"], "a"],
+    [["Off", "Off"], ["단말기를 손으로 치고 Approval code와 끝 4자리 입력", "Key the terminal by hand, then enter the approval code and last 4"], "w"],
+  ) + win("Cashier", "", `<p style="margin:0">Enter your Pelham Shift ID to pay</p>${g2(fld("Shift ID", "• • • •"), fld("Amount", "$67.80"))}${btns(btn("Charge $67.80", "m"), btn("Test connection"))}<small style="color:var(--muted)">Can't use your ID? Type your name</small>`),
+  [["Mode는 <b>컴퓨터마다</b> 따로 저장됩니다", "Mode is saved <b>per computer</b>"], ["안 되면 <b>Test connection</b>으로 먼저 확인", "If it fails, try <b>Test connection</b> first"], ["<b>Charge</b> 다음 Shift ID를 넣고 <b>Pay</b>", "After <b>Charge</b>, enter your Shift ID and press <b>Pay</b>"]],
+  "카드는 에스 칠백 리더기로 받습니다. 모드가 링크드이면 금액이 리더기로 바로 가고, 손님은 카드를 대기만 하면 됩니다. 오프일 때는 단말기를 손으로 치고 승인 번호를 입력해야 합니다. 차지를 누르면 시프트 아이디를 묻습니다. 리더기가 반응하지 않으면 테스트 커넥션부터 눌러 보세요.",
+  "Cards go through the S700 reader. In Linked mode the amount goes straight to the reader and the guest just taps. In Off mode you key the terminal by hand and enter the approval code. Press Charge and you'll be asked for your Shift ID. If the reader doesn't respond, try Test connection first.");
+add("pay-end", ["영수증·프린터", "Receipts & printers"], ["결제가 끝나면 영수증을 고릅니다", "Choose the receipt at the end"],
+  () => g2(win("Payment complete", "", `${fld("Text receipt to", "416-555-0100")}${fld("Email receipt to", "")}${btns(btn("Print & send", "m"), btn("Send"), btn("No"))}`),
+    win("Receipt Printer", L("기기마다", "Per device"), `${rw("Print dialog", pill("PC", "n"))}${rw("Bluetooth TM-m30", pill("BT", "n"))}${rw("Network TM-m30III", pill("LAN", "n"))}${rw("iPad", pill("Epson app", "n"))}`)),
+  [["문자나 이메일 칸을 비우면 그쪽은 안 보냅니다", "A blank box is skipped"], ["현금과 카드 모두 보낼 수 있습니다", "Works for cash and card"], ["프린터는 <b>Receipt Printer</b> 타일에서 기기마다 설정", "Set the printer per device on the <b>Receipt Printer</b> tile"], ["iPad는 <b>Epson TM Print Assistant</b> 앱을 거칩니다", "iPad prints through the <b>Epson TM Print Assistant</b> app"]],
+  "결제가 끝나면 페이먼트 컴플리트 화면이 나옵니다. 문자 번호나 이메일을 넣고 보내거나 인쇄하세요. 비워 둔 칸은 보내지 않습니다. 프린터는 기기마다 따로 정합니다. 아이패드는 엡손 앱을 거쳐 인쇄합니다.",
+  "When the payment is done you'll see Payment complete. Enter a phone number or email to send a receipt, or print one. Blank boxes are skipped. The printer is set separately on each device, and iPads print through the Epson app.");
+add("pay-refund", ["환불", "Refunds"], ["환불은 이유와 Shift ID가 필요합니다", "Refunds need a reason and a Shift ID"],
+  () => steps(["계산서를 찾습니다<small>스캔, 영수증 번호, 카드 끝 4자리로 Find</small>", "Find the sale<small>Scan, receipt number or last 4 digits, then Find</small>"], ["<b>Refund this sale</b><small>Refund reason을 적습니다</small>", "<b>Refund this sale</b><small>Enter the refund reason</small>"], ["<b>Confirm refund</b><small>Shift ID를 넣습니다</small>", "<b>Confirm refund</b><small>Enter your Shift ID</small>"]) + warn("여러 수단으로 나눠 낸 계산서는 카드 결제부터 환불하세요. 직불은 손님이 카드를 다시 대야 하고, 신용카드는 카드 없이 됩니다.", "On split bills, refund the card payment first. Debit needs the guest to tap again. Credit doesn't need the card."),
+  [["기프트카드로 낸 금액은 환불하면 <b>카드 잔액으로 돌아갑니다</b>", "Gift card payments go <b>back on the card</b>"], ["쿠폰 무료 라운드는 환불하면 다시 살아납니다", "A free round comes back after a refund"], ["환불하면 쿠폰북 도장 하나가 빠집니다", "A refund removes one coupon book stamp"]],
+  "환불은 계산대 첫 화면의 리펀드에서 시작합니다. 판매를 찾아 리펀드 디스 세일을 누르고, 이유를 적은 뒤 시프트 아이디로 확인합니다. 나눠서 낸 계산서는 카드 결제부터 환불하세요. 직불카드는 손님이 카드를 다시 대야 합니다. 기프트카드로 낸 돈은 카드 잔액으로 저절로 돌아갑니다.",
+  "Refunds start from the Refund tile on the register. Find the sale, press Refund this sale, enter a reason and confirm with your Shift ID. On split bills, refund the card payment first. Debit needs the guest to tap again. Money paid by gift card goes back on the card by itself.");

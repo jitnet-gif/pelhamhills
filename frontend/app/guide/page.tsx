@@ -13,7 +13,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { ADMIN_HOME, ADMIN_RETAIL, ADMIN_SCAN, REGISTER_CLOSE_GUIDE, REGISTER_GUIDE } from "@/lib/nav";
+import { ADMIN_HOME, ADMIN_RETAIL, ADMIN_SCAN, REGISTER_CLOSE_GUIDE, REGISTER_GUIDE, USER_MANUAL } from "@/lib/nav";
 
 export const metadata: Metadata = {
   title: "Staff Guides",
@@ -30,6 +30,18 @@ type Guide = {
 };
 
 const sections: { heading: string; guides: Guide[] }[] = [
+  {
+    heading: "전체 사용설명서",
+    guides: [
+      {
+        href: USER_MANUAL,
+        title: "Pelham Hills 사용설명서",
+        summary:
+          "티시트·결제·계산대 마감·기프트카드·쿠폰·회원권·시뮬레이터·손님 화면·마케팅·관리자까지 10개 장 54장면. Hope 나레이션(한국어/English)과 실제 샘플로 설명한다.",
+        tag: "나레이션",
+      },
+    ],
+  },
   {
     heading: "계산대 (Pro Shop · Snack Bar)",
     guides: [

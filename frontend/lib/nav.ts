@@ -112,6 +112,12 @@ export const ADMIN_ACCOUNTS = "/admin/accounts";
 /** 데이터 백업·복원(0100). 매니저(Reports 명단)와 계정 관리자에게만 메뉴에 뜬다(`lib/backup.ts`). */
 export const ADMIN_BACKUP = "/admin/backup";
 
+/**
+ * 전체 사용설명서 — 10개 장 나레이션 프레젠테이션(`public/guides/user-manual/`). 로그인 없이 열린다.
+ * `adminNav` 가 쓰므로 그 위에 둔다.
+ */
+export const USER_MANUAL = "/guides/user-manual/index.html";
+
 /** 요금 두 화면. 매니저(Reports 명단, 0046 — 지금은 admin@pelhamhills.ca)에게만 메뉴에 뜬다(2026-10-23). */
 export const ADMIN_PRICING = "/admin/pricing";
 export const ADMIN_DYNAMIC_PRICING = "/admin/dynamic-pricing";
@@ -162,6 +168,7 @@ export const adminNav: NavItem[] = [
   { label: "Starter Phone App", href: "/admin/starter-app", glyph: "📱" },
   { label: "Account Setup", href: ADMIN_ACCOUNTS, glyph: "👤" },
   { label: "Data Backup", href: ADMIN_BACKUP, glyph: "⇩" },
+  { label: "User Manual", href: USER_MANUAL, glyph: "▶" },
   { label: "Staff Guides", href: "/guide", glyph: "▶" },
 ];
 
@@ -238,6 +245,7 @@ export const adminDivisions: AdminDivision[] = [
       { label: "Camera Scan", href: ADMIN_SCAN, glyph: "📷" },
       pick("Gift Cards"),
       { label: "Register Guide", href: REGISTER_GUIDE, glyph: "▶" },
+      pick("User Manual"),
       { label: "Staff Guides", href: GUIDE_HOME, glyph: "▶" },
       pick("Reports"),
       pick("Integrations"),
@@ -257,6 +265,7 @@ export const adminDivisions: AdminDivision[] = [
       pick("Reports"),
       pick("Starter Phone App"),
       pick("Data Backup"),
+      pick("User Manual"),
     ],
   },
 ];
