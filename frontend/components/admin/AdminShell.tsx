@@ -80,6 +80,7 @@ import { todayIso } from "@/lib/teeSheet/dates";
 import { accessToken, getSession, signIn, signOut, subscribe } from "@/lib/teeSheet/session";
 import {
   cachedIdleLockMs,
+  IDLE_LOCK_CHANGED_EVENT,
   idleLockMs,
   isLockedStored,
   lastActive,
@@ -1073,6 +1074,11 @@ function IdleLock({ onSignOut }: { onSignOut: () => void }) {
     void idleLockMs().then((ms) => {
       limit = ms;
     });
+    // Settings 에서 잠금 시간을 바꾸면(0143) 이 화면도 바로 따른다.
+    const onLimitChanged = (event: Event) => {
+      limit = (event as CustomEvent<number>).detail;
+    };
+    window.addEventListener(IDLE_LOCK_CHANGED_EVENT, onLimitChanged);
 
     let lastMark = 0;
     const onActivity = () => {
@@ -1096,6 +1102,7 @@ function IdleLock({ onSignOut }: { onSignOut: () => void }) {
       for (const name of events) window.removeEventListener(name, onActivity, { capture: true });
       window.clearInterval(timer);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(IDLE_LOCK_CHANGED_EVENT, onLimitChanged);
     };
   }, []);
 

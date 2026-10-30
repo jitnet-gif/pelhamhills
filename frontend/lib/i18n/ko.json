@@ -3506,5 +3506,17 @@
  "Expires: {0}": "만료: {0}",
  "Expired {0}.": "{0} 만료됨.",
  "No expiry": "만료일 없음",
- "Clear the date for No expiry.": "만료일이 없으면 날짜를 지우세요."
+ "Clear the date for No expiry.": "만료일이 없으면 날짜를 지우세요.",
+ "Screen Lock": "화면 잠금",
+ "Admin screens lock when nobody touches them for this long. Staff open them again with their staff ID.": "이 시간 동안 아무도 손대지 않으면 어드민 화면이 잠깁니다. 직원은 직원 ID 로 다시 엽니다.",
+ "Lock after": "잠금 시간",
+ "Don't lock": "잠그지 않음",
+ "1 minute": "1분",
+ "{0} minutes": "{0}분",
+ "{0} seconds": "{0}초",
+ "Save lock time": "잠금 시간 저장",
+ "Saved. Other screens follow the next time they open.": "저장했습니다. 다른 화면은 다음에 새로 열 때부터 따릅니다.",
+ "Admin screens will stay open with nobody at them.": "자리를 비워도 어드민 화면이 열린 채로 있게 됩니다.",
+ "Only managers can change the screen lock.": "화면 잠금은 매니저만 바꿀 수 있습니다.",
+ "Lock time must be off, or between 15 seconds and 1 hour.": "잠금 시간은 끔이거나 15초~1시간이어야 합니다."
 }

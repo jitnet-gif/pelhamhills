@@ -52,6 +52,23 @@ export async function idleLockMs(): Promise<number> {
   }
 }
 
+/** 이 탭의 잠금 타이머가 새 시간을 바로 따르게 하는 신호. */
+export const IDLE_LOCK_CHANGED_EVENT = "pelham:idle-lock-changed";
+
+/** Settings 에서 잠금 시간을 바꾼다(0143, 매니저 이상). 저장된 초를 돌려준다. */
+export async function saveIdleLockSeconds(seconds: number): Promise<number> {
+  const body = await staffRpc<{ idle_lock_seconds: number }>("pelham_staff_lock_settings_set", {
+    p_idle_lock_seconds: seconds,
+  });
+  try {
+    window.localStorage.setItem(IDLE_LOCK_KEY, String(body.idle_lock_seconds * 1000));
+  } catch {
+    // 이번 탭에서만 쓴다.
+  }
+  window.dispatchEvent(new CustomEvent(IDLE_LOCK_CHANGED_EVENT, { detail: body.idle_lock_seconds * 1000 }));
+  return body.idle_lock_seconds;
+}
+
 /** 직원 ID 로 들어온다. 성공하면 세션이 저장되고 그 직원 이름을 돌려준다. */
 export async function pinSignIn(code: string): Promise<string> {
   let response: Response;

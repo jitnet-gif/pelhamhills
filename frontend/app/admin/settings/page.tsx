@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
+import ScreenLockCard from "@/components/admin/ScreenLockCard";
 
 type StaffRole = "Owner" | "Manager" | "Pro Shop" | "Read Only";
 
@@ -47,6 +48,8 @@ export default function SettingsPage() {
     >
       <div className="min-w-0">
         <section className="grid grid-cols-[minmax(0,1fr)] gap-4 p-4 xl:grid-cols-[1fr_1fr]">
+          <ScreenLockCard />
+
           <section className="border border-[#d6d6dc] bg-white">
             <div className="border-b border-[#d6d6dc] bg-[#d7d5da] px-3 py-2 text-xs font-bold">Course Information</div>
             <div className="grid gap-3 p-4 text-xs">
