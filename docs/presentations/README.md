@@ -76,3 +76,4 @@ claude.ai 에 올렸던 나레이션 프레젠테이션(장면별 재생 + Eleve
 | 2026-10-29 | 쿠폰북 라운드 100번마다 기념품 | 7 | [2026-10-29-coupon-100-souvenir/](./2026-10-29-coupon-100-souvenir/index.html) | [claude.ai](https://claude.ai/artifact/UjjZzGDgsp76kQhgtdVWuW) |
 | 2026-10-30 | 클럽 CCTV를 어드민 화면으로 (Hikvision NVR + go2rtc) | 6 | [2026-10-30-cctv-admin-hope/](./2026-10-30-cctv-admin-hope/index.html) | [claude.ai](https://claude.ai/artifact/1rjqvcxz1js7yF9JgUvrcw) |
 | 2026-10-30 | 이메일·문자·영수증은 어디로 나가나 (Gmail·Twilio·Stripe, 전화번호) | 7 | [2026-10-30-email-receipt-routes/](./2026-10-30-email-receipt-routes/index.html) | [claude.ai](https://claude.ai/artifact/Ahmqx8bW6FLw9XE9eUf1LT) |
+| 2026-10-30 | 전체 사용설명서 (10개 장, 기프트카드·쿠폰 실제 샘플, 한/영 Hope) | 54 | [2026-10-30-user-manual/](./2026-10-30-user-manual/index.html) | [claude.ai](https://claude.ai/artifact/T3soqnE9EE8vyLpR2psonJ) |
