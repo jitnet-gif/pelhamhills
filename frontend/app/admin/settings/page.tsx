@@ -5,10 +5,6 @@ import { useState } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import ScreenLockCard from "@/components/admin/ScreenLockCard";
 
-type StaffRole = "Owner" | "Manager" | "Pro Shop" | "Read Only";
-
-const staffRoles: StaffRole[] = ["Owner", "Manager", "Pro Shop", "Read Only"];
-
 export default function SettingsPage() {
   const [courseName, setCourseName] = useState("Pelham Hills Golf Club");
   const [coursePhone, setCoursePhone] = useState("905-892-2196");
@@ -18,17 +14,7 @@ export default function SettingsPage() {
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(true);
   const [cancelAlerts, setCancelAlerts] = useState(true);
-  const [roles, setRoles] = useState([
-    { name: "Francis", email: "info@pelhamhills.ca", role: "Owner" as StaffRole, active: true },
-    { name: "Front Desk", email: "shop@pelhamhills.com", role: "Pro Shop" as StaffRole, active: true },
-    { name: "Reports User", email: "reports@pelhamhills.com", role: "Read Only" as StaffRole, active: false },
-  ]);
   const [saved, setSaved] = useState("Unsaved local settings");
-
-  function updateRole(index: number, patch: Partial<(typeof roles)[number]>) {
-    setRoles((current) => current.map((role, roleIndex) => (roleIndex === index ? { ...role, ...patch } : role)));
-    setSaved("Unsaved local settings");
-  }
 
   return (
     <AdminShell
@@ -95,44 +81,6 @@ export default function SettingsPage() {
                 <p className="font-bold">Preview</p>
                 <p>{courseName} uses {interval}-minute tee intervals with {taxRate}% tax and ${cartFee.toFixed(2)} cart fee.</p>
               </div>
-            </div>
-          </section>
-
-          <section className="min-w-0 border border-[#d6d6dc] bg-white xl:col-span-2">
-            <div className="border-b border-[#d6d6dc] bg-[#d7d5da] px-3 py-2 text-xs font-bold">Staff Permissions</div>
-            <div className="min-w-0 overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-xs">
-                <thead className="bg-[#f7f7f8] text-left">
-                  <tr>
-                    {["Staff", "Email", "Role", "Status", "Controls"].map((heading) => (
-                      <th className="border-b border-[#d6d6dc] px-3 py-2" key={heading}>{heading}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {roles.map((staff, index) => (
-                    <tr key={staff.email}>
-                      <td className="border-b border-[#ececf0] px-3 py-2 font-bold">{staff.name}</td>
-                      <td className="border-b border-[#ececf0] px-3 py-2">{staff.email}</td>
-                      <td className="border-b border-[#ececf0] px-3 py-2">
-                        <select className="border border-[#d6d6dc] bg-white px-2 py-1" value={staff.role} onChange={(event) => updateRole(index, { role: event.target.value as StaffRole })}>
-                          {staffRoles.map((role) => (
-                            <option key={role}>{role}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border-b border-[#ececf0] px-3 py-2">
-                        <span className={`px-2 py-1 font-bold ${staff.active ? "bg-[#ecfff1] text-[#168a3c]" : "bg-[#ececf0] text-[#4e5560]"}`}>{staff.active ? "Active" : "Disabled"}</span>
-                      </td>
-                      <td className="border-b border-[#ececf0] px-3 py-2">
-                        <button className="border border-[#d6d6dc] px-3 py-1 font-bold" onClick={() => updateRole(index, { active: !staff.active })}>
-                          {staff.active ? "Disable" : "Enable"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </section>
         </section>
