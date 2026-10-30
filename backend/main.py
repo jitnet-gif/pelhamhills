@@ -140,6 +140,18 @@ async def start_reminder_loop() -> None:
         # 웹 예약 확인 문자. 웹 예약은 이 서버를 거치지 않아 1분마다 Supabase 에 묻는다.
         app.state.booking_text_loop = asyncio.create_task(booking_texts.loop())
 
+
+@app.on_event("startup")
+async def start_booking_email_loop() -> None:
+    # 시뮬레이터 웹 예약 확정 메일과 온라인 결제 영수증 메일. 문자와 달리 Twilio 가 아니라 Gmail 키에 달렸다.
+    from backend.api.routes import receipts
+    from backend.services import booking_emails, payment_emails
+
+    if receipts.email_enabled():
+        app.state.booking_email_loop = asyncio.create_task(booking_emails.loop())
+        app.state.payment_email_loop = asyncio.create_task(payment_emails.loop())
+
+
 @app.get("/")
 def read_root():
     """서버 헬스 체크 엔드포인트"""

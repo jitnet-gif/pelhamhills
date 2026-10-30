@@ -1,0 +1,37 @@
+/* email · receipt deck: service colours Gmail=red, Twilio=gold, Stripe=green */
+:root{--red-soft:#f7e3df}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--red-soft:#3a201b}}
+:root[data-theme="dark"]{--red-soft:#3a201b}
+.er-svc{display:inline-block;font-size:12px;font-weight:700;padding:2px 7px;white-space:nowrap}
+.er-svc.g{background:var(--red-soft);color:var(--red)}
+.er-svc.t{background:var(--gold-soft);color:var(--gold)}
+.er-svc.s{background:var(--green-soft);color:var(--green)}
+.er-svc.n{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.er-flow{display:grid;gap:10px}
+.er-fr{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) 18px minmax(0,1fr);gap:6px;align-items:center}
+.er-fr>div{border:1px solid var(--line);padding:10px 8px;text-align:center;font-size:13px;font-weight:600;min-width:0}
+.er-fr>div small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.er-fr>span{color:var(--muted);text-align:center}
+.er-fr .g{background:var(--red-soft);color:var(--red);border-color:transparent}
+.er-fr .t{background:var(--gold-soft);color:var(--gold);border-color:transparent}
+.er-fr .s{background:var(--green-soft);color:var(--green);border-color:transparent}
+.er-fr>div.g small,.er-fr>div.t small,.er-fr>div.s small{color:inherit}
+.er-list{display:grid;border-top:1px solid var(--line)}
+.er-it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.er-it small{display:block;color:var(--muted);font-size:12px}
+.er-it.off{color:var(--muted)}
+.er-tb{border-collapse:collapse;width:100%;min-width:520px;font-size:13px}
+.er-tb th{text-align:left;font-size:11px;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line)}
+.er-tb td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.er-tb td b{font-weight:600}
+.er-pay{border:1px solid var(--line);display:grid;gap:10px;padding:14px}
+.er-pay .ok{font-weight:700;color:var(--green)}
+.er-pay label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+.er-pay label span{border:1px solid var(--line);padding:8px;color:var(--ink);font-size:14px;font-family:var(--mono);overflow-wrap:anywhere}
+.er-pay .bt{display:flex;flex-wrap:wrap;gap:6px}
+.er-pay .bt span{font-size:13px;font-weight:600;padding:8px 12px;border:1px solid var(--line)}
+.er-pay .bt span.m{background:var(--green);border-color:var(--green);color:#fff}
+.er-gap{display:grid;gap:8px}
+.er-gap>div{border:1px solid var(--line);padding:10px 12px;display:grid;gap:3px;font-size:14px;min-width:0}
+.er-gap>div small{color:var(--muted);font-size:12px}
+@media (max-width:480px){.er-fr{grid-template-columns:minmax(0,1fr);}.er-fr>span{transform:rotate(90deg);line-height:1}}

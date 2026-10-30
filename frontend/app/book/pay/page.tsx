@@ -108,7 +108,8 @@ function PayResult() {
           <dt className="text-[#5c6459]">Booking</dt>
           <dd className="break-all font-mono">{code}</dd>
         </dl>
-        <p className="mt-4 text-sm">
+        <p className="mt-4 text-sm font-semibold">A receipt is on its way to your email.</p>
+        <p className="mt-1 text-sm">
           Nothing more to pay at the club. Cancel online up to 24 hours before your start time for a full refund.
         </p>
         <Actions code={code} />

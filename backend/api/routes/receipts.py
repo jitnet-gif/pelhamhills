@@ -198,20 +198,26 @@ def email_enabled() -> bool:
     return bool(user and password)
 
 
-def _send_email(to: str, bill: dict[str, Any]) -> None:
+def send_mail(to: str, subject: str, text: str, body_html: str) -> None:
+    """손님에게 가는 메일은 전부 여기로 나간다(영수증, `booking_emails`, `payment_emails`)."""
     user, password = _smtp()
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Your Pelham Hills receipt {bill.get('receipt_no') or ''}".strip()
+    msg["Subject"] = subject
     msg["From"] = formataddr((CLUB_NAME, user))
     msg["To"] = to
     msg["Reply-To"] = os.getenv("RECEIPT_REPLY_TO") or "info@pelhamhills.ca"
-    msg.attach(MIMEText(receipt_email_text(bill), "plain", "utf-8"))
-    msg.attach(MIMEText(receipt_email_html(bill), "html", "utf-8"))
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(body_html, "html", "utf-8"))
     with smtplib.SMTP(os.getenv("RECEIPT_SMTP_HOST") or "smtp.gmail.com",
                       int(os.getenv("RECEIPT_SMTP_PORT") or "587"), timeout=20) as server:
         server.starttls()
         server.login(user, password)
         server.sendmail(user, [to], msg.as_string())
+
+
+def _send_email(to: str, bill: dict[str, Any]) -> None:
+    send_mail(to, f"Your Pelham Hills receipt {bill.get('receipt_no') or ''}".strip(),
+              receipt_email_text(bill), receipt_email_html(bill))
 
 
 def _paid_bill(request: Request, bill_id: int) -> dict[str, Any]:

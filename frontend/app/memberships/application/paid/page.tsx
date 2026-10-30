@@ -120,7 +120,8 @@ function PaidResult() {
           <dt className="text-[#516050]">Payment</dt>
           <dd className="font-mono">{payment.invoice}</dd>
         </dl>
-        <p className="mt-5 leading-7">
+        <p className="mt-5 font-semibold">A receipt is on its way to your email.</p>
+        <p className="mt-2 leading-7">
           {payment.membership_status === "active"
             ? "Your membership is paid in full. Your indoor golf simulator coupons will be sent by email, and you can book tee times 14 days ahead once the season opens."
             : `Thank you — ${money(payment.balance ?? 0)} is still owing. The pro shop will be in touch.`}

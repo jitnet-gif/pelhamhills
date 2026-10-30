@@ -773,8 +773,11 @@ export default function IndoorGolfBooking() {
             </div>
           </div>
 
-          {/* 확정 메일은 지금 나가지 않는다 — 메일 발송은 멈춘 FastAPI 서버(SMTP)에 있었다.
-              보내지 않은 메일을 보냈다고 쓰지 않는다. */}
+          {/* 확정 메일은 서버가 1분 안에 보낸다(`backend/services/booking_emails.py`, 0140).
+              메일이 실패해도 손님이 코드를 갖도록 저장 안내는 그대로 둔다. */}
+          <p className="mb-2 break-words text-sm font-semibold text-[#214d2f]">
+            A confirmation email is on its way.
+          </p>
           <p className="mb-4 break-words text-sm text-[#5c6459]">
             Save or screenshot this code. With it and your email you can change or cancel online up to 24 hours before your start time.
           </p>

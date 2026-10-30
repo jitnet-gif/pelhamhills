@@ -75,3 +75,4 @@ claude.ai 에 올렸던 나레이션 프레젠테이션(장면별 재생 + Eleve
 | 2026-10-29 | 변경 도장 폴링 적용(전송량 줄이기) | 7 | [2026-10-29-egress-stamp-built/](./2026-10-29-egress-stamp-built/index.html) | [claude.ai](https://claude.ai/artifact/37HeJAMc4aowcGKPjDENmj) |
 | 2026-10-29 | 쿠폰북 라운드 100번마다 기념품 | 7 | [2026-10-29-coupon-100-souvenir/](./2026-10-29-coupon-100-souvenir/index.html) | [claude.ai](https://claude.ai/artifact/UjjZzGDgsp76kQhgtdVWuW) |
 | 2026-10-30 | 클럽 CCTV를 어드민 화면으로 (Hikvision NVR + go2rtc) | 6 | [2026-10-30-cctv-admin-hope/](./2026-10-30-cctv-admin-hope/index.html) | [claude.ai](https://claude.ai/artifact/1rjqvcxz1js7yF9JgUvrcw) |
+| 2026-10-30 | 이메일·문자·영수증은 어디로 나가나 (Gmail·Twilio·Stripe, 전화번호) | 7 | [2026-10-30-email-receipt-routes/](./2026-10-30-email-receipt-routes/index.html) | [claude.ai](https://claude.ai/artifact/Ahmqx8bW6FLw9XE9eUf1LT) |
