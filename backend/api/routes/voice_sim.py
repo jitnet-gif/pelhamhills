@@ -160,6 +160,8 @@ class BookSimRequest(voice._VoiceRequest):
     time: str = Field(..., description="One of the times find_sim_times returned, e.g. '3:00 PM'.")
     duration_hours: int = Field(default=1, ge=1, le=MAX_HOURS)
     players: int = Field(default=1, ge=1, le=MAX_PLAYERS)
+    #: 왼손 손님이면 Bay 1(오른손 전용)을 뺀다(0142).
+    left_handed: bool = False
     first_name: str = Field(..., min_length=1, max_length=60)
     last_name: str = Field(..., min_length=1, max_length=60)
     #: 손님이 **다른** 번호를 불러 줬을 때만. 비면 발신번호.
@@ -315,6 +317,7 @@ def book_sim_bay(body: BookSimRequest, background: BackgroundTasks) -> BookSimRe
         start_time=to_hhmm(body.time),
         duration_hours=body.duration_hours,
         player_count=body.players,
+        left_handed=body.left_handed,
         customer_name=f"{first} {last}",
         phone=phone,
         via="text" if by_text else "phone",

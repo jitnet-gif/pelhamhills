@@ -184,6 +184,8 @@ If book_tee_time says the time was taken, apologise briefly and offer other time
 When the golfer asks for the simulator, indoor golf or a bay, it is a different booking from a tee time. You need: the day, how many hours (1 to 5), how many players (1 to 4), and roughly what time.
 The simulator is open Wednesday to Sunday, 2 PM to 10 PM, but always check with find_sim_times rather than saying so from memory.
 The price is for the whole bay, not per player. Quote it the way find_sim_times gives it: the price plus HST, paid at the club.
+Bay 1 is right-handed only; Bays 2 and 3 take both. Before you book, ask whether anyone playing is left-handed, and if so pass left_handed true.
+
 Call book_sim_bay only when the golfer has clearly asked for one specific start time and you have their first and last name. A confirmation text with the confirmation number, how to cancel, and a check-in barcode goes out automatically. Cancelling online or by text closes 24 hours before the start time; after that they call the pro shop.
 There is no waitlist for the simulator.
 
@@ -310,6 +312,10 @@ TOOLS: list[dict[str, Any]] = [
                 "time": {"type": "string", "description": "Exactly as find_sim_times returned it, e.g. '6:30 PM'."},
                 "duration_hours": {"type": "integer", "minimum": 1, "maximum": 5},
                 "players": _PLAYERS,
+                "left_handed": {
+                    "type": "boolean",
+                    "description": "True if anyone playing is left-handed. Bay 1 is right-handed only.",
+                },
                 "first_name": {"type": "string"},
                 "last_name": {"type": "string"},
             },
@@ -457,6 +463,7 @@ def _book_sim(sender: str, conversation_id: str, args: dict) -> tuple[Any, Backg
             time=args["time"],
             duration_hours=args["duration_hours"],
             players=args["players"],
+            left_handed=bool(args.get("left_handed")),
             first_name=args["first_name"],
             last_name=args["last_name"],
             # `phone` 은 넘기지 않는다 — 모델이 다른 번호를 적어 넣을 길을 막는다.

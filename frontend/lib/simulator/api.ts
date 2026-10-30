@@ -45,6 +45,9 @@ export type SimReservation = {
 
 export type SimReservationInput = Omit<SimReservation, "id" | "confirmation_code">;
 
+/** 오른손 전용 베이 번호. 나머지는 오른손·왼손 겸용이다. */
+export const RIGHT_HAND_ONLY_BAYS = [1];
+
 export const simApi = {
   bays: () => staffRpc<SimBay[]>("pelham_staff_sim_bays"),
   setBayStatus: (bay: number, status: BayStatus) =>

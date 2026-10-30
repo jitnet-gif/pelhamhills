@@ -142,11 +142,19 @@ def test_booking_uses_the_caller_id_and_texts_the_code(client, sim):
     booking = res.json()["booking"]
     _, args = sim.calls[-1]
     assert args["p"] == {"date": SAT, "start_time": "18:30", "duration_hours": 2, "player_count": 3,
-                         "customer_name": "Ana Nakamura", "phone": CALLER, "via": "phone"}
+                         "left_handed": False, "customer_name": "Ana Nakamura", "phone": CALLER, "via": "phone"}
     sent = texts("confirm")
     assert len(sent) == 1 and booking["confirmation_code"] in sent[0]
     assert f"reply C {booking['confirmation_code']}" in sent[0]
     assert "phone" not in booking  # 번호는 비서에게 돌려주지 않는다
+
+
+def test_left_handed_caller_is_passed_to_the_booking(client, sim):
+    res = post(client, "book-sim-bay", date=SAT, time="3:00 PM", duration_hours=1, players=1,
+               first_name="Sam", last_name="Lee", caller_number=CALLER, left_handed=True)
+
+    assert res.status_code == 200, res.text
+    assert sim.calls[-1][1]["p"]["left_handed"] is True
 
 
 def test_booking_without_a_usable_number_is_refused(client, sim):

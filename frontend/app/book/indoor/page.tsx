@@ -29,6 +29,7 @@ import { recordBookingSource } from "@/lib/booking/attribution";
 import { bookingConfigured, bookingRpc } from "@/lib/booking/rpc";
 import { ApiError } from "@/lib/teeSheet/api";
 import { CLUB, lookupHref } from "@/lib/nav";
+import { RIGHT_HAND_ONLY_BAYS } from "@/lib/simulator/api";
 
 interface TimeSlot {
   time: string;
@@ -195,9 +196,9 @@ export default function IndoorGolfBooking() {
    *  UTC-5 에서 하루 전으로 찍힌다. */
   const formatDate = (dateStr: string) => (dateStr ? formatLongDate(dateStr) : "");
 
-  // 베이는 3개, 모두 오른손·왼손 겸용이다(0009). 고를 종류가 하나뿐이다.
+  // 베이는 3개다. Bay 1 은 오른손 전용, Bay 2·3 은 겸용(0009 의 left_right 는 예약 종류 값으로만 남는다).
   const bayTypeDisplay = {
-    left_right: "Right & Left Handed Bay",
+    left_right: "Simulator Bay",
   };
 
   // 서버(`backend/services/simulator_store.py`)의 시간당 요금과 같은 값.
@@ -437,9 +438,15 @@ export default function IndoorGolfBooking() {
                     type="button"
                   >
                     {bay === null ? "Any bay" : `Bay ${bay}`}
+                    {bay !== null && RIGHT_HAND_ONLY_BAYS.includes(bay) && (
+                      <span className="block text-xs font-normal">Right-handed only</span>
+                    )}
                   </button>
                 ))}
               </div>
+              {bayNumbers.some((bay) => RIGHT_HAND_ONLY_BAYS.includes(bay)) && (
+                <p className="mt-2 text-sm text-[#5c6459]">Left-handed? Please choose Bay 2 or Bay 3.</p>
+              )}
             </div>
           )}
 

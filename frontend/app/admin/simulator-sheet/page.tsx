@@ -24,6 +24,7 @@ import { BOOK_INDOOR } from "@/lib/nav";
 import { ApiError } from "@/lib/teeSheet/api";
 import {
   describeSimError,
+  RIGHT_HAND_ONLY_BAYS,
   simApi,
   type BayStatus,
   type SimBay as Bay,
@@ -680,7 +681,9 @@ export default function SimulatorSheetPage() {
                         </div>
                         <div className="mt-1 flex items-center justify-between gap-1">
                           <span className="truncate text-[11px] text-[#4e5560]">
-                            {BAY_TYPE_LABEL[b.bay_type] ?? b.bay_type}
+                            {RIGHT_HAND_ONLY_BAYS.includes(b.bay_number)
+                              ? BAY_TYPE_LABEL.right_handed
+                              : BAY_TYPE_LABEL[b.bay_type] ?? b.bay_type}
                           </span>
                           <select
                             aria-label={`Bay ${b.bay_number} status`}
