@@ -56,6 +56,7 @@ import {
   describeGiftCardError,
   giftCardApi,
   isGiftCardCode,
+  expiryText,
   maskGiftCard,
   subscribeGiftCardCode,
   takeGiftCardCode,
@@ -1329,7 +1330,50 @@ function PaymentsEditor({
     return subscribeRainCheckCode(use);
   }, [lookUpRainCheck]);
 
-  const lookUpGiftCard = useCallback(async (raw: string) => {
+  // 스캔한 카드를 결제 줄에 바로 올릴 때 쓰는 최신 결제 줄과 콜백. await 뒤에도 낡지 않게 ref 로 든다.
+  const paymentsNow = useRef(payments);
+  const onFilled = useRef(onTerminalApproved);
+  useEffect(() => {
+    paymentsNow.current = payments;
+    onFilled.current = onTerminalApproved;
+  }, [payments, onTerminalApproved]);
+
+  /**
+   * 스캔한 카드를 바로 결제 줄에 올린다: 잔액과 남은 금액 중 작은 쪽. 계산서가 다 차면 Charge 창이 뜬다
+   * (단말기 승인과 같은 길). 2026-10-28: 티 시트에서 카드를 쏘면 계산까지 되게 해 달라고 했다.
+   * 못 쓰는 카드(무효·잔액 0·이미 올림)는 올리지 않고 카드 상자에 까닭을 보인다.
+   */
+  const applyGiftCard = useCallback(
+    async (card: GiftCard) => {
+      const onBill = (list: PendingPayment[]) =>
+        list.filter((p) => p.method === "gift_card" && p.auth_code === card.code).reduce((sum, p) => sum + p.amount, 0);
+      if (card.status !== "active" || card.expired || onBill(paymentsNow.current) > 0 || card.balance <= 0) return;
+      setPreparing(true);
+      const fresh = await billActions.reload();
+      setPreparing(false);
+      if (!fresh) return;
+      const current = paymentsNow.current;
+      if (onBill(current) > 0) return;
+      const left = Math.max(fresh.total - current.reduce((sum, p) => sum + p.amount, 0), 0);
+      const applied = Math.min(card.balance, left);
+      if (applied <= 0) {
+        setFormError("Nothing is left to pay on this bill.");
+        return;
+      }
+      const key = keyRef.current++;
+      if (applied === left) onFilled.current?.();
+      setPayments((list) => [...list, { key, method: "gift_card", amount: applied, auth_code: card.code }]);
+      setAmountInput("");
+      setGcCode("");
+      setGcFound(null);
+      // 카드로 다 못 냈으면 나머지는 보통 카드로 받는다.
+      if (applied < left) setMethod("card");
+    },
+    [setPayments],
+  );
+
+  /** `apply` 면 찾은 카드를 바로 결제 줄에 올린다(스캔). 손으로 친 번호는 확인만 하고 버튼으로 올린다. */
+  const lookUpGiftCard = useCallback(async (raw: string, apply = false) => {
     const code = raw.trim().toUpperCase();
     setGcCode(code);
     setGcFound(null);
@@ -1340,22 +1384,25 @@ function PaymentsEditor({
       return;
     }
     setGcLooking(true);
+    let card: GiftCard | null = null;
     try {
-      setGcFound(await giftCardApi.byCode(code));
+      card = await giftCardApi.byCode(code);
+      setGcFound(card);
     } catch (error) {
       setFormError(describeGiftCardError(error));
     } finally {
       setGcLooking(false);
     }
-  }, []);
+    if (card && apply) await applyGiftCard(card);
+  }, [applyGiftCard]);
 
-  // 계산대·티 시트에서 쏜 기프트카드. 수단을 기프트카드로 바꾸고 바로 찾는다.
+  // 계산대·티 시트에서 쏜 기프트카드. 수단을 기프트카드로 바꾸고 찾아서 바로 결제 줄에 올린다.
   useEffect(() => {
     const use = (code: string) => {
       setMethod("gift_card");
       setAmountInput("");
       setTipInput("");
-      void lookUpGiftCard(code);
+      void lookUpGiftCard(code, true);
     };
     const waiting = takeGiftCardCode();
     if (waiting) use(waiting);
@@ -1367,14 +1414,16 @@ function PaymentsEditor({
     ? payments.filter((p) => p.method === "gift_card" && p.auth_code === gcFound.code).reduce((sum, p) => sum + p.amount, 0)
     : 0;
   const gcBalance = gcFound ? Math.max(gcFound.balance - gcOnBill, 0) : 0;
-  const gcUsable = gcFound !== null && gcFound.status === "active" && gcBalance > 0;
+  const gcUsable = gcFound !== null && gcFound.status === "active" && !gcFound.expired && gcBalance > 0;
   const gcProblem = !gcFound
     ? ""
     : gcFound.status === "void"
       ? `Voided${gcFound.void_reason ? ` — ${gcFound.void_reason}` : ""}.`
-      : gcBalance <= 0
-        ? "Nothing is left on this card."
-        : "";
+      : gcFound.expired
+        ? `Expired ${expiryText(gcFound)}.`
+        : gcBalance <= 0
+          ? "Nothing is left on this card."
+          : "";
   // 금액을 치면 그만큼(잔액·남은 금액 안에서), 안 치면 쓸 수 있는 최대.
   const gcMax = Math.min(gcBalance, remaining);
   const gcApplied = gcUsable ? (amountInput.trim() ? Math.min(parseMoney(amountInput), gcMax) : gcMax) : 0;
@@ -1740,9 +1789,10 @@ function PaymentsEditor({
                   }}
                   onChange={(event) => setGcCode(event.target.value)}
                   onKeyDown={(event) => {
+                    // 스캐너는 끝에 Enter 를 친다. 이 칸에 커서가 있을 때 쏜 카드도 바로 올린다.
                     if (event.key === "Enter") {
                       event.preventDefault();
-                      void lookUpGiftCard(event.currentTarget.value);
+                      void lookUpGiftCard(event.currentTarget.value, true);
                     }
                   }}
                   placeholder="Scan the card"

@@ -3,7 +3,7 @@
  * 종이 = 봉투 크기, 여백 0, 상품권은 그 한가운데. 초록 제목·로고 색은 print-color-adjust 로 인쇄에도 그대로 나간다.
  * 원본 스캔은 세로로 누워 있어 돌려 세웠고, 왼쪽 로고(공·월계수)만 잘라 `public/pelham-hills/gift-certificate-logo.png` 에 두었다.
  *
- * 빈 줄에 들어가는 것: 금액(entitles), 받는 사람(To — 없으면 손으로 쓰게 비운다), 만료(No expiry — 온타리오법),
+ * 빈 줄에 들어가는 것: 금액(entitles), 받는 사람(To — 없으면 손으로 쓰게 비운다), 만료(카드의 만료일, 없으면 No expiry — 0139),
  * 오른쪽 위 번호 자리에는 카드 코드. Authorized by 는 서명 자리라 비워 둔다.
  * 바코드는 감열 카드와 같은 값이라 계산서 결제 칸에서 그대로 쏘면 된다.
  */
@@ -11,7 +11,7 @@
 import { code128Svg } from "@/lib/retail/barcode";
 import { formatMoney } from "@/lib/retail/types";
 
-import type { GiftCard } from "./giftCard";
+import { expiryText, type GiftCard } from "./giftCard";
 
 function escapeHtml(text: string) {
   return text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -72,7 +72,7 @@ export function giftCertificateHtml(
     `<div class="row in">To <span class="fill">${escapeHtml(card.recipient ?? "")}</span></div>` +
     `<p class="cash">*not redeemable for cash</p>` +
     `<div class="row in">Authorized by <span class="fill short"></span>` +
-    ` Expires on <span class="fill exp">No expiry</span></div>` +
+    ` Expires on <span class="fill exp">${escapeHtml(expiryText(card))}</span></div>` +
     `<div class="foot"><div class="bars"><span>${code128Svg(card.code)}</span><p>${escapeHtml(card.code)}</p></div>` +
     `<span class="web">www.pelhamhills.ca</span></div>` +
     `</div></div></div>`

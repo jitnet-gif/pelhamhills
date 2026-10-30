@@ -12,12 +12,13 @@ POST /gift-cards/{code}/email   {email}   발행할 때 이메일을 적었으�
 로고와 바코드는 링크가 아니라 메일 안에 붙인 그림(cid)이라 손님 메일 앱이 그림을 막아도 열면 보이고, 인쇄해 와도 된다.
 SMTP 설정은 영수증 메일(`receipts._smtp`)과 같다.
 
-무효·잔액 없는 카드는 보내지 않는다. 같은 카드를 여러 번 보내도 된다 — 번호를 잘못 넣었거나 손님이 지웠을 때.
+무효·잔액 없는·만료된(0139) 카드는 보내지 않는다. 같은 카드를 여러 번 보내도 된다 — 번호를 잘못 넣었거나 손님이 지웠을 때.
 """
 
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 import html
 import logging
 import os
@@ -57,12 +58,21 @@ def _money(cents: Any) -> str:
     return f"${int(cents or 0) / 100:,.2f}"
 
 
+def expiry_text(card: dict[str, Any]) -> str:
+    """`Dec 31, 2027`, 없으면 `No expiry`(`giftCard.ts` 의 expiryText 와 같다)."""
+    if not card.get("expires_on"):
+        return "No expiry"
+    day = date.fromisoformat(card["expires_on"])
+    return f"{day:%b} {day.day}, {day.year}"
+
+
 def gift_card_text(card: dict[str, Any]) -> str:
     who = f" for {card['recipient']}" if card.get("recipient") else ""
+    expiry = f"Expires {expiry_text(card)}" if card.get("expires_on") else "No expiry"
     return (
         f"Pelham Hills gift card{who}: {_money(card.get('balance'))} to spend on green fees, "
         f"the pro shop and the snack bar. Show this barcode at the counter. Card {card['code']}. "
-        f"No expiry, not redeemable for cash. Anyone with this barcode can spend it, so keep it to yourself. "
+        f"{expiry}, not redeemable for cash. Anyone with this barcode can spend it, so keep it to yourself. "
         f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}."
     )
 
@@ -77,7 +87,7 @@ def certificate_email_text(card: dict[str, Any]) -> str:
     return (
         f"Pelham Hills Golf Club — Gift Certificate\n\n"
         f"This certificate entitles {_money(certificate_value(card))} — green fees, pro shop & snack bar.\n"
-        f"{who}Certificate {card['code']}\nExpires: No expiry\n\n"
+        f"{who}Certificate {card['code']}\nExpires: {expiry_text(card)}\n\n"
         f"Show the barcode in this email (on your phone or printed) at the counter.\n"
         f"Not redeemable for cash. Anyone with this barcode can spend it, so keep it to yourself.\n\n"
         f"Pelham Hills Golf Club, 196 Webber Road, Pelham, ON L3B 5N8 · 905-735-6768 · www.pelhamhills.ca\n"
@@ -111,7 +121,7 @@ def certificate_email_html(card: dict[str, Any]) -> str:
 <td style="{line}">{esc(_money(certificate_value(card)))} <span style="font-size:12px;font-weight:normal;white-space:nowrap">— green fees, pro shop &amp; snack bar</span></td></tr>
 <tr><td style="padding:14px 0 6px 28px;white-space:nowrap" width="1">To&nbsp;</td><td style="{line}">{recipient}</td></tr>
 <tr><td colspan="2" style="text-align:right;font-size:10px;padding-top:2px">*not redeemable for cash</td></tr>
-<tr><td style="padding:10px 0 6px 28px;white-space:nowrap" width="1">Expires on&nbsp;</td><td style="{line};font-size:16px">No expiry</td></tr>
+<tr><td style="padding:10px 0 6px 28px;white-space:nowrap" width="1">Expires on&nbsp;</td><td style="{line};font-size:16px">{esc(expiry_text(card))}</td></tr>
 </table>
 <div style="margin-top:14px;text-align:right;font-size:18px">www.pelhamhills.ca</div>
 </td></tr>
@@ -162,6 +172,8 @@ async def _usable_card(request: Request, code: str) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail=f"Gift card {code} was voided — nothing to send.")
     if int(card.get("balance") or 0) <= 0:
         raise HTTPException(status_code=409, detail=f"Gift card {code} has nothing left — nothing to send.")
+    if card.get("expired"):
+        raise HTTPException(status_code=409, detail=f"Gift card {code} has expired — nothing to send.")
     return card
 
 

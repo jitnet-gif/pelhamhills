@@ -571,10 +571,34 @@ def sun_minutes(iso_date: str) -> tuple[int, int]:
 LAST_TEE_BEFORE_SUNSET_MINUTES = 120
 
 
+def day_hours(iso_date: str) -> tuple[int | None, int | None]:
+    """직원이 그날 정한 (첫 티, 마지막 티) 분(0131 `pelham_tee_day_hours`). 없거나 못 읽으면 (None, None)."""
+    from backend.services import supabase_rest
+
+    if not supabase_rest.configured():
+        return None, None
+    try:
+        rows = supabase_rest.select(
+            "pelham_tee_day_hours",
+            {"select": "first_tee,last_tee", "booking_date": f"eq.{iso_date}"},
+        )
+    except supabase_rest.SupabaseUnavailable:
+        logger.warning("tee day hours unavailable for %s; using sunrise/sunset only", iso_date)
+        return None, None
+    if not rows:
+        return None, None
+    first, last = rows[0].get("first_tee"), rows[0].get("last_tee")
+    return (None if first is None else int(first)), (None if last is None else int(last))
+
+
 def tee_window(iso_date: str) -> tuple[int, int]:
-    """(첫 티, 마지막 티) — 일출, 일몰 2시간 전."""
+    """(첫 티, 마지막 티) — 직원이 정한 값, 없으면 일출, 일몰 2시간 전. SQL `pelham_tee_window`(0131)와 같다."""
     sunrise, sunset = sun_minutes(iso_date)
-    return sunrise, sunset - LAST_TEE_BEFORE_SUNSET_MINUTES
+    first, last = day_hours(iso_date)
+    return (
+        sunrise if first is None else first,
+        sunset - LAST_TEE_BEFORE_SUNSET_MINUTES if last is None else last,
+    )
 
 
 def slot_locks(iso_date: str) -> dict[int, bool]:
@@ -594,26 +618,42 @@ def slot_locks(iso_date: str) -> dict[int, bool]:
     return {int(row["minutes"]): bool(row["locked"]) for row in rows}
 
 
-def slot_lock_reason(iso_date: str, minutes: int, locks: dict[int, bool] | None = None) -> str | None:
-    """잠긴 칸이면 손님에게 읽어 줄 이유, 열려 있으면 None."""
+def slot_lock_reason(
+    iso_date: str,
+    minutes: int,
+    locks: dict[int, bool] | None = None,
+    hours: tuple[int | None, int | None] | None = None,
+) -> str | None:
+    """잠긴 칸이면 손님에게 읽어 줄 이유, 열려 있으면 None. 칸을 여러 개 볼 때는 locks·hours 를 한 번 읽어 넘긴다."""
     locks = slot_locks(iso_date) if locks is None else locks
-    first, last = tee_window(iso_date)
     locked = locks.get(minutes)
     if locked is False:
         return None
     if locked is True:
         return "that tee time is closed"
-    if minutes < first:
-        return f"that is before sunrise; the first tee time is {minutes_to_label(first)}"
-    if minutes > last:
-        return f"that is too close to sunset; the last tee time is {minutes_to_label(last)}"
+    sunrise, sunset = sun_minutes(iso_date)
+    set_first, set_last = day_hours(iso_date) if hours is None else hours
+    if set_first is not None and minutes < set_first:
+        return f"that is too early; the first tee time that day is {minutes_to_label(set_first)}"
+    if set_first is None and minutes < sunrise:
+        return f"that is before sunrise; the first tee time is {minutes_to_label(sunrise)}"
+    if set_last is not None and minutes > set_last:
+        return f"that is too late; the last tee time that day is {minutes_to_label(set_last)}"
+    if set_last is None and minutes > sunset - LAST_TEE_BEFORE_SUNSET_MINUTES:
+        return (
+            "that is too close to sunset; the last tee time is "
+            f"{minutes_to_label(sunset - LAST_TEE_BEFORE_SUNSET_MINUTES)}"
+        )
     return None
 
 
 def daylight_slots(iso_date: str) -> list[TeeSlot]:
     """열린 칸만 — 전화·문자 비서와 대기자 제안이 손님에게 내놓는 목록."""
     locks = slot_locks(iso_date)
-    return [slot for slot in generate_slots(iso_date) if slot_lock_reason(iso_date, slot.minutes, locks) is None]
+    hours = day_hours(iso_date)
+    return [
+        slot for slot in generate_slots(iso_date) if slot_lock_reason(iso_date, slot.minutes, locks, hours) is None
+    ]
 
 
 def slot_index(iso_date: str) -> dict[str, TeeSlot]:

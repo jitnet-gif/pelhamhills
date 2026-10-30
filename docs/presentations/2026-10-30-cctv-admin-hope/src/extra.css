@@ -1,0 +1,21 @@
+.fl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.7em; }
+.fn { position: relative; background: var(--raise); border-radius: 8px; padding: .8em .9em; display: grid; gap: .3em; align-content: start; }
+.fn b { font-size: 1.02em; line-height: 1.3; } .fn .k { font: 600 .74em var(--mono); }
+.fn p { margin: 0; font-size: .84em; color: var(--muted); line-height: 1.4; }
+.fn:not(:last-child)::after { content: "→"; position: absolute; right: -1.35em; top: 50%; transform: translateY(-50%); color: var(--amber); font: 600 1.1em var(--mono); }
+.scr { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; background: #000; border-radius: 8px; max-width: 22em; width: 100%; }
+.scr span { aspect-ratio: 16 / 10; background: var(--raise); border-radius: 2px; }
+.scr .on { background: var(--turf); } .scr .off { background: var(--alert); }
+.steps.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.way p { margin: 0; }
+.fl { margin-top: 2.4em; }
+.fn { padding: 1.5em 1.1em; gap: .7em; min-height: 15em; }
+.fn b { font-size: 1.3em; } .fn p { font-size: 1em; line-height: 1.5; }
+.steps.five { margin-top: 2.4em; }
+.steps.five li { min-height: 13em; }
+.steps.five b { font-size: 1.2em; line-height: 1.35; } .steps.five span { font-size: 1em; }
+@container (max-width: 759px) {
+  .fl, .steps.five { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+  .fn, .steps.five li { min-height: 0; }
+  .fn:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -1.5em; transform: none; }
+}

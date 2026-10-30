@@ -236,3 +236,13 @@ export const staffSlotLocks = (from: string, to: string) =>
 /** 직원 누구나 — 매니저 PIN 없음. 자동 판정과 같은 값이면 서버가 수동 설정을 지운다. */
 export const staffSlotLockSet = (date: string, time: string, locked: boolean) =>
   staffRpc<SlotLockRow>("pelham_staff_slot_lock_set", { p: { date, time, locked } });
+
+/** 날짜마다 직원이 정한 첫 티·마지막 티 (0131). first·last 는 분, null = 자동(일출·일몰 2시간 전). */
+export type TeeHoursRow = { date: string; first: number | null; last: number | null };
+
+export const staffTeeHours = (from: string, to: string) =>
+  staffRpc<TeeHoursRow[]>("pelham_staff_tee_hours", { p_from: from, p_to: to });
+
+/** 직원 누구나. 라벨("8:00 AM") 또는 null(자동). `outside` = 새 시간 밖에 남은 예약 수(옮기지 않는다). */
+export const staffTeeHoursSet = (date: string, first: string | null, last: string | null) =>
+  staffRpc<TeeHoursRow & { outside: number }>("pelham_staff_tee_hours_set", { p: { date, first, last } });

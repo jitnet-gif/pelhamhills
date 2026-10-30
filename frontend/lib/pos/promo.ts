@@ -65,8 +65,9 @@ export const promoApi = {
   forBill: (bill: number) => staffRpc<BillPromo | null>("pelham_staff_bill_promo", { p_bill: bill }),
 };
 
-/** 스캐너가 읽은 값이 프로모션 바코드인가. 손으로 친 코드(FALL18)는 계산서의 Promo code 칸으로 받는다. */
-export const PROMO_BARCODE = /^PROMO-[A-Z0-9]{3,16}$/i;
+/** 스캐너가 읽은 값이 프로모션 바코드인가. 손으로 친 코드(FALL18)는 계산서의 Promo code 칸으로 받는다.
+ *  `CPN-` + 16진 10자는 GPS 앱 지갑의 개인 쿠폰(0121) — 서버에서는 같은 프로모션 줄이라 같은 길로 간다. */
+export const PROMO_BARCODE = /^(PROMO-[A-Z0-9]{3,16}|CPN-[0-9A-F]{10})$/i;
 
 export function isPromoBarcode(raw: string): boolean {
   return PROMO_BARCODE.test(raw.trim());

@@ -1,0 +1,80 @@
+      <!-- 1 -->
+      <section class="slide" data-n="1">
+        <span class="eyebrow">Pelham Hills · Hikvision DVR/NVR</span>
+        <h1 data-ko="클럽 CCTV를 어드민 화면으로" data-en="Club CCTV in the admin site"></h1>
+        <p class="lede" data-ko="카메라와 녹화 장비는 그대로 두고, 영상을 보는 길만 새로 만듭니다." data-en="The cameras and recorders stay as they are. We only add a new way to watch."></p>
+        <div class="trio">
+          <div class="shot"><span class="k sky" data-ko="그대로" data-en="Stays"></span><b data-ko="카메라, 녹화기 2대" data-en="Cameras, 2 recorders"></b><p data-ko="녹화는 지금처럼 녹화기가 맡습니다." data-en="The recorders keep recording as they do now."></p></div>
+          <div class="shot"><span class="k turf" data-ko="새로 설치" data-en="New install"></span><b>go2rtc + Cloudflare</b><p data-ko="영상을 브라우저용으로 바꾸고 안전하게 내보냅니다." data-en="Converts video for browsers and sends it out safely."></p></div>
+          <div class="shot"><span class="k amber" data-ko="새로 개발" data-en="New build"></span><b data-ko="어드민 CCTV 탭" data-en="Admin CCTV tab"></b><p data-ko="실시간 그리드, 누르면 크게 보기." data-en="Live grid, tap to enlarge."></p></div>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="slide" data-n="2" hidden>
+        <span class="eyebrow" data-ko="영상이 지나가는 길" data-en="The video path"></span>
+        <h2 data-ko="녹화기에서 받아 어드민까지" data-en="From the recorder to the admin site"></h2>
+        <div class="fl">
+          <div class="fn"><span class="k sky" data-ko="클럽 안" data-en="At the club"></span><b data-ko="카메라" data-en="Cameras"></b><p data-ko="손대지 않습니다" data-en="Untouched"></p></div>
+          <div class="fn"><span class="k sky" data-ko="클럽 안" data-en="At the club"></span><b>Hikvision DVR/NVR</b><p data-ko="2대, RTSP로 영상 제공" data-en="2 units, serve video over RTSP"></p></div>
+          <div class="fn"><span class="k turf" data-ko="클럽 안" data-en="At the club"></span><b>go2rtc</b><p data-ko="항상 켜 둔 PC에서 브라우저용으로 변환" data-en="Converts for browsers on an always-on PC"></p></div>
+          <div class="fn"><span class="k turf" data-ko="인터넷" data-en="Internet"></span><b>Cloudflare</b><p data-ko="Tunnel + Access. 포트는 닫아 두고 스태프만 통과" data-en="Tunnel + Access. Ports stay closed, staff only"></p></div>
+          <div class="fn"><span class="k amber" data-ko="스태프 화면" data-en="Staff screen"></span><b data-ko="CCTV 탭" data-en="CCTV tab"></b><p data-ko="실시간 영상. 외부에서는 몇 초 늦을 수 있음" data-en="Live video, a few seconds behind off-site"></p></div>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section class="slide" data-n="3" hidden>
+        <span class="eyebrow" data-ko="사진 속 모니터" data-en="The monitor in the photo"></span>
+        <h2 data-ko="NO LINK 카메라부터 점검합니다" data-en="Fix the NO LINK cameras first"></h2>
+        <div class="verdict">
+          <div class="scr" role="img" aria-label="16 cells: 1 live, 3 NO LINK, 12 empty">
+            <span class="on"></span><span class="off"></span><span class="off"></span><span class="off"></span>
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="facts">
+            <div><span class="turf">1</span><span data-ko="영상이 나오는 칸" data-en="cell showing video"></span></div>
+            <div><span class="alert">3</span><span data-ko="NO LINK, 카메라 연결 끊김" data-en="NO LINK, camera disconnected"></span></div>
+            <div><span>12</span><span data-ko="로고만 보이는 빈 칸" data-en="empty cells with only the logo"></span></div>
+          </div>
+        </div>
+        <p class="small" data-ko="사진에 보이는 16칸 기준입니다. 사진 왼쪽이 잘려 있어서 실제 칸 수는 더 많을 수 있습니다." data-en="This counts the 16 cells visible in the photo. The left side is cut off, so there may be more."></p>
+      </section>
+
+      <!-- 4 -->
+      <section class="slide" data-n="4" hidden>
+        <span class="eyebrow" data-ko="화질" data-en="Quality"></span>
+        <h2 data-ko="채널마다 화질이 두 개입니다" data-en="Every channel has two qualities"></h2>
+        <div class="versus">
+          <div class="way pick"><span class="pill" data-ko="그리드" data-en="Grid"></span><h3 data-ko="저화질" data-en="Low quality"></h3><span class="mono sky">/Streaming/Channels/102</span><p class="small" data-ko="여러 대를 띄워도 인터넷을 적게 씁니다." data-en="Uses little internet, even with many cameras on screen."></p></div>
+          <div class="way"><span class="pill" data-ko="크게 보기" data-en="Enlarged"></span><h3 data-ko="고화질" data-en="High quality"></h3><span class="mono sky">/Streaming/Channels/101</span><p class="small" data-ko="한 대를 눌렀을 때만 씁니다." data-en="Used only when you tap one camera."></p></div>
+        </div>
+        <p class="small" data-ko="앞자리는 채널 번호입니다. 2번 채널은 201과 202가 됩니다." data-en="The first digit is the channel. Channel 2 is 201 and 202."></p>
+      </section>
+
+      <!-- 5 -->
+      <section class="slide" data-n="5" hidden>
+        <span class="eyebrow" data-ko="진행 순서" data-en="The order"></span>
+        <h2 data-ko="다섯 단계로 끝납니다" data-en="Five steps"></h2>
+        <ol class="steps five">
+          <li><b data-ko="NO LINK 점검" data-en="Check NO LINK"></b><span>EG COMM</span></li>
+          <li><b data-ko="녹화기 정보 확인, 보기 전용 계정" data-en="Recorder details, view-only account"></b><span data-ko="EG COMM 또는 클럽" data-en="EG COMM or the club"></span></li>
+          <li><b data-ko="go2rtc 설치" data-en="Install go2rtc"></b><span data-ko="클럽 PC" data-en="Club PC"></span></li>
+          <li><b data-ko="Tunnel, Access 연결" data-en="Connect Tunnel, Access"></b><span data-ko="Cloudflare 도메인 필요" data-en="Needs a Cloudflare domain"></span></li>
+          <li><b data-ko="어드민 CCTV 탭 완성" data-en="Finish the CCTV tab"></b><span>Claude</span></li>
+        </ol>
+      </section>
+
+      <!-- 6 -->
+      <section class="slide" data-n="6" hidden>
+        <span class="eyebrow" data-ko="알려 주실 것" data-en="What we need"></span>
+        <h2 data-ko="여섯 가지만 알려 주세요" data-en="Six things to send us"></h2>
+        <div class="versus">
+          <div class="way pick"><span class="pill" data-ko="먼저 필요" data-en="First"></span>
+            <ul><li data-ko="녹화기 2대의 모델명" data-en="Model of both recorders"></li><li data-ko="녹화기 2대의 내부 IP" data-en="Internal IP of both recorders"></li><li data-ko="쓰는 채널 번호와 위치 이름" data-en="Channels in use and their locations"></li></ul></div>
+          <div class="way"><span class="pill" data-ko="설치할 때" data-en="At install"></span>
+            <ul><li data-ko="보기 전용 녹화기 계정" data-en="View-only recorder account"></li><li data-ko="항상 켜 둘 PC" data-en="An always-on PC"></li><li data-ko="Cloudflare에 연결된 도메인" data-en="A domain on Cloudflare"></li></ul></div>
+        </div>
+      </section>

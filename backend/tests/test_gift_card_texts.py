@@ -117,6 +117,22 @@ def test_certificate_email_shows_value_name_and_inline_barcode():
     assert gift_cards.LOGO_PNG.read_bytes().startswith(b"\x89PNG")
 
 
+def test_expiry_shows_the_date_or_no_expiry():
+    dated = {**CARD, "expires_on": "2027-12-31"}
+    assert "Expires Dec 31, 2027," in gift_cards.gift_card_text(dated)
+    assert "Dec 31, 2027" in gift_cards.certificate_email_html(dated)
+    assert "Expires: Dec 31, 2027" in gift_cards.certificate_email_text(dated)
+    assert "No expiry" in gift_cards.gift_card_text(CARD)
+    assert "No expiry" in gift_cards.certificate_email_html(CARD)
+
+
+def test_expired_card_is_not_sent(env):
+    client, state = env
+    state["card"].update({"expired": True})
+    assert client.post(f"{API}/gift-cards/{CODE}/text", json={"phone": "9055550101"}).status_code == 409
+    assert state["sent"] == []
+
+
 @pytest.mark.parametrize("change", [{"status": "void"}, {"balance": 0}])
 def test_email_refuses_unusable_card(mail, change):
     client, state = mail

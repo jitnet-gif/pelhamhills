@@ -1,0 +1,360 @@
+<title>GPS Coupons and Gift Cards</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one presenter column — header, scene chips, two-lane stage (picture · key points), dark narration band, player bar */
+:root{
+  --bg:#f3f5f1; --panel:#ffffff; --ink:#1c2420; --muted:#5d6a62; --line:#d6ddd6;
+  --green:#1a7f4b; --green-soft:#dcefe3; --gold:#b7791f; --gold-soft:#f8ecd6; --red:#b4412f;
+  --band:#14201a; --band-ink:#e9f2ec; --band-muted:#9fb5a8;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --panel:#17201b; --ink:#e4ece6; --muted:#97a89d; --line:#2b3830;
+  --green:#3fbf7f; --green-soft:#1d3527; --gold:#e0a64a; --gold-soft:#3a2e19; --red:#e07a66;
+  --band:#08100c; --band-ink:#e9f2ec; --band-muted:#8aa395; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-size:24px;line-height:1.25;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+.seg{display:inline-flex;border:1px solid var(--line);background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);font:600 13px var(--sans);padding:7px 12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg svg{width:20px;height:20px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 13px var(--sans);padding:6px 10px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip b{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.chip[aria-current="true"]{border-color:var(--green);background:var(--green-soft)}
+.chip[aria-current="true"] b{color:var(--green)}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;min-height:400px}
+@media (max-width:820px){.stage{grid-template-columns:minmax(0,1fr)}}
+.lane{background:var(--panel);border:1px solid var(--line);padding:16px;min-width:0;display:grid;align-content:start;gap:12px}
+.lane h2{margin:0;font-size:19px;line-height:1.3;text-wrap:balance}
+.lane .lt{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pts{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.pts li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start}
+.pts li i{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--green);padding-top:2px}
+.band{background:var(--band);color:var(--band-ink);padding:14px 16px;min-height:96px;display:grid;gap:4px}
+.band .who{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--band-muted)}
+.band p{margin:0;font-size:16px;line-height:1.6}
+.player{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 14px var(--sans);min-height:44px;min-width:44px;padding:0 14px;cursor:pointer}
+.pbtn.main{background:var(--green);border-color:var(--green);color:#fff;min-width:120px}
+.bar{flex:1 1 160px;height:6px;background:var(--line);position:relative}
+.bar span{position:absolute;inset:0 auto 0 0;background:var(--green);width:0}
+.speed{font:500 13px var(--sans);color:var(--muted)}
+.note{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 6px;background:var(--gold-soft);color:var(--gold)}
+.tag.ok{background:var(--green-soft);color:var(--green)}
+/* scene visuals */
+.mock{border:1px solid var(--line);display:grid}
+.mock .mh{padding:8px 10px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px}
+.mock .mb{padding:10px;display:grid;gap:8px}
+.mta{border:1px solid var(--line);padding:8px;color:var(--muted);font-size:13px;min-height:52px}
+.mbtn{justify-self:start;background:var(--green);color:#fff;font-weight:700;font-size:13px;padding:8px 12px}
+.msec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.msec div{border:1px dashed var(--line);padding:8px;font-size:12px;color:var(--muted)}
+.msec div b{display:block;color:var(--ink);font-size:13px}
+.tw{overflow-x:auto}
+table.hm{border-collapse:separate;border-spacing:3px;width:100%;min-width:460px;font-size:13px;font-variant-numeric:tabular-nums}
+table.hm th{font-size:11px;color:var(--muted);font-weight:700;text-align:center}
+table.hm th.r{text-align:left;color:var(--ink);font-size:13px;white-space:nowrap}
+table.hm td{text-align:center;padding:6px 2px;font-weight:600}
+table.hm td.empty{outline:2px dashed var(--gold);outline-offset:-2px}
+.chart{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:118px minmax(0,1fr) 62px;gap:8px;align-items:center;font-size:13px}
+.row .t{height:16px;background:var(--line)}
+.row .t span{display:block;height:100%;background:var(--green)}
+.row.hl .t span{background:var(--gold)}
+.row .v{text-align:right;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.stack{display:flex;height:34px}
+.stack span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;overflow:hidden;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+.offer{border:1px solid var(--green);background:var(--green-soft);padding:10px;display:grid;gap:4px;font-size:13px}
+.offer b{font-size:14px}
+.code{font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid var(--line);padding:1px 6px}
+.ladder{position:relative;height:210px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);margin:4px 4px 22px 4px}
+.ladder .zone{position:absolute;top:0;bottom:0;background:var(--gold-soft)}
+.ladder .zone em{position:absolute;top:4px;left:6px;font-style:normal;font-size:11px;font-weight:700;color:var(--gold)}
+.ladder .pin{position:absolute;transform:translateX(-50%);display:grid;justify-items:center;gap:2px;font-size:11px;white-space:nowrap}
+.ladder .pin s{display:block;width:10px;height:10px;border-radius:50%;background:var(--green);text-decoration:none}
+.ladder .pin.h s{background:var(--gold)}
+.ladder .tick{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-family:var(--mono)}
+.plan{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.plan{grid-template-columns:minmax(0,1fr)}}
+.plan div{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px}
+.plan h3{margin:0;font-size:14px}
+.plan ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.check{display:grid;gap:8px}
+.check div{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;border:1px solid var(--line);padding:10px;font-size:14px}
+/* gift wallet mocks */
+.gw-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.gw-two{grid-template-columns:minmax(0,1fr)}}
+.gw-box{border:1px solid var(--line);padding:10px;display:grid;gap:6px;align-content:start;font-size:13px}
+.gw-box h3{margin:0;font-size:14px}
+.gw-box.off{border-style:dashed;color:var(--muted)}
+.gw-flow{display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr) 34px minmax(0,1fr);gap:4px;align-items:center}
+@media (max-width:560px){.gw-flow{grid-template-columns:minmax(0,1fr)}.gw-flow .gw-ar{transform:rotate(90deg);justify-self:center}}
+.gw-node{border:1px solid var(--line);padding:10px;font-size:13px;display:grid;gap:4px;text-align:center;background:var(--panel)}
+.gw-node b{font-size:14px}
+.gw-node.db{border:2px solid var(--green);background:var(--green-soft)}
+.gw-ar{text-align:center;color:var(--green);font-weight:700;font-size:18px}
+.gw-tabs{display:flex;flex-wrap:wrap;gap:4px;font-size:12px}
+.gw-tabs span{border:1px solid var(--line);padding:4px 8px;color:var(--muted)}
+.gw-tabs span.on{border-color:var(--green);background:var(--green);color:#fff;font-weight:700}
+.gw-form{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 8px;font-size:13px;align-items:center}
+.gw-form i{font-style:normal;color:var(--muted);font-size:12px}
+.gw-form span{border:1px solid var(--line);padding:5px 8px}
+.gw-who{display:grid;gap:6px}
+.gw-who div{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;font-size:13px;align-items:center}
+.gw-who .y{color:var(--green);font-weight:700}
+.gw-who .n{color:var(--red);font-weight:700}
+.gw-tw{overflow-x:auto}
+table.gw-t{border-collapse:collapse;width:100%;min-width:480px;font-size:13px}
+table.gw-t th,table.gw-t td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+table.gw-t thead th{font-size:11px;color:var(--muted);letter-spacing:.04em}
+table.gw-t td.new{background:var(--gold-soft)}
+.gw-ph{justify-self:center;width:250px;max-width:100%;border:8px solid var(--ink);border-radius:26px;padding:12px 10px;display:grid;gap:8px;background:var(--bg)}
+.gw-ph .top{font-size:12px;font-weight:700;text-align:center}
+.gw-card{border-radius:10px;padding:10px;display:grid;gap:2px;font-size:12px;color:#fff;background:linear-gradient(135deg,#1a7f4b,#0f4f2e)}
+.gw-card b{font-size:18px;font-variant-numeric:tabular-nums}
+.gw-card.cp{background:linear-gradient(135deg,#b7791f,#7a4f12)}
+.gw-card .mono{font-family:var(--mono);font-size:11px;opacity:.85}
+.gw-stamps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;border:1px solid var(--line);padding:6px;background:var(--panel)}
+.gw-stamps s{aspect-ratio:1;border-radius:50%;border:1px dashed var(--line);text-decoration:none}
+.gw-stamps s.f{background:var(--green);border-color:var(--green)}
+.gw-bc{height:46px;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 4px,var(--ink) 4px 5px,transparent 5px 8px,var(--ink) 8px 11px,transparent 11px 12px);border:6px solid #fff;outline:1px solid var(--line)}
+.gw-bill{border:1px solid var(--line);font-size:13px;display:grid}
+.gw-bill div{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
+.gw-bill div:last-child{border-bottom:0;font-weight:700}
+.gw-bill .d{color:var(--gold)}
+.gw-bill .g{color:var(--green)}
+.gw-push{border:1px solid var(--line);background:var(--panel);padding:8px 10px;font-size:13px;display:grid;gap:2px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.gw-push small{color:var(--muted)}
+.gw-sc{display:grid;gap:8px}
+.gw-sc div{display:grid;grid-template-columns:112px minmax(0,1fr);gap:10px;border:1px solid var(--line);padding:8px 10px;font-size:13px;align-items:start}
+.gw-sc div b{font-size:13px}
+.gw-sc em{font-style:normal;font-size:11px;font-weight:700;padding:1px 6px;background:var(--green-soft);color:var(--green);margin-right:4px}
+.gw-sc em.c{background:var(--gold-soft);color:var(--gold)}
+.tag.no{background:color-mix(in srgb,var(--red) 14%,var(--panel));color:var(--red)}
+@media (prefers-reduced-motion:no-preference){.lane{animation:in .35s ease both}@keyframes in{from{transform:translateY(6px)}to{transform:none}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="title"></h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Language">
+      <button id="lang-ko" type="button" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">가</text></svg>한국어</button>
+      <button id="lang-en" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H9l-5 4v-4H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="13.5" font-size="8" text-anchor="middle" fill="currentColor" font-family="sans-serif" font-weight="700">Aa</text></svg>English</button>
+    </div>
+  </header>
+  <nav class="chips" id="chips" aria-label="Scenes"></nav>
+  <section class="stage" id="stage"></section>
+  <section class="band" aria-live="polite"><div class="who" id="who"></div><p id="narr"></p></section>
+  <div class="player">
+    <button class="pbtn" id="prev" type="button" aria-label="Previous">◀</button>
+    <button class="pbtn main" id="play" type="button"></button>
+    <button class="pbtn" id="next" type="button" aria-label="Next">▶</button>
+    <div class="bar" aria-hidden="true"><span id="prog"></span></div>
+    <label class="speed"><span id="speedL"></span>
+      <select id="speed"><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.2">1.2×</option><option value="1.4">1.4×</option></select>
+    </label>
+  </div>
+  <p class="note" id="foot"></p>
+</div>
+<audio id="audio" preload="auto"></audio>
+
+<script>
+const NARR = {"ko": ["지금은 기프트카드와 프로모 코드를 펠햄힐스 관리자 화면에서만 만들 수 있습니다. GPS 앱에는 라운드 열 번에 한 번 무료인 도장 쿠폰북만 있고, 손님 폰에는 받은 카드나 쿠폰이 보이지 않습니다. 그래서 GPS 앱에서도 발행하고, 손님 앱에서 바로 꺼내 쓰게 하려고 합니다.", "가장 중요한 원칙은 장부를 하나로 두는 것입니다. GPS 앱과 프로샵은 같은 데이터베이스를 씁니다. 그래서 GPS 앱은 새 표를 만들지 않고, 프로샵이 쓰는 기프트카드 표와 프로모션 표에 같은 함수로 씁니다. 어디서 발행하든 바코드도 같고, 잔액도 같습니다.", "발행은 GPS 관리 화면의 새 탭, 쿠폰과 기프트카드에서 합니다. 이 탭은 프로샵에서 기프트카드를 발행할 수 있는 매니저 계정에게만 보입니다. 같은 로그인이니 따로 권한을 줄 필요가 없습니다. 여럿이 같이 쓰는 proshop 계정과, 코스 지도만 고치는 관리자는 볼 수 없습니다.", "발행하는 것은 세 가지입니다. 기프트카드는 금액이 있고 쓰면 잔액이 줄며, 만료일이 없습니다. 개인 쿠폰은 새로 제안하는 것으로, 손님 한 명에게 묶인 한 번짜리 할인이고 만료일이 있습니다. 캠페인 쿠폰은 지금의 프로모 코드처럼 여러 사람이 같이 쓰는 코드입니다.", "손님 앱의 쿠폰 화면은 지갑이 됩니다. 맨 위에 기프트카드와 남은 잔액, 그 아래 쿠폰과 만료일, 맨 아래에 지금의 도장판이 있습니다. 하나를 누르면 바코드가 크게 뜹니다. 앱이 없는 손님에게는 지금처럼 문자로 바코드를 보냅니다.", "계산은 바꾸지 않습니다. 프로샵 계산서에서 바코드를 쏘면, 기프트카드는 결제 수단으로, 쿠폰은 그린피 할인으로 들어갑니다. 결제가 끝나면 손님 앱의 잔액과 쿠폰 상태가 바로 바뀌고, 남은 금액을 알림으로 보냅니다.", "운영은 이렇게 하면 좋습니다. 불만 전화가 오면 매니저가 그 자리에서 무료 기프트카드를 그 손님 앱으로 보냅니다. 비로 라운드가 끊기면 레인체크 대신 개인 쿠폰을 줍니다. 연말에는 프로샵에서 돈을 받고 판매용 카드를 발행합니다. 오래 안 온 손님에게는 매니저가 명단을 보고 재방문 쿠폰을 보냅니다.", "안전장치는 그대로 이어집니다. 발행 사유는 필수이고, 기프트카드는 한 장에 오천 달러까지, 무효로 할 때도 사유를 적습니다. 발행 내역은 매일 메일로 갑니다. 순서는 먼저 0120 SQL을 실행하고, 개인 쿠폰을 넣을지 정한 뒤, 0121 함수와 GPS 화면을 만들어 배포합니다. GPS 저장소 푸시는 아직 권한이 필요합니다."], "en": ["Right now, gift cards and promo codes can only be made on the Pelham Hills admin pages. The GPS app has just the stamp book, one free round for every ten, and a guest's phone never shows the cards or coupons they were given. The plan is to issue from the GPS app too, and let guests pull them up in the app.", "The key rule is one ledger. The GPS app and the pro shop share the same database. So the GPS app adds no new tables: it writes to the same gift card and promotion tables, through the same functions the pro shop uses. Wherever a card is issued, the barcode and the balance are the same.", "Issuing happens in a new tab on the GPS admin page, Coupons and Gift Cards. Only manager accounts that can already issue gift cards at the pro shop see it. It is the same sign-in, so no separate permission is needed. The shared proshop account and admins who only edit the course map cannot see it.", "There are three things to issue. A gift card has an amount, its balance goes down as it is used, and it never expires. A personal coupon is new: a one-time discount tied to one guest, with an expiry date. A campaign coupon is a shared code, like today's promo codes.", "The coupon screen in the guest app becomes a wallet. Gift cards with their balance sit on top, coupons with expiry dates below, and today's stamp book at the bottom. Tap one and the barcode fills the screen. Guests without the app still get the barcode by text, as they do now.", "Checkout stays the same. Scan the barcode on a pro shop bill: a gift card goes in as the payment method, a coupon as a green fee discount. Once the bill is paid, the balance and coupon status in the guest's app change right away, and a notification tells them what is left.", "Here is how to run it. When a complaint call comes in, the manager sends a complimentary gift card straight to that guest's app. When rain stops a round, give a personal coupon instead of a rain check. At the holidays, take payment at the pro shop and issue a sold card. For guests who haven't been back in a while, the manager reviews the list and sends a come-back coupon.", "The safeguards carry over. A reason is required to issue, a gift card tops out at five thousand dollars, and voiding needs a reason too. Issued cards go out in a daily email. The order: run the 0120 SQL first, decide on personal coupons, then build the 0121 functions and the GPS screens and deploy. Pushing to the GPS repository still needs access."]};
+const DUR = {"ko": [18.52, 18.39, 17.58, 17.87, 15.28, 15.18, 20.09, 23.67], "en": [17.58, 17.58, 17.87, 17.03, 15.78, 15.23, 20.32, 25.52]};
+let LANG = "ko";
+try { const s = localStorage.getItem("pelham-deck-lang"); if (s === "en" || s === "ko") LANG = s; } catch (e) {}
+const T = (o) => (typeof o === "string" ? o : o[LANG]);
+
+const UI = {
+  eyebrow: { ko: "GPS 앱 · 운영안", en: "GPS app · operating plan" },
+  title: { ko: "GPS 앱에서도 쿠폰·기프트카드 발행", en: "Coupons and gift cards from the GPS app" },
+  sub: { ko: "golf-gps-pelhamhills-seven.vercel.app · 2026-10-26 제안 (아직 만들지 않음) · 나레이션 Hope", en: "golf-gps-pelhamhills-seven.vercel.app · proposal 2026-10-26 (not built yet) · narrated by Hope" },
+  play: { ko: "▶ 재생", en: "▶ Play" }, pause: { ko: "❚❚ 멈춤", en: "❚❚ Pause" },
+  speed: { ko: "속도 ", en: "Speed " }, who: { ko: "나레이션", en: "Narration" },
+  pic: { ko: "화면", en: "Picture" }, keys: { ko: "핵심", en: "Key points" },
+  foot: { ko: "제안입니다. 기프트카드(0120)·프로모 코드(0078)·도장 쿠폰북(GPS 0023–0028)은 이미 있는 것이고, GPS 발행 탭·손님 지갑·개인 쿠폰·0121은 아직 만들지 않았습니다. 화면 속 이름·금액은 예시입니다.",
+          en: "This is a proposal. Gift cards (0120), promo codes (0078) and the stamp book (GPS 0023–0028) exist today; the GPS issue tab, guest wallet, personal coupons and 0121 are not built yet. Names and amounts on screen are examples." },
+};
+
+const bc = () => `<div class="gw-bc" aria-hidden="true"></div>`;
+
+const S = [
+  { n: { ko: "지금", en: "Today" },
+    h: { ko: "발행은 프로샵 관리자 화면에서만", en: "Issuing happens only on the pro shop admin" },
+    pic: () => `<div class="gw-two">
+      <div class="gw-box"><h3>${T({ ko: "펠햄힐스 관리자", en: "Pelham Hills admin" })}</h3>
+        <span><span class="tag ok">${T({ ko: "있음", en: "Have" })}</span> /admin/gift-cards — GIFT-</span>
+        <span><span class="tag ok">${T({ ko: "있음", en: "Have" })}</span> /admin/promotions — PROMO-</span>
+        <span><span class="tag ok">${T({ ko: "있음", en: "Have" })}</span> ${T({ ko: "계산서에서 바코드 스캔", en: "Scan the barcode on any bill" })}</span></div>
+      <div class="gw-box"><h3>${T({ ko: "GPS 앱", en: "GPS app" })}</h3>
+        <span><span class="tag ok">${T({ ko: "있음", en: "Have" })}</span> ${T({ ko: "도장 쿠폰북 10 = 무료 1", en: "Stamp book, 10 = 1 free" })}</span>
+        <span><span class="tag no">${T({ ko: "없음", en: "Missing" })}</span> ${T({ ko: "기프트카드·쿠폰 발행", en: "Issue gift cards and coupons" })}</span>
+        <span><span class="tag no">${T({ ko: "없음", en: "Missing" })}</span> ${T({ ko: "손님 폰에서 받은 카드 보기", en: "Guest sees cards on their phone" })}</span></div></div>`,
+    pts: [{ ko: "기프트카드: 0120 (배포됨, SQL 실행 대기)", en: "Gift cards: 0120 (deployed, SQL not run yet)" },
+      { ko: "프로모 코드: 0078, 계산서마다 1개", en: "Promo codes: 0078, one per bill" },
+      { ko: "도장: 체크인 때 자동, 회원 제외 (GPS 0027·0026)", en: "Stamps: automatic at check-in, members excluded (GPS 0027, 0026)" },
+      { ko: "목표: GPS에서 발행 + 손님 앱에서 꺼내 쓰기", en: "Goal: issue from GPS + guests pull them up in the app" }] },
+  { n: { ko: "한 장부", en: "One ledger" },
+    h: { ko: "GPS는 창구, 장부는 하나", en: "GPS is another window onto one ledger" },
+    pic: () => `<div class="gw-flow">
+      <div class="gw-node"><b>${T({ ko: "프로샵 관리자", en: "Pro shop admin" })}</b>pelhamhills.vercel.app</div>
+      <div class="gw-ar">→</div>
+      <div class="gw-node db"><b>Supabase</b>pelham_gift_cards<br>pelham_promotions<br><span class="note">${T({ ko: "같은 발행 함수", en: "same issue functions" })}</span></div>
+      <div class="gw-ar">←</div>
+      <div class="gw-node"><b>${T({ ko: "GPS 앱", en: "GPS app" })}</b>golf-gps-…-seven</div></div>
+      <div class="offer"><b>${T({ ko: "같은 바코드 · 같은 잔액", en: "Same barcode · same balance" })}</b>${T({ ko: "GPS에서 만든 GIFT-7C2A… 카드도 프로샵 계산서에서 그대로 쏩니다.", en: "A GIFT-7C2A… card made in GPS scans on a pro shop bill exactly the same way." })}</div>`,
+    pts: [{ ko: "두 앱은 이미 같은 데이터베이스 (GPS 0026이 pelham_ 표를 읽음)", en: "Both apps already share one database (GPS 0026 reads pelham_ tables)" },
+      { ko: "GPS 쪽에 새 기프트카드 표를 만들지 않음", en: "No second gift card table on the GPS side" },
+      { ko: "잔액은 결제 줄에서 계산 → 환불하면 저절로 복원", en: "Balance comes from payments → a refund puts it back automatically" },
+      { ko: "리포트·백업도 한 곳에서", en: "Reports and backups stay in one place" }] },
+  { n: { ko: "누가", en: "Who" },
+    h: { ko: "GPS 관리 화면 새 탭 — 매니저만", en: "New GPS admin tab — managers only" },
+    pic: () => `<div class="mock"><div class="mh">GPS Admin</div><div class="mb">
+      <div class="gw-tabs"><span>${T({ ko: "플레이어", en: "Players" })}</span><span>${T({ ko: "통계", en: "Stats" })}</span><span>${T({ ko: "배너", en: "Banners" })}</span><span>${T({ ko: "주문", en: "Orders" })}</span><span class="on">${T({ ko: "쿠폰·기프트카드", en: "Coupons & Gift Cards" })}</span></div>
+      <div class="gw-form"><i>${T({ ko: "종류", en: "Type" })}</i><span>${T({ ko: "기프트카드 · 무료", en: "Gift card · Complimentary" })}</span>
+        <i>${T({ ko: "금액", en: "Amount" })}</i><span>$25.00</span>
+        <i>${T({ ko: "받는 손님", en: "Guest" })}</i><span>${T({ ko: "앱 계정 검색 — 예: J. Smith", en: "Search app accounts — e.g. J. Smith" })}</span>
+        <i>${T({ ko: "사유", en: "Reason" })}</i><span>${T({ ko: "10/25 전화 불만 — 카트 고장", en: "10/25 complaint call — cart broke down" })}</span></div>
+      <div class="mbtn">${T({ ko: "발행하고 손님 앱으로 보내기", en: "Issue and send to the guest's app" })}</div></div></div>`,
+    pts: [{ ko: "권한 = 프로샵 기프트카드 매니저와 같은 판정 (pelham_is_gift_card_manager)", en: "Access = same check as pro shop gift card managers (pelham_is_gift_card_manager)" },
+      { ko: "같은 로그인이라 따로 권한 줄 필요 없음", en: "Same sign-in, so no separate grant" },
+      { ko: "proshop@ 공용 계정은 제외 (0102와 같음)", en: "Shared proshop@ account excluded (as in 0102)" },
+      { ko: "코스 지도만 고치는 GPS 관리자는 탭이 안 보임", en: "GPS admins who only edit the course map don't see the tab" }] },
+  { n: { ko: "세 종류", en: "Three kinds" },
+    h: { ko: "기프트카드 · 개인 쿠폰 · 캠페인 쿠폰", en: "Gift card · personal coupon · campaign coupon" },
+    pic: () => `<div class="gw-tw"><table class="gw-t"><thead><tr><th></th><th>${T({ ko: "기프트카드", en: "Gift card" })}</th><th>${T({ ko: "개인 쿠폰 (새)", en: "Personal coupon (new)" })}</th><th>${T({ ko: "캠페인 쿠폰", en: "Campaign coupon" })}</th></tr></thead><tbody>
+      <tr><th>${T({ ko: "바코드", en: "Barcode" })}</th><td>GIFT-…</td><td class="new">CPN-…</td><td>PROMO-…</td></tr>
+      <tr><th>${T({ ko: "가치", en: "Value" })}</th><td>${T({ ko: "금액 → 잔액", en: "Amount → balance" })}</td><td class="new">${T({ ko: "$ 또는 % 할인 1회", en: "One $ or % discount" })}</td><td>${T({ ko: "$ 또는 % 할인", en: "$ or % discount" })}</td></tr>
+      <tr><th>${T({ ko: "누구", en: "Who" })}</th><td>${T({ ko: "가진 사람 누구나 (회원 포함)", en: "Whoever holds it (members too)" })}</td><td class="new">${T({ ko: "손님 한 명에 묶임", en: "Tied to one guest" })}</td><td>${T({ ko: "코드 아는 누구나", en: "Anyone with the code" })}</td></tr>
+      <tr><th>${T({ ko: "만료", en: "Expiry" })}</th><td>${T({ ko: "없음 (온타리오법)", en: "None (Ontario law)" })}</td><td class="new">${T({ ko: "있음 (예: 60일)", en: "Yes (e.g. 60 days)" })}</td><td>${T({ ko: "기간·횟수", en: "Dates · use limit" })}</td></tr>
+      <tr><th>${T({ ko: "쓰는 곳", en: "Applies to" })}</th><td>${T({ ko: "모든 계산서 결제", en: "Payment on any bill" })}</td><td class="new">${T({ ko: "그린피 할인", en: "Green fee discount" })}</td><td>${T({ ko: "그린피 할인", en: "Green fee discount" })}</td></tr>
+      <tr><th>${T({ ko: "지금", en: "Today" })}</th><td>0120</td><td class="new">${T({ ko: "결정 필요", en: "Needs a decision" })}</td><td>0078</td></tr></tbody></table></div>`,
+    pts: [{ ko: "기프트카드 = 돈 (선수금 또는 무료 보상)", en: "Gift card = money (prepaid or complimentary)" },
+      { ko: "개인 쿠폰 = 남이 못 쓰는 할인, 보상·재방문용", en: "Personal coupon = a discount nobody else can use, for make-goods and come-backs" },
+      { ko: "캠페인 쿠폰 = 문자·배너로 뿌리는 공용 코드", en: "Campaign coupon = shared code sent by text or banner" },
+      { ko: "할인 쿠폰은 계산서당 1장 (0078 규칙 유지)", en: "One discount coupon per bill (keeps the 0078 rule)" }] },
+  { n: { ko: "손님 지갑", en: "Guest wallet" },
+    h: { ko: "앱의 쿠폰 화면이 지갑이 됩니다", en: "The app's coupon screen becomes a wallet" },
+    pic: () => `<div class="gw-ph"><div class="top">${T({ ko: "내 지갑", en: "My wallet" })}</div>
+      <div class="gw-card"><span>${T({ ko: "기프트카드", en: "Gift card" })}</span><b>$35.00</b><span class="mono">GIFT-7C2A91F0B4 · ${T({ ko: "만료 없음", en: "no expiry" })}</span></div>
+      <div class="gw-card cp"><span>${T({ ko: "개인 쿠폰 · 그린피", en: "Personal coupon · green fee" })}</span><b>−20%</b><span class="mono">${T({ ko: "12월 25일까지", en: "until Dec 25" })}</span></div>
+      ${bc()}
+      <div class="note" style="text-align:center">${T({ ko: "도장 7 / 10", en: "Stamps 7 / 10" })}</div>
+      <div class="gw-stamps">${Array.from({ length: 10 }, (_, i) => `<s class="${i < 7 ? "f" : ""}"></s>`).join("")}</div></div>`,
+    pts: [{ ko: "순서: 기프트카드 → 쿠폰 → 도장판", en: "Order: gift cards → coupons → stamp book" },
+      { ko: "누르면 바코드 전체 화면 (밝기 최대)", en: "Tap for a full-screen barcode (brightness up)" },
+      { ko: "다 쓴 카드·지난 쿠폰은 아래 '지난 것'으로", en: "Spent cards and expired coupons move to 'Past'" },
+      { ko: "앱 없는 손님: 지금처럼 문자 MMS 바코드", en: "Guests without the app: barcode by MMS, as today" }] },
+  { n: { ko: "계산", en: "Checkout" },
+    h: { ko: "프로샵 계산은 그대로 — 스캔 한 번", en: "Pro shop checkout unchanged — one scan" },
+    pic: () => `<div class="gw-bill">
+      <div><span>${T({ ko: "그린피 18홀", en: "Green fee 18 holes" })}</span><span>$54.00</span></div>
+      <div class="d"><span>CPN-… ${T({ ko: "개인 쿠폰 −20%", en: "personal coupon −20%" })}</span><span>−$10.80</span></div>
+      <div class="g"><span>GIFT-7C2A… ${T({ ko: "기프트카드", en: "gift card" })}</span><span>−$35.00</span></div>
+      <div><span>${T({ ko: "카드로 낼 나머지", en: "Rest by card" })}</span><span>$8.20</span></div></div>
+      <div class="gw-push"><b>Pelham Hills</b>${T({ ko: "기프트카드를 $35.00 썼습니다. 남은 잔액 $0.00 · 쿠폰 사용 완료", en: "You used $35.00 on your gift card. Balance $0.00 · coupon used" })}<small>${T({ ko: "결제 직후 앱 알림 (예시, 세금 제외)", en: "App notification right after payment (example, before tax)" })}</small></div>`,
+    pts: [{ ko: "GIFT- → 결제 수단 Gift card (0120 트리거가 잔액 확인)", en: "GIFT- → Gift card payment (0120 trigger checks the balance)" },
+      { ko: "PROMO-·CPN- → 그린피 할인", en: "PROMO- / CPN- → green fee discount" },
+      { ko: "모자란 몫은 다른 수단으로", en: "Any shortfall goes on another method" },
+      { ko: "환불하면 잔액·쿠폰이 손님 지갑에 돌아옴", en: "A refund puts the balance and coupon back in the wallet" }] },
+  { n: { ko: "운영", en: "Running it" },
+    h: { ko: "이럴 때 이렇게 씁니다", en: "When to use which" },
+    pic: () => `<div class="gw-sc">
+      <div><b>${T({ ko: "불만 전화", en: "Complaint call" })}</b><span><em>${T({ ko: "기프트 · 무료", en: "Gift · comp" })}</em>${T({ ko: "문제 기록(0099)을 보고 매니저가 $25 카드를 그 손님 앱으로", en: "Manager reads the problem log (0099) and sends a $25 card to that guest's app" })}</span></div>
+      <div><b>${T({ ko: "비로 중단", en: "Rained out" })}</b><span><em class="c">${T({ ko: "개인 쿠폰", en: "Personal" })}</em>${T({ ko: "레인체크 종이 대신 남은 홀만큼 할인 쿠폰", en: "A discount for the unplayed holes instead of a paper rain check" })}</span></div>
+      <div><b>${T({ ko: "연말 선물", en: "Holiday gifts" })}</b><span><em>${T({ ko: "기프트 · 판매", en: "Gift · sold" })}</em>${T({ ko: "프로샵에서 돈 받고 발행 → 받는 분 문자", en: "Take payment at the pro shop, issue, text the recipient" })}</span></div>
+      <div><b>${T({ ko: "오래 안 온 손님", en: "Lapsed guests" })}</b><span><em class="c">${T({ ko: "개인 쿠폰", en: "Personal" })}</em>${T({ ko: "60일 이상 미방문 명단을 매니저가 보고 골라서", en: "Manager picks from a 60-days-away list" })}</span></div>
+      <div><b>${T({ ko: "평일 오후", en: "Weekday PM" })}</b><span><em class="c">${T({ ko: "캠페인", en: "Campaign" })}</em>${T({ ko: "PROMO-WKPM을 문자·앱 배너로 (동의한 사람만)", en: "PROMO-WKPM by text and app banner (consented only)" })}</span></div>
+      <div><b>${T({ ko: "10번 라운드", en: "10th round" })}</b><span><em>${T({ ko: "도장", en: "Stamps" })}</em>${T({ ko: "지금 그대로 — 자동, 회원 제외", en: "Unchanged — automatic, members excluded" })}</span></div></div>`,
+    pts: [{ ko: "보상은 그 자리에서, 손님 앱으로 바로", en: "Make-goods on the spot, straight to the guest's app" },
+      { ko: "회원: 기프트카드는 OK, 할인 쿠폰은 제외 (도장과 같은 규칙)", en: "Members: gift cards yes, discount coupons no (same rule as stamps)" },
+      { ko: "자동 발송은 하지 않음 — 매니저가 고름", en: "No automatic sending — a manager chooses" },
+      { ko: "판매 카드도 온라인 판매는 하지 않음 (10-26 결정)", en: "Sold cards are not sold online (decided 10-26)" }] },
+  { n: { ko: "안전·순서", en: "Safeguards" },
+    h: { ko: "안전장치와 진행 순서", en: "Safeguards and next steps" },
+    pic: () => `<div class="check">
+      <div><span class="tag ok">${T({ ko: "있음", en: "Have" })}</span>${T({ ko: "사유 필수 · 기프트카드 $5,000 한도 · 무효도 사유", en: "Reason required · $5,000 gift card cap · void needs a reason" })}</div>
+      <div><span class="tag">${T({ ko: "추가", en: "Add" })}</span>${T({ ko: "발행 내역 매일 메일 (analysis@·jitnet57@)", en: "Daily email of issued cards (analysis@, jitnet57@)" })}</div>
+      <div><span class="tag">1</span>${T({ ko: "0120 SQL 실행 — 지금 대기 중", en: "Run the 0120 SQL — waiting now" })}</div>
+      <div><span class="tag">2</span>${T({ ko: "결정: 개인 쿠폰(CPN-)을 넣을지, 회원 제외할지", en: "Decide: add personal coupons (CPN-)? exclude members?" })}</div>
+      <div><span class="tag">3</span>${T({ ko: "0121: 계정 지정 발행 + 내 지갑 조회 함수", en: "0121: issue-to-account + my-wallet functions" })}</div>
+      <div><span class="tag">4</span>${T({ ko: "GPS 관리 탭 + 지갑 화면 → 깨끗한 worktree에서 Vercel 배포", en: "GPS admin tab + wallet → Vercel deploy from a clean worktree" })}</div>
+      <div><span class="tag no">${T({ ko: "막힘", en: "Blocked" })}</span>${T({ ko: "GPS 저장소 푸시 403 — jitnet-gif 권한 필요", en: "GPS repo push 403 — needs jitnet-gif access" })}</div></div>`,
+    pts: [{ ko: "발행·무효·사용 모두 기록에 남음", en: "Issue, void and every use stay on record" },
+      { ko: "손님 지갑은 자기 것만 읽기 (보안 함수)", en: "The wallet reads only the guest's own cards (secured function)" },
+      { ko: "번호는 무작위 — 옆 번호로 남의 잔액 못 씀", en: "Codes are random — no guessing a neighbour's card" },
+      { ko: "정해 주시면 2번부터 바로 만듭니다", en: "Once decided, I build from step 2" }] },
+];
+
+const $ = (id) => document.getElementById(id);
+const audio = $("audio");
+let cur = 0, playing = false, timer = null, startAt = 0;
+
+function renderUI() {
+  $("eyebrow").textContent = T(UI.eyebrow); $("title").textContent = T(UI.title); $("sub").textContent = T(UI.sub);
+  $("who").textContent = T(UI.who); $("speedL").textContent = T(UI.speed); $("foot").textContent = T(UI.foot);
+  $("play").textContent = playing ? T(UI.pause) : T(UI.play);
+  $("lang-ko").setAttribute("aria-pressed", LANG === "ko"); $("lang-en").setAttribute("aria-pressed", LANG === "en");
+  document.documentElement.lang = LANG;
+  $("chips").innerHTML = S.map((s, i) => `<button class="chip" type="button" data-i="${i}" aria-current="${i === cur}"><b>${i + 1}</b>${T(s.n)}</button>`).join("");
+}
+
+function show(i) {
+  cur = Math.max(0, Math.min(S.length - 1, i));
+  const s = S[cur];
+  $("stage").innerHTML = `<div class="lane"><div class="lt">${T(UI.pic)}</div><h2>${T(s.h)}</h2>${s.pic()}</div>
+    <div class="lane"><div class="lt">${T(UI.keys)}</div><ul class="pts">${s.pts.map((p, k) => `<li><i>${k + 1}</i><span>${T(p)}</span></li>`).join("")}</ul></div>`;
+  $("narr").textContent = NARR[LANG][cur];
+  $("prog").style.width = "0";
+  renderUI();
+}
+
+function stopAudio() { audio.pause(); clearInterval(timer); }
+function playScene() {
+  stopAudio();
+  audio.src = `audio/${LANG}/s${cur + 1}.mp3`;
+  audio.playbackRate = Number($("speed").value);
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => { playing = false; renderUI(); });
+  timer = setInterval(() => {
+    const d = audio.duration || DUR[LANG][cur] || 1;
+    $("prog").style.width = `${Math.min(100, (audio.currentTime / d) * 100)}%`;
+  }, 200);
+}
+audio.addEventListener("ended", () => {
+  clearInterval(timer); $("prog").style.width = "100%";
+  if (playing && cur < S.length - 1) setTimeout(() => { if (playing) { show(cur + 1); playScene(); } }, 700);
+  else { playing = false; renderUI(); }
+});
+$("play").onclick = () => { playing = !playing; if (playing) playScene(); else stopAudio(); renderUI(); };
+$("prev").onclick = () => { show(cur - 1); if (playing) playScene(); };
+$("next").onclick = () => { show(cur + 1); if (playing) playScene(); };
+$("chips").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (!b) return; show(Number(b.dataset.i)); if (playing) playScene(); };
+$("speed").onchange = () => { audio.playbackRate = Number($("speed").value); };
+function setLang(l) { LANG = l; try { localStorage.setItem("pelham-deck-lang", l); } catch (e) {} show(cur); if (playing) playScene(); }
+$("lang-ko").onclick = () => setLang("ko");
+$("lang-en").onclick = () => setLang("en");
+document.addEventListener("keydown", (e) => { if (e.key === "ArrowRight") $("next").click(); if (e.key === "ArrowLeft") $("prev").click(); });
+show(0);
+</script>

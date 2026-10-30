@@ -14,8 +14,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import DayTabs from "@/components/admin/DayTabs";
+import { useSlotLocks } from "@/hooks/useSlotLocks";
 import { dayNumber, longDate, minutesToTime, toDate, todayIso } from "@/lib/teeSheet/dates";
-import { CLUB_LAT, CLUB_LON, CLUB_TZ, sunMinutes } from "@/lib/teeSheet/sun";
+import { CLUB_LAT, CLUB_LON, CLUB_TZ, gridMinutes, sunMinutes, teeWindow } from "@/lib/teeSheet/sun";
 import type { TeeSheetController, Toast } from "@/lib/teeSheet/types";
 
 export type DateNavProps = { controller: TeeSheetController };
@@ -306,6 +307,157 @@ function HourlyForecastPanel({ iso, rows }: { iso: string; rows: HourForecast[] 
   );
 }
 
+// ===== 첫 티 · 마지막 티 (0131) =====
+// 그날 언제부터 언제까지 티타임을 여나. 정하지 않으면 일출 ~ 일몰 2시간 전. 그 밖의 칸은 시트에서 🔒 로
+// 잠기고 웹·전화 손님에게도 닫힌다. 칸 하나씩은 여전히 자물쇠로 블록·릴리스한다(0051).
+
+function TeeHoursButton({ controller }: DateNavProps) {
+  const { focusedDate, pushToast } = controller;
+  const { locks, setHours } = useSlotLocks([focusedDate]);
+  const win = teeWindow(focusedDate, locks);
+  const auto = teeWindow(focusedDate);
+  const set = locks.hours.get(focusedDate);
+  const custom = set != null && (set.first != null || set.last != null);
+
+  const [open, setOpen] = useState(false);
+  const [first, setFirst] = useState(0);
+  const [last, setLast] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // 고를 수 있는 시각 = 그날 격자. 자동 첫 티(일출)가 격자 사이면 그 다음 칸부터 보인다.
+  const grid = useMemo(() => gridMinutes(focusedDate), [focusedDate]);
+  const snap = (minutes: number, up: boolean) =>
+    up ? (grid.find((m) => m >= minutes) ?? grid[grid.length - 1]) : ([...grid].reverse().find((m) => m <= minutes) ?? grid[0]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!Number.isFinite(win.first) || !Number.isFinite(win.last)) return null;
+
+  const start = () => {
+    setFirst(snap(win.first, true));
+    setLast(snap(win.last, false));
+    setOpen(true);
+  };
+
+  const save = async (nextFirst: number | null, nextLast: number | null) => {
+    setSaving(true);
+    try {
+      const outside = await setHours(
+        focusedDate,
+        nextFirst == null ? null : minutesToTime(nextFirst),
+        nextLast == null ? null : minutesToTime(nextLast),
+      );
+      const shown = teeWindow(focusedDate, {
+        ...locks,
+        hours: new Map([[focusedDate, { first: nextFirst, last: nextLast }]]),
+      });
+      pushToast(
+        "success",
+        `Tee times ${minutesToTime(shown.first)} – ${minutesToTime(shown.last)}` +
+          (outside > 0 ? ` · ${outside} reservation(s) outside these hours stay booked.` : "."),
+      );
+      setOpen(false);
+    } catch (error) {
+      pushToast("error", error instanceof Error ? error.message : "Could not change the tee times.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={`flex items-center gap-1.5 rounded border px-2 py-0.5 font-semibold hover:bg-[#f2f2f4] ${
+          open ? "border-[#c4c4cc] bg-[#f2f2f4]" : custom ? "border-[#d6c28f] bg-[#f3ead2] text-[#5c4a1c]" : "border-transparent"
+        }`}
+        onClick={() => (open ? setOpen(false) : start())}
+        title={custom ? "First and last tee time set by staff — click to change" : "First and last tee time (sunrise / 2 hours before sunset) — click to change"}
+        type="button"
+      >
+        <span aria-hidden>{custom ? "🔒" : "⛳"}</span>
+        {minutesToTime(win.first)} – {minutesToTime(win.last)}
+      </button>
+      {open ? (
+        <div
+          className="absolute left-0 top-full z-40 mt-1 w-72 rounded border border-[#d4d4d8] bg-white p-3 text-xs text-[#1f2328] shadow-lg"
+          role="dialog"
+          aria-label="Tee times for this day"
+        >
+          <p className="mb-2 font-bold">Tee times on {longDate(focusedDate)}</p>
+          <label className="mb-2 flex items-center justify-between gap-2">
+            <span>First tee (open)</span>
+            <select
+              className="rounded border border-[#d4d4d8] px-1 py-0.5"
+              onChange={(event) => setFirst(Number(event.target.value))}
+              value={first}
+            >
+              {grid.map((m) => (
+                <option key={m} value={m}>
+                  {minutesToTime(m)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mb-2 flex items-center justify-between gap-2">
+            <span>Last tee (close)</span>
+            <select
+              className="rounded border border-[#d4d4d8] px-1 py-0.5"
+              onChange={(event) => setLast(Number(event.target.value))}
+              value={last}
+            >
+              {grid.map((m) => (
+                <option key={m} value={m}>
+                  {minutesToTime(m)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="mb-2 text-[11px] text-[#6b7280]">
+            Times outside these hours are locked 🔒 for staff, web and phone. Booked reservations are not moved.
+            Default: {minutesToTime(auto.first)} – {minutesToTime(auto.last)} (sunrise / 2 hours before sunset).
+          </p>
+          {first > last ? <p className="mb-2 font-semibold text-[#c62828]">The first tee must be before the last tee.</p> : null}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              className="rounded border border-[#d7d7dc] px-2 py-1 hover:bg-[#f2f2f4] disabled:opacity-50"
+              disabled={saving || !custom}
+              onClick={() => void save(null, null)}
+              type="button"
+            >
+              Reset to sunrise/sunset
+            </button>
+            <button
+              className="rounded bg-[#4533ff] px-3 py-1 font-bold text-white hover:bg-[#3726e0] disabled:opacity-50"
+              disabled={saving || first > last}
+              onClick={() => void save(first, last)}
+              type="button"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function DateNav({ controller }: DateNavProps) {
   const { connection, focusedDate, stats, toasts, visibleBookings } = controller;
 
@@ -381,6 +533,8 @@ export default function DateNav({ controller }: DateNavProps) {
             </button>
             {forecastOpen ? <HourlyForecastPanel iso={focusedDate} rows={forecast} /> : null}
           </div>
+
+          <TeeHoursButton controller={controller} />
 
           <span
             className="flex shrink-0 items-center gap-1.5 font-semibold text-[#111315]"

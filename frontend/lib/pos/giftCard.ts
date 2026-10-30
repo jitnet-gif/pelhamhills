@@ -40,6 +40,10 @@ export type GiftCard = {
   issued_email: string | null;
   issued_on: string;
   issued_at: string;
+  /** `YYYY-MM-DD`(0139). 비면 No expiry. */
+  expires_on: string | null;
+  /** 결제가 막히는가. 판매 카드는 날짜가 지나도 false 다(온타리오법, 0139). */
+  expired: boolean;
   void_reason: string | null;
   voided_at: string | null;
   uses: GiftCardUse[];
@@ -52,6 +56,7 @@ export type GiftCardIssue = {
   phone?: string;
   email?: string;
   note: string;
+  expires_on?: string;
 };
 
 export const giftCardApi = {
@@ -61,6 +66,8 @@ export const giftCardApi = {
   issue: (fields: GiftCardIssue) => staffRpc<GiftCard>("pelham_staff_gift_card_issue", { p: fields }),
   void: (code: string, reason: string) =>
     staffRpc<GiftCard>("pelham_staff_gift_card_void", { p_code: code, p_reason: reason }),
+  setExpiry: (code: string, expires: string | null) =>
+    staffRpc<GiftCard>("pelham_staff_gift_card_set_expiry", { p_code: code, p_expires: expires }),
   text: (code: string, phone: string) => sendGiftCard(code, "text", { phone }),
   email: (code: string, email: string) => sendGiftCard(code, "email", { email }),
 };
@@ -129,6 +136,16 @@ export function isGiftCardCode(raw: string): boolean {
   return GIFT_CARD_CODE.test(raw.trim());
 }
 
+/** 만료일 글자: `Dec 31, 2027`, 없으면 `No expiry`. */
+export function expiryText(card: Pick<GiftCard, "expires_on">): string {
+  if (!card.expires_on) return "No expiry";
+  return new Date(`${card.expires_on}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 /** 영수증·결제 줄에 찍는 카드 번호. 전체 코드는 돈과 같으므로 끝 4자만. */
 export function maskGiftCard(code: string): string {
   return `Gift card ****${code.slice(-4)}`;
@@ -179,7 +196,7 @@ export function giftCardBlocks(card: GiftCard, options: { header: ReceiptHeader;
   if (card.used > 0) blocks.push({ kind: "total", label: "Balance", amount: formatMoney(card.balance), bold: true });
   blocks.push({
     kind: "text",
-    text: "Use it for green fees, the pro shop and the snack bar. Any amount left stays on the card. No expiry. Not redeemable for cash. Keep it safe — anyone with this barcode can spend it.",
+    text: `Use it for green fees, the pro shop and the snack bar. Any amount left stays on the card. ${card.expires_on ? `Expires ${expiryText(card)}` : "No expiry"}. Not redeemable for cash. Keep it safe — anyone with this barcode can spend it.`,
     align: "center",
     gap: true,
   });

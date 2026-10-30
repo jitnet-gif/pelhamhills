@@ -146,6 +146,14 @@ Pauses: callers often stop to think — "uh", "um", "hmm", "let me see", or a fe
 is not the end of their turn. Do not jump in, repeat the question, or move on. If they hesitate or ask you
 to wait, say once, briefly, "Take your time — I'll wait." and then stay quiet until they speak.
 
+Silence: this wins over every note that says to wait, stay quiet or stay in silence, on the phone and on
+the website. If the conversation comes back to you and the caller has said nothing since your last line,
+10 seconds have passed with no answer. Do not ask "are you still there?" and do not repeat yourself. Say
+only, in English, whatever language the call was in: "I haven't heard an answer for 10 seconds, so I'll
+end the call now. If you have any other questions, please contact us again. Goodbye." and call end_call in
+that same turn. Never do this while a tool is running, or if the caller said anything at all, even "uh" or
+"hold on". This step is important.
+
 Staff hours: identify_caller tells you whether pro shop staff are on duty now (staff_available) and their
 hours. When staff are NOT on duty, never transfer — nobody can answer. Say: "Our pro shop staff aren't in
 right now; they're here from 8 AM to 6 PM. I'll have someone call you back during business hours." (use
@@ -187,6 +195,11 @@ WEB_NODE_RULE = (
     "If the channel is website: never transfer, never offer the pro shop or its number; take a "
     "callback with request_callback instead."
 )
+#: 10초 침묵이면 멘트하고 끊는다(2026-10-30 사용자 요청, ElevenLabs 비용). 노드 지시가 더 뒤에 붙어 여기도 넣는다.
+SILENCE_NODE_RULE = (
+    "If the conversation comes back to you and the caller has said nothing, follow the Silence rule: say "
+    "only the English silence line and call end_call in that same turn."
+)
 NODE_RULES = {
     "Tee Time Booking": (
         "Ask one short question at a time, always in this order, and never skip one: 1. \"Are you a member "
@@ -198,13 +211,13 @@ NODE_RULES = {
         "confirm_booking. After the booking is confirmed and you have read the code, the cart and the "
         "price, ask only \"You're all set. Is it okay if I hang up now?\" Never offer another booking. "
         "If they agree, say \"Thanks for calling Pelham Hills. Goodbye!\" and call end_call. "
-        + WEB_NODE_RULE
+        + WEB_NODE_RULE + " " + SILENCE_NODE_RULE
     ),
     "General Inquiry": (
         "If a booking was just confirmed on this call, do not ask if there is anything else and do not "
         "offer another booking: ask \"Is it okay if I hang up now?\" and call end_call when they agree. "
         "After any goodbye, call end_call right away. "
-        + WEB_NODE_RULE
+        + WEB_NODE_RULE + " " + SILENCE_NODE_RULE
     ),
 }
 

@@ -78,6 +78,13 @@ def test_barcode_png_for_promo_codes(client):
     assert client.get(f"{API}/sms/barcode/PROMO-AB.png").status_code == 404
 
 
+def test_barcode_png_for_personal_coupons(client):
+    """GPS 지갑의 개인 쿠폰(0121) — CPN- + 16진 10자만."""
+    client.app.include_router(sms.router, prefix=API)
+    assert client.get(f"{API}/sms/barcode/CPN-1A2B3C4D5E.png").content.startswith(b"\x89PNG")
+    assert client.get(f"{API}/sms/barcode/CPN-XYZ.png").status_code == 404
+
+
 def test_reply_with_the_old_letter_code_still_cancels(client):
     """숫자로 바뀌기 전에 확인 문자를 받은 손님도 그 코드로 취소할 수 있어야 한다."""
     booking = book(client)

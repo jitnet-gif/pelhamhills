@@ -47,7 +47,7 @@ import type {
 import { useSlotLocks } from "@/hooks/useSlotLocks";
 import type { RainCheck } from "@/lib/pos/rainCheck";
 import { rainCheckTitle, rainCheckTone, useRainChecksBetween } from "./RainCheckDialog";
-import { isSlotLocked, slotLockKey, slotLockReason } from "@/lib/teeSheet/sun";
+import { isSlotLocked, slotLockKey, slotLockReason, teeWindow, type SlotLocks } from "@/lib/teeSheet/sun";
 import { copyBookingInput, copySeats } from "@/lib/teeSheet/copy";
 
 export type WeekGridProps = {
@@ -456,7 +456,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
   const gridId = useId();
 
   // ===== 칸 잠금: 자동(일출 전·일몰 2시간 전 이후) + 직원의 블록·릴리스(0051). PIN 없이 누구나. =====
-  const { locks, setLock } = useSlotLocks(columns);
+  const { locks, setLock, setHours } = useSlotLocks(columns);
   const toggleLock = useCallback(
     async (date: string, time: string, minutes: number, lock: boolean) => {
       // 릴리스는 그 칸을 웹·전화 손님에게도 연다. 손이 미끄러져 여는 일이 없게 한 번 묻는다.
@@ -471,6 +471,49 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
       }
     },
     [pushToast, setLock],
+  );
+
+  // 일간 시트 시간 칸의 자물쇠 → 메뉴: 이 칸 블록·릴리스, 여기서 오픈(첫 티), 여기서 마감(마지막 티)(0131).
+  const [timeMenu, setTimeMenu] = useState<{ time: string; minutes: number; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!timeMenu) return;
+    const close = () => setTimeMenu(null);
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Element && event.target.closest("[data-grid-time-menu]"))) close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [timeMenu]);
+  const changeHours = useCallback(
+    async (date: string, first: number | null, last: number | null) => {
+      try {
+        const outside = await setHours(
+          date,
+          first == null ? null : minutesToTime(first),
+          last == null ? null : minutesToTime(last),
+        );
+        const shown = teeWindow(date, { ...locks, hours: new Map([[date, { first, last }]]) });
+        pushToast(
+          "success",
+          `Tee times ${minutesToTime(shown.first)} – ${minutesToTime(shown.last)}` +
+            (outside > 0 ? ` · ${outside} reservation(s) outside these hours stay booked.` : "."),
+        );
+      } catch (error) {
+        pushToast("error", error instanceof Error ? error.message : "Could not change the tee times.");
+      }
+    },
+    [locks, pushToast, setHours],
   );
 
   // ===== 일간 시트: 선수 칸 우클릭 → 그 한 명만 예약에서 뺀다 =====
@@ -931,7 +974,7 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                     ({ booking }) => !isDead(booking) && booking.status !== "blocked",
                   )?.booking;
                   const darkReason = slotLockReason(focusedDate, slot.time, locks);
-                  const released = locks.get(slotLockKey(focusedDate, slot.minutes)) === false;
+                  const released = locks.slots.get(slotLockKey(focusedDate, slot.minutes)) === false;
 
                   return (
                     <Fragment key={line.key}>
@@ -948,9 +991,13 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
                             손으로 연 칸(release)은 🔓 를 늘 띄워 자동 잠금을 풀었다는 걸 알린다. */}
                         <button
                           type="button"
-                          onClick={() => void toggleLock(focusedDate, slot.time, slot.minutes, !darkReason)}
+                          onClick={(event) => {
+                            const box = event.currentTarget.getBoundingClientRect();
+                            setTimeMenu({ time: slot.time, minutes: slot.minutes, x: box.left, y: box.bottom + 2 });
+                          }}
+                          aria-haspopup="menu"
                           aria-label={darkReason ? `Release ${slot.time}` : `Block ${slot.time}`}
-                          title={darkReason ? `${darkReason}` : released ? `Released by staff — click to block ${slot.time}` : `Block ${slot.time}`}
+                          title={`${darkReason ?? (released ? "Released by staff." : `${slot.time} is open.`)} Click to block/release or set the first/last tee.`}
                           className={`ml-auto flex h-6 w-6 items-center justify-center rounded-sm text-[12px] hover:bg-[#ececf0] ${FOCUS_RING} ${
                             darkReason || released ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                           }`}
@@ -1170,6 +1217,17 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
         />
       </div>
 
+      {timeMenu && isDayView ? (
+        <TimeLockMenu
+          date={focusedDate}
+          menu={timeMenu}
+          locks={locks}
+          onClose={() => setTimeMenu(null)}
+          onLock={(lock) => void toggleLock(focusedDate, timeMenu.time, timeMenu.minutes, lock)}
+          onHours={(first, last) => void changeHours(focusedDate, first, last)}
+        />
+      ) : null}
+
       {playerMenu && menuBooking && menuPlayer ? (
         <div
           data-grid-player-menu
@@ -1209,6 +1267,80 @@ export default function WeekGrid({ controller, onCreateAt }: WeekGridProps) {
 }
 
 // ===================== 하위 컴포넌트 =====================
+
+/**
+ * 일간 시트 시간 칸 🔒/🔓 메뉴. 칸 하나 블록·릴리스(0051)와 그날 첫 티·마지막 티(0131)를 여기서 바로 정한다.
+ * 첫 티만 바꾸면 마지막 티는 지금 설정(없으면 자동)을 그대로 둔다. 반대도 같다.
+ */
+function TimeLockMenu({
+  date,
+  menu,
+  locks,
+  onClose,
+  onLock,
+  onHours,
+}: {
+  date: string;
+  menu: { time: string; minutes: number; x: number; y: number };
+  locks: SlotLocks;
+  onClose: () => void;
+  onLock: (lock: boolean) => void;
+  onHours: (first: number | null, last: number | null) => void;
+}) {
+  const locked = isSlotLocked(date, menu.minutes, locks);
+  const win = teeWindow(date, locks);
+  const set = locks.hours.get(date);
+  const custom = set != null && (set.first != null || set.last != null);
+  const item = "flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f0efff] disabled:opacity-40 disabled:hover:bg-transparent";
+  const run = (action: () => void) => () => {
+    onClose();
+    action();
+  };
+  return (
+    <div
+      data-grid-time-menu
+      role="menu"
+      className="fixed z-50 min-w-[250px] border border-[#c7c7cc] bg-white py-1 text-[12px] shadow-lg"
+      style={{ left: Math.min(menu.x, window.innerWidth - 266), top: Math.min(menu.y, window.innerHeight - 190) }}
+    >
+      <p className="px-3 pt-1 pb-1.5 text-[11px] text-[#6b7280]">
+        {menu.time} · tee times {minutesToTime(win.first)} – {minutesToTime(win.last)}
+      </p>
+      <button type="button" role="menuitem" className={item} onClick={run(() => onLock(!locked))}>
+        <span aria-hidden>{locked ? "🔓" : "🔒"}</span>
+        {locked ? `Release ${menu.time}` : `Block ${menu.time}`}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={item}
+        disabled={menu.minutes === win.first || menu.minutes > win.last}
+        onClick={run(() => onHours(menu.minutes, set?.last ?? null))}
+        title="Everything before this time is locked"
+      >
+        <span aria-hidden>▶</span>
+        Open from {menu.time} (first tee)
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={item}
+        disabled={menu.minutes === win.last || menu.minutes < win.first}
+        onClick={run(() => onHours(set?.first ?? null, menu.minutes))}
+        title="Everything after this time is locked"
+      >
+        <span aria-hidden>■</span>
+        Close after {menu.time} (last tee)
+      </button>
+      {custom ? (
+        <button type="button" role="menuitem" className={item} onClick={run(() => onHours(null, null))}>
+          <span aria-hidden>☀</span>
+          Reset to sunrise/sunset
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 // 레인체크 ☂: 파랑 = 쓸 수 있음, 회색 = 썼거나 지남. 칸 바탕이 요금제마다 달라 흰 테두리를 두른다.
 const RAIN_MARK_BASE =

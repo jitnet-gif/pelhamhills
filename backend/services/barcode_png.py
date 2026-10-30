@@ -24,7 +24,8 @@ from backend.services.twilio_sms import public_api_base
 #: 그 주소는 손님에게 간 문자에만 있다. 프로모션 코드(`PROMO-` + 영문·숫자 3–16자, 0078)는
 #: 여러 손님이 같이 쓰는 공개 할인 코드라 그림을 누가 봐도 괜찮다. 기프트카드(`GIFT-` + 16진 10자, 0120)는
 #: 레인체크와 같다 — 그림에는 주소에 있는 코드뿐이고, 그 주소는 받는 손님의 문자에만 있다.
-BARCODE_CODE_RE = re.compile(r"\d{6}|\d{10}|RC-[0-9A-F]{10}|PROMO-[A-Z0-9]{3,16}|GIFT-[0-9A-F]{10}")
+#: GPS 지갑의 개인 쿠폰(`CPN-` + 16진 10자, 0121)도 같다.
+BARCODE_CODE_RE = re.compile(r"\d{6}|\d{10}|RC-[0-9A-F]{10}|PROMO-[A-Z0-9]{3,16}|GIFT-[0-9A-F]{10}|CPN-[0-9A-F]{10}")
 
 MODULE_PX = 4  # 막대 한 칸의 폭. 휴대폰 화면에서 스캐너가 읽기 넉넉한 굵기.
 HEIGHT_PX = 160

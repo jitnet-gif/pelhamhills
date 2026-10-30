@@ -126,6 +126,9 @@ export const ADMIN_GIFT_CARDS = "/admin/gift-cards";
 
 export const GOLF_GPS_MAP_EDITOR = "https://golf-gps-pelhamhills-seven.vercel.app/admin/map";
 
+/** 클럽 CCTV. 화면은 GPS 앱 어드민의 CCTV 탭에 있다(go2rtc 연결 전에는 호프 안내만). */
+export const GOLF_GPS_CCTV = "https://golf-gps-pelhamhills-seven.vercel.app/admin/cctv";
+
 /**
  * 어드민 사이드바 메뉴. 순서가 곧 화면에 보이는 순서다.
  *
@@ -152,6 +155,7 @@ export const adminNav: NavItem[] = [
   { label: "Reports", href: ADMIN_REPORTS, glyph: "▥" },
   { label: "AI Manager Marketing Strategies", href: ADMIN_AI_MARKETING, glyph: "◧" },
   { label: "Course Map", href: GOLF_GPS_MAP_EDITOR, glyph: "⌖" },
+  { label: "CCTV", href: GOLF_GPS_CCTV, glyph: "📹" },
   { label: "Integrations", href: "/admin/integrations", glyph: "⊞" },
   { label: "Settings", href: "/admin/settings", glyph: "⚙" },
   // 1번 티 스타터 폰(Android) 앱 내려받기와 설치 순서(android/starter).

@@ -2,7 +2,8 @@
 //
 // SQL `pelham_tee_sun`(0048)·백엔드 `tee_sheet.sun_minutes` 와 **같은 식, 같은 반올림**(분 아래 버림)이다.
 // 셋이 어긋나면 화면에서 열린 칸을 DB 트리거가 거절하거나 그 반대가 된다.
-// 자동으로 열리는 칸: 일출 <= 티타임 <= 일몰 - 2시간 (0051). 그날 격자에는 일출 칸이 하나 더 있다.
+// 자동으로 열리는 칸: 첫 티 <= 티타임 <= 마지막 티. 첫 티·마지막 티는 직원이 그날 정한 값(0131
+// `pelham_tee_day_hours`), 없으면 일출·일몰 - 2시간(0051). 그날 격자에는 일출 칸이 하나 더 있다.
 // 직원이 칸마다 블록·릴리스한 값(`pelham_tee_slot_locks`)이 자동 판정보다 앞선다.
 
 import { minutesToTime, timeToMinutes, toDate } from "@/lib/teeSheet/dates";
@@ -69,10 +70,25 @@ const GRID_FIRST = 400;
 const GRID_LAST = 1138;
 const GRID_STEP = 9;
 
-/** 그날 자동으로 열리는 첫 티(일출)와 마지막 티(일몰 2시간 전). */
-export function teeWindow(iso: string): { first: number; last: number } {
+/** 직원이 정한 그날의 첫 티·마지막 티(분, 0131). null = 자동. */
+export type DayHours = { first: number | null; last: number | null };
+
+/**
+ * 직원의 손 설정 — 칸마다 블록·릴리스(`slots`, 키는 `slotLockKey`, true = 블록, false = 릴리스)와
+ * 날짜마다 첫 티·마지막 티(`hours`, 키는 ISO 날짜).
+ */
+export type SlotLocks = {
+  readonly slots: ReadonlyMap<string, boolean>;
+  readonly hours: ReadonlyMap<string, DayHours>;
+};
+
+export const NO_LOCKS: SlotLocks = { slots: new Map(), hours: new Map() };
+
+/** 그날 열리는 첫 티와 마지막 티 — 직원이 정한 값, 없으면 일출과 일몰 2시간 전. */
+export function teeWindow(iso: string, locks: SlotLocks = NO_LOCKS): { first: number; last: number } {
   const { sunrise, sunset } = sunMinutes(iso);
-  return { first: sunrise, last: sunset - LAST_TEE_BEFORE_SUNSET_MINUTES };
+  const set = locks.hours.get(iso);
+  return { first: set?.first ?? sunrise, last: set?.last ?? sunset - LAST_TEE_BEFORE_SUNSET_MINUTES };
 }
 
 /** 그날 격자 위의 시각인가: 9분 격자 + 일출 칸. */
@@ -82,34 +98,46 @@ export function isOnGrid(iso: string, minutes: number): boolean {
   return minutes === sunrise && sunrise > GRID_FIRST && sunrise < GRID_LAST;
 }
 
-/** 수동 설정 없이 잠기는 칸인가(일출 전, 일몰 2시간 전 이후). 계산이 안 되는 날(NaN)은 잠그지 않는다. */
-export function isAutoLocked(iso: string, minutes: number): boolean {
-  const { first, last } = teeWindow(iso);
+/** 그날 격자의 모든 시각(분, 오름차순). 첫 티·마지막 티 고르기에 쓴다. */
+export function gridMinutes(iso: string): number[] {
+  const out: number[] = [];
+  for (let m = GRID_FIRST; m <= GRID_LAST; m += GRID_STEP) out.push(m);
+  const { sunrise } = sunMinutes(iso);
+  if (sunrise > GRID_FIRST && sunrise < GRID_LAST && !out.includes(sunrise)) out.push(sunrise);
+  return out.sort((a, b) => a - b);
+}
+
+/** 칸 설정 없이 잠기는 칸인가(첫 티 전, 마지막 티 뒤). 계산이 안 되는 날(NaN)은 잠그지 않는다. */
+export function isAutoLocked(iso: string, minutes: number, locks: SlotLocks = NO_LOCKS): boolean {
+  const { first, last } = teeWindow(iso, locks);
   if (!Number.isFinite(first) || !Number.isFinite(last)) return false;
   return minutes < first || minutes > last;
 }
-
-/** 수동 블록·릴리스. 키는 `slotLockKey`, 값 true = 블록, false = 릴리스. */
-export type SlotLocks = ReadonlyMap<string, boolean>;
 
 export function slotLockKey(iso: string, minutes: number): string {
   return `${iso}|${minutes}`;
 }
 
-/** 그 칸이 지금 잠겨 있나 — 수동 설정이 있으면 그것, 없으면 자동 판정. 그날 격자 밖은 늘 잠김. */
+/** 그 칸이 지금 잠겨 있나 — 칸 설정이 있으면 그것, 없으면 첫 티·마지막 티 판정. 그날 격자 밖은 늘 잠김. */
 export function isSlotLocked(iso: string, minutes: number, locks: SlotLocks): boolean {
   if (!isOnGrid(iso, minutes)) return true;
-  return locks.get(slotLockKey(iso, minutes)) ?? isAutoLocked(iso, minutes);
+  return locks.slots.get(slotLockKey(iso, minutes)) ?? isAutoLocked(iso, minutes, locks);
 }
 
-/** 잠긴 칸이면 직원에게 보일 이유 한 줄, 아니면 null. 트리거(0051)의 문구와 맞춘다. */
+/** 잠긴 칸이면 직원에게 보일 이유 한 줄, 아니면 null. 트리거(0131)의 문구와 맞춘다. */
 export function slotLockReason(iso: string, time: string, locks: SlotLocks): string | null {
   const minutes = timeToMinutes(time);
   if (!Number.isFinite(minutes) || !isSlotLocked(iso, minutes, locks)) return null;
   if (!isOnGrid(iso, minutes)) return `${time} is not a tee time on this day.`;
-  if (locks.get(slotLockKey(iso, minutes)) === true) return `${time} is blocked. Click the lock to release it.`;
-  const { first, last } = teeWindow(iso);
-  return minutes < first
-    ? `${time} is before sunrise (${minutesToTime(first)}). Click the lock to release it.`
+  if (locks.slots.get(slotLockKey(iso, minutes)) === true) return `${time} is blocked. Click the lock to release it.`;
+  const { first, last } = teeWindow(iso, locks);
+  const set = locks.hours.get(iso);
+  if (minutes < first) {
+    return set?.first != null
+      ? `${time} is before the first tee time (${minutesToTime(first)}). Click the lock to release it.`
+      : `${time} is before sunrise (${minutesToTime(first)}). Click the lock to release it.`;
+  }
+  return set?.last != null
+    ? `${time} is after the last tee time (${minutesToTime(last)}). Click the lock to release it.`
     : `${time} is too close to sunset — the last tee time is ${minutesToTime(last)}. Click the lock to release it.`;
 }

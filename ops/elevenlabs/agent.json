@@ -72,12 +72,12 @@
     },
     "_turn_comment": [
       "손님이 '에~', '음~' 하고 생각하는 동안 끼어들지 않게 한다(2026-10-20 요청).",
-      "turn_eagerness 'patient' = 말이 끝났다고 판단하기 전에 더 기다린다. turn_timeout = 조용할 때 다시 말을 걸기까지 초.",
+      "turn_eagerness 'patient' = 말이 끝났다고 판단하기 전에 더 기다린다. turn_timeout = 조용할 때 에이전트 차례가 오기까지 초. 10초면 침묵 멘트를 하고 끊는다(프롬프트 Silence 규칙, 2026-10-30 비용 절감).",
       "필드 이름은 ElevenLabs 대시보드 Advanced → Turn eagerness / Take turn after silence 와 같다. 거부되면 대시보드에서 직접 켠다."
     ],
     "turn": {
       "turn_eagerness": "patient",
-      "turn_timeout": 15
+      "turn_timeout": 10
     }
   },
   "_tools_comment": [

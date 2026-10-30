@@ -568,6 +568,36 @@ async def strategy(body: StrategyIn, request: Request) -> dict[str, Any]:
 _audio_cache: dict[str, bytes] = {}
 AUDIO_CACHE_MAX = 200
 
+#: 한 번 만든 mp3 를 영구 보관하는 비공개 버킷(0124). 서버가 재시작·배포돼도 ElevenLabs 를 다시 부르지 않는다.
+AUDIO_BUCKET = "ai-narration"
+
+
+def _stored_audio(digest: str) -> bytes | None:
+    """버킷에 저장해 둔 mp3. 없거나 Storage 가 안 되면 None — 그때만 ElevenLabs 로 만든다."""
+    if not supabase_rest.configured():
+        return None
+    try:
+        with supabase_rest._client() as client:
+            res = client.get(f"/storage/v1/object/{AUDIO_BUCKET}/{digest}.mp3")
+    except Exception as exc:
+        logger.warning("나레이션 저장본 읽기 실패: %s", type(exc).__name__)
+        return None
+    return res.content if res.is_success and res.content else None
+
+
+def _store_audio(digest: str, audio: bytes) -> None:
+    """만든 mp3 를 버킷에 넣는다. 실패해도 이번 재생은 그대로 간다(다음에 한 번 더 만들 뿐)."""
+    if not supabase_rest.configured():
+        return
+    try:
+        with supabase_rest._client() as client:
+            res = client.post(f"/storage/v1/object/{AUDIO_BUCKET}/{digest}.mp3", content=audio,
+                              headers={"Content-Type": "audio/mpeg", "x-upsert": "true"})
+        if not res.is_success:
+            logger.warning("나레이션 저장 실패: Storage HTTP %s", res.status_code)
+    except Exception as exc:
+        logger.warning("나레이션 저장 실패: %s", type(exc).__name__)
+
 
 def _require_viewer(request: Request) -> None:
     """AI 마케팅 명단(0094) 계정인가. 아니면 SQL 이 false 를 돌려준다."""
@@ -640,6 +670,8 @@ async def narrate(body: NarrateIn, request: Request) -> Response:
     digest = hashlib.sha256((text + (json.dumps(voice, sort_keys=True) if voice else "")).encode("utf-8")).hexdigest()
     audio = _audio_cache.get(digest)
     if audio is None:
+        audio = await asyncio.to_thread(_stored_audio, digest)
+    if audio is None:
         payload: dict[str, Any] = {"text": text, "model_id": NARRATOR_MODEL}
         if voice:
             payload["voice_settings"] = voice
@@ -657,6 +689,8 @@ async def narrate(body: NarrateIn, request: Request) -> Response:
             logger.warning("나레이션 실패: ElevenLabs HTTP %s", res.status_code)
             raise HTTPException(status_code=503, detail="The narrator is not available right now.")
         audio = res.content
+        await asyncio.to_thread(_store_audio, digest, audio)
+    if digest not in _audio_cache:
         if len(_audio_cache) >= AUDIO_CACHE_MAX:
             _audio_cache.pop(next(iter(_audio_cache)))
         _audio_cache[digest] = audio

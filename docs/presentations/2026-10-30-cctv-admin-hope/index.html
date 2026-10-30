@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<!-- 어드민 'CCTV' 탭의 호프 가이드. drone-guide.html 의 화면과 플레이어를 그대로 씁니다. -->
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Pelham Hills CCTV 연결도</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one 16:9 flight-display slide at a time, with Hope's narration bar underneath. Single dark look on purpose. */
+:root {
+  --bg: #0A130F; --surface: #111F18; --raise: #17291F; --line: #24392D;
+  --fg: #E7EFE9; --muted: #98AE9F;
+  --amber: #FFB547; --sky: #5FD4FF; --turf: #7CF29A; --alert: #FF8F6B;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 32px; max-width: 1240px; margin: 0 auto; display: grid; gap: 12px; }
+.frame { container-type: inline-size; }
+.stage { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: clamp(13px, 1.3cqw, 20px); }
+@container (min-width: 760px) { .stage { aspect-ratio: 16 / 9; } }
+.slide { display: grid; gap: 1.1em; align-content: start; padding: 2.4em 2.8em; height: 100%; box-sizing: border-box; overflow: auto; }
+.slide[hidden] { display: none !important; }
+.slide { animation: rise .35s ease-out; }
+@keyframes rise { from { transform: translateY(6px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .slide { animation: none; } }
+.eyebrow { font: 600 .78em var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--amber); }
+h1 { font-size: 3.1em; line-height: 1.12; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+h2 { font-size: 2.05em; line-height: 1.2; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+.lede { font-size: 1.15em; color: var(--muted); margin: 0; max-width: 46ch; line-height: 1.55; }
+.small { font-size: .88em; color: var(--muted); margin: 0; line-height: 1.5; }
+.mono { font-family: var(--mono); }
+.amber { color: var(--amber); } .sky { color: var(--sky); } .turf { color: var(--turf); } .alert { color: var(--alert); }
+svg text { font-family: var(--mono); }
+
+.title-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2em; align-items: center; height: 100%; }
+.title-grid img { width: 100%; max-width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6em; }
+.stat { border-top: 2px solid var(--amber); padding-top: .45em; }
+.stat b { display: block; font: 600 1.7em var(--mono); }
+.stat span { font-size: .8em; color: var(--muted); }
+
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8em; }
+.shot { background: var(--raise); border-radius: 8px; padding: .8em 1em; display: grid; gap: .25em; }
+.shot b { font-size: 1.02em; }
+.shot .k { font: 600 .8em var(--mono); }
+.shot p { margin: 0; font-size: .86em; color: var(--muted); line-height: 1.45; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8em; counter-reset: s; }
+.steps li { counter-increment: s; background: var(--raise); border-radius: 8px; padding: .8em 1em; display: grid; gap: .3em; align-content: start; }
+.steps li::before { content: counter(s); font: 600 1.5em var(--mono); color: var(--amber); }
+.steps b { font-size: 1.02em; } .steps span { font-size: .86em; color: var(--muted); line-height: 1.45; }
+
+.versus { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1em; }
+.way { border: 1px solid var(--line); border-radius: 10px; padding: 1em 1.2em; display: grid; gap: .5em; align-content: start; }
+.way.pick { border-color: var(--turf); }
+.way h3 { margin: 0; font-size: 1.25em; }
+.pill { justify-self: start; font: 600 .74em var(--mono); letter-spacing: .08em; padding: .25em .6em; border-radius: 99px; background: var(--raise); }
+.way ul { margin: 0; padding-left: 1.1em; display: grid; gap: .35em; font-size: .92em; line-height: 1.45; }
+.plus::marker { color: var(--turf); } .minus::marker { color: var(--alert); }
+
+.verdict { display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.6em; align-items: center; }
+.big { font-size: 1.7em; font-weight: 700; line-height: 1.3; margin: 0; text-wrap: balance; }
+.facts { display: grid; gap: .6em; font-size: .92em; line-height: 1.45; }
+.facts div { display: grid; grid-template-columns: 2.2em 1fr; gap: .4em; }
+.facts div > span:first-child { font: 600 1em var(--mono); }
+
+.bats { display: grid; grid-template-columns: 18fr 17fr 18fr 18fr 9fr; gap: .4em; }
+.bat { background: var(--raise); border-radius: 6px; padding: .55em .6em; border-bottom: 3px solid var(--amber); min-width: 0; }
+.bat b { display: block; font: 600 .95em var(--mono); } .bat span { font: .8em var(--mono); color: var(--muted); }
+.tips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6em 1.6em; font-size: .95em; line-height: 1.5; }
+.tips div { border-left: 2px solid var(--line); padding-left: .8em; }
+
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: .55em; }
+.checks li { display: grid; grid-template-columns: 1.6em 1fr; gap: .5em; font-size: 1em; line-height: 1.45; }
+.checks li::before { content: "✓"; font: 600 1em var(--mono); color: var(--turf); }
+.checks li.hot::before { content: "!"; color: var(--alert); }
+
+/* narration bar */
+.bar { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; }
+.hope { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--raise); border: 2px solid var(--amber); display: grid; place-items: center; font: 600 15px var(--mono); color: var(--amber); }
+.avatar.talking { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(255,181,71,.18); } }
+@media (prefers-reduced-motion: reduce) { .avatar.talking { animation: none; } }
+.who { display: grid; min-width: 0; }
+.who b { font-size: 14px; } .who span { font-size: 12px; color: var(--muted); }
+.caption { font-size: 15px; line-height: 1.55; min-height: 2.6em; margin: 0; color: var(--fg); }
+.caption mark { background: rgba(255,181,71,.22); color: var(--fg); border-radius: 3px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.group { display: flex; align-items: center; gap: 6px; }
+button { font: 500 13px var(--sans); color: var(--fg); background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--amber); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+button.primary { background: var(--amber); color: var(--bg); border-color: var(--amber); font-weight: 700; min-width: 92px; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.count { font: 500 13px var(--mono); color: var(--muted); min-width: 44px; text-align: center; }
+label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+input[type=range] { width: 110px; accent-color: var(--amber); }
+output { font: 500 12px var(--mono); color: var(--fg); min-width: 32px; }
+select { font: 13px var(--sans); background: var(--raise); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 220px; }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+kbd { font: 11px var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+@container (max-width: 759px) {
+  .slide { padding: 1.4em 1.2em; }
+  h1 { font-size: 2.2em; } h2 { font-size: 1.6em; }
+  .title-grid, .verdict, .versus, .tips { grid-template-columns: minmax(0, 1fr); }
+  .trio, .steps { grid-template-columns: minmax(0, 1fr); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bats { grid-template-columns: minmax(0, 1fr); }
+}
+.fl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.7em; }
+.fn { position: relative; background: var(--raise); border-radius: 8px; padding: .8em .9em; display: grid; gap: .3em; align-content: start; }
+.fn b { font-size: 1.02em; line-height: 1.3; } .fn .k { font: 600 .74em var(--mono); }
+.fn p { margin: 0; font-size: .84em; color: var(--muted); line-height: 1.4; }
+.fn:not(:last-child)::after { content: "→"; position: absolute; right: -1.35em; top: 50%; transform: translateY(-50%); color: var(--amber); font: 600 1.1em var(--mono); }
+.scr { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; background: #000; border-radius: 8px; max-width: 22em; width: 100%; }
+.scr span { aspect-ratio: 16 / 10; background: var(--raise); border-radius: 2px; }
+.scr .on { background: var(--turf); } .scr .off { background: var(--alert); }
+.steps.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.way p { margin: 0; }
+.fl { margin-top: 2.4em; }
+.fn { padding: 1.5em 1.1em; gap: .7em; min-height: 15em; }
+.fn b { font-size: 1.3em; } .fn p { font-size: 1em; line-height: 1.5; }
+.steps.five { margin-top: 2.4em; }
+.steps.five li { min-height: 13em; }
+.steps.five b { font-size: 1.2em; line-height: 1.35; } .steps.five span { font-size: 1em; }
+@container (max-width: 759px) {
+  .fl, .steps.five { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+  .fn, .steps.five li { min-height: 0; }
+  .fn:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -1.5em; transform: none; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <div class="frame">
+    <div class="stage" id="stage" aria-live="polite">
+      <!-- 1 -->
+      <section class="slide" data-n="1">
+        <span class="eyebrow">Pelham Hills · Hikvision DVR/NVR</span>
+        <h1 data-ko="클럽 CCTV를 어드민 화면으로" data-en="Club CCTV in the admin site"></h1>
+        <p class="lede" data-ko="카메라와 녹화 장비는 그대로 두고, 영상을 보는 길만 새로 만듭니다." data-en="The cameras and recorders stay as they are. We only add a new way to watch."></p>
+        <div class="trio">
+          <div class="shot"><span class="k sky" data-ko="그대로" data-en="Stays"></span><b data-ko="카메라, 녹화기 2대" data-en="Cameras, 2 recorders"></b><p data-ko="녹화는 지금처럼 녹화기가 맡습니다." data-en="The recorders keep recording as they do now."></p></div>
+          <div class="shot"><span class="k turf" data-ko="새로 설치" data-en="New install"></span><b>go2rtc + Cloudflare</b><p data-ko="영상을 브라우저용으로 바꾸고 안전하게 내보냅니다." data-en="Converts video for browsers and sends it out safely."></p></div>
+          <div class="shot"><span class="k amber" data-ko="새로 개발" data-en="New build"></span><b data-ko="어드민 CCTV 탭" data-en="Admin CCTV tab"></b><p data-ko="실시간 그리드, 누르면 크게 보기." data-en="Live grid, tap to enlarge."></p></div>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="slide" data-n="2" hidden>
+        <span class="eyebrow" data-ko="영상이 지나가는 길" data-en="The video path"></span>
+        <h2 data-ko="녹화기에서 받아 어드민까지" data-en="From the recorder to the admin site"></h2>
+        <div class="fl">
+          <div class="fn"><span class="k sky" data-ko="클럽 안" data-en="At the club"></span><b data-ko="카메라" data-en="Cameras"></b><p data-ko="손대지 않습니다" data-en="Untouched"></p></div>
+          <div class="fn"><span class="k sky" data-ko="클럽 안" data-en="At the club"></span><b>Hikvision DVR/NVR</b><p data-ko="2대, RTSP로 영상 제공" data-en="2 units, serve video over RTSP"></p></div>
+          <div class="fn"><span class="k turf" data-ko="클럽 안" data-en="At the club"></span><b>go2rtc</b><p data-ko="항상 켜 둔 PC에서 브라우저용으로 변환" data-en="Converts for browsers on an always-on PC"></p></div>
+          <div class="fn"><span class="k turf" data-ko="인터넷" data-en="Internet"></span><b>Cloudflare</b><p data-ko="Tunnel + Access. 포트는 닫아 두고 스태프만 통과" data-en="Tunnel + Access. Ports stay closed, staff only"></p></div>
+          <div class="fn"><span class="k amber" data-ko="스태프 화면" data-en="Staff screen"></span><b data-ko="CCTV 탭" data-en="CCTV tab"></b><p data-ko="실시간 영상. 외부에서는 몇 초 늦을 수 있음" data-en="Live video, a few seconds behind off-site"></p></div>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section class="slide" data-n="3" hidden>
+        <span class="eyebrow" data-ko="사진 속 모니터" data-en="The monitor in the photo"></span>
+        <h2 data-ko="NO LINK 카메라부터 점검합니다" data-en="Fix the NO LINK cameras first"></h2>
+        <div class="verdict">
+          <div class="scr" role="img" aria-label="16 cells: 1 live, 3 NO LINK, 12 empty">
+            <span class="on"></span><span class="off"></span><span class="off"></span><span class="off"></span>
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="facts">
+            <div><span class="turf">1</span><span data-ko="영상이 나오는 칸" data-en="cell showing video"></span></div>
+            <div><span class="alert">3</span><span data-ko="NO LINK, 카메라 연결 끊김" data-en="NO LINK, camera disconnected"></span></div>
+            <div><span>12</span><span data-ko="로고만 보이는 빈 칸" data-en="empty cells with only the logo"></span></div>
+          </div>
+        </div>
+        <p class="small" data-ko="사진에 보이는 16칸 기준입니다. 사진 왼쪽이 잘려 있어서 실제 칸 수는 더 많을 수 있습니다." data-en="This counts the 16 cells visible in the photo. The left side is cut off, so there may be more."></p>
+      </section>
+
+      <!-- 4 -->
+      <section class="slide" data-n="4" hidden>
+        <span class="eyebrow" data-ko="화질" data-en="Quality"></span>
+        <h2 data-ko="채널마다 화질이 두 개입니다" data-en="Every channel has two qualities"></h2>
+        <div class="versus">
+          <div class="way pick"><span class="pill" data-ko="그리드" data-en="Grid"></span><h3 data-ko="저화질" data-en="Low quality"></h3><span class="mono sky">/Streaming/Channels/102</span><p class="small" data-ko="여러 대를 띄워도 인터넷을 적게 씁니다." data-en="Uses little internet, even with many cameras on screen."></p></div>
+          <div class="way"><span class="pill" data-ko="크게 보기" data-en="Enlarged"></span><h3 data-ko="고화질" data-en="High quality"></h3><span class="mono sky">/Streaming/Channels/101</span><p class="small" data-ko="한 대를 눌렀을 때만 씁니다." data-en="Used only when you tap one camera."></p></div>
+        </div>
+        <p class="small" data-ko="앞자리는 채널 번호입니다. 2번 채널은 201과 202가 됩니다." data-en="The first digit is the channel. Channel 2 is 201 and 202."></p>
+      </section>
+
+      <!-- 5 -->
+      <section class="slide" data-n="5" hidden>
+        <span class="eyebrow" data-ko="진행 순서" data-en="The order"></span>
+        <h2 data-ko="다섯 단계로 끝납니다" data-en="Five steps"></h2>
+        <ol class="steps five">
+          <li><b data-ko="NO LINK 점검" data-en="Check NO LINK"></b><span>EG COMM</span></li>
+          <li><b data-ko="녹화기 정보 확인, 보기 전용 계정" data-en="Recorder details, view-only account"></b><span data-ko="EG COMM 또는 클럽" data-en="EG COMM or the club"></span></li>
+          <li><b data-ko="go2rtc 설치" data-en="Install go2rtc"></b><span data-ko="클럽 PC" data-en="Club PC"></span></li>
+          <li><b data-ko="Tunnel, Access 연결" data-en="Connect Tunnel, Access"></b><span data-ko="Cloudflare 도메인 필요" data-en="Needs a Cloudflare domain"></span></li>
+          <li><b data-ko="어드민 CCTV 탭 완성" data-en="Finish the CCTV tab"></b><span>Claude</span></li>
+        </ol>
+      </section>
+
+      <!-- 6 -->
+      <section class="slide" data-n="6" hidden>
+        <span class="eyebrow" data-ko="알려 주실 것" data-en="What we need"></span>
+        <h2 data-ko="여섯 가지만 알려 주세요" data-en="Six things to send us"></h2>
+        <div class="versus">
+          <div class="way pick"><span class="pill" data-ko="먼저 필요" data-en="First"></span>
+            <ul><li data-ko="녹화기 2대의 모델명" data-en="Model of both recorders"></li><li data-ko="녹화기 2대의 내부 IP" data-en="Internal IP of both recorders"></li><li data-ko="쓰는 채널 번호와 위치 이름" data-en="Channels in use and their locations"></li></ul></div>
+          <div class="way"><span class="pill" data-ko="설치할 때" data-en="At install"></span>
+            <ul><li data-ko="보기 전용 녹화기 계정" data-en="View-only recorder account"></li><li data-ko="항상 켜 둘 PC" data-en="An always-on PC"></li><li data-ko="Cloudflare에 연결된 도메인" data-en="A domain on Cloudflare"></li></ul></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="hope">
+      <div class="avatar" id="avatar" aria-hidden="true">H</div>
+      <div class="who"><b data-ko="나레이터 호프" data-en="Narrator Hope"></b><span data-ko="ElevenLabs Hope Natural" data-en="ElevenLabs Hope Natural"></span></div>
+    </div>
+    <p class="caption" id="caption"></p>
+    <div class="controls">
+      <div class="group">
+        <button id="prev" type="button" aria-label="Previous slide">◀</button>
+        <span class="count" id="count">1 / 8</span>
+        <button id="next" type="button" aria-label="Next slide">▶</button>
+      </div>
+      <button class="primary" id="play" type="button"></button>
+      <label><input type="checkbox" id="auto" checked> <span data-ko="자동 넘김" data-en="Auto-advance"></span></label>
+      <div class="group seg" role="group" aria-label="Language">
+        <button type="button" id="lang-ko" data-lang="ko">한국어</button>
+        <button type="button" id="lang-en" data-lang="en">English</button>
+      </div>
+      <label for="pitch"><span data-ko="피치" data-en="Pitch"></span><input type="range" id="pitch" min="0.7" max="1.4" step="0.01"><output id="pitch-out"></output></label>
+      <label for="rate"><span data-ko="속도" data-en="Speed"></span><input type="range" id="rate" min="0.5" max="2" step="0.05"><output id="rate-out"></output></label>
+      <button type="button" id="reset" data-ko="기본값" data-en="Reset"></button>
+    </div>
+    <p class="hint" id="hint"></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script>
+const NARR = [
+ {
+  "ko": "안녕하세요, 호프입니다. 오늘은 클럽의 CCTV를 어드민 사이트에서 보는 방법을 안내해 드릴게요. 카메라와 녹화 장비는 그대로 두고, 영상을 보는 길만 새로 만듭니다.",
+  "en": "Hi, I'm Hope. Let's look at how to watch the club's CCTV from the admin site. The cameras and recorders stay as they are. We only add a new way to watch."
+ },
+ {
+  "ko": "영상은 이렇게 지나갑니다. 카메라 영상은 지금처럼 하이크비전 녹화기 두 대로 들어갑니다. 클럽에 항상 켜 둔 PC의 고투알티씨가 녹화기에서 영상을 받아 브라우저용으로 바꿉니다. 그다음 클라우드플레어를 거쳐 안전하게 밖으로 나오고, 스태프로 확인된 사람만 어드민 CCTV 탭에서 볼 수 있습니다. 공유기 포트는 열지 않습니다. 클럽 밖에서 볼 때는 영상이 몇 초 늦을 수 있습니다.",
+  "en": "Here's the path. Camera video keeps going into the two Hikvision recorders. An always-on PC at the club runs go to R T C, which takes the video from the recorders and converts it for browsers. It then goes out safely through Cloudflare, and only confirmed staff can watch it in the admin CCTV tab. The router's ports stay closed. Away from the club, video can run a few seconds behind."
+ },
+ {
+  "ko": "사진 속 모니터를 볼게요. 보이는 열여섯 칸 중 영상이 나오는 칸은 한 칸, 노 링크가 세 칸, 로고만 보이는 칸이 열두 칸입니다. 사진 왼쪽이 잘려 있어서 실제 칸 수는 더 많을 수 있습니다. 노 링크 카메라는 웹앱에서도 나오지 않으니, 설치 업체에 점검을 먼저 요청해 주세요.",
+  "en": "Now the monitor in the photo. Of the sixteen cells we can see, one shows video, three say no link, and twelve show only the logo. The left side of the photo is cut off, so there may be more. No link cameras won't show up in the web app either, so please ask the installer to check them first."
+ },
+ {
+  "ko": "채널마다 화질이 두 개입니다. 여러 대를 함께 볼 때는 저화질, 눌러서 크게 볼 때는 고화질을 씁니다. 1번 채널이면 저화질은 일공이, 고화질은 일공일입니다. 2번 채널은 이공이와 이공일이 됩니다. 이렇게 하면 인터넷을 적게 씁니다.",
+  "en": "Every channel has two qualities. The grid uses low quality, and tapping a camera switches to high quality. On channel one, low is one oh two and high is one oh one. Channel two is two oh two and two oh one. This keeps internet use down."
+ },
+ {
+  "ko": "순서는 다섯 단계입니다. 먼저 노 링크를 점검하고, 녹화기 정보를 확인해서 보기 전용 계정을 만듭니다. 그다음 고투알티씨를 설치하고, 클라우드플레어를 연결합니다. 마지막으로 어드민 CCTV 탭을 완성합니다.",
+  "en": "There are five steps. First check the no link cameras, then confirm the recorder details and create a view-only account. Next install go to R T C and connect Cloudflare. Last, we finish the admin CCTV tab."
+ },
+ {
+  "ko": "알려 주실 것은 여섯 가지입니다. 먼저 녹화기 두 대의 모델명과 내부 IP, 그리고 쓰는 채널 번호와 위치 이름이 필요합니다. 이것이 있으면 화면부터 시작할 수 있습니다. 보기 전용 계정, 항상 켜 둘 PC, 클라우드플레어 도메인은 설치할 때 필요합니다. 감사합니다!",
+  "en": "We need six things. First, the model and internal IP of both recorders, plus the channels in use and where they point. With those we can start on the screen. The view-only account, an always-on PC and a Cloudflare domain are needed at install. Thank you!"
+ }
+];
+
+// Hope's clips, baked with ElevenLabs (Hope natural, voice tnSpp4vdxKPjI9w0GnoV, eleven_multilingual_v2).
+const UI = {
+  play: { ko: '▶ 재생', en: '▶ Play' },
+  pause: { ko: '❚❚ 멈춤', en: '❚❚ Pause' },
+  hint: { ko: '키보드: ← → 슬라이드 · 스페이스 재생/멈춤 · 한/영 키 또는 L 언어 전환', en: 'Keys: ← → slides · Space play/pause · Han/Eng key or L switches language' },
+  noPitch: { ko: '피치 조절 모듈을 불러오지 못해 속도만 바꿀 수 있습니다.', en: "The pitch module didn't load, so only speed can change." },
+};
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('hope.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('hope.' + k, JSON.stringify(v)); } catch (e) {} },
+};
+
+const slides = [...document.querySelectorAll('.slide')];
+const $ = id => document.getElementById(id);
+const pitch = $('pitch'), rate = $('rate');
+const asked = new URLSearchParams(location.search).get('lang');
+let lang = asked === 'ko' || asked === 'en' ? asked : store.get('lang', 'ko');
+let idx = 0, playing = false, token = 0;
+pitch.value = store.get('pitch2', 1);
+rate.value = store.get('rate2', 1);
+
+// 클립은 public/audio/cctv/ 에 있습니다.
+const clipUrl = (l, i) => `audio/slide-${i + 1}-${l}.mp3`;
+
+// Speed: the browser time-stretches and keeps the pitch. Pitch: a separate shifter, so the two move independently.
+const audio = new Audio();
+audio.preload = 'auto';
+audio.preservesPitch = audio.webkitPreservesPitch = audio.mozPreservesPitch = true;
+let graph = null;
+function ensureGraph() {
+  if (graph || !window.Tone) return;
+  try {
+    const src = Tone.getContext().rawContext.createMediaElementSource(audio);
+    const shift = new Tone.PitchShift({ pitch: 0, windowSize: 0.08 }).toDestination();
+    Tone.connect(src, shift);
+    graph = { src, shift };
+  } catch (e) { graph = null; }
+}
+function applyPitch() {
+  if (!graph) return;
+  const p = +pitch.value;
+  graph.shift.pitch = 12 * Math.log2(p);
+  graph.shift.wet.value = Math.abs(p - 1) < 0.005 ? 0 : 1;
+}
+function applyRate() { audio.defaultPlaybackRate = audio.playbackRate = +rate.value; }
+
+function sentences(text) { return text.match(/[^.!?]+[.!?]?/g).map(s => s.trim()).filter(Boolean); }
+function renderCaption(active = -1) {
+  const parts = sentences(NARR[idx][lang]);
+  $('caption').innerHTML = parts.map((s, i) => i === active ? `<mark>${s}</mark>` : s).join(' ');
+}
+audio.ontimeupdate = () => {
+  if (!playing || !audio.duration) return;
+  const parts = sentences(NARR[idx][lang]), total = parts.reduce((a, s) => a + s.length, 0);
+  const at = audio.currentTime / audio.duration * total;
+  let sum = 0, k = 0;
+  for (; k < parts.length - 1; k++) { sum += parts[k].length; if (sum > at) break; }
+  renderCaption(k);
+};
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-ko]').forEach(e => { e.innerHTML = e.dataset[lang]; });
+  $('lang-ko').setAttribute('aria-pressed', String(lang === 'ko'));
+  $('lang-en').setAttribute('aria-pressed', String(lang === 'en'));
+  $('play').textContent = UI[playing ? 'pause' : 'play'][lang];
+  $('hint').textContent = window.Tone ? UI.hint[lang] : UI.noPitch[lang];
+  renderCaption();
+}
+
+function show(i) {
+  idx = (i + slides.length) % slides.length;
+  slides.forEach((s, k) => { s.hidden = k !== idx; });
+  $('count').textContent = `${idx + 1} / ${slides.length}`;
+  try { history.replaceState(null, '', '#s' + (idx + 1)); } catch (e) {}
+  renderCaption();
+}
+
+function playSlide() {
+  const my = ++token;
+  audio.src = clipUrl(lang, idx);
+  applyRate();
+  audio.play().then(() => { if (my === token) $('avatar').classList.add('talking'); })
+    .catch(() => { if (my === token) stop(); });
+}
+audio.onended = () => {
+  $('avatar').classList.remove('talking');
+  if (!playing) return;
+  const my = token;
+  if ($('auto').checked && idx < slides.length - 1) {
+    show(idx + 1);
+    setTimeout(() => { if (playing && my === token) playSlide(); }, 450);
+  } else stop();
+};
+
+function stop() {
+  token++; playing = false;
+  audio.pause();
+  $('avatar').classList.remove('talking');
+  $('play').textContent = UI.play[lang];
+  renderCaption();
+}
+
+async function toggle() {
+  if (playing) { stop(); return; }
+  playing = true;
+  $('play').textContent = UI.pause[lang];
+  if (window.Tone) { try { await Tone.start(); ensureGraph(); applyPitch(); } catch (e) {} }
+  playSlide();
+}
+
+function setLang(l) {
+  if (l === lang) return;
+  lang = l; store.set('lang', l);
+  applyLang();
+  if (playing) playSlide();
+}
+function go(d) { show(idx + d); if (playing) playSlide(); }
+
+$('prev').onclick = () => go(-1);
+$('next').onclick = () => go(1);
+$('play').onclick = toggle;
+$('lang-ko').onclick = () => setLang('ko');
+$('lang-en').onclick = () => setLang('en');
+function syncOut() { $('pitch-out').textContent = (+pitch.value).toFixed(2); $('rate-out').textContent = (+rate.value).toFixed(2) + '×'; }
+pitch.oninput = () => { syncOut(); applyPitch(); store.set('pitch2', +pitch.value); };
+rate.oninput = () => { syncOut(); applyRate(); store.set('rate2', +rate.value); };
+$('reset').onclick = () => { pitch.value = 1; rate.value = 1; pitch.oninput(); rate.oninput(); };
+if (!window.Tone) pitch.disabled = true;
+
+addEventListener('keydown', e => {
+  if (e.target.closest('select, input')) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+  else if (e.key === ' ' && !e.target.closest('button')) { e.preventDefault(); toggle(); }
+  else if (e.key === 'HangulMode' || e.key === 'Lang1' || e.code === 'Lang1' || e.code === 'Lang2' || e.code === 'KeyL' || /^[lLㅣ]$/.test(e.key)) { setLang(lang === 'ko' ? 'en' : 'ko'); }
+});
+
+syncOut();
+const m = /^#s([1-9])$/.exec(location.hash);
+show(m ? +m[1] - 1 : 0);
+applyLang();
+</script>
+
+</body>
+</html>

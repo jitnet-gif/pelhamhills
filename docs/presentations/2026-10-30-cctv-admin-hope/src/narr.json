@@ -1,0 +1,14 @@
+[
+ {"ko":"안녕하세요, 호프입니다. 오늘은 클럽의 CCTV를 어드민 사이트에서 보는 방법을 안내해 드릴게요. 카메라와 녹화 장비는 그대로 두고, 영상을 보는 길만 새로 만듭니다.",
+  "en":"Hi, I'm Hope. Let's look at how to watch the club's CCTV from the admin site. The cameras and recorders stay as they are. We only add a new way to watch."},
+ {"ko":"영상은 이렇게 지나갑니다. 카메라 영상은 지금처럼 하이크비전 녹화기 두 대로 들어갑니다. 클럽에 항상 켜 둔 PC의 고투알티씨가 녹화기에서 영상을 받아 브라우저용으로 바꿉니다. 그다음 클라우드플레어를 거쳐 안전하게 밖으로 나오고, 스태프로 확인된 사람만 어드민 CCTV 탭에서 볼 수 있습니다. 공유기 포트는 열지 않습니다. 클럽 밖에서 볼 때는 영상이 몇 초 늦을 수 있습니다.",
+  "en":"Here's the path. Camera video keeps going into the two Hikvision recorders. An always-on PC at the club runs go to R T C, which takes the video from the recorders and converts it for browsers. It then goes out safely through Cloudflare, and only confirmed staff can watch it in the admin CCTV tab. The router's ports stay closed. Away from the club, video can run a few seconds behind."},
+ {"ko":"사진 속 모니터를 볼게요. 보이는 열여섯 칸 중 영상이 나오는 칸은 한 칸, 노 링크가 세 칸, 로고만 보이는 칸이 열두 칸입니다. 사진 왼쪽이 잘려 있어서 실제 칸 수는 더 많을 수 있습니다. 노 링크 카메라는 웹앱에서도 나오지 않으니, 설치 업체에 점검을 먼저 요청해 주세요.",
+  "en":"Now the monitor in the photo. Of the sixteen cells we can see, one shows video, three say no link, and twelve show only the logo. The left side of the photo is cut off, so there may be more. No link cameras won't show up in the web app either, so please ask the installer to check them first."},
+ {"ko":"채널마다 화질이 두 개입니다. 여러 대를 함께 볼 때는 저화질, 눌러서 크게 볼 때는 고화질을 씁니다. 1번 채널이면 저화질은 일공이, 고화질은 일공일입니다. 2번 채널은 이공이와 이공일이 됩니다. 이렇게 하면 인터넷을 적게 씁니다.",
+  "en":"Every channel has two qualities. The grid uses low quality, and tapping a camera switches to high quality. On channel one, low is one oh two and high is one oh one. Channel two is two oh two and two oh one. This keeps internet use down."},
+ {"ko":"순서는 다섯 단계입니다. 먼저 노 링크를 점검하고, 녹화기 정보를 확인해서 보기 전용 계정을 만듭니다. 그다음 고투알티씨를 설치하고, 클라우드플레어를 연결합니다. 마지막으로 어드민 CCTV 탭을 완성합니다.",
+  "en":"There are five steps. First check the no link cameras, then confirm the recorder details and create a view-only account. Next install go to R T C and connect Cloudflare. Last, we finish the admin CCTV tab."},
+ {"ko":"알려 주실 것은 여섯 가지입니다. 먼저 녹화기 두 대의 모델명과 내부 IP, 그리고 쓰는 채널 번호와 위치 이름이 필요합니다. 이것이 있으면 화면부터 시작할 수 있습니다. 보기 전용 계정, 항상 켜 둘 PC, 클라우드플레어 도메인은 설치할 때 필요합니다. 감사합니다!",
+  "en":"We need six things. First, the model and internal IP of both recorders, plus the channels in use and where they point. With those we can start on the screen. The view-only account, an always-on PC and a Cloudflare domain are needed at install. Thank you!"}
+]

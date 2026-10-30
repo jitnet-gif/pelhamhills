@@ -11,7 +11,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
-import { describeGiftCardError, giftCardApi, type GiftCard } from "@/lib/pos/giftCard";
+import { describeGiftCardError, expiryText, giftCardApi, type GiftCard } from "@/lib/pos/giftCard";
 import { printGiftCertificate } from "@/lib/pos/giftCertificate";
 import { code128ScreenWidth, code128Svg } from "@/lib/retail/barcode";
 import { printGiftCard } from "@/lib/retail/printReceipt";
@@ -26,6 +26,7 @@ const EMPTY_FORM = {
   phone: "",
   email: "",
   note: "",
+  expires: "2027-12-31",
 };
 
 const INPUT = "border border-[#cfd2d8] px-3 py-2 font-normal outline-none focus:border-[#4533ff]";
@@ -33,6 +34,7 @@ const INPUT = "border border-[#cfd2d8] px-3 py-2 font-normal outline-none focus:
 function statusOf(card: GiftCard): { label: string; className: string } {
   if (card.status === "void") return { label: "Void", className: "bg-[#ececf0] text-[#4e5560]" };
   if (card.balance <= 0) return { label: "Used up", className: "bg-[#ececf0] text-[#4e5560]" };
+  if (card.expired) return { label: "Expired", className: "bg-[#fdf1f1] text-[#8c1d1d]" };
   return { label: "Active", className: "bg-[#dff7e8] text-[#087333]" };
 }
 
@@ -132,6 +134,7 @@ export default function GiftCardsPage() {
         phone: form.phone.trim(),
         email: form.email.trim(),
         note: form.note.trim(),
+        expires_on: form.expires,
       });
       setForm(EMPTY_FORM);
       setShown(card.id);
@@ -174,7 +177,7 @@ export default function GiftCardsPage() {
   }
 
   function sendButtons(card: GiftCard) {
-    const disabled = busy === card.id || card.status !== "active" || card.balance <= 0;
+    const disabled = busy === card.id || card.status !== "active" || card.balance <= 0 || card.expired;
     return (
       <>
         <button
@@ -203,6 +206,21 @@ export default function GiftCardsPage() {
   function printCertificate(card: GiftCard, reprint: boolean) {
     if (!printGiftCertificate(card, { reprint })) {
       setError("The browser blocked the print window. Allow pop-ups for this site and try again.");
+    }
+  }
+
+  async function saveExpiry(card: GiftCard, expires: string) {
+    setError("");
+    setNotice("");
+    setBusy(card.id);
+    try {
+      const saved = await giftCardApi.setExpiry(card.code, expires || null);
+      setNotice(`${card.code}: ${expiryText(saved)}.`);
+      load();
+    } catch (cause) {
+      setError(describeGiftCardError(cause));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -334,6 +352,16 @@ export default function GiftCardsPage() {
                 </label>
               </div>
               <label className="grid gap-1 font-bold">
+                Expires on
+                <input
+                  className={INPUT}
+                  onChange={(event) => setForm((current) => ({ ...current, expires: event.target.value }))}
+                  type="date"
+                  value={form.expires}
+                />
+                <span className="font-normal text-[#5d6673]">Clear the date for No expiry.</span>
+              </label>
+              <label className="grid gap-1 font-bold">
                 Reason
                 <input
                   className={INPUT}
@@ -452,6 +480,7 @@ export default function GiftCardsPage() {
                           <span className="text-right text-[#5d6673]">
                             {card.issued_on}
                             {card.issued_email ? <span className="block">{card.issued_email}</span> : null}
+                            <span className="block">Expires: {expiryText(card)}</span>
                           </span>
                         </div>
                         <div className="mt-2 flex flex-wrap justify-end gap-1">
@@ -523,6 +552,33 @@ export default function GiftCardsPage() {
                               )}
                               {card.phone || card.email ? (
                                 <p className="mt-2 text-[#5d6673]">{[card.phone, card.email].filter(Boolean).join(" · ")}</p>
+                              ) : null}
+                              {card.status === "active" ? (
+                                <form
+                                  className="mt-2 flex flex-wrap items-center gap-1"
+                                  key={card.expires_on ?? ""}
+                                  onSubmit={(event) => {
+                                    event.preventDefault();
+                                    void saveExpiry(card, String(new FormData(event.currentTarget).get("expires") ?? ""));
+                                  }}
+                                >
+                                  <label className="flex items-center gap-1 font-bold">
+                                    Expires on
+                                    <input
+                                      className={`${INPUT} py-1`}
+                                      defaultValue={card.expires_on ?? ""}
+                                      name="expires"
+                                      type="date"
+                                    />
+                                  </label>
+                                  <button
+                                    className="border border-[#cfd2d8] bg-white px-2 py-1 text-[11px] font-bold disabled:opacity-50"
+                                    disabled={busy === card.id}
+                                    type="submit"
+                                  >
+                                    Save
+                                  </button>
+                                </form>
                               ) : null}
                             </div>
                           </div>

@@ -82,6 +82,8 @@ export default function TeeSheetPage() {
   const billState = useCurrentBill();
   // 티 시트 두 장 나란히 보기(Chronogolf 의 "Add Tee Sheet"). 오른쪽 시트는 SecondSheet 참고.
   const [split, setSplit] = useState(false);
+  // 스캐너가 못 읽는 바코드(화면·구겨진 종이)를 손으로 친다. 친 값은 스캔과 똑같이 처리한다.
+  const [typedCode, setTypedCode] = useState("");
   const [detailHost, setDetailHost] = useState<HTMLDivElement | null>(null);
   const clearSelection = useCallback(() => select(null), [select]);
   // 예전에는 빈 칸이 넘겨주는 날짜·시각을 ref 에 담아 뒀는데, 그 ref 를 렌더 중에
@@ -267,7 +269,15 @@ export default function TeeSheetPage() {
     },
     [bookings, focusedDate, pushToast, select, sellScannedProduct, setFocusedDate, showCheckin],
   );
-  useBarcodeScanner(onScan);
+  // 직접 입력 칸에서 쏜 스캔도 여기로 온다(data-scan-target). 칸에 찍힌 글자는 비운다.
+  const onScanOrTyped = useCallback(
+    (raw: string) => {
+      setTypedCode("");
+      onScan(raw);
+    },
+    [onScan],
+  );
+  useBarcodeScanner(onScanOrTyped);
 
   // 한 화면 고정: 페이지 자체는 절대 스크롤하지 않고, 티 시트와 상세 패널이
   // 각자 내부에서만 스크롤한다. 그래야 예약을 클릭했을 때 격자와 상세가 동시에 보인다.
@@ -278,6 +288,26 @@ export default function TeeSheetPage() {
         // 자기 헤더 줄을 하나 더 그려서 거기 달았는데, 그래서 화면 머리가 세 겹이었다.
         <span className="flex items-center gap-1.5">
         <ToneLegend />
+        {/* 2026-10-29: 스캔이 안 될 때 바코드(GIFT-·RC-·PROMO-·상품·영수증 번호)를 직접 친다. */}
+        <form
+          className="hidden md:block"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const code = typedCode.trim();
+            if (code) onScanOrTyped(code);
+          }}
+        >
+          <input
+            aria-label="Type a barcode"
+            autoComplete="off"
+            className="w-44 border border-[#c7c7cc] bg-white px-2 py-1.5 text-xs uppercase placeholder:normal-case"
+            data-scan-target=""
+            onChange={(event) => setTypedCode(event.target.value)}
+            placeholder="Type barcode + Enter"
+            spellCheck={false}
+            value={typedCode}
+          />
+        </form>
         <button
           aria-pressed={split}
           className={`hidden items-center border px-2 py-1.5 lg:inline-flex ${
