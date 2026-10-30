@@ -5,5 +5,5 @@
 "Hand over the souvenir and press Gave souvenir. It is a physical gift, so the bill total does not change. One souvenir line goes in the ledger, and the row turns to Souvenir given. If it was pressed by mistake, Undo takes it back.",
 "Customers see this on the coupon screen in the app. Under the stamp card there is a progress bar to one hundred rounds. When it fills, a banner says a souvenir is waiting. After pickup, it shows in their history.",
 "A few exceptions. Members do not collect stamps, so their rounds do not add up. Guests not linked to an app account do not appear on the bill. And if a refund removes a stamp, the round count drops with it.",
-"Here is where things stand. The code is deployed in both apps. What remains is running two SQL files in order: GPS 0029 first, then 0138. Until then the souvenir rows stay hidden and billing works as usual. The button on the staff F and B screen is not deployed yet."
+"Here is where things stand. The code is deployed in both apps, and both SQL files have been run. Put an eligible player's green fee on the bill and the souvenir row appears. The button on the staff F and B screen is not deployed yet, so for now record it on the tee sheet bill."
 ]

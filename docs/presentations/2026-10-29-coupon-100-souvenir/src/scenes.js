@@ -93,16 +93,15 @@ const S = [
       { ko: "그린피가 계산서에 있어야 줄이 보임", en: "The row needs the green fee on the bill" },
     ] },
   { n: { ko: "지금 상태", en: "Status" },
-    h: { ko: "배포 완료, SQL 두 개만 남음", en: "Deployed. Two SQL files remain" },
+    h: { ko: "배포와 SQL 실행 완료", en: "Deployed, and both SQL files have run" },
     pic: () => `<div class="sv-st">
         <div><span class="p">${T({ ko: "완료", en: "Done" })}</span><span>${T({ ko: "티 시트 계산서 · 손님 앱 배포", en: "Tee sheet bill · customer app deployed" })}</span></div>
-        <div><span class="p w">${T({ ko: "1번째", en: "Run 1st" })}</span><code>GPS 0029_coupon_hundred_gift.sql</code></div>
-        <div><span class="p w">${T({ ko: "2번째", en: "Run 2nd" })}</span><code>0138_coupon_book_hundred_gift.sql</code></div>
+        <div><span class="p">${T({ ko: "완료", en: "Done" })}</span><code>GPS 0029_coupon_hundred_gift.sql</code></div>
+        <div><span class="p">${T({ ko: "완료", en: "Done" })}</span><code>0138_coupon_book_hundred_gift.sql</code></div>
         <div><span class="p n">${T({ ko: "미배포", en: "Not live" })}</span><span>${T({ ko: "직원 /fnb 화면의 '기념품 줬음' 버튼", en: "'Gave souvenir' button on the staff /fnb screen" })}</span></div>
       </div>`,
     pts: [
-      { ko: "<b>순서 지킬 것</b> — 0029 먼저", en: "<b>Keep the order</b> — 0029 first" },
-      { ko: "실행 전: 기념품 줄만 안 보이고 계산은 정상", en: "Before that: rows stay hidden, billing is normal" },
+      { ko: "받을 손님의 그린피를 담으면 <b>기념품 줄 표시</b>", en: "Put an eligible green fee on the bill and <b>the row appears</b>" },
       { ko: "지금은 티 시트 계산서에서만 기록", en: "For now, record it on the tee sheet bill only" },
     ] },
 ];
