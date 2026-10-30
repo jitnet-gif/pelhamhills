@@ -114,7 +114,7 @@ const S = [
       <div><b>${T({ ko: "온라인 결제 영수증", en: "Online payment receipts" })} ${svc("g")}</b><small>${T({ ko: "티타임·시뮬레이터·회원권. 승인 후 1분 안에 한 통. STOP 번호여도 이메일로 받음", en: "Tee times, simulator, memberships. One email within a minute. It reaches customers with a STOP number too" })}</small></div>
       <div><b>${T({ ko: "실내 시뮬레이터 확정 메일", en: "Indoor simulator confirmations" })} ${svc("g")}</b><small>${T({ ko: "웹 예약만 해당. 전화·문자·직원 예약은 대상이 아님", en: "Web bookings only. Phone, text and staff bookings are not included" })}</small></div>
       <div><b>${T({ ko: "아직 남은 빈틈", en: "Still open" })}</b><small>${T({ ko: "손으로 입력한 카드는 직원이 보내야 함. 실패한 메일은 다시 보내지 않음", en: "Keyed cards still need staff to send a receipt. A failed email is not retried" })}</small></div>
-      <div><b><span class="tag">${T({ ko: "적용 전", en: "Not live yet" })}</span></b><small>${T({ ko: "코드는 있지만 커밋·배포 전. 순서: 0140·0141 SQL 실행 → 푸시 + Fly 배포", en: "The code exists but isn't committed or deployed. Order: run SQL 0140 and 0141, then push and deploy to Fly" })}</small></div>
+      <div><b><span class="tag">${T({ ko: "남은 일", en: "One step left" })}</span></b><small>${T({ ko: "코드는 Vercel·Fly에 배포 완료. 운영 DB에서 0140·0141 SQL을 실행해야 메일이 나감", en: "The code is live on Vercel and Fly. Emails start once SQL 0140 and 0141 run on the production database" })}</small></div>
     </div>`,
     pts: [
       { ko: "온라인 손님도 이제 <b>영수증을 받을 길</b>이 생김", en: "Online customers now have <b>a way to get a receipt</b>" },
