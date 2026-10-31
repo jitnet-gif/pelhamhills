@@ -8,6 +8,7 @@
 
 import { paymentsApiBase } from "@/lib/booking/payments";
 import { ApiError } from "@/lib/teeSheet/api";
+import { addDays } from "@/lib/teeSheet/dates";
 import { accessToken } from "@/lib/teeSheet/session";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 import { clubDateTime, usDate, type ReceiptBlock, type ReceiptHeader } from "@/lib/retail/receipt";
@@ -201,7 +202,7 @@ export function describeRainCheckError(error: unknown): string {
  */
 export function rainCheckBlocks(
   check: RainCheck,
-  options: { header: ReceiptHeader; reprint?: boolean },
+  options: { header: ReceiptHeader; reprint?: boolean; sample?: boolean },
 ): ReceiptBlock[] {
   const { header } = options;
   const blocks: ReceiptBlock[] = [{ kind: "logo" }];
@@ -211,6 +212,7 @@ export function rainCheckBlocks(
 
   blocks.push({ kind: "text", text: "RAIN CHECK", align: "center", bold: true, large: true, gap: true });
   blocks.push({ kind: "text", text: `Issued ${clubDateTime(check.issued_on, check.issued_at)}`, align: "center" });
+  if (options.sample) blocks.push({ kind: "text", text: SAMPLE_MARK, align: "center", bold: true });
   if (options.reprint) blocks.push({ kind: "text", text: "*** REPRINT ***", align: "center", bold: true });
   if (check.status === "void") blocks.push({ kind: "text", text: "*** VOID ***", align: "center", bold: true });
   if (check.status === "redeemed") blocks.push({ kind: "text", text: "*** USED ***", align: "center", bold: true });
@@ -244,8 +246,44 @@ export function rainCheckBlocks(
   });
   if (check.note) blocks.push({ kind: "text", text: `Note: ${check.note}`, align: "left" });
 
+  if (options.sample) blocks.push({ kind: "text", text: SAMPLE_MARK, align: "center", bold: true, gap: true });
   blocks.push({ kind: "barcode", value: check.code });
   return blocks;
+}
+
+const SAMPLE_MARK = "*** SAMPLE - NOT VALID ***";
+
+/**
+ * 전표 견본(Reports → Rain checks 의 Sample). 서버에 없는 가짜 전표다 — 코드의 S·M·P·L 은 16진수가
+ * 아니라 `RAIN_CHECK_CODE` 에 맞지 않으므로 바코드를 쏴도 크레딧으로 잡히지 않는다.
+ * 만료일은 기본값(발행일 + 180일, 0044)과 같게 둔다.
+ */
+export function sampleRainCheck(today: string): RainCheck {
+  return {
+    id: 0,
+    code: "RC-SAMPLE0001",
+    status: "issued",
+    expired: false,
+    booking_id: "sample",
+    player_id: "sample",
+    player_name: "Sample Guest",
+    tee_date: today,
+    tee_time: "9:00 AM",
+    holes: 18,
+    holes_played: 7,
+    amount: 6500,
+    paid_value: 6500,
+    source_receipt: "SAMPLE",
+    issued_on: today,
+    expires_on: addDays(today, 180),
+    cashier: "Pro Shop",
+    note: "Rain, stopped at hole 7",
+    issued_at: new Date().toISOString(),
+    redeemed_receipt: null,
+    redeemed_at: null,
+    void_reason: null,
+    voided_at: null,
+  };
 }
 
 // ===== 스캔 전달 ========================================================

@@ -9,6 +9,8 @@
  *
  * Issued·Used·Expired·Void 칸은 먼저 요약(Issued 는 상태별, Void 는 사유별, 나머지는 발행한 담당자별), 줄을 누르면
  * 그 전표들(2026-10-24, `ReportDrill`). Outstanding 은 기간 밖 전표까지라 이 화면의 목록으로는 펼칠 수 없다.
+ *
+ * Sample(2026-10-31): 손님이 받는 전표가 어떻게 생겼는지 보고 찍어 본다. 서버 기록은 없다.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -17,9 +19,11 @@ import {
   describeRainCheckError,
   onRainChecksChanged,
   rainCheckApi,
+  sampleRainCheck,
   type RainCheckReport,
   type RainCheckReportRow,
 } from "@/lib/pos/rainCheck";
+import { printRainChecks, rainCheckSheetHtml } from "@/lib/retail/printReceipt";
 import { usDate } from "@/lib/retail/receipt";
 import { localBusinessDate } from "@/lib/retail/api";
 import { formatMoney } from "@/lib/retail/types";
@@ -28,7 +32,7 @@ import { addDays } from "@/lib/teeSheet/dates";
 
 import StaffName from "@/components/reports/StaffName";
 import ReportDrill, { type DrillGroup } from "@/components/reports/ReportDrill";
-import { Chip, EmptyNote, ErrorNote, Field, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
+import { Button, Chip, EmptyNote, ErrorNote, Field, Modal, SkeletonRows, StatCard, TextInput } from "@/components/retail/ui";
 
 type State = "live" | "redeemed" | "expired" | "void";
 
@@ -80,12 +84,36 @@ function sum(rows: RainCheckReportRow[]): { count: number; amount: number } {
   return { count: rows.length, amount: rows.reduce((total, row) => total + row.amount, 0) };
 }
 
+/** 전표 견본. 미리보기와 종이가 같은 HTML 이다. */
+function SampleSlip({ today, onClose }: { today: string; onClose: () => void }) {
+  const sample = useMemo(() => sampleRainCheck(today), [today]);
+  return (
+    <Modal onClose={onClose} title="Rain check slip — sample">
+      <div className="grid gap-3">
+        <p className="text-xs text-[#6b7280]">
+          What a guest receives, with made-up details. Its barcode can&apos;t be redeemed and nothing is recorded.
+        </p>
+        <div
+          className="rc-sheet mx-auto bg-white p-3 shadow"
+          // 우리 포맷터가 만든 HTML 이다 — 견본 글자도 전부 이스케이프돼 있다.
+          dangerouslySetInnerHTML={{ __html: rainCheckSheetHtml(sample, { sample: true }) }}
+          style={{ width: "72mm" }}
+        />
+        <Button full onClick={() => printRainChecks([sample], { sample: true })} tone="primary">
+          Print sample
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function RainChecksReport() {
   const today = localBusinessDate();
   const [from, setFrom] = useState(() => addDays(today, -29));
   const [to, setTo] = useState(today);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [drill, setDrill] = useState<{ title: string; rows: RainCheckReportRow[]; by: DrillBy } | null>(null);
+  const [showSample, setShowSample] = useState(false);
   const [loaded, setLoaded] = useState<{ range: string; report: RainCheckReport | null; error: string } | null>(null);
 
   const range = `${from}..${to}`;
@@ -131,6 +159,10 @@ export default function RainChecksReport() {
         <Field label="To">
           <TextInput min={from} onChange={(event) => setTo(event.target.value)} type="date" value={to} />
         </Field>
+        <Button className="ml-auto" onClick={() => setShowSample(true)} title="See and print a sample rain check slip">
+          <span aria-hidden>☂</span>
+          Sample
+        </Button>
       </div>
 
       {rangeError ? <ErrorNote>{rangeError}</ErrorNote> : null}
@@ -306,6 +338,7 @@ export default function RainChecksReport() {
           ) : null}
         </>
       )}
+      {showSample ? <SampleSlip onClose={() => setShowSample(false)} today={today} /> : null}
     </div>
   );
 }

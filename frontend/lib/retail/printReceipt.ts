@@ -95,17 +95,20 @@ function paidInCash(doc: ReceiptDoc): boolean {
 }
 
 /** 레인체크 전표 한 장의 HTML. 화면 미리보기와 종이가 같다. */
-export function rainCheckSheetHtml(check: RainCheck, options: { reprint?: boolean } = {}): string {
-  return receiptHtml(rainCheckBlocks(check, { header: CLUB_HEADER, reprint: options.reprint }));
+export function rainCheckSheetHtml(check: RainCheck, options: { reprint?: boolean; sample?: boolean } = {}): string {
+  return receiptHtml(rainCheckBlocks(check, { header: CLUB_HEADER, ...options }));
 }
 
 /**
  * 레인체크 전표를 **사람마다 한 장씩** 찍는다. 장 사이에서 페이지가 끊기므로 감열 프린터가
  * 사람 사이를 자른다. 기록은 서버에 있으므로 보관용 사본은 찍지 않는다.
  */
-export function printRainChecks(checks: readonly RainCheck[], options: { reprint?: boolean } = {}): void {
+export function printRainChecks(
+  checks: readonly RainCheck[],
+  options: { reprint?: boolean; sample?: boolean } = {},
+): void {
   if (checks.length === 0) return;
-  printSheets(checks.map((check) => rainCheckBlocks(check, { header: CLUB_HEADER, reprint: options.reprint })));
+  printSheets(checks.map((check) => rainCheckBlocks(check, { header: CLUB_HEADER, ...options })));
 }
 
 /** 기프트카드 한 장의 HTML(Gift Cards 화면의 미리보기). */
