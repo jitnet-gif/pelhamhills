@@ -158,8 +158,20 @@ function simRow(reservation: SimReservation, bayNumbers: Map<number, number>): R
   };
 }
 
-/** 베이 장부에는 기간 함수가 없다. 하루씩 읽되 한꺼번에 수십 개를 쏘지 않는다. */
+/** 0147 이 아직 없으면 true. 30초마다 없는 함수를 부르지 않게 기억한다. */
+let noRangeFunction = false;
+
+/** 베이는 기간 함수(0147)로 한 번에 읽는다. 그 SQL 전이면 하루씩 읽되 한꺼번에 수십 개를 쏘지 않는다. */
 async function loadSim(dates: string[]): Promise<{ rows: SimReservation[]; failed: number; error: string }> {
+  if (!noRangeFunction && dates.length > 0) {
+    try {
+      const rows = await simApi.reservationsRange(dates[0], dates[dates.length - 1]);
+      return { rows, failed: 0, error: "" };
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) noRangeFunction = true;
+      else return { rows: [], failed: dates.length, error: describeSimError(cause) };
+    }
+  }
   const rows: SimReservation[] = [];
   let failed = 0;
   let error = "";
@@ -244,6 +256,9 @@ type Loaded = {
   at: Date;
 };
 
+/** 기간별 마지막 결과. 탭을 옮겼다 돌아오거나 기간을 되돌리면 이것을 바로 보이고 뒤에서 새로 읽는다. */
+const lastLoaded = new Map<string, Loaded>();
+
 export default function BookingsReport() {
   const today = localBusinessDate();
   const [from, setFrom] = useState(today);
@@ -255,16 +270,19 @@ export default function BookingsReport() {
   const [showCancelled, setShowCancelled] = useState(false);
   const [paused, setPaused] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [latest, setLatest] = useState<Loaded | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // 이 기간을 처음 읽었을 때 있던 예약. 그 뒤에 나타난 예약이 NEW 다.
   const seen = useRef<{ range: string; keys: Set<string> } | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  // 가장 나중에 보낸 읽기의 번호. 늦게 도착한 옛 응답이 새 결과를 덮지 못하게 한다.
+  const lastRead = useRef(0);
 
   const dates = useMemo(() => datesBetween(from, to), [from, to]);
   const rangeError =
     dates.length === 0 ? "From must be on or before To." : dates.length > MAX_DAYS ? `Pick ${MAX_DAYS} days or fewer.` : "";
   const range = `${from}..${to}`;
+  const loaded = latest?.range === range ? latest : (lastLoaded.get(range) ?? null);
   const loading = loaded?.range !== range;
 
   const load = useCallback(async (): Promise<Loaded> => {
@@ -335,29 +353,33 @@ export default function BookingsReport() {
         for (const key of added) known.add(key);
       }
     }
-    setLoaded(next);
+    lastLoaded.set(next.range, next);
+    setLatest(next);
   }, []);
+
+  const read = useCallback(async () => {
+    const id = ++lastRead.current;
+    const next = await load();
+    if (id === lastRead.current) apply(next);
+  }, [apply, load]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      apply(await load());
+      await read();
     } finally {
       setRefreshing(false);
     }
-  }, [apply, load]);
+  }, [read]);
 
   // 기간이 바뀌면 새로 읽는다.
   useEffect(() => {
     if (rangeError) return;
-    let cancelled = false;
-    load().then((next) => {
-      if (!cancelled) apply(next);
-    });
+    void read();
     return () => {
-      cancelled = true;
+      lastRead.current += 1;
     };
-  }, [load, apply, rangeError]);
+  }, [read, rangeError]);
 
   // 실시간: 보이는 동안만 다시 읽는다. 탭으로 돌아오면 바로 한 번.
   useEffect(() => {

@@ -54,6 +54,9 @@ export const simApi = {
     staffRpc<SimBay>("pelham_staff_sim_bay_status", { p_bay: bay, p_status: status }),
   reservations: (date: string) =>
     staffRpc<SimReservation[]>("pelham_staff_sim_reservations", { p_date: date }),
+  /** 0147: 기간 전체를 한 번에. 함수가 없으면 404 다. */
+  reservationsRange: (from: string, to: string) =>
+    staffRpc<SimReservation[]>("pelham_staff_sim_reservations_range", { p_from: from, p_to: to }),
   create: (input: SimReservationInput) =>
     staffRpc<SimReservation>("pelham_staff_sim_create", { p: input }),
   update: (id: number, patch: Partial<SimReservationInput>) =>
