@@ -6,6 +6,7 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import ReportDrilldown, { type ReportDrill, type ReportMetric } from "@/components/teesheet/ReportDrilldown";
 import { ApiError, teeSheetApi } from "@/lib/teeSheet/api";
 import { columnLabel, longDate, money } from "@/lib/teeSheet/dates";
 import type {
@@ -262,12 +263,16 @@ function StateBadge({ state }: { state: TaskState | string }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
   return (
-    <div className="rounded border border-[#ececf0] px-2 py-1.5">
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded border border-[#ececf0] px-2 py-1.5 text-left hover:border-[#4533ff]"
+    >
       <div className="text-[10px] tracking-wide text-[#4e5560] uppercase">{label}</div>
       <div className="mt-0.5 font-bold tabular-nums">{value}</div>
-    </div>
+    </button>
   );
 }
 
@@ -421,6 +426,7 @@ export default function OrchestrationPanel({ controller }: OrchestrationPanelPro
   const [reportsError, setReportsError] = useState<string | null>(null);
   const [reportsUpdatedAt, setReportsUpdatedAt] = useState<Date | null>(null);
   const [reportsNonce, setReportsNonce] = useState(0);
+  const [drill, setDrill] = useState<ReportDrill | null>(null);
 
   // --- 작업 상태 ---
   const [tasks, setTasks] = useState<OrchestrationTask[]>([]);
@@ -730,6 +736,9 @@ export default function OrchestrationPanel({ controller }: OrchestrationPanelPro
     },
   ];
 
+  const openDay = (metric: ReportMetric, expected: number) =>
+    setDrill({ metric, dates: [focusedDate], expected });
+
   // ===== 렌더 =====
 
   return (
@@ -837,11 +846,15 @@ export default function OrchestrationPanel({ controller }: OrchestrationPanelPro
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between">
                     <span className="font-bold">Occupancy</span>
-                    <span className="tabular-nums text-[#4e5560]">
+                    <button
+                      type="button"
+                      onClick={() => openDay("booked", safeNumber(dailyReport.booked_slots))}
+                      className="tabular-nums text-[#4e5560] hover:text-[#4533ff] hover:underline"
+                    >
                       {occupancyPercent(dailyReport).toFixed(0)}% ·{" "}
                       {safeNumber(dailyReport.booked_slots)} booked ·{" "}
                       {safeNumber(dailyReport.available_slots)} available
-                    </span>
+                    </button>
                   </div>
                   <OccupancyBar
                     percent={occupancyPercent(dailyReport)}
@@ -851,16 +864,44 @@ export default function OrchestrationPanel({ controller }: OrchestrationPanelPro
                   />
 
                   <div className="grid grid-cols-3 gap-1.5">
-                    <Stat label="Total" value={money(safeNumber(dailyReport.total_revenue))} />
-                    <Stat label="Collected" value={money(safeNumber(dailyReport.collected_revenue))} />
-                    <Stat label="Outstanding" value={money(safeNumber(dailyReport.outstanding_revenue))} />
+                    <Stat
+                      label="Total"
+                      value={money(safeNumber(dailyReport.total_revenue))}
+                      onClick={() => openDay("total", safeNumber(dailyReport.total_revenue))}
+                    />
+                    <Stat
+                      label="Collected"
+                      value={money(safeNumber(dailyReport.collected_revenue))}
+                      onClick={() => openDay("collected", safeNumber(dailyReport.collected_revenue))}
+                    />
+                    <Stat
+                      label="Outstanding"
+                      value={money(safeNumber(dailyReport.outstanding_revenue))}
+                      onClick={() => openDay("outstanding", safeNumber(dailyReport.outstanding_revenue))}
+                    />
                   </div>
 
                   <div className="grid grid-cols-4 gap-1.5">
-                    <Stat label="Checked in" value={String(safeNumber(dailyReport.checked_in))} />
-                    <Stat label="Cancelled" value={String(safeNumber(dailyReport.cancelled))} />
-                    <Stat label="No show" value={String(safeNumber(dailyReport.no_show))} />
-                    <Stat label="Carts" value={String(safeNumber(dailyReport.carts))} />
+                    <Stat
+                      label="Checked in"
+                      value={String(safeNumber(dailyReport.checked_in))}
+                      onClick={() => openDay("checked_in", safeNumber(dailyReport.checked_in))}
+                    />
+                    <Stat
+                      label="Cancelled"
+                      value={String(safeNumber(dailyReport.cancelled))}
+                      onClick={() => openDay("cancelled", safeNumber(dailyReport.cancelled))}
+                    />
+                    <Stat
+                      label="No show"
+                      value={String(safeNumber(dailyReport.no_show))}
+                      onClick={() => openDay("no_show", safeNumber(dailyReport.no_show))}
+                    />
+                    <Stat
+                      label="Carts"
+                      value={String(safeNumber(dailyReport.carts))}
+                      onClick={() => openDay("carts", safeNumber(dailyReport.carts))}
+                    />
                   </div>
                 </div>
               ) : !reportsLoading && !reportsError ? (
@@ -873,29 +914,52 @@ export default function OrchestrationPanel({ controller }: OrchestrationPanelPro
                     <span className="font-bold">
                       Week {weekReport.from || weekFrom} → {weekReport.to || weekTo}
                     </span>
-                    <span className="tabular-nums text-[#4e5560]">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDrill({
+                          metric: "total",
+                          dates: (weekReport.days ?? []).map((day) => day.date),
+                          expected: safeNumber(weekReport.summary?.total_revenue),
+                        })
+                      }
+                      className="tabular-nums text-[#4e5560] hover:text-[#4533ff] hover:underline"
+                    >
                       {money(safeNumber(weekReport.summary?.total_revenue))} ·{" "}
                       {clampPercent(safeNumber(weekReport.summary?.average_occupancy)).toFixed(0)}% avg
-                    </span>
+                    </button>
                   </div>
                   <ul className="space-y-1">
                     {(weekReport.days ?? []).map((day, index) => {
                       const percent = occupancyPercent(day);
                       return (
-                        <li key={day?.date ?? `day-${index}`} className="flex items-center gap-2">
-                          <span className="w-12 shrink-0 text-[#4e5560]">
-                            {dayLabel(day?.date)}
-                          </span>
-                          <span className="h-1.5 min-w-0 flex-1 rounded-full bg-[#ececf0]" aria-hidden="true">
-                            <span
-                              className="block h-full rounded-full bg-[#4533ff]"
-                              style={{ width: `${percent}%` }}
-                            />
-                          </span>
-                          <span className="w-10 shrink-0 text-right tabular-nums">{percent.toFixed(0)}%</span>
-                          <span className="w-16 shrink-0 text-right tabular-nums">
-                            {money(safeNumber(day?.total_revenue))}
-                          </span>
+                        <li key={day?.date ?? `day-${index}`}>
+                          <button
+                            type="button"
+                            disabled={!day?.date}
+                            onClick={() =>
+                              setDrill({
+                                metric: "total",
+                                dates: [day.date],
+                                expected: safeNumber(day.total_revenue),
+                              })
+                            }
+                            className="flex w-full items-center gap-2 text-left hover:text-[#4533ff]"
+                          >
+                            <span className="w-12 shrink-0 text-[#4e5560]">
+                              {dayLabel(day?.date)}
+                            </span>
+                            <span className="h-1.5 min-w-0 flex-1 rounded-full bg-[#ececf0]" aria-hidden="true">
+                              <span
+                                className="block h-full rounded-full bg-[#4533ff]"
+                                style={{ width: `${percent}%` }}
+                              />
+                            </span>
+                            <span className="w-10 shrink-0 text-right tabular-nums">{percent.toFixed(0)}%</span>
+                            <span className="w-16 shrink-0 text-right tabular-nums">
+                              {money(safeNumber(day?.total_revenue))}
+                            </span>
+                          </button>
                         </li>
                       );
                     })}
@@ -1072,6 +1136,10 @@ export default function OrchestrationPanel({ controller }: OrchestrationPanelPro
             </div>
           )}
         </div>
+      ) : null}
+
+      {drill ? (
+        <ReportDrilldown drill={drill} bookings={controller.bookings} onClose={() => setDrill(null)} />
       ) : null}
     </section>
   );
