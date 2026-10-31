@@ -2356,8 +2356,8 @@ function CashierPrompt({
 
 /**
  * 결제가 끝나면 "결제 완료" 와 영수증을 어떻게 줄지 묻는다 — 종이(Print), 문자, 이메일. 어느 쪽을 골라도 새 계산서로 간다.
- * 문자·이메일 칸은 예약에 적힌 값으로 미리 채운다(2026-10-26). 단말기 카드로만 낸 계산서는 승인 문자(0028)가 이미 가서
- * 번호를 채우지 않는다 — 직원이 적으면 영수증 전체가 한 번 더 간다. 칸이 비면 보내지 않는다.
+ * 문자·이메일 칸은 티 시트 예약 값으로 미리 채운다 — 그룹 결제는 대표자(첫 플레이어), 개별 결제는 본인(`bill_contact`). 단말기 카드로만 낸
+ * 계산서도 채운다 — 승인 문자(0028)는 이미 갔으니 그대로 보내면 영수증 전체가 한 번 더 간다. 칸이 비면 보내지 않는다.
  */
 function PaidReceipt({ sale, onDone }: { sale: Sale; onDone: () => void }) {
   const card = (sale.payments ?? []).find((payment) => payment.card_last4);
@@ -2377,7 +2377,7 @@ function PaidReceipt({ sale, onDone }: { sale: Sale; onDone: () => void }) {
       .then((found) => {
         if (cancelled) return;
         setContact(found);
-        if (!touched.current.phone && !cardTexted) setPhone(found.phone);
+        if (!touched.current.phone) setPhone(found.phone);
         if (!touched.current.email) setEmail(found.email);
       })
       .catch(() => {
@@ -2386,7 +2386,7 @@ function PaidReceipt({ sale, onDone }: { sale: Sale; onDone: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [sale.id, cardTexted]);
+  }, [sale.id]);
 
   const to = {
     phone: contact?.can_text ? phone.trim() : "",
@@ -2433,7 +2433,7 @@ function PaidReceipt({ sale, onDone }: { sale: Sale; onDone: () => void }) {
         <div className="grid gap-2 text-left">
           {contact.can_text ? (
             <Field
-              hint={cardTexted ? "The card approval was already texted. Enter a number to text the full receipt." : undefined}
+              hint={cardTexted ? "The card approval was already texted. Keep the number to also text the full receipt." : undefined}
               label="Text receipt to"
             >
               <TextInput

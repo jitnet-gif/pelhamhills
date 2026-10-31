@@ -3,7 +3,7 @@
 왜(2026-10-26): 카드 결제는 승인 문자(0028)가 가지만 현금·수표·기프트카드 등으로 낸 손님은 종이 영수증뿐이었고,
 이메일 영수증은 어느 결제에도 없었다. 결제 끝 화면("Payment complete")에서 번호·이메일을 받아 여기로 보낸다.
 
-  GET  /pos/receipts/{bill}/contact   예약에 적힌 번호·이메일(화면이 칸을 미리 채운다)
+  GET  /pos/receipts/{bill}/contact   그룹이면 대표자, 개별이면 본인의 번호·이메일(화면이 칸을 미리 채운다)
   POST /pos/receipts/{bill}/send      {phone?, email?}  적힌 곳으로 영수증 전체를 보낸다
 
 직원 확인은 단말기와 같다 — 요청의 Supabase 토큰으로 `pelham_staff_bill`(0005)을 불러 계산서도 같이 읽는다.
@@ -232,13 +232,19 @@ def _first(values: list[str | None]) -> str:
 
 
 def bill_contact(bill_id: int) -> dict[str, str]:
-    """계산서에 담긴 예약에서 번호·이메일 하나씩. 0028 의 순서와 같다: 줄의 티타임 플레이어 → 그 예약의 첫 값 → 베이 예약."""
+    """계산서에 담긴 예약에서 번호·이메일 하나씩.
+
+    여러 명을 한 계산서로 내면(그룹) 예약 대표자(첫 플레이어) → 줄의 티타임 플레이어 → 그 예약의 첫 값 → 베이 예약.
+    한 명만 내면(개별) 대표자를 앞세우지 않고 그 사람 값부터 쓴다.
+    """
     lines = supabase_rest.select("pelham_bill_lines", {
-        "bill_id": f"eq.{bill_id}", "select": "kind,booking_id,player_id,sim_reservation_id", "order": "id"})
+        "bill_id": f"eq.{bill_id}", "select": "kind,booking_id,player_id,sim_reservation_id,active", "order": "id"})
     phones: list[str | None] = []
     emails: list[str | None] = []
-    tee = [line for line in lines if line.get("kind") == "tee_player" and line.get("booking_id")]
+    tee = [line for line in lines
+           if line.get("kind") == "tee_player" and line.get("booking_id") and line.get("active", True)]
     if tee:
+        group = len({(str(line["booking_id"]), str(line.get("player_id"))) for line in tee}) > 1
         ids = sorted({str(line["booking_id"]) for line in tee})
         quoted = ",".join('"' + i.replace('"', "") + '"' for i in ids)
         docs = {str(row["id"]): row.get("doc") or {} for row in supabase_rest.select(
@@ -246,7 +252,7 @@ def bill_contact(bill_id: int) -> dict[str, str]:
         for line in tee:
             players = docs.get(str(line["booking_id"]), {}).get("players") or []
             mine = [p for p in players if str(p.get("id")) == str(line.get("player_id"))]
-            for player in mine + players:
+            for player in (players[:1] if group else []) + mine + players:
                 phones.append(player.get("phone"))
                 emails.append(player.get("email"))
     sims = [int(line["sim_reservation_id"]) for line in lines if line.get("sim_reservation_id")]

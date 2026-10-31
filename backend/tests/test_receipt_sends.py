@@ -67,12 +67,55 @@ def env(monkeypatch):
     return TestClient(app), state
 
 
-def test_contact_prefers_the_player_on_the_bill(env):
+def tee_line(player_id, **extra):
+    return {"kind": "tee_player", "booking_id": "B1", "player_id": player_id, "sim_reservation_id": None, **extra}
+
+
+def test_individual_bill_uses_that_player(env):
     client, state = env
     res = client.get(f"{API}/pos/receipts/41/contact")
     assert res.status_code == 200, res.text
     assert res.json() == {"phone": "905-555-0101", "email": "jane@example.com", "can_text": True, "can_email": True}
     assert state["calls"] == [("pelham_staff_bill", {"p_id": 41})]
+
+
+def test_individual_without_contact_falls_back_to_the_representative(env, monkeypatch):
+    client, _ = env
+    monkeypatch.setitem(TABLES, "pelham_tee_bookings", [{"id": "B1", "doc": {"players": [
+        {"id": "p1", "phone": "905-555-0100", "email": "first@example.com"},
+        {"id": "p2", "phone": "", "email": "jane@example.com"},
+    ]}}])
+    res = client.get(f"{API}/pos/receipts/41/contact")
+    assert res.json()["phone"] == "905-555-0100"
+    assert res.json()["email"] == "jane@example.com"
+
+
+def test_group_bill_uses_the_representative(env, monkeypatch):
+    client, _ = env
+    monkeypatch.setitem(TABLES, "pelham_bill_lines", [tee_line("p2"), tee_line("p1")])
+    res = client.get(f"{API}/pos/receipts/41/contact")
+    assert res.json()["phone"] == "905-555-0100"
+    assert res.json()["email"] == "first@example.com"
+
+
+def test_group_falls_back_to_the_player_on_the_bill(env, monkeypatch):
+    client, _ = env
+    monkeypatch.setitem(TABLES, "pelham_bill_lines", [tee_line("p2"), tee_line("p3")])
+    monkeypatch.setitem(TABLES, "pelham_tee_bookings", [{"id": "B1", "doc": {"players": [
+        {"id": "p1", "phone": "", "email": "first@example.com"},
+        {"id": "p3", "phone": "905-555-0103", "email": ""},
+        {"id": "p2", "phone": "905-555-0101", "email": "jane@example.com"},
+    ]}}])
+    res = client.get(f"{API}/pos/receipts/41/contact")
+    assert res.json()["phone"] == "905-555-0101"
+    assert res.json()["email"] == "first@example.com"
+
+
+def test_removed_line_does_not_make_a_group(env, monkeypatch):
+    client, _ = env
+    monkeypatch.setitem(TABLES, "pelham_bill_lines", [tee_line("p1", active=False), tee_line("p2")])
+    res = client.get(f"{API}/pos/receipts/41/contact")
+    assert res.json()["phone"] == "905-555-0101"
 
 
 def test_cash_bill_sends_text_and_email(env):
