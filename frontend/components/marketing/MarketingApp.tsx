@@ -16,11 +16,14 @@ import {
   type AudienceCustomer,
   type AudienceFilter,
   type Campaign,
+  type CampaignContact,
   type CampaignCost,
+  type CampaignReplies,
   type CampaignSend,
   type Channel,
   type MarketingStatus,
   type OptOut,
+  type ReplyChannel,
   type Segment,
   type SendView,
   OPTOUT_SOURCE_LABEL,
@@ -32,6 +35,7 @@ import {
   describeCampaignAudience,
   describeMarketingError,
   formatPhone,
+  isMarketingMissing,
   marketingApi,
   sendInView,
   sendMatches,
@@ -747,6 +751,21 @@ const STATUS_TONE: Record<Campaign["status"], string> = {
   cancelled: "bg-[#f0f1f3] text-[#4e5560]",
 };
 
+/** 예약·신청·콜백의 status 값(0145). 사전에 있는 말로 보여 준다. */
+const CONTACT_STATUS_LABEL: Record<string, string> = {
+  reserved: "Reserved",
+  confirmed: "Confirmed",
+  checked_in: "Checked in",
+  paid: "Paid",
+  no_show: "No show",
+  cancelled: "Cancelled",
+  pending: "Pending",
+  active: "Active",
+  open: "Open",
+  called: "Called",
+  closed: "Closed",
+};
+
 function clubTime(iso: string | null): string {
   if (!iso) return "";
   return new Date(iso).toLocaleString("en-CA", {
@@ -952,24 +971,7 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
             <CostLine campaign={detail} key={detail.id} />
             <RecipientMix sends={detail.sends ?? []} />
             {detail.replies && detail.replies.reached > 0 ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span
-                  className="bg-[#eaf6ee] px-2 py-1 font-bold text-[#1d6b3a]"
-                  title={`People who got this and then booked or applied on the website, called, or texted back within ${detail.replies.days} days`}
-                >
-                  <span>Contacted us</span>: {detail.replies.responded} / {detail.replies.reached} (
-                  {Math.round((detail.replies.responded / detail.replies.reached) * 100)}%)
-                </span>
-                {(["web", "call", "text"] as const).map((key) => (
-                  <span className="bg-[#f0f1f3] px-2 py-1 font-bold" key={key}>
-                    <span>{REPLY_LABEL[key]}</span>: {detail.replies?.[key] ?? 0}
-                  </span>
-                ))}
-                <span className="text-[#6b7280]">
-                  <span>Counted for {detail.replies.days} days after sending</span>
-                  {detail.replies.until ? ` · until ${clubTime(detail.replies.until)}` : ""}
-                </span>
-              </div>
+              <ContactLine campaignId={detail.id} key={detail.id} replies={detail.replies} />
             ) : null}
             {detail.status === "sending" && waiting > 0 && status &&
             !(detail.audience?.kind === "weather" ? status.alert_window_open : status.window_open) ? (
@@ -995,6 +997,110 @@ function Campaigns({ initial, status }: { initial: number | null; status: Market
         )}
       </section>
     </div>
+  );
+}
+
+/** 연락 온 수 줄 — 칩을 누르면 그 경로의 연락 한 건 한 건이 아래에 펼쳐진다(0145). 다시 누르면 닫힌다. */
+function ContactLine({ campaignId, replies }: { campaignId: number; replies: CampaignReplies }) {
+  const [open, setOpen] = useState<ReplyChannel | "all" | null>(null);
+  const [contacts, setContacts] = useState<CampaignContact[] | null>(null);
+  const [error, setError] = useState("");
+
+  const toggle = (next: ReplyChannel | "all") => {
+    if (open === next) {
+      setOpen(null);
+      return;
+    }
+    setOpen(next);
+    if (contacts) return;
+    setError("");
+    marketingApi.contacts(campaignId).then(setContacts, (cause) =>
+      setError(
+        isMarketingMissing(cause)
+          ? "Details are not switched on yet. Run supabase/migrations/0145_marketing_campaign_contacts.sql in the Supabase SQL editor."
+          : describeMarketingError(cause),
+      ),
+    );
+  };
+  const shown = (contacts ?? []).filter((c) => open === "all" || c.kind === open);
+  const chip = (key: ReplyChannel | "all") =>
+    `px-2 py-1 font-bold disabled:cursor-default ${
+      open === key ? "outline-2 outline-[#4533ff]" : ""
+    } ${key === "all" ? "bg-[#eaf6ee] text-[#1d6b3a]" : "bg-[#f0f1f3]"}`;
+
+  return (
+    <>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <button
+          aria-expanded={open === "all"}
+          className={chip("all")}
+          disabled={replies.responded === 0}
+          onClick={() => toggle("all")}
+          title={`People who got this and then booked or applied on the website, called, or texted back within ${replies.days} days`}
+          type="button"
+        >
+          <span>Contacted us</span>: {replies.responded} / {replies.reached} (
+          {Math.round((replies.responded / replies.reached) * 100)}%)
+        </button>
+        {(["web", "call", "text"] as const).map((key) => (
+          <button
+            aria-expanded={open === key}
+            className={chip(key)}
+            disabled={replies[key] === 0}
+            key={key}
+            onClick={() => toggle(key)}
+            type="button"
+          >
+            <span>{REPLY_LABEL[key]}</span>: {replies[key]}
+          </button>
+        ))}
+        <span className="text-[#6b7280]">
+          <span>Counted for {replies.days} days after sending</span>
+          {replies.until ? ` · until ${clubTime(replies.until)}` : ""}
+        </span>
+      </div>
+      {open === null ? null : error ? (
+        <p className="mt-2 border border-[#f0b4b4] bg-[#fdf1f1] p-2 text-xs text-[#8c1d1d]" role="alert">
+          {error}
+        </p>
+      ) : !contacts ? (
+        <p className="mt-2 text-xs text-[#6b7280]">Loading…</p>
+      ) : (
+        <div className="mt-2 max-h-[40vh] overflow-auto border border-[#d4d4d8]">
+          <table className="w-full text-left text-xs">
+            <thead className="sticky top-0 bg-white">
+              <tr className="border-b border-[#d4d4d8]">
+                <th className="px-2 py-1.5">When</th>
+                <th className="px-2 py-1.5">Name</th>
+                <th className="px-2 py-1.5">Phone</th>
+                <th className="px-2 py-1.5">Channel</th>
+                <th className="px-2 py-1.5">What</th>
+                <th className="px-2 py-1.5">Details</th>
+                <th className="px-2 py-1.5">Status</th>
+                <th className="px-2 py-1.5">Reference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((contact, index) => (
+                <tr className="border-b border-[#f0f0f2] align-top" key={index}>
+                  <td className="px-2 py-1.5 whitespace-nowrap">{clubTime(contact.at)}</td>
+                  <td className="px-2 py-1.5 font-bold">{contact.name}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">{formatPhone(contact.phone)}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">{REPLY_LABEL[contact.kind]}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">{contact.what}</td>
+                  <td className="px-2 py-1.5 whitespace-pre-wrap">{contact.detail}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">
+                    {CONTACT_STATUS_LABEL[contact.status ?? ""] ?? contact.status}
+                  </td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">{contact.ref}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {shown.length ? null : <p className="px-2 py-4 text-center text-xs text-[#6b7280]">No one matches.</p>}
+        </div>
+      )}
+    </>
   );
 }
 

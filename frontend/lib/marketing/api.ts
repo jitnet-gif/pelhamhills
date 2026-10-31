@@ -87,6 +87,18 @@ export type CampaignReplies = {
   text: number;
 };
 
+/** 0145 — 연락 온 숫자 뒤의 한 건. what·detail 은 서버가 만든 글. status 는 지금 상태, 문자는 null. */
+export type CampaignContact = {
+  kind: ReplyChannel;
+  at: string;
+  phone: string;
+  name: string | null;
+  what: string;
+  detail: string | null;
+  status: string | null;
+  ref: string | null;
+};
+
 export type Campaign = {
   id: number;
   channel: Channel;
@@ -206,6 +218,7 @@ export const marketingApi = {
   }) => staffRpc<Campaign>("pelham_marketing_campaign_create", { p: fields }),
   campaigns: () => staffRpc<Campaign[]>("pelham_marketing_campaigns"),
   campaign: (id: number) => staffRpc<Campaign>("pelham_marketing_campaign", { p_id: id }),
+  contacts: (id: number) => staffRpc<CampaignContact[]>("pelham_marketing_campaign_contacts", { p_id: id }),
   cancel: (id: number) => staffRpc<Campaign>("pelham_marketing_campaign_cancel", { p_id: id }),
   setPrefs: (customer_ref: string, prefs: { sms_ok?: boolean | null; call_ok?: boolean | null }) =>
     staffRpc<unknown>("pelham_marketing_prefs_set", { p: { customer_ref, ...prefs } }),
