@@ -3538,5 +3538,18 @@
  "Your gift card is ready": "기프트카드가 준비됐습니다",
  "The gift certificate and receipt are on their way by email, the barcode by text.": "상품권과 영수증은 이메일로, 바코드는 문자로 보내고 있습니다.",
  "Show this barcode at the counter. Anyone with it can spend the card, so keep it safe.": "계산대에서 이 바코드를 보여 주세요. 바코드가 있으면 누구나 쓸 수 있으니 잘 보관하세요.",
- "No charge was made and no gift card was issued.": "결제되지 않았고 기프트카드도 발행되지 않았습니다."
+ "No charge was made and no gift card was issued.": "결제되지 않았고 기프트카드도 발행되지 않았습니다.",
+ "Membership application": "회원 신청",
+ "Channel": "경로",
+ "Transaction date": "거래일",
+ "Online transactions": "온라인 거래",
+ "Needs refund": "환불 필요",
+ "Declined": "거절됨",
+ "Online transactions could not be loaded.": "온라인 거래를 불러오지 못했습니다.",
+ "Member transactions": "회원 거래",
+ "Open receipt": "영수증 열기",
+ "Possible match — same date and amount. Add the receipt number to the member's notes to confirm.": "후보입니다 — 날짜와 금액이 같습니다. 확인되면 회원 메모에 영수증 번호를 넣으세요.",
+ "No member is linked to this receipt. Add the receipt number to the member's notes in Memberships to link it.": "이 영수증에 연결된 회원이 없습니다. Memberships에서 해당 회원 메모에 영수증 번호를 넣으면 연결됩니다.",
+ "The membership list could not be loaded.": "회원 명부를 불러오지 못했습니다.",
+ "Tap a membership row to see the member's transactions, any other row to open the receipt.": "회원권 행을 누르면 회원 거래가, 다른 행을 누르면 영수증이 열립니다."
 }

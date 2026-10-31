@@ -9,6 +9,7 @@
 
 import { paymentsApiBase } from "@/lib/booking/payments";
 import { bookingRpc } from "@/lib/booking/rpc";
+import { computeTax, type Sale, type SaleLine } from "@/lib/retail/types";
 import { ApiError } from "@/lib/teeSheet/api";
 import { staffRpc } from "@/lib/teeSheet/staffRpc";
 
@@ -177,8 +178,38 @@ export type RenewalCandidate = {
   rounds: number;
 };
 
+/** 온라인 카드 거래 한 줄(0146). `amount` 는 센트, `trans_id` 는 Stripe PaymentIntent. */
+export type MembershipTransaction = {
+  invoice: string;
+  amount: number;
+  status: "approved" | "declined" | "error" | "orphaned" | "refunded";
+  card_brand: string | null;
+  card_last4: string | null;
+  trans_id: string | null;
+  response_text: string | null;
+  transacted_at: string;
+  refunded_at: string | null;
+};
+
+export const TRANSACTION_STATUS_LABEL: Record<MembershipTransaction["status"], string> = {
+  approved: "Approved",
+  declined: "Declined",
+  error: "Error",
+  orphaned: "Needs refund",
+  refunded: "Refunded",
+};
+
 export const membershipsApi = {
   list: (season: number) => staffRpc<Membership[]>("pelham_staff_memberships", { p_season: season }),
+  transactions: (id: string) =>
+    staffRpc<MembershipTransaction[]>("pelham_staff_membership_transactions", { p_membership: id }),
+  /** 거래를 Stripe 대시보드의 맞는 쪽(test·live)으로 열려고 묻는다. */
+  stripeEnvironment: async (): Promise<"test" | "live"> => {
+    const response = await fetch(`${paymentsApiBase()}/payments/online/config`);
+    if (!response.ok) throw new Error("Stripe settings are unavailable.");
+    const body = (await response.json()) as { environment: "test" | "live" };
+    return body.environment;
+  },
   save: (id: string | null, input: MembershipInput) =>
     staffRpc<Membership>("pelham_staff_membership_save", { p_id: id, p: input }),
   renewals: (season: number) =>
@@ -276,6 +307,37 @@ export function listPrice(m: {
   const range = m.range_pass && !type.rangeIncluded ? RANGE_PASS_PRICE : 0;
   const subtotal = base + cart + range;
   return round2(m.payment_method === "Credit card" ? subtotal * (1 + CREDIT_CARD_SURCHARGE) : subtotal);
+}
+
+/**
+ * 계산서 줄이 회원권 판매인가. 레지스터의 Sell membership 줄과, 직원이 Open Item 으로 친 회원권.
+ * 상품은 넣지 않는다 — 연습장 이용권 상품 이름에도 Members 가 들어 있다.
+ */
+export function isMembershipLine(line: Pick<SaleLine, "kind" | "name">): boolean {
+  return line.kind === "membership" || (line.kind === "open_item" && /member/i.test(line.name));
+}
+
+/**
+ * 영수증의 회원을 명부에서 찾는다. 계산서에는 회원 연결이 없으니(Open Item 줄은 더더욱) 둘로 찾는다:
+ * 메모의 영수증 번호(결제 트리거가 적고, 직원이 손으로 적어도 된다)는 확실, 같은 날 같은 금액은 후보일 뿐이다.
+ */
+export function membershipsForSale(
+  rows: Membership[],
+  sale: Pick<Sale, "receipt_no" | "business_date" | "total">,
+  line: Pick<SaleLine, "line_total">,
+): { rows: Membership[]; exact: boolean } {
+  const exact = rows.filter((row) => row.notes?.includes(sale.receipt_no));
+  if (exact.length) return { rows: exact, exact: true };
+  const amounts = [sale.total, line.line_total + computeTax(line.line_total)];
+  return {
+    rows: rows.filter(
+      (row) =>
+        row.status !== "cancelled" &&
+        row.paid_on === sale.business_date &&
+        amounts.includes(Math.round(Number(row.amount_paid) * 100)),
+    ),
+    exact: false,
+  };
 }
 
 export function balance(m: Pick<Membership, "amount_due" | "amount_paid">): number {

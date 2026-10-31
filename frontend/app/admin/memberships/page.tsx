@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import AdminShell from "@/components/admin/AdminShell";
+import OnlineTransactions from "@/components/memberships/OnlineTransactions";
 import {
   Button,
   Chip,
@@ -50,7 +51,7 @@ import {
   type MembershipType,
   type RenewalCandidate,
 } from "@/lib/memberships";
-import { CLUB_TIME_ZONE } from "@/lib/retail/receipt";
+import { CLUB_TIME_ZONE, usDate } from "@/lib/retail/receipt";
 
 /** 클럽 현지 날짜 `YYYY-MM-DD`. */
 function clubToday(): string {
@@ -390,6 +391,12 @@ function MemberCard({ row, onOpen }: { row: Membership; onOpen: () => void }) {
           </span>
         ) : null}
       </div>
+      {/* 전액 환불되면 paid_on 은 남아도 낸 돈이 없다. 거래일로 보이지 않게 한다. */}
+      {row.paid_on && Number(row.amount_paid) > 0 ? (
+        <p className="text-xs text-[#6b7280]">
+          <span>Transaction date</span> <span className="tabular-nums">{usDate(row.paid_on)}</span>
+        </p>
+      ) : null}
       {/* 온라인 신청의 금액은 손님 화면이 낸 견적이다(0041). 요금표와 다르면 결제 전에 본다. */}
       {row.source === "online" && row.status === "pending" && Number(row.amount_due) !== listPrice(row) ? (
         <p className="text-xs font-bold text-[#8a1f1f]">Check amount — rate card says {money(listPrice(row))}</p>
@@ -658,6 +665,8 @@ function MembershipModal({
         <Field label="Notes">
           <TextArea onChange={text("notes")} value={form.notes ?? ""} />
         </Field>
+
+        {id ? <OnlineTransactions membershipId={id} /> : null}
 
         {error ? <ErrorNote>{error}</ErrorNote> : null}
 

@@ -15,6 +15,7 @@
 
 import { useMemo, type ReactNode } from "react";
 
+import { isMembershipLine } from "@/lib/memberships";
 import { PAYMENT_LABELS, stationLabel } from "@/lib/retail/receipt";
 import {
   DIVISIONS,
@@ -194,6 +195,7 @@ export default function SalesDrilldown({
   sales,
   onChange,
   onOpenSale,
+  onOpenMembership,
   onClose,
 }: {
   drill: Drill;
@@ -201,6 +203,8 @@ export default function SalesDrilldown({
   /** 사업부 안의 분류 칩을 누르면 같은 창에서 범위를 바꾼다. */
   onChange: (drill: Drill) => void;
   onOpenSale: (sale: Sale) => void;
+  /** 회원권 줄은 영수증 대신 회원의 거래로 간다. */
+  onOpenMembership: (sale: Sale, line: SaleLine) => void;
   onClose: () => void;
 }) {
   const paid = useMemo(() => sales.filter(isPaid), [sales]);
@@ -470,7 +474,11 @@ export default function SalesDrilldown({
                   <li key={`${sale.id}-${line.id ?? index}`}>
                     <RowButton
                       amount={shown(line.line_total)}
-                      onClick={() => onOpenSale(sale)}
+                      onClick={() =>
+                        isMembershipLine(line)
+                          ? onOpenMembership(sale, line)
+                          : onOpenSale(sale)
+                      }
                       primary={`${line.quantity}× ${line.name}`}
                       staff={<StaffName date={sale.business_date} name={sale.cashier} />}
                       secondary={[
@@ -509,7 +517,9 @@ export default function SalesDrilldown({
               : drill.kind === "cards"
                 ? "Credit and debit, tips excluded (same as the Card Sales figure). Tap a line to see the transactions."
                 : "Tap a line to see the transactions."
-            : "Tap a row to open the receipt."}
+            : lines?.some((row) => isMembershipLine(row.line))
+              ? "Tap a membership row to see the member's transactions, any other row to open the receipt."
+              : "Tap a row to open the receipt."}
         </p>
       </div>
     </Modal>

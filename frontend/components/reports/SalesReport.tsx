@@ -24,6 +24,7 @@ import Cancellations from "@/components/reports/Cancellations";
 import CardSales from "@/components/reports/CardSales";
 import CashierShifts from "@/components/reports/CashierShifts";
 import CashReconcile from "@/components/reports/CashReconcile";
+import MembershipSale, { type MembershipSaleRow } from "@/components/reports/MembershipSale";
 import PriceReview from "@/components/reports/PriceReview";
 import SaleDetail from "@/components/reports/SaleDetail";
 import SalesDrilldown, { type Drill } from "@/components/reports/SalesDrilldown";
@@ -60,6 +61,7 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
   const [selected, setSelected] = useState<Sale | null>(null);
   // 숫자를 눌러 연 상세. 영수증을 열면 잠시 가렸다가, 영수증을 닫으면 그 목록으로 돌아온다.
   const [drill, setDrill] = useState<Drill | null>(null);
+  const [memberSale, setMemberSale] = useState<MembershipSaleRow | null>(null);
   // 환불하면 대사표 숫자도 바뀐다. 대사표에 다시 읽으라고 알린다.
   const [closeoutKey, setCloseoutKey] = useState(0);
   const [printing, setPrinting] = useState(false);
@@ -477,13 +479,25 @@ export default function SalesReport({ cash = false }: { cash?: boolean }) {
         )}
       </Panel>
 
-      {drill && !selected ? (
+      {drill && !selected && !memberSale ? (
         <SalesDrilldown
           drill={drill}
           onChange={setDrill}
           onClose={() => setDrill(null)}
+          onOpenMembership={(sale, line) => setMemberSale({ sale, line })}
           onOpenSale={setSelected}
           sales={sales}
+        />
+      ) : null}
+
+      {memberSale && !selected ? (
+        <MembershipSale
+          onClose={() => setMemberSale(null)}
+          onOpenReceipt={() => {
+            setSelected(memberSale.sale);
+            setMemberSale(null);
+          }}
+          row={memberSale}
         />
       ) : null}
 
