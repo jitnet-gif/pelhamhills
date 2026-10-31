@@ -47,7 +47,7 @@ def membership_text(row: dict[str, Any]) -> str:
     out = [receipts.CLUB_NAME, *receipts.CLUB_ADDRESS, "", "Membership payment receipt",
            receipts._when({"paid_at": row.get("approved_at")}), ""]
     out += [f"{label}: {value}" for label, value in _membership_details(row)]
-    out += ["", "Thank you!", f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}."]
+    out += ["", "Thank you!", f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}.", receipts.APP_LINE]
     return "\n".join(out) + "\n"
 
 
@@ -72,6 +72,7 @@ def membership_html(row: dict[str, Any]) -> str:
 <div style="color:#6b7280;font-size:12px">{when}</div>
 </td></tr>
 {rows}
+{receipts.app_html()}
 <tr><td colspan="2" style="text-align:center;padding-top:20px;color:#6b7280;font-size:12px">
 Thank you! Questions? Call {esc(settings.PROSHOP_PHONE_NUMBER)}.</td></tr>
 </table>

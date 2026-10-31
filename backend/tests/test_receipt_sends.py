@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.api.routes import receipts, terminal  # noqa: E402
+from backend.api.routes import customer_qr, receipts, terminal  # noqa: E402
 from backend.services.twilio_sms import SmsMessage  # noqa: E402
 
 API = "/api/v1"
@@ -162,6 +162,40 @@ def test_email_html_escapes_names():
     html = receipts.receipt_email_html(BILL)
     assert "<b>Smith</b>" not in html and "&lt;b&gt;Smith&lt;/b&gt;" in html
     assert "$158.20" in html and "PH-20261026-0007" in html
+
+
+def test_text_and_email_carry_the_app_link_and_qr(env, monkeypatch):
+    client, state = env
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", "https://api.example.com/api/v1")
+    sent = []
+    real_send = receipts.send_sms
+
+    async def spy(to, body, template=None, booking_ref=None, media_url=None):
+        sent.append(media_url)
+        return await real_send(to, body, template, booking_ref, media_url)
+
+    monkeypatch.setattr(receipts, "send_sms", spy)
+    assert client.post(f"{API}/pos/receipts/41/send", json={"phone": "9055550101"}).status_code == 200
+    assert sent == ["https://api.example.com/api/v1/sms/app-qr.png"]
+    app = "https://golf-gps-pelhamhills-seven.vercel.app"
+    assert app in state["sms"][0]["body"]
+    assert app in receipts.receipt_email_text(BILL)
+    page = receipts.receipt_email_html(BILL)
+    assert app in page and 'src="https://api.example.com/api/v1/sms/app-qr.png"' in page
+
+
+def test_without_a_public_api_the_link_goes_alone(monkeypatch):
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", "http://localhost:8000/api/v1")
+    page = receipts.receipt_email_html(BILL)
+    assert "<img" not in page and "golf-gps-pelhamhills-seven.vercel.app" in page
+
+
+def test_app_qr_image_is_a_public_png():
+    app = FastAPI()
+    app.include_router(customer_qr.router, prefix=API)
+    res = TestClient(app).get(f"{API}/sms/app-qr.png")
+    assert res.status_code == 200 and res.headers["content-type"] == "image/png"
+    assert res.content.startswith(b"\x89PNG")
 
 
 def test_long_bill_text_is_cut():

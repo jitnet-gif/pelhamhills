@@ -67,6 +67,7 @@ function receiptSheetBlocks(doc: ReceiptDoc, options: { reprint?: boolean; copyL
     register: REGISTER_NAME,
     reprint: options.reprint,
     copyLabel: options.copyLabel,
+    appQr: options.copyLabel !== MERCHANT_COPY,
   });
 }
 
@@ -75,7 +76,8 @@ function receiptSheetBlocks(doc: ReceiptDoc, options: { reprint?: boolean; copyL
  * 클럽이 쓰던 Lightspeed 영수증도 두 장이었다. 장 사이에서 페이지가 끊기므로
  * 감열 프린터가 사이를 자른다(`globals.css` 의 `.rc-copy`).
  */
-const COPY_LABELS = ["CUSTOMER COPY", "MERCHANT COPY"];
+const MERCHANT_COPY = "MERCHANT COPY";
+const COPY_LABELS = ["CUSTOMER COPY", MERCHANT_COPY];
 
 /** 판매가 아닌 결제(티 시트 카드의 Payment)도 같은 모양의 영수증으로 찍는다. */
 export function printReceiptDoc(doc: ReceiptDoc, options: { reprint?: boolean } = {}): void {

@@ -34,7 +34,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from backend.api.routes import terminal, voice
+from backend.api.routes import customer_qr, terminal, voice
 from backend.core.config import settings
 from backend.services import supabase_rest
 from backend.services.twilio_sms import normalize_phone, send_sms
@@ -62,6 +62,20 @@ PAYMENT_LABELS = {
 SMS_LINES = 6
 
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+#: 영수증 문자·메일에 함께 가는 앱 링크. 그림은 `customer_qr.app_qr_image_url()`.
+APP_URL = customer_qr.GPS_APP_ORIGIN
+APP_LINE = f"Pelham Hills app: {APP_URL}"
+
+
+def app_html() -> str:
+    """영수증 메일의 앱 QR 과 링크. 메일 프로그램이 data: 그림을 막아서 그림은 공개 주소로 건다."""
+    image = customer_qr.app_qr_image_url()
+    qr = (f'<a href="{APP_URL}"><img src="{html.escape(image)}" width="140" height="140" '
+          'alt="QR code for the Pelham Hills app" style="display:block;margin:0 auto 6px;border:0"></a>') if image else ""
+    return (f'<tr><td colspan="2" style="text-align:center;padding-top:20px;font-size:13px">'
+            f'<div style="font-weight:bold;padding-bottom:8px">Scan to open the Pelham Hills app</div>{qr}'
+            f'<a href="{APP_URL}" style="color:#1f4d2b;font-size:12px">{APP_URL}</a></td></tr>')
 
 
 class SendRequest(BaseModel):
@@ -112,6 +126,7 @@ def receipt_sms(bill: dict[str, Any]) -> str:
         out.append("Paid: " + ", ".join(f"{_payment_label(p)} {_money(p.get('amount'))}" for p in payments))
     if int(bill.get("tip") or 0) > 0:
         out.append(f"Tip {_money(bill.get('tip'))}")
+    out.append(APP_LINE)
     out.append(f"Thank you! Questions? Call {settings.PROSHOP_PHONE_NUMBER}. Reply STOP to opt out.")
     return "\n".join(out)
 
@@ -132,7 +147,7 @@ def receipt_email_text(bill: dict[str, Any]) -> str:
         out.append(f"{_payment_label(payment)}  {_money(payment.get('amount'))}")
     if int(bill.get("tip") or 0) > 0:
         out.append(f"Tip  {_money(bill.get('tip'))}")
-    out += ["", "Thank you!", f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}."]
+    out += ["", "Thank you!", f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}.", APP_LINE]
     return "\n".join(out) + "\n"
 
 
@@ -180,6 +195,7 @@ def receipt_email_html(bill: dict[str, Any]) -> str:
 {rule}
 <tr><td colspan="2" style="padding:8px 0 2px;font-size:12px;font-weight:bold;color:#6b7280">PAYMENTS</td></tr>
 {''.join(paid) or row('No charge', _money(0))}
+{app_html()}
 <tr><td colspan="2" style="text-align:center;padding-top:20px;color:#6b7280;font-size:12px">
 Thank you! Questions? Call {esc(settings.PROSHOP_PHONE_NUMBER)}.</td></tr>
 </table>
@@ -294,7 +310,8 @@ async def send(bill_id: int, body: SendRequest, request: Request) -> dict[str, A
     result: dict[str, Any] = {"ok": True, "text": None, "email": None}
     problems: list[str] = []
     if phone:
-        msg = await send_sms(phone, receipt_sms(bill), template="bill_receipt", booking_ref=bill.get("receipt_no"))
+        msg = await send_sms(phone, receipt_sms(bill), template="bill_receipt", booking_ref=bill.get("receipt_no"),
+                             media_url=customer_qr.app_qr_image_url())
         result["text"] = {"to": phone, "status": msg.status}
         if msg.status in ("failed", "skipped"):
             problems.append(f"the text did not go out ({msg.error or msg.status})")

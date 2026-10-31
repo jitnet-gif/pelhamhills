@@ -10,6 +10,7 @@
  * "페이지마다 자르기" 설정이 필요 없다.
  */
 
+import { APP_QR_QUIET, APP_QR_ROWS } from "./appQr";
 import type { ReceiptBlock } from "./receipt";
 
 /** 80mm 롤, Font A(12×24) 한 줄 글자 수. */
@@ -120,7 +121,38 @@ function writeBlock(out: ByteWriter, block: ReceiptBlock, logo: Raster | null): 
       textLine(out, block.value);
       return;
     }
+    case "appQr": {
+      const qr = qrRaster(APP_QR_ROWS, APP_QR_QUIET);
+      align(out, "center");
+      out.push(GS, 0x76, 0x30, 0, ...le16(qr.width / 8), ...le16(qr.height));
+      out.append(qr.data);
+      out.push(LF);
+      return;
+    }
   }
+}
+
+/** QR 한 칸의 점 수. 203dpi 에서 0.75mm — 앱 QR 이 약 31mm 로 찍혀 휴대폰이 쉽게 읽는다. */
+const QR_MODULE_DOTS = 6;
+
+/** QR 칸 → 래스터. 프린터 내장 QR(`GS ( k`)이 아니라 로고와 같은 `GS v 0` 으로 찍어 화면과 패턴이 같다. */
+export function qrRaster(rows: readonly string[], quiet: number, scale = QR_MODULE_DOTS): Raster {
+  const size = (rows.length + quiet * 2) * scale;
+  const rowBytes = Math.ceil(size / 8);
+  const data = new Uint8Array(rowBytes * size);
+  rows.forEach((row, moduleY) => {
+    for (let moduleX = 0; moduleX < row.length; moduleX++) {
+      if (row[moduleX] !== "#") continue;
+      for (let dy = 0; dy < scale; dy++) {
+        for (let dx = 0; dx < scale; dx++) {
+          const x = (moduleX + quiet) * scale + dx;
+          const y = (moduleY + quiet) * scale + dy;
+          data[y * rowBytes + (x >> 3)] |= 0x80 >> (x & 7);
+        }
+      }
+    }
+  });
+  return { width: rowBytes * 8, height: size, data };
 }
 
 /** 품목 줄 칸: 설명 | 수량(4) | 금액(11). 합이 48. */

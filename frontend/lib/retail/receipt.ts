@@ -24,6 +24,7 @@
  *   옮겨 적은 승인번호·끝 4자리뿐이고, "keyed" 로 표시한다.
  */
 
+import { APP_QR_QUIET, APP_QR_ROWS, APP_URL } from "./appQr";
 import { code128Svg } from "./barcode";
 import { RECEIPT_LOGO } from "./logo";
 import { TAX_RATE, formatMoney, type Cents, type PaymentMethod, type Sale } from "./types";
@@ -46,6 +47,7 @@ export const STATION_LABELS: Record<string, string> = {
   snack_bar: "Snack Bar",
   tee_sheet: "Tee Sheet",
   simulator: "Bay Sheet",
+  membership: "Memberships",
 };
 
 export function stationLabel(station: string | null | undefined): string {
@@ -86,6 +88,8 @@ export type ReceiptOptions = {
    * 어느 장이 손님 것이고 어느 장이 보관용인지 종이만 보고 알 수 있어야 한다.
    */
   copyLabel?: string;
+  /** 앱 QR 을 넣는다. 손님이 가져가는 장에만 — 보관용 사본에는 쓸모가 없다. */
+  appQr?: boolean;
 };
 
 /** 품목 한 줄. `amount` 는 그 줄의 합계(센트) — Price 칸에 그대로 찍힌다. */
@@ -200,7 +204,8 @@ export type ReceiptBlock =
   | { kind: "rule" }
   | { kind: "total"; label: string; amount: string; bold?: true }
   | { kind: "section"; title: string }
-  | { kind: "barcode"; value: string };
+  | { kind: "barcode"; value: string }
+  | { kind: "appQr" };
 
 const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
   timeZone: CLUB_TIME_ZONE,
@@ -279,6 +284,11 @@ export function receiptDocBlocks(doc: ReceiptDoc, options: ReceiptOptions): Rece
   }
 
   blocks.push({ kind: "text", text: "Thank You!", align: "center", gap: true });
+  if (options.appQr) {
+    blocks.push({ kind: "text", text: "Scan to open the Pelham Hills app", align: "center", bold: true, gap: true });
+    blocks.push({ kind: "appQr" });
+    blocks.push({ kind: "text", text: APP_URL, align: "center" });
+  }
   blocks.push({ kind: "barcode", value: doc.ticket });
   if (options.copyLabel) {
     blocks.push({ kind: "text", text: options.copyLabel, align: "center", bold: true, gap: true });
@@ -325,7 +335,20 @@ function blockHtml(block: ReceiptBlock): string {
       return `<p class="rc-section">${escapeHtml(block.title)}</p>`;
     case "barcode":
       return `<div class="rc-barcode">${code128Svg(block.value)}<p>${escapeHtml(block.value)}</p></div>`;
+    case "appQr":
+      return `<div class="rc-qr">${appQrSvg()}</div>`;
   }
+}
+
+function appQrSvg(): string {
+  const size = APP_QR_ROWS.length + APP_QR_QUIET * 2;
+  let path = "";
+  APP_QR_ROWS.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === "#") path += `M${x + APP_QR_QUIET} ${y + APP_QR_QUIET}h1v1h-1z`;
+    }
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges" role="img" aria-label="${APP_URL}"><path d="${path}"/></svg>`;
 }
 
 function classes(...names: Array<string | false | undefined>): string {

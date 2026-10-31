@@ -18,7 +18,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from backend.api.routes import voice
+from backend.api.routes import customer_qr, voice
 from backend.core.config import settings
 from backend.services import supabase_rest
 from backend.services.twilio_sms import send_sms
@@ -62,6 +62,7 @@ def receipt_text(row: dict[str, Any]) -> str:
             parts.append(f"Booking {row['confirmation_code']}.")
     if row.get("receipt_no"):
         parts.append(f"Receipt {row['receipt_no']}.")
+    parts.append(f"Pelham Hills app: {customer_qr.GPS_APP_ORIGIN}")
     parts.append(f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}. Reply STOP to opt out.")
     return " ".join(parts)
 
@@ -91,7 +92,8 @@ async def run() -> None:
             return
         for row in outbox:
             msg = await send_sms(str(row["phone"]), receipt_text(row), template="payment_approved",
-                                 booking_ref=row.get("confirmation_code") or row.get("receipt_no"))
+                                 booking_ref=row.get("confirmation_code") or row.get("receipt_no"),
+                                 media_url=customer_qr.app_qr_image_url())
             status = msg.status if msg.status in ("failed", "skipped") else "sent"
             try:
                 await run_in_threadpool(_record, int(row["id"]), status, msg.error, msg.twilio_sid)

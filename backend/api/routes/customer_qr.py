@@ -6,6 +6,7 @@
 
   POST /pos/customer-qr/text   직원: 그 손님 휴대폰으로 QR 그림 + 주소를 보낸다(MMS)
   GET  /sms/qr/{code}.png      Twilio 가 받아 가는 QR 그림 (공개)
+  GET  /sms/app-qr.png         영수증 문자·메일의 앱 QR 그림 (공개, 앱 첫 화면 주소뿐)
 
 그림 주소가 공개인 까닭은 확정 문자의 바코드(`sms.barcode_png`)와 같다 — 그림에는 주소의 무작위 토큰뿐이고
 이름·번호가 없다. 그 토큰으로 할 수 있는 것은 직원 화면의 체크인과, 생년월일까지 맞을 때의 계정 잇기뿐이다.
@@ -19,6 +20,7 @@ from __future__ import annotations
 import io
 import logging
 import re
+from functools import lru_cache
 
 import segno
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -54,6 +56,20 @@ def qr_png(code: str) -> bytes:
     return out.getvalue()
 
 
+@lru_cache(maxsize=1)
+def app_qr_png() -> bytes:
+    """영수증 문자·메일에 붙는 앱 QR. 누구에게나 같은 앱 주소라 토큰이 없다."""
+    out = io.BytesIO()
+    segno.make(GPS_APP_ORIGIN, error="m").save(out, kind="png", scale=8, border=4)
+    return out.getvalue()
+
+
+def app_qr_image_url() -> str | None:
+    """Twilio·메일 프로그램이 받아 갈 주소. 공개 https 주소가 없으면(로컬 개발) None — 링크만 간다."""
+    base = public_api_base()
+    return f"{base}/sms/app-qr.png" if base.startswith("https://") else None
+
+
 def qr_image_url(code: str) -> str | None:
     """Twilio 가 받아 갈 주소. 공개 https 주소가 없으면(로컬 개발) None — 그림 없이 글만 간다."""
     base = public_api_base()
@@ -65,6 +81,12 @@ def qr_image_url(code: str) -> str | None:
 def _token(request: Request) -> str:
     header = request.headers.get("authorization") or ""
     return header[7:].strip() if header.lower().startswith("bearer ") else ""
+
+
+@router.get("/sms/app-qr.png")
+def app_qr_image() -> Response:
+    return Response(content=app_qr_png(), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/sms/qr/{code}.png")

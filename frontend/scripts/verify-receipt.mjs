@@ -534,3 +534,42 @@ test("TM Print Assistant URL: ePOS-Print XML with the same hex, URL-encoded, opt
   assert.ok(!/[<> "]/.test(url));
   assert.equal(new URLSearchParams(tmPrintAssistantUrl(Uint8Array.of(0)).split("?")[1]).has("success"), false);
 });
+
+test("App QR: only when asked, between Thank You and the barcode, and the HTML draws it", () => {
+  const kinds = (options) => receiptDocBlocks(teeReceipt(teeBooking(), teePlayer()), { header: HEADER, ...options }).map((block) => block.kind);
+  assert.ok(!kinds({}).includes("appQr"));
+  const blocks = receiptDocBlocks(teeReceipt(teeBooking(), teePlayer()), { header: HEADER, appQr: true });
+  const at = blocks.findIndex((block) => block.kind === "appQr");
+  assert.ok(at > blocks.findIndex((block) => block.text === "Thank You!"));
+  assert.ok(at < blocks.findIndex((block) => block.kind === "barcode"));
+  assert.equal(blocks[at + 1].text, "https://golf-gps-pelhamhills-seven.vercel.app");
+  assert.match(receiptHtml(blocks), /class="rc-qr"><svg[^>]*viewBox="0 0 41 41"/);
+});
+
+test("App QR: the stored pattern is the app URL, and the printed raster scans back to it", async () => {
+  const { APP_QR_QUIET, APP_QR_ROWS, APP_URL } = await import("../lib/retail/appQr.ts");
+  const { qrRaster } = await import("../lib/retail/escpos.ts");
+  const { createRequire } = await import("node:module");
+  const zxing = createRequire(import.meta.url)("@zxing/library");
+
+  const matrix = zxing.QRCodeEncoder.encode(APP_URL, zxing.QRCodeDecoderErrorCorrectionLevel.M).getMatrix();
+  assert.equal(APP_QR_ROWS.length, matrix.getHeight());
+  APP_QR_ROWS.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) assert.equal(row[x] === "#", matrix.get(x, y) === 1);
+  });
+
+  // 33칸 + 여백 8칸 = 41칸 × 6점 = 246점. 8 의 배수로 올려 248점 폭.
+  const raster = qrRaster(APP_QR_ROWS, APP_QR_QUIET);
+  assert.equal(raster.height, 246);
+  assert.equal(raster.width, 248);
+  const rowBytes = raster.width / 8;
+  const gray = new Uint8ClampedArray(raster.width * raster.height);
+  for (let y = 0; y < raster.height; y++) {
+    for (let x = 0; x < raster.width; x++) {
+      gray[y * raster.width + x] = raster.data[y * rowBytes + (x >> 3)] & (0x80 >> (x & 7)) ? 0 : 255;
+    }
+  }
+  const source = new zxing.RGBLuminanceSource(gray, raster.width, raster.height);
+  const bitmap = new zxing.BinaryBitmap(new zxing.HybridBinarizer(source));
+  assert.equal(new zxing.QRCodeReader().decode(bitmap).getText(), APP_URL);
+});

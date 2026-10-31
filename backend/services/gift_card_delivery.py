@@ -47,7 +47,7 @@ def receipt_text(row: dict[str, Any]) -> str:
            receipts._when({"paid_at": row.get("approved_at")}), ""]
     out += [f"{label}: {value}" for label, value in _details(row)]
     out += ["", "No HST on a gift card: tax is charged when it is spent.",
-            f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}."]
+            f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}.", receipts.APP_LINE]
     return "\n".join(out) + "\n"
 
 
@@ -71,6 +71,7 @@ def receipt_html(row: dict[str, Any]) -> str:
 <div style="color:#6b7280;font-size:12px">{when}</div>
 </td></tr>
 {rows}
+{receipts.app_html()}
 <tr><td colspan="2" style="text-align:center;padding-top:20px;color:#6b7280;font-size:12px">
 No HST on a gift card: tax is charged when it is spent.<br>Questions? Call {esc(settings.PROSHOP_PHONE_NUMBER)}.</td></tr>
 </table>

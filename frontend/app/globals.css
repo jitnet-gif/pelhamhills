@@ -345,6 +345,14 @@ body {
   letter-spacing: 0.15em;
 }
 
+.rc-sheet .rc-qr svg {
+  display: block;
+  width: 31mm;
+  height: 31mm;
+  margin: 0 auto;
+  fill: #000;
+}
+
 @media print {
   body:has(> #receipt-print-root:not(:empty)) > :not(#receipt-print-root) {
     display: none !important;
