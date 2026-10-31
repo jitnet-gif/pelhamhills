@@ -68,6 +68,7 @@ include_route_module("backend.api.routes.sms", f"{settings.API_V1_STR}", ["SMS (
 include_route_module("backend.api.routes.payments", f"{settings.API_V1_STR}", ["Online Payments"])
 # 회원권 신용카드 결제(Stripe Checkout). 열쇠(신청 uuid) + 이메일, 금액은 SQL 0042 가 정한다.
 include_route_module("backend.api.routes.membership_payments", f"{settings.API_V1_STR}", ["Online Payments"])
+include_route_module("backend.api.routes.gift_orders", f"{settings.API_V1_STR}", ["Online Payments"])
 # 계산대 카드 단말기(Stripe Terminal)와 Stripe 웹훅. 직원 확인은 요청의 Supabase 토큰으로 SQL 이 한다
 # (`pelham_staff_terminal_*`, 0021) — 그래서 공개 배포에서도 연다.
 include_route_module("backend.api.routes.terminal", f"{settings.API_V1_STR}", ["Card Terminal"])
@@ -150,6 +151,14 @@ async def start_booking_email_loop() -> None:
     if receipts.email_enabled():
         app.state.booking_email_loop = asyncio.create_task(booking_emails.loop())
         app.state.payment_email_loop = asyncio.create_task(payment_emails.loop())
+
+
+@app.on_event("startup")
+async def start_gift_card_delivery_loop() -> None:
+    # 온라인으로 산 기프트카드의 문자·메일. 패스마다 키를 보므로 어느 쪽 키가 없어도 띄운다.
+    from backend.services import gift_card_delivery
+
+    app.state.gift_card_delivery_loop = asyncio.create_task(gift_card_delivery.loop())
 
 
 @app.get("/")

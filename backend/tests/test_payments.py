@@ -24,7 +24,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.api.routes import membership_payments, payments, terminal
+from backend.api.routes import gift_orders, membership_payments, payments, terminal
 from backend.services import stripe_gateway as sg
 from backend.services import supabase_rest
 
@@ -988,3 +988,142 @@ def test_membership_dashboard_refund_unpays_membership(env):
     assert res.status_code == 200 and res.json()["status"] == "refunded"
     assert sql.member_balance == 314253
     assert not sql.called("pelham_online_refund_finish")
+
+
+# ===== 기프트카드 온라인 판매(0144) =====================================
+
+class FakeGiftSql:
+    """`FakeSql` 앞에 끼우는 얇은 주문 장부. 카드는 승인 때 한 장만 생긴다."""
+
+    def __init__(self, inner) -> None:
+        self.inner = inner
+        self.rows: dict[str, dict[str, Any]] = {}
+        self.cards: list[str] = []
+
+    def __call__(self, function: str, args: dict[str, Any]) -> Any:
+        method = getattr(self, function, None)
+        return method(args) if method else self.inner(function, args)
+
+    def pelham_gift_order_start(self, args):
+        p = args["p"]
+        if p["amount"] < 1000:
+            raise supabase_rest.RpcRefused(422, "Gift cards are $10 to $1,000, in whole dollars.")
+        inv = f"PHG{len(self.rows):012X}"
+        self.rows[inv] = {"invoice": inv, "status": "pending", "amount": p["amount"], "created_at": _now_iso(),
+                          "recipient": p["recipient"] or p["buyer_name"]}
+        return {"invoice": inv, "amount": p["amount"], "email": p["buyer_email"], "description": "Gift card"}
+
+    def pelham_gift_order_session(self, args):
+        self.rows[args["p_invoice"]]["gateway_session"] = args["p_session"]
+
+    def pelham_gift_order(self, args):
+        p = args["p"]
+        if "invoice" in p:
+            row = self.rows.get(p["invoice"])
+        else:
+            row = next((r for r in self.rows.values() if r.get("trans_id") == p["trans_id"]), None)
+        return dict(row) if row else None
+
+    def pelham_gift_order_complete(self, args):
+        p = args["p"]
+        row = self.rows[p["invoice"]]
+        if row.get("trans_id") and row["trans_id"] != p["trans_id"]:
+            return {**row, "needs_reversal": True, "reversal_trans_id": p["trans_id"]}
+        if row["status"] != "pending":
+            return {**row, "needs_reversal": row["status"] == "orphaned"}
+        if p["amount"] != row["amount"]:
+            row.update(status="orphaned", trans_id=p["trans_id"])
+            return {**row, "needs_reversal": True, "reversal_trans_id": p["trans_id"]}
+        code = f"GIFT-{len(self.cards):010X}"
+        self.cards.append(code)
+        row.update(status="approved", trans_id=p["trans_id"], card_last4=p["card_last4"], code=code)
+        return {**row, "needs_reversal": False}
+
+    def pelham_gift_order_refund_finish(self, args):
+        row = next((r for r in self.rows.values() if r.get("trans_id") == args["p_trans"]), None)
+        if not row:
+            return None
+        row.update(status="refunded", refund_trans_id=args["p_refund"], code=None)
+        return dict(row)
+
+
+GIFT = "/api/v1/payments/gift-card"
+GIFT_ORDER = {"amount": 10000, "buyer_name": "Pat Kim", "buyer_email": EMAIL, "buyer_phone": "9055551234"}
+
+
+@pytest.fixture()
+def gift_env(env, monkeypatch):
+    client, gw, sql = env
+    client.app.include_router(gift_orders.router, prefix="/api/v1")
+    gifts = FakeGiftSql(sql)
+    monkeypatch.setattr(supabase_rest, "rpc", gifts)
+    kicks: list[int] = []
+    monkeypatch.setattr(gift_orders.gift_card_delivery, "kick", lambda: kicks.append(1))
+    return client, gw, gifts, kicks
+
+
+def _gift_checkout(client, gifts) -> tuple[str, str]:
+    res = client.post(f"{GIFT}/checkout", json=GIFT_ORDER)
+    assert res.status_code == 200, res.text
+    invoice = res.json()["invoice"]
+    return invoice, gifts.rows[invoice]["gateway_session"]
+
+
+def test_gift_checkout_charges_the_order_amount(gift_env):
+    client, gw, gifts, _ = gift_env
+    invoice, _ = _gift_checkout(client, gifts)
+    form = gw.posts("/checkout/sessions")[-1]
+    assert form["line_items[0][price_data][unit_amount]"] == "10000"
+    assert form["client_reference_id"] == invoice and invoice.startswith("PHG")
+    assert form["success_url"].endswith(f"/gift-cards/paid?invoice={invoice}")
+
+
+def test_gift_checkout_passes_on_sql_refusal(gift_env):
+    client, gw, _, _ = gift_env
+    res = client.post(f"{GIFT}/checkout", json={**GIFT_ORDER, "amount": 100})
+    assert res.status_code == 422 and "$10" in res.json()["detail"]
+    assert not gw.posts("/checkout/sessions")
+
+
+def test_gift_card_appears_only_after_stripe_says_paid(gift_env):
+    client, gw, gifts, kicks = gift_env
+    invoice, session = _gift_checkout(client, gifts)
+    body = client.get(f"{GIFT}/status/{invoice}").json()
+    assert body["status"] == "pending" and not body.get("code") and not gifts.cards
+    gw.pay_session(session)
+    body = client.get(f"{GIFT}/status/{invoice}").json()
+    assert body["status"] == "approved" and body["code"] == gifts.cards[0]
+    assert "trans_id" not in body and "gateway_session" not in body
+    client.get(f"{GIFT}/status/{invoice}")
+    assert len(gifts.cards) == 1 and len(kicks) == 1
+
+
+def test_gift_webhook_issues_the_card(gift_env):
+    client, gw, gifts, kicks = gift_env
+    invoice, session = _gift_checkout(client, gifts)
+    gw.pay_session(session)
+    event = {"id": "evt_gift", "type": "checkout.session.completed",
+             "data": {"object": {"id": session, "client_reference_id": invoice}}}
+    res = _signed(client, event)
+    assert res.status_code == 200 and res.json()["status"] == "approved"
+    assert len(gifts.cards) == 1 and kicks
+
+
+def test_gift_wrong_amount_is_refunded_and_no_card(gift_env):
+    client, gw, gifts, kicks = gift_env
+    invoice, session = _gift_checkout(client, gifts)
+    gw.pay_session(session, amount=5000)
+    body = client.get(f"{GIFT}/status/{invoice}").json()
+    assert body["status"] == "refunded" and body["reversed"] == "refund"
+    assert not gifts.cards and not kicks and gw.posts("/refunds")
+
+
+def test_gift_stripe_refund_closes_the_order(gift_env):
+    client, gw, gifts, _ = gift_env
+    invoice, session = _gift_checkout(client, gifts)
+    pi = gw.pay_session(session)
+    client.get(f"{GIFT}/status/{invoice}")
+    res = _signed(client, {"id": "evt_gift_refund", "type": "charge.refunded",
+                           "data": {"object": {"id": "ch_1", "payment_intent": pi}}})
+    assert res.status_code == 200 and res.json()["status"] == "refunded"
+    assert not client.get(f"{GIFT}/status/{invoice}").json().get("code")

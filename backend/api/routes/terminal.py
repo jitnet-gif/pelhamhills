@@ -28,6 +28,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from backend.api.routes import gift_orders
 from backend.api.routes import membership_payments as membership
 from backend.api.routes import payments as online
 from backend.services import payment_texts
@@ -558,6 +559,13 @@ def _on_checkout(session: dict[str, Any]) -> dict[str, Any]:
             return {"ok": True, "ignored": "not paid yet"}
         result = membership.settle(paid, invoice)
         return {"ok": True, "status": result.get("status")}
+    # 기프트카드 온라인 판매(0144, `gift_orders.py`). 같은 세션 확인, 승인되면 SQL 이 카드를 만든다.
+    if invoice.startswith(gift_orders.INVOICE_PREFIX) and session.get("id"):
+        session_invoice, paid = sg.checkout_payment(str(session["id"]))
+        if not paid or session_invoice.upper() != invoice:
+            return {"ok": True, "ignored": "not paid yet"}
+        result = gift_orders.settle(paid, invoice)
+        return {"ok": True, "status": result.get("status")}
     if not invoice.startswith("PHW") or not session.get("id"):
         return {"ok": True, "ignored": "not an online booking payment"}
     session_invoice, paid = sg.checkout_payment(str(session["id"]))
@@ -592,6 +600,12 @@ def _on_refund(charge: dict[str, Any]) -> dict[str, Any]:
         for row in pending:
             refresh(row)
         return {"ok": True, "terminal_refunds": len(pending)}
+    # 기프트카드 주문을 Stripe 대시보드에서 환불했다 → 카드를 무효로 한다(0144). 맨 뒤에 묻는다 — 0144 전에도 위의 환불은 된다.
+    gift_order = supabase_rest.rpc("pelham_gift_order", {"p": {"trans_id": pi}})
+    if gift_order:
+        done = supabase_rest.rpc("pelham_gift_order_refund_finish",
+                                 {"p_trans": pi, "p_refund": sg.latest_refund(pi) or ""})
+        return {"ok": True, "status": (done or {}).get("status")}
     return {"ok": True, "ignored": "unknown payment"}
 
 

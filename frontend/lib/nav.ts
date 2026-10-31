@@ -43,12 +43,16 @@ export const SITE_MEMBERSHIPS = "/memberships";
 export const SITE_MEMBERSHIP_APPLY = "/memberships/application";
 export const SITE_MEMBERSHIP_EARLY_BIRD = "/memberships/early-bird";
 
+/** 기프트카드 온라인 판매(0144)와 결제 뒤 돌아오는 자리. */
+export const SITE_GIFT_CARDS = "/gift-cards";
+
 /** 그린피 안내. 옛 사이트 주소(`/golf/rates/`)를 그대로 쓴다 — 밖에 퍼진 링크가 살아 있게. */
 export const SITE_GOLF_RATES = "/golf/rates";
 
 export const siteNav: NavItem[] = [
   { label: "Golf", href: "/#golf", glyph: "⛳" },
   { label: "Memberships", href: SITE_MEMBERSHIPS, glyph: "★" },
+  { label: "Gift Cards", href: SITE_GIFT_CARDS, glyph: "🎁" },
   { label: "Pub", href: "/#pub", glyph: "🍽" },
   { label: "Indoor", href: "/#indoor", glyph: "🏌" },
   { label: "Visit", href: "/#visit", glyph: "📍" },

@@ -68,9 +68,11 @@ def expiry_text(card: dict[str, Any]) -> str:
 
 def gift_card_text(card: dict[str, Any]) -> str:
     who = f" for {card['recipient']}" if card.get("recipient") else ""
+    # `from_name` 은 온라인 선물에만 있다(`gift_card_delivery`).
+    sender = f"A gift from {card['from_name']}. " if card.get("from_name") else ""
     expiry = f"Expires {expiry_text(card)}" if card.get("expires_on") else "No expiry"
     return (
-        f"Pelham Hills gift card{who}: {_money(card.get('balance'))} to spend on green fees, "
+        f"{sender}Pelham Hills gift card{who}: {_money(card.get('balance'))} to spend on green fees, "
         f"the pro shop and the snack bar. Show this barcode at the counter. Card {card['code']}. "
         f"{expiry}, not redeemable for cash. Anyone with this barcode can spend it, so keep it to yourself. "
         f"Questions? Call {settings.PROSHOP_PHONE_NUMBER}."
@@ -84,6 +86,8 @@ def certificate_value(card: dict[str, Any]) -> int:
 
 def certificate_email_text(card: dict[str, Any]) -> str:
     who = f"To: {card['recipient']}\n" if card.get("recipient") else ""
+    if card.get("from_name"):
+        who += f"From: {card['from_name']}\n"
     return (
         f"Pelham Hills Golf Club — Gift Certificate\n\n"
         f"This certificate entitles {_money(certificate_value(card))} — green fees, pro shop & snack bar.\n"
@@ -130,7 +134,7 @@ def certificate_email_html(card: dict[str, Any]) -> str:
 <div style="font:13px Menlo,Consolas,monospace;letter-spacing:1px;padding-top:2px">{esc(card['code'])}</div>
 </td></tr></table>
 <p style="max-width:680px;margin:12px auto 0;font:13px/1.45 system-ui,Arial,sans-serif;color:#333">
-Show the barcode above at the counter — on your phone or printed. It works for green fees, the pro shop and the snack bar,
+{f"A gift from {esc(card['from_name'])}.<br>" if card.get("from_name") else ""}Show the barcode above at the counter — on your phone or printed. It works for green fees, the pro shop and the snack bar,
 and any amount left stays on the card. Anyone with this barcode can spend it, so keep it to yourself.
 Questions? Call {esc(settings.PROSHOP_PHONE_NUMBER)}.</p>
 </body></html>"""

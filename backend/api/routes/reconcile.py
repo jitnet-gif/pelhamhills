@@ -27,6 +27,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from backend.api.routes import terminal
 from backend.services import stripe_gateway as sg
 from backend.services import stripe_reconcile
+from backend.services import supabase_rest
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,16 @@ def _window(start: date, end: date) -> tuple[datetime, datetime]:
     lo = datetime.combine(start, time.min, CLUB_TZ).astimezone(timezone.utc)
     hi = datetime.combine(end + timedelta(days=1), time.min, CLUB_TZ).astimezone(timezone.utc)
     return lo, hi
+
+
+def _gift_orders(lo: datetime, hi: datetime, ids: set[str]) -> list[dict[str, Any]]:
+    """온라인 기프트카드 주문(0144)을 온라인 줄로. 못 읽어도 대사는 돌린다 — 그 줄이 Stripe 전용으로 보일 뿐이다."""
+    try:
+        return supabase_rest.rpc("pelham_gift_order_records", {
+            "p_from": lo.isoformat(), "p_to": hi.isoformat(), "p_ids": sorted(ids)}) or []
+    except (supabase_rest.RpcRefused, supabase_rest.SupabaseUnavailable) as exc:
+        logger.warning("기프트카드 주문을 대사에 넣지 못함: %s", exc)
+        return []
 
 
 def _decisions(request: Request, by_pi: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -102,6 +113,7 @@ def reconcile(
 
     records = terminal._as_staff(request, "pelham_staff_stripe_records", {
         "p_from": lo.isoformat(), "p_to": hi.isoformat(), "p_ids": sorted(ids)}) or {}
+    records["online"] = [*(records.get("online") or []), *_gift_orders(lo, hi, ids)]
 
     # 기간 밖에서 만든 PaymentIntent: 오늘 환불한 지난 결제, 자정 근처에 걸친 판매.
     wanted: list[str] = []

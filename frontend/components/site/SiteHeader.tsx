@@ -109,7 +109,7 @@ export default function SiteHeader() {
             {CLUB.shortName}
           </Link>
 
-          <div className="hidden items-center gap-7 text-sm font-semibold tracking-[0.14em] text-[#465444] uppercase md:flex">
+          <div className="hidden items-center gap-4 text-sm font-semibold tracking-[0.08em] text-[#465444] uppercase md:flex lg:gap-7 lg:tracking-[0.14em]">
             {/* 데스크톱 메뉴도 모바일 패널과 **같은** 핸들러를 쓴다. 같은 문서
                 안의 프래그먼트로 가는 App Router 의 `<Link>` 이동은 두 번째
                 클릭부터 맨 위로 튀는 등 동작이 일정하지 않다. 앵커 점프는 한
