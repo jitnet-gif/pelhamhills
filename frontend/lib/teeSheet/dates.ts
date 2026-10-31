@@ -27,8 +27,11 @@ export function todayIso(): string {
   return toIso(new Date());
 }
 
+// 24시간을 더하지 않고 달력으로 센다 — 서머타임이 끝나는 날은 25시간이라 같은 날짜가 두 번 나온다.
 export function addDays(iso: string, days: number): string {
-  return toIso(new Date(toDate(iso).getTime() + days * DAY_MS));
+  const date = toDate(iso);
+  date.setDate(date.getDate() + days);
+  return toIso(date);
 }
 
 /** Monday of the week containing `iso`. */
